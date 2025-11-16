@@ -1,7 +1,12 @@
 {
   "Version": 1,
   "WorkspaceRootPath": "C:\\Users\\A11\\Documents\\GitHub\\Beyti-platform\\Beyti-MVC\\",
-  "Documents": [],
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{7FBE4A08-FBD6-4769-88C2-E53ACFAE093C}|Beyti-MVC.csproj|c:\\users\\a11\\documents\\github\\beyti-platform\\beyti-mvc\\controllers\\test1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7FBE4A08-FBD6-4769-88C2-E53ACFAE093C}|Beyti-MVC.csproj|solutionrelative:controllers\\test1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
   "DocumentGroupContainers": [
     {
       "Orientation": 0,
@@ -9,11 +14,24 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": -1,
+          "SelectedChildIndex": 1,
           "Children": [
             {
               "$type": "Bookmark",
               "Name": "ST:0:0:{1c4feeaa-4718-4aa9-859d-94ce25d182ba}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Test1.cs",
+              "DocumentMoniker": "C:\\Users\\A11\\Documents\\GitHub\\Beyti-platform\\Beyti-MVC\\Controllers\\Test1.cs",
+              "RelativeDocumentMoniker": "Controllers\\Test1.cs",
+              "ToolTip": "C:\\Users\\A11\\Documents\\GitHub\\Beyti-platform\\Beyti-MVC\\Controllers\\Test1.cs",
+              "RelativeToolTip": "Controllers\\Test1.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-16T19:58:49.391Z",
+              "EditorCaption": ""
             }
           ]
         }
