@@ -7,6 +7,7 @@ namespace Beyti_MVC.Controllers
         public IActionResult Index()
 
         //this is a one line commit for testing purposes only.
+        //Last test.
         {
             return View();
         }
