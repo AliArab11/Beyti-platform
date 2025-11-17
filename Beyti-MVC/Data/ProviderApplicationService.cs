@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 
-namespace Beyti_MVC.Data;
+namespace Beyti.Data;
 
 [Table("ProviderApplicationService")]
 [Index("ProviderApplicationId", Name = "IX_PAS_App")]

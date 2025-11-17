@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 
-namespace Beyti_MVC.Data;
+namespace Beyti.Data;
 
 [Table("Message")]
 [Index("RecipientUserId", "IsRead", Name = "IX_Message_Recipient_Read")]

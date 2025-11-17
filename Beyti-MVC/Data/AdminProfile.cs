@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 
-namespace Beyti_MVC.Data;
+namespace Beyti.Data;
 
 [Table("AdminProfile")]
 [Index("UserProfileId", Name = "UQ__AdminPro__9E267F63F21F410D", IsUnique = true)]

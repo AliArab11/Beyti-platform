@@ -1,9 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36310.24 d17.14
+VisualStudioVersion = 17.14.36310.24
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Beyti-MVC", "Beyti-MVC.csproj", "{7FBE4A08-FBD6-4769-88C2-E53ACFAE093C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Beyti", "Beyti.csproj", "{7FBE4A08-FBD6-4769-88C2-E53ACFAE093C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

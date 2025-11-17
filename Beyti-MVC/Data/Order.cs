@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 
-namespace Beyti_MVC.Data;
+namespace Beyti.Data;
 
 [Index("CustomerId", Name = "IX_Orders_Customer")]
 [Index("DeliveryAddressId", Name = "IX_Orders_DeliveryAddress")]

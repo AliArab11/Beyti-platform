@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 
-namespace Beyti_MVC.Data;
+namespace Beyti.Data;
 
 [Index("ActorUserId", Name = "IX_AuditLogs_Actor")]
 [Index("EventType", Name = "IX_AuditLogs_EventType")]
