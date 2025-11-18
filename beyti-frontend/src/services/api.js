@@ -4,7 +4,7 @@
  */
 
 // Base URL for all API requests
-const BASE_URL = 'http://localhost:5023/api';
+const BASE_URL = 'https://localhost:7062/api';
 
 /**
  * Generic fetch helper function with error handling
@@ -121,7 +121,7 @@ export const getMembershipPlan = async (id) => {
  * @returns {Promise<object>} - Created membership plan object
  */
 export const createMembershipPlan = async (data) => {
-  return await fetchAPI('/MembershipPlans/add', {
+  return await fetchAPI('/MembershipPlans', {
     method: 'POST',
     body: JSON.stringify(data),
   });
