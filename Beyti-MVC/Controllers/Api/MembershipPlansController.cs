@@ -80,17 +80,12 @@ namespace Beyti_MVC.Controllers.Api
             }
         }
 
-        // PUT: api/MembershipPlans/5
-        [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateMembershipPlan(int id, [FromBody] MembershipPlan membershipPlan)
+        // PUT: api/MembershipPlans/update/5
+        [HttpPut("update/{id}")]
+        public async Task<ActionResult<MembershipPlan>> UpdateMembershipPlan(int id, [FromBody] MembershipPlan membershipPlan)
         {
             try
             {
-                if (id != membershipPlan.Id)
-                {
-                    return BadRequest(new { message = "ID mismatch between route and body." });
-                }
-
                 if (!ModelState.IsValid)
                 {
                     return BadRequest(ModelState);
@@ -110,22 +105,9 @@ namespace Beyti_MVC.Controllers.Api
                 existingPlan.IsActive = membershipPlan.IsActive;
                 // Keep the original CreatedAt value
 
-                _context.Entry(existingPlan).State = EntityState.Modified;
-
                 await _context.SaveChangesAsync();
 
                 return Ok(existingPlan);
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!await MembershipPlanExists(id))
-                {
-                    return NotFound(new { message = $"Membership plan with ID {id} not found." });
-                }
-                else
-                {
-                    throw;
-                }
             }
             catch (DbUpdateException ex)
             {
@@ -137,9 +119,9 @@ namespace Beyti_MVC.Controllers.Api
             }
         }
 
-        // DELETE: api/MembershipPlans/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteMembershipPlan(int id)
+        // DELETE: api/MembershipPlans/delete/5
+        [HttpDelete("delete/{id}")]
+        public async Task<ActionResult<MembershipPlan>> DeleteMembershipPlan(int id)
         {
             try
             {
@@ -189,13 +171,6 @@ namespace Beyti_MVC.Controllers.Api
             {
                 return StatusCode(500, new { message = "An unexpected error occurred.", error = ex.Message });
             }
-        }
-
-
-        // Helper method to check if a membership plan exists
-        private async Task<bool> MembershipPlanExists(int id)
-        {
-            return await _context.MembershipPlans.AnyAsync(e => e.Id == id);
         }
     }
 }
