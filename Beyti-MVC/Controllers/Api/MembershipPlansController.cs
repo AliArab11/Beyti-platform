@@ -62,8 +62,8 @@ namespace Beyti_MVC.Controllers.Api
                     return BadRequest(ModelState);
                 }
 
-                // Set CreatedAt to current UTC time
-                membershipPlan.CreatedAt = DateTime.UtcNow;
+                // Set CreatedAt to current time
+                membershipPlan.CreatedAt = DateTime.Now;
 
                 _context.MembershipPlans.Add(membershipPlan);
                 await _context.SaveChangesAsync();
@@ -163,6 +163,34 @@ namespace Beyti_MVC.Controllers.Api
                 return StatusCode(500, new { message = "An unexpected error occurred.", error = ex.Message });
             }
         }
+
+        //add new membership plan api/membershipplans/add
+        [HttpPost("add")]
+        public async Task<ActionResult<MembershipPlan>> AddMembershipPlan([FromBody] MembershipPlan membershipPlan)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
+                // Set CreatedAt to current UTC time
+                membershipPlan.CreatedAt = DateTime.Now;
+                membershipPlan.IsActive = true; // Set default value for IsActive
+                _context.MembershipPlans.Add(membershipPlan);
+                await _context.SaveChangesAsync();
+                return CreatedAtAction(nameof(GetMembershipPlan), new { id = membershipPlan.Id }, membershipPlan);
+            }
+            catch (DbUpdateException ex)
+            {
+                return StatusCode(500, new { message = "An error occurred while adding the membership plan.", error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "An unexpected error occurred.", error = ex.Message });
+            }
+        }
+
 
         // Helper method to check if a membership plan exists
         private async Task<bool> MembershipPlanExists(int id)

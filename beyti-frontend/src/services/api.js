@@ -103,10 +103,10 @@ export const getMembershipPlan = async (id) => {
  * import { createMembershipPlan } from './services/api';
  *
  * const newPlan = {
- *   planName: 'Gold Plan',
- *   price: 99.99,
- *   duration: 30,
- *   features: 'Access to premium content'
+ *   Name: 'Gold Plan',
+ *   Description: 'Access to premium content',
+ *   MonthlyPrice: 99.99,
+ *   DurationDays: 30
  * };
  *
  * try {
@@ -117,11 +117,11 @@ export const getMembershipPlan = async (id) => {
  * }
  * ```
  *
- * @param {object} data - Membership plan data to create
+ * @param {object} data - Membership plan data (use PascalCase: Name, Description, MonthlyPrice, DurationDays)
  * @returns {Promise<object>} - Created membership plan object
  */
 export const createMembershipPlan = async (data) => {
-  return await fetchAPI('/MembershipPlans', {
+  return await fetchAPI('/MembershipPlans/add', {
     method: 'POST',
     body: JSON.stringify(data),
   });
@@ -135,10 +135,10 @@ export const createMembershipPlan = async (data) => {
  * import { updateMembershipPlan } from './services/api';
  *
  * const updatedData = {
- *   planName: 'Gold Plus Plan',
- *   price: 129.99,
- *   duration: 30,
- *   features: 'Access to premium and exclusive content'
+ *   Name: 'Gold Plus Plan',
+ *   Description: 'Access to premium and exclusive content',
+ *   MonthlyPrice: 129.99,
+ *   DurationDays: 30
  * };
  *
  * try {
@@ -150,11 +150,11 @@ export const createMembershipPlan = async (data) => {
  * ```
  *
  * @param {number} id - The membership plan ID to update
- * @param {object} data - Updated membership plan data
+ * @param {object} data - Updated membership plan data (use PascalCase: Name, Description, MonthlyPrice, DurationDays)
  * @returns {Promise<object>} - Updated membership plan object
  */
 export const updateMembershipPlan = async (id, data) => {
-  return await fetchAPI(`/MembershipPlans/${id}`, {
+  return await fetchAPI(`/MembershipPlans/update/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   });
@@ -179,7 +179,7 @@ export const updateMembershipPlan = async (id, data) => {
  * @returns {Promise<null>} - Returns null on successful deletion
  */
 export const deleteMembershipPlan = async (id) => {
-  return await fetchAPI(`/MembershipPlans/${id}`, {
+  return await fetchAPI(`/MembershipPlans/delete/${id}`, {
     method: 'DELETE',
   });
 };

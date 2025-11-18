@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import RegistrationPage from "./Pages/Registration";
 import MembershipPage from "./Pages/Membership";
+import AddPlanPage from "./Pages/Membership/AddPlan";
 
 // Placeholder components for pages that don't exist yet
 const PlaceholderPage = ({ pageName }) => (
@@ -18,6 +19,7 @@ export default function App() {
   const navItems = [
     { id: 'registration', label: 'Registration' },
     { id: 'membership', label: 'Membership' },
+    { id: 'addplan', label: 'Add Plan' },
     { id: 'seller', label: 'Seller' },
     { id: 'customer', label: 'Customer' },
     { id: 'driver', label: 'Driver' },
@@ -32,6 +34,8 @@ export default function App() {
         return <RegistrationPage />;
       case 'membership':
         return <MembershipPage />;
+      case 'addplan':
+        return <AddPlanPage />;
       case 'seller':
         return <PlaceholderPage pageName="Seller" />;
       case 'customer':
