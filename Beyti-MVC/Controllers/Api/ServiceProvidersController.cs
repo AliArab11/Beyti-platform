@@ -17,7 +17,7 @@ namespace Beyti_MVC.Controllers.Api
 
         // GET: api/ServiceProviders
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<ServiceProvider>>> GetServiceProviders()
+        public async Task<ActionResult<IEnumerable<Beyti.Data.ServiceProvider>>> GetServiceProviders()
         {
             try
             {
@@ -34,7 +34,7 @@ namespace Beyti_MVC.Controllers.Api
 
         // GET: api/ServiceProviders/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<ServiceProvider>> GetServiceProvider(int id)
+        public async Task<ActionResult<Beyti.Data.ServiceProvider>> GetServiceProvider(int id)
         {
             try
             {
@@ -57,7 +57,7 @@ namespace Beyti_MVC.Controllers.Api
 
         // POST: api/ServiceProviders/add
         [HttpPost("add")]
-        public async Task<ActionResult<ServiceProvider>> AddServiceProvider([FromBody] ServiceProvider serviceProvider)
+        public async Task<ActionResult<Beyti.Data.ServiceProvider>> AddServiceProvider([FromBody] Beyti.Data.ServiceProvider serviceProvider)
         {
             try
             {
@@ -92,7 +92,7 @@ namespace Beyti_MVC.Controllers.Api
 
         // PUT: api/ServiceProviders/5
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateServiceProvider(int id, [FromBody] ServiceProvider serviceProvider)
+        public async Task<IActionResult> UpdateServiceProvider(int id, [FromBody] Beyti.Data.ServiceProvider serviceProvider)
         {
             try
             {
