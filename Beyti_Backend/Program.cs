@@ -1,6 +1,10 @@
+using Microsoft.EntityFrameworkCore;
+using BeytiDB.Data;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+builder.Services.AddDbContext<BeytiContext>();
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -14,8 +18,8 @@ builder.Services.AddCors(options =>
     {
         policy.WithOrigins("http://localhost:5173")
               .AllowAnyHeader()
-              .AllowAnyOrigin()
-              .AllowAnyMethod();
+              .AllowAnyMethod()
+              .AllowCredentials();
     });
 });
 var app = builder.Build();
@@ -26,6 +30,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+// IMPORTANT: CORS must be called before UseHttpsRedirection and UseAuthorization
+app.UseCors("FrontendPolicy");
 
 app.UseHttpsRedirection();
 
