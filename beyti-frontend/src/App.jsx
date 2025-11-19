@@ -5,6 +5,7 @@ import AddPlanPage from "./Pages/Membership/AddPlan";
 import AdminPage from './Pages/Admin/AdminPage';
 
 import SellerPage from "./Pages/Seller";
+import ProductsPage from "./Pages/Product/Products";
 
 // Placeholder components for pages that don't exist yet
 const PlaceholderPage = ({ pageName }) => (
@@ -24,6 +25,7 @@ export default function App() {
     { id: 'membership', label: 'Membership' },
     { id: 'addplan', label: 'Add Plan' },
     { id: 'seller', label: 'Seller' },
+    { id: 'product', label: 'Product' },
     { id: 'customer', label: 'Customer' },
     { id: 'driver', label: 'Driver' },
     { id: 'admin', label: 'Admin' },
@@ -41,6 +43,8 @@ export default function App() {
         return <AddPlanPage />;
       case 'seller':
         return <SellerPage />;
+      case 'product':
+        return <ProductsPage />;
       case 'customer':
         return <PlaceholderPage pageName="Customer" />;
       case 'driver':
