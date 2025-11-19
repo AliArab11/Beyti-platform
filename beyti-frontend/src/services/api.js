@@ -183,3 +183,56 @@ export const deleteMembershipPlan = async (id) => {
     method: 'DELETE',
   });
 };
+
+/**
+
+ * @returns {Promise<Array>} - Array of all sellers
+ */
+export const getSellers = async () => {
+  return await fetchAPI('/Sellers');
+};
+
+/**
+
+ * @param {number} id - Seller ID
+ * @returns {Promise<object>} - Seller object
+ */
+export const getSeller = async (id) => {
+  return await fetchAPI(`/Sellers/${id}`);
+};
+
+/**
+
+ * @param {object} data - Seller data (PascalCase: UserProfileId, StoreName, Phone)
+ * @returns {Promise<object>} - Created seller object
+ */
+export const createSeller = async (data) => {
+  return await fetchAPI('/Sellers', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+
+ * @param {number} id - Seller ID to update
+ * @param {object} data - Updated seller data
+ * @returns {Promise<null>} - Returns null on success
+ */
+export const updateSeller = async (id, data) => {
+  return await fetchAPI(`/Sellers/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+
+ * @param {number} id - Seller ID
+ * @returns {Promise<null>} - Returns null on successful deletion
+ */
+export const deleteSeller = async (id) => {
+  return await fetchAPI(`/Sellers/${id}`, {
+    method: 'DELETE',
+  });
+};

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import RegistrationPage from "./Pages/Registration";
 import MembershipPage from "./Pages/Membership";
 import AddPlanPage from "./Pages/Membership/AddPlan";
+import SellerPage from "./Pages/Seller";
 
 // Placeholder components for pages that don't exist yet
 const PlaceholderPage = ({ pageName }) => (
@@ -37,7 +38,7 @@ export default function App() {
       case 'addplan':
         return <AddPlanPage />;
       case 'seller':
-        return <PlaceholderPage pageName="Seller" />;
+        return <SellerPage />;
       case 'customer':
         return <PlaceholderPage pageName="Customer" />;
       case 'driver':
