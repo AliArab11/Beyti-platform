@@ -183,3 +183,33 @@ export const deleteMembershipPlan = async (id) => {
     method: 'DELETE',
   });
 };
+
+// --- Admin APIs ---
+
+export const getAdmins = async () => {
+  return await fetchAPI('/AdminProfiles');
+};
+
+export const getAdmin = async (id) => {
+  return await fetchAPI(`/AdminProfiles/${id}`);
+};
+
+export const createAdmin = async (data) => {
+  return await fetchAPI('/AdminProfiles', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export const updateAdmin = async (id, data) => {
+  return await fetchAPI(`/AdminProfiles/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+export const deleteAdmin = async (id) => {
+  return await fetchAPI(`/AdminProfiles/${id}`, {
+    method: 'DELETE',
+  });
+};

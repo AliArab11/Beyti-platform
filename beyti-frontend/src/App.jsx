@@ -2,6 +2,8 @@ import { useState } from 'react';
 import RegistrationPage from "./Pages/Registration";
 import MembershipPage from "./Pages/Membership";
 import AddPlanPage from "./Pages/Membership/AddPlan";
+import AdminPage from './Pages/Admin/AdminPage';
+
 
 // Placeholder components for pages that don't exist yet
 const PlaceholderPage = ({ pageName }) => (
@@ -43,7 +45,7 @@ export default function App() {
       case 'driver':
         return <PlaceholderPage pageName="Driver" />;
       case 'admin':
-        return <PlaceholderPage pageName="Admin" />;
+        return <AdminPage/>;
       case 'serviceprovider':
         return <PlaceholderPage pageName="Service Provider" />;
       case 'notification':
