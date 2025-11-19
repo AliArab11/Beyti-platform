@@ -293,3 +293,59 @@ export const deleteSeller = async (id) => {
     method: 'DELETE',
   });
 };
+
+// --- Product APIs ---
+
+/**
+ * Get all products
+ * @returns {Promise<Array>} - Array of all products
+ */
+export const getProducts = async () => {
+  return await fetchAPI('/Products');
+};
+
+/**
+ * Get a single product by ID
+ * @param {number} id - Product ID
+ * @returns {Promise<object>} - Product object
+ */
+export const getProduct = async (id) => {
+  return await fetchAPI(`/Products/${id}`);
+};
+
+/**
+ * Create a new product
+ * @param {object} data - Product data
+ *   Example: { SellerId, SubCategoryId, Name, Description, BasePrice, IsActive, GenderId }
+ * @returns {Promise<object>} - Created product object
+ */
+export const createProduct = async (data) => {
+  return await fetchAPI('/Products', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Update an existing product
+ * @param {number} id - Product ID to update
+ * @param {object} data - Updated product data
+ * @returns {Promise<object>} - Updated product object
+ */
+export const updateProduct = async (id, data) => {
+  return await fetchAPI(`/Products/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Delete a product
+ * @param {number} id - Product ID to delete
+ * @returns {Promise<null>} - Returns null on successful deletion
+ */
+export const deleteProduct = async (id) => {
+  return await fetchAPI(`/Products/${id}`, {
+    method: 'DELETE',
+  });
+};

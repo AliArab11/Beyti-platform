@@ -77,6 +77,9 @@ namespace Beyti_Backend.Controllers.Api
         [HttpPost]
         public async Task<ActionResult<Seller>> PostSeller(Seller seller)
         {
+            seller.CreatedAt = DateTime.UtcNow;
+            seller.UpdatedAt = DateTime.UtcNow;
+
             _context.Sellers.Add(seller);
             await _context.SaveChangesAsync();
 
