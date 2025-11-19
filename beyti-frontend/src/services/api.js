@@ -186,14 +186,28 @@ export const deleteMembershipPlan = async (id) => {
 
 // --- Admin APIs ---
 
+/**
+ * Get all admin profiles
+ * @returns {Promise<Array>} - Array of all admin profiles
+ */
 export const getAdmins = async () => {
   return await fetchAPI('/AdminProfiles');
 };
 
+/**
+ * Get a single admin profile by ID
+ * @param {number} id - Admin profile ID
+ * @returns {Promise<object>} - Admin profile object
+ */
 export const getAdmin = async (id) => {
   return await fetchAPI(`/AdminProfiles/${id}`);
 };
 
+/**
+ * Create a new admin profile
+ * @param {object} data - Admin profile data
+ * @returns {Promise<object>} - Created admin profile object
+ */
 export const createAdmin = async (data) => {
   return await fetchAPI('/AdminProfiles', {
     method: 'POST',
@@ -201,6 +215,12 @@ export const createAdmin = async (data) => {
   });
 };
 
+/**
+ * Update an existing admin profile
+ * @param {number} id - Admin profile ID to update
+ * @param {object} data - Updated admin profile data
+ * @returns {Promise<object>} - Updated admin profile object
+ */
 export const updateAdmin = async (id, data) => {
   return await fetchAPI(`/AdminProfiles/${id}`, {
     method: 'PUT',
@@ -208,8 +228,68 @@ export const updateAdmin = async (id, data) => {
   });
 };
 
+/**
+ * Delete an admin profile
+ * @param {number} id - Admin profile ID to delete
+ * @returns {Promise<null>} - Returns null on successful deletion
+ */
 export const deleteAdmin = async (id) => {
   return await fetchAPI(`/AdminProfiles/${id}`, {
+    method: 'DELETE',
+  });
+};
+
+// --- Seller APIs ---
+
+/**
+ * Get all sellers
+ * @returns {Promise<Array>} - Array of all sellers
+ */
+export const getSellers = async () => {
+  return await fetchAPI('/Sellers');
+};
+
+/**
+ * Get a single seller by ID
+ * @param {number} id - Seller ID
+ * @returns {Promise<object>} - Seller object
+ */
+export const getSeller = async (id) => {
+  return await fetchAPI(`/Sellers/${id}`);
+};
+
+/**
+ * Create a new seller
+ * @param {object} data - Seller data (PascalCase: UserProfileId, StoreName, Phone)
+ * @returns {Promise<object>} - Created seller object
+ */
+export const createSeller = async (data) => {
+  return await fetchAPI('/Sellers', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Update an existing seller
+ * @param {number} id - Seller ID to update
+ * @param {object} data - Updated seller data
+ * @returns {Promise<object>} - Updated seller object
+ */
+export const updateSeller = async (id, data) => {
+  return await fetchAPI(`/Sellers/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Delete a seller
+ * @param {number} id - Seller ID to delete
+ * @returns {Promise<null>} - Returns null on successful deletion
+ */
+export const deleteSeller = async (id) => {
+  return await fetchAPI(`/Sellers/${id}`, {
     method: 'DELETE',
   });
 };
