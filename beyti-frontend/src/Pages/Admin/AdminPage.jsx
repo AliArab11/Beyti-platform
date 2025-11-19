@@ -5,49 +5,50 @@ export default function AdminPage() {
   const [admins, setAdmins] = useState([]);
   const [formData, setFormData] = useState({
     title: '',
-    permissions: []
+    permissions: ''
   });
   const [editingId, setEditingId] = useState(null);
 
   // Fetch admins from API
   const fetchAdmins = async () => {
-    const data = await getAdmins();
-    setAdmins(data);
+    try {
+      const data = await getAdmins();
+      setAdmins(data);
+    } catch (error) {
+      console.error('Failed to fetch admins:', error);
+    }
   };
 
   useEffect(() => {
     fetchAdmins();
   }, []);
 
-  // Handle permission checkbox changes
-  const handlePermissionChange = (permission) => {
-    setFormData((prev) => ({
-      ...prev,
-      permissions: prev.permissions.includes(permission)
-        ? prev.permissions.filter((p) => p !== permission)
-        : [...prev.permissions, permission]
-    }));
-  };
-
   // Handle form submit
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     const payload = {
-  title: formData.title,
-  permissions: formData.permissions.join(','), // convert array to string
-  userProfileId: 1
-};
+      title: formData.title,
+      permissions: formData.permissions, // send as string
+      userProfileId: 2 // make sure this ID exists in your backend
+    };
 
+    console.log('Submitting payload:', payload);
 
-    if (editingId) {
-      await updateAdmin(editingId, payload);
-      setEditingId(null);
-    } else {
-      await createAdmin(payload);
+    try {
+      if (editingId) {
+        await updateAdmin(editingId, payload);
+        setEditingId(null);
+      } else {
+        await createAdmin(payload);
+      }
+
+      setFormData({ title: '', permissions: '' });
+      fetchAdmins();
+    } catch (error) {
+      console.error('Failed to submit admin:', error);
+      alert('Failed to submit admin. Check console for details.');
     }
-
-    setFormData({ title: '', permissions: [] });
-    fetchAdmins();
   };
 
   // Edit admin
@@ -55,15 +56,20 @@ export default function AdminPage() {
     setEditingId(admin.id);
     setFormData({
       title: admin.title,
-      permissions: admin.permissions || []
+      permissions: admin.permissions || ''
     });
   };
 
   // Delete admin
   const handleDelete = async (id) => {
     if (confirm('Are you sure you want to delete this admin?')) {
-      await deleteAdmin(id);
-      fetchAdmins();
+      try {
+        await deleteAdmin(id);
+        fetchAdmins();
+      } catch (error) {
+        console.error('Failed to delete admin:', error);
+        alert('Failed to delete admin. Check console for details.');
+      }
     }
   };
 
@@ -83,19 +89,15 @@ export default function AdminPage() {
           required
         />
 
-        {/* Permissions checkboxes */}
-        <div className="flex gap-4">
-          {['READ', 'WRITE', 'DELETE'].map((perm) => (
-            <label key={perm} className="flex items-center gap-1">
-              <input
-                type="checkbox"
-                checked={formData.permissions.includes(perm)}
-                onChange={() => handlePermissionChange(perm)}
-              />
-              {perm}
-            </label>
-          ))}
-        </div>
+        <input
+          type="text"
+          name="permissions"
+          placeholder="Permissions (comma separated)"
+          value={formData.permissions}
+          onChange={(e) => setFormData({ ...formData, permissions: e.target.value })}
+          className="border px-2 py-1 rounded w-full"
+          required
+        />
 
         <button
           type="submit"
@@ -123,7 +125,7 @@ export default function AdminPage() {
               <td className="border px-2 py-1">{admin.id}</td>
               <td className="border px-2 py-1">{admin.userProfileId}</td>
               <td className="border px-2 py-1">{admin.title}</td>
-              <td className="border px-2 py-1">{admin.permissions?.join(', ')}</td>
+              <td className="border px-2 py-1">{admin.permissions}</td>
               <td className="border px-2 py-1">{admin.createdAt}</td>
               <td className="border px-2 py-1 space-x-2">
                 <button
