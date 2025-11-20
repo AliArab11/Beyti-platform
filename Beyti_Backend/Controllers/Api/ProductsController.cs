@@ -20,6 +20,36 @@ namespace Beyti_Backend.Controllers.Api
             _context = context;
         }
 
+        // Add this at the top with your other using statements
+        public class CreateProductDto
+        {
+            public string Name { get; set; }
+            public string? Description { get; set; }
+            public decimal BasePrice { get; set; }
+            public int SellerId { get; set; }
+            public int SubCategoryId { get; set; }
+            public int? GenderId { get; set; }
+        }
+
+        [HttpGet("sellers-dropdown")]
+        public async Task<ActionResult<IEnumerable<object>>> GetSellerDropdown()
+        {
+            return await _context.Sellers
+                .Select(s => new { s.Id, s.StoreName })
+                .ToListAsync();
+        }
+
+        [HttpGet("subcategories-dropdown")]
+        public async Task<ActionResult<IEnumerable<object>>> GetSubCategoryDropdown()
+        {
+            return await _context.SubCategories
+                .Select(s => new { s.Id, s.Name })
+                .ToListAsync();
+        }
+
+
+
+
         // GET: api/Products
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
@@ -75,13 +105,35 @@ namespace Beyti_Backend.Controllers.Api
         // POST: api/Products
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Product>> PostProduct(Product product)
+        public async Task<ActionResult<Product>> PostProduct([FromBody] CreateProductDto dto)
         {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            if (!_context.Sellers.Any(s => s.Id == dto.SellerId))
+                return BadRequest("Invalid SellerId");
+
+            if (!_context.SubCategories.Any(sc => sc.Id == dto.SubCategoryId))
+                return BadRequest("Invalid SubCategoryId");
+
+            var product = new Product
+            {
+                Name = dto.Name,
+                Description = dto.Description,
+                BasePrice = dto.BasePrice,
+                SellerId = dto.SellerId,
+                SubCategoryId = dto.SubCategoryId,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+                IsActive = true
+            };
+
             _context.Products.Add(product);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetProduct", new { id = product.Id }, product);
+            return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, product);
         }
+
 
         // DELETE: api/Products/5
         [HttpDelete("{id}")]
