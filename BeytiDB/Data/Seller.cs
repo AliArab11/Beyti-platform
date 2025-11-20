@@ -17,10 +17,11 @@ public partial class Seller
     public int UserProfileId { get; set; }
 
     [StringLength(120)]
-    public string StoreName { get; set; } = null!;
+    [Required]
+    public string StoreName { get; set; } = string.Empty;  // Required, not nullable
 
     [StringLength(30)]
-    public string? Phone { get; set; }
+    public string? Phone { get; set; }  // Optional
 
     [Precision(3)]
     public DateTime CreatedAt { get; set; }

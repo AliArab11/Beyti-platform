@@ -9,6 +9,12 @@ using BeytiDB.Data;
 
 namespace Beyti_Backend.Controllers.Api
 {
+    public class CreateSellerDto
+    {
+        public string StoreName { get; set; }
+        public string Phone { get; set; }
+    }
+
     [Route("api/[controller]")]
     [ApiController]
     public class SellersController : ControllerBase
@@ -44,47 +50,66 @@ namespace Beyti_Backend.Controllers.Api
         // PUT: api/Sellers/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutSeller(int id, Seller seller)
+        public async Task<IActionResult> PutSeller(int id, CreateSellerDto dto)
         {
-            if (id != seller.Id)
-            {
-                return BadRequest();
-            }
+            var seller = await _context.Sellers.FindAsync(id);
+            if (seller == null) return NotFound();
 
-            _context.Entry(seller).State = EntityState.Modified;
+            seller.StoreName = dto.StoreName;
+            seller.Phone = dto.Phone;
+            seller.UpdatedAt = DateTime.UtcNow;
 
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!SellerExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return NoContent();
+            await _context.SaveChangesAsync();
+            return Ok(new { id = seller.Id, storeName = seller.StoreName, phone = seller.Phone });
         }
+
 
         // POST: api/Sellers
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Seller>> PostSeller(Seller seller)
+        public async Task<IActionResult> PostSeller(CreateSellerDto dto)
         {
-            seller.CreatedAt = DateTime.UtcNow;
-            seller.UpdatedAt = DateTime.UtcNow;
+            try
+            {
+                var userProfile = new UserProfile
+                {
+                    DisplayName = dto.StoreName,
+                    RoleType = "Seller",
+                    Status = "Active",
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
 
-            _context.Sellers.Add(seller);
-            await _context.SaveChangesAsync();
+                _context.UserProfiles.Add(userProfile);
+                await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetSeller", new { id = seller.Id }, seller);
+                var seller = new Seller
+                {
+                    UserProfileId = userProfile.Id,
+                    StoreName = dto.StoreName,
+                    Phone = dto.Phone,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                _context.Sellers.Add(seller);
+                await _context.SaveChangesAsync();
+
+                // Return valid JSON so frontend can parse it
+                return Ok(new
+                {
+                    id = seller.Id,
+                    storeName = seller.StoreName,
+                    phone = seller.Phone
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = ex.Message, innerError = ex.InnerException?.Message });
+            }
         }
+
+
 
         // DELETE: api/Sellers/5
         [HttpDelete("{id}")]
