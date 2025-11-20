@@ -298,7 +298,7 @@ export const deleteSeller = async (id) => {
 
 /**
  * Get all products
- * @returns {Promise<Array>} - Array of all products
+ * @returns {Promise<Array>} - Array of product objects
  */
 export const getProducts = async () => {
   return await fetchAPI('/Products');
@@ -315,8 +315,16 @@ export const getProduct = async (id) => {
 
 /**
  * Create a new product
- * @param {object} data - Product data
- *   Example: { SellerId, SubCategoryId, Name, Description, BasePrice, IsActive, GenderId }
+ * @param {object} data - Product payload
+ *   Example: {
+ *     sellerId,
+ *     subCategoryId,
+ *     name,
+ *     description,
+ *     basePrice,
+ *     genderId,
+ *     isActive
+ *   }
  * @returns {Promise<object>} - Created product object
  */
 export const createProduct = async (data) => {
@@ -327,9 +335,9 @@ export const createProduct = async (data) => {
 };
 
 /**
- * Update an existing product
- * @param {number} id - Product ID to update
- * @param {object} data - Updated product data
+ * Update a product
+ * @param {number} id - Product ID
+ * @param {object} data - Updated product fields
  * @returns {Promise<object>} - Updated product object
  */
 export const updateProduct = async (id, data) => {
@@ -342,10 +350,132 @@ export const updateProduct = async (id, data) => {
 /**
  * Delete a product
  * @param {number} id - Product ID to delete
- * @returns {Promise<null>} - Returns null on successful deletion
+ * @returns {Promise<null>} - Returns null on success
  */
 export const deleteProduct = async (id) => {
   return await fetchAPI(`/Products/${id}`, {
+    method: 'DELETE',
+  });
+};
+
+/**
+ * Get sellers for dropdown (Store selector)
+ * @returns {Promise<Array>} - Array [{ id, storeName }]
+ */
+export const getSellerDropdown = async () => {
+  return await fetchAPI('/Products/sellers-dropdown');
+};
+
+export const getSubCategoryDropdown = async () => {
+  return await fetchAPI('/Products/subcategories-dropdown');
+};
+
+// --- Category APIs ---
+
+/**
+ * Get all categories with subcategories
+ * @returns {Promise<Array>} - Array of categories
+ */
+export const getCategories = async () => {
+  return await fetchAPI('/Categories');
+};
+
+/**
+ * Get a single category by ID
+ * @param {number} id - Category ID
+ * @returns {Promise<object>} - Category object
+ */
+export const getCategory = async (id) => {
+  return await fetchAPI(`/Categories/${id}`);
+};
+
+/**
+ * Create a new category
+ * @param {object} data - Category data (PascalCase: Name, IsActive)
+ * @returns {Promise<object>} - Created category object
+ */
+export const createCategory = async (data) => {
+  return await fetchAPI('/Categories', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Update an existing category
+ * @param {number} id - Category ID to update
+ * @param {object} data - Updated category data
+ * @returns {Promise<object>} - Updated category object
+ */
+export const updateCategory = async (id, data) => {
+  return await fetchAPI(`/Categories/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Delete a category
+ * @param {number} id - Category ID to delete
+ * @returns {Promise<null>} - Returns null on successful deletion
+ */
+export const deleteCategory = async (id) => {
+  return await fetchAPI(`/Categories/${id}`, {
+    method: 'DELETE',
+  });
+};
+
+// --- SubCategory APIs ---
+
+/**
+ * Get all subcategories
+ * @returns {Promise<Array>} - Array of subcategories
+ */
+export const getSubCategories = async () => {
+  return await fetchAPI('/SubCategories');
+};
+
+/**
+ * Get a single subcategory by ID
+ * @param {number} id - SubCategory ID
+ * @returns {Promise<object>} - SubCategory object
+ */
+export const getSubCategory = async (id) => {
+  return await fetchAPI(`/SubCategories/${id}`);
+};
+
+/**
+ * Create a new subcategory
+ * @param {object} data - SubCategory data (PascalCase: Name, CategoryId, IsActive)
+ * @returns {Promise<object>} - Created subcategory object
+ */
+export const createSubCategory = async (data) => {
+  return await fetchAPI('/SubCategories', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Update an existing subcategory
+ * @param {number} id - SubCategory ID to update
+ * @param {object} data - Updated subcategory data
+ * @returns {Promise<object>} - Updated subcategory object
+ */
+export const updateSubCategory = async (id, data) => {
+  return await fetchAPI(`/SubCategories/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Delete a subcategory
+ * @param {number} id - SubCategory ID to delete
+ * @returns {Promise<null>} - Returns null on successful deletion
+ */
+export const deleteSubCategory = async (id) => {
+  return await fetchAPI(`/SubCategories/${id}`, {
     method: 'DELETE',
   });
 };
