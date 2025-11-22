@@ -535,6 +535,94 @@ export const deleteCustomer = async (id) => {
   });
 };
 
+// --- Address APIs ---
+export const getAddresses = async () => {
+  return await fetchAPI('/Addresses');
+};
+
+export const getAddress = async (id) => {
+  return await fetchAPI(`/Addresses/${id}`);
+};
+
+export const createAddress = async (data) => {
+  return await fetchAPI('/Addresses', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export const updateAddress = async (id, data) => {
+  return await fetchAPI(`/Addresses/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+export const deleteAddress = async (id) => {
+  return await fetchAPI(`/Addresses/${id}`, {
+    method: 'DELETE',
+  });
+};
+
+// --- CustomerAddress (linking customers to addresses) APIs ---
+export const getCustomerAddresses = async () => {
+  return await fetchAPI('/CustomerAddresses');
+};
+
+export const getCustomerAddress = async (id) => {
+  return await fetchAPI(`/CustomerAddresses/${id}`);
+};
+
+export const createCustomerAddress = async (data) => {
+  return await fetchAPI('/CustomerAddresses', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export const updateCustomerAddress = async (id, data) => {
+  return await fetchAPI(`/CustomerAddresses/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+export const deleteCustomerAddress = async (id) => {
+  return await fetchAPI(`/CustomerAddresses/${id}`, {
+    method: 'DELETE',
+  });
+};
+
+// --- SellerAddress (linking sellers to addresses) APIs ---
+export const getSellerAddresses = async () => {
+  return await fetchAPI('/SellerAddresses');
+};
+
+export const getSellerAddress = async (id) => {
+  return await fetchAPI(`/SellerAddresses/${id}`);
+};
+
+export const createSellerAddress = async (data) => {
+  return await fetchAPI('/SellerAddresses', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export const updateSellerAddress = async (id, data) => {
+  return await fetchAPI(`/SellerAddresses/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+export const deleteSellerAddress = async (id) => {
+  return await fetchAPI(`/SellerAddresses/${id}`, {
+    method: 'DELETE',
+  });
+};
+
+
 // --- Driver APIs ---
 
 /**
