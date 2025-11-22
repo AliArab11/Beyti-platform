@@ -479,3 +479,113 @@ export const deleteSubCategory = async (id) => {
     method: 'DELETE',
   });
 };
+
+// --- Customer APIs ---
+
+/**
+ * Get all customers
+ * @returns {Promise<Array>} - Array of all customers
+ */
+export const getCustomers = async () => {
+  return await fetchAPI('/Customers');
+};
+
+/**
+ * Get a single customer by ID
+ * @param {number} id - Customer ID
+ * @returns {Promise<object>} - Customer object
+ */
+export const getCustomer = async (id) => {
+  return await fetchAPI(`/Customers/${id}`);
+};
+
+/**
+ * Create a new customer
+ * @param {object} data - Customer data (PascalCase: UserProfileId, FullName, Phone)
+ * @returns {Promise<object>} - Created customer object
+ */
+export const createCustomer = async (data) => {
+  return await fetchAPI('/Customers', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Update an existing customer
+ * @param {number} id - Customer ID to update
+ * @param {object} data - Updated customer data
+ * @returns {Promise<object>} - Updated customer object
+ */
+export const updateCustomer = async (id, data) => {
+  return await fetchAPI(`/Customers/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Delete a customer
+ * @param {number} id - Customer ID to delete
+ * @returns {Promise<null>} - Returns null on successful deletion
+ */
+export const deleteCustomer = async (id) => {
+  return await fetchAPI(`/Customers/${id}`, {
+    method: 'DELETE',
+  });
+};
+
+// --- Driver APIs ---
+
+/**
+ * Get all drivers
+ * @returns {Promise<Array>} - Array of all drivers
+ */
+export const getDrivers = async () => {
+  return await fetchAPI('/Drivers');
+};
+
+/**
+ * Get a single driver by ID
+ * @param {number} id - Driver ID
+ * @returns {Promise<object>} - Driver object
+ */
+export const getDriver = async (id) => {
+  return await fetchAPI(`/Drivers/${id}`);
+};
+
+/**
+ * Create a new driver
+ * @param {object} data - Driver data (PascalCase: UserProfileId, Phone, Status)
+ * @returns {Promise<object>} - Created driver object
+ */
+export const createDriver = async (data) => {
+  return await fetchAPI('/Drivers', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Update an existing driver
+ * @param {number} id - Driver ID
+ * @param {object} data - Updated driver data
+ * @returns {Promise<object>} - Updated driver object
+ */
+export const updateDriver = async (id, data) => {
+  return await fetchAPI(`/Drivers/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Delete a driver
+ * @param {number} id - Driver ID to delete
+ * @returns {Promise<null>} - Returns null on successful deletion
+ */
+export const deleteDriver = async (id) => {
+  return await fetchAPI(`/Drivers/${id}`, {
+    method: 'DELETE',
+  });
+};

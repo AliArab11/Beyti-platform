@@ -3,10 +3,11 @@ import RegistrationPage from "./Pages/Registration";
 import MembershipPage from "./Pages/Membership";
 import AddPlanPage from "./Pages/Membership/AddPlan";
 import AdminPage from './Pages/Admin/AdminPage';
-
+import CustomerPage from "./Pages/Customer";
 import SellerPage from "./Pages/Seller";
 import ProductsPage from "./Pages/Product/Products";
 import CategoryPage from "./Pages/Product/Categories";
+import DriverPage from "./Pages/Driver";
 
 // Placeholder components for pages that don't exist yet
 const PlaceholderPage = ({ pageName }) => (
@@ -50,9 +51,9 @@ export default function App() {
       case 'category':
         return <CategoryPage />;
       case 'customer':
-        return <PlaceholderPage pageName="Customer" />;
+        return <CustomerPage />;
       case 'driver':
-        return <PlaceholderPage pageName="Driver" />;
+        return <DriverPage />;
       case 'admin':
         return <AdminPage/>;
       case 'serviceprovider':
