@@ -27,15 +27,32 @@ namespace Beyti_Backend.Controllers.Api
         {
             return await _context.Customers
                 .Include(c => c.UserProfile)
+                .Include(c => c.CustomerAddresses)
+                    .ThenInclude(ca => ca.Address)
                 .Select(c => new
                 {
                     c.Id,
                     fullName = c.UserProfile.DisplayName,
                     c.Phone,
-                    c.CreatedAt
+                    c.CreatedAt,
+                    customerAddresses = c.CustomerAddresses.Select(ca => new
+                    {
+                        ca.Id,
+                        address = new
+                        {
+                            ca.Address.Id,
+                            ca.Address.Label,
+                            ca.Address.Street,
+                            ca.Address.City,
+                            ca.Address.Region,
+                            ca.Address.PostalCode,
+                            ca.Address.Country
+                        }
+                    })
                 })
                 .ToListAsync();
         }
+
 
         // GET: api/Customers/5
         [HttpGet("{id}")]

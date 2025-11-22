@@ -5,6 +5,8 @@ import AddPlanPage from "./Pages/Membership/AddPlan";
 import AdminPage from './Pages/Admin/AdminPage';
 import CustomerPage from "./Pages/Customer";
 import SellerPage from "./Pages/Seller";
+import StoresPage from "./Pages/Seller/Store";
+import StoreDetailsPage from "./Pages/Seller/StoreDetails";
 import ProductsPage from "./Pages/Product/Products";
 import CategoryPage from "./Pages/Product/Categories";
 import DriverPage from "./Pages/Driver";
@@ -21,12 +23,14 @@ const PlaceholderPage = ({ pageName }) => (
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState('registration');
+  const [selectedStoreId, setSelectedStoreId] = useState(null);
 
   const navItems = [
     { id: 'registration', label: 'Registration' },
     { id: 'membership', label: 'Membership' },
     { id: 'addplan', label: 'Add Plan' },
     { id: 'seller', label: 'Seller' },
+    { id: 'store', label: 'Store' },
     { id: 'product', label: 'Product' },
     { id: 'category', label: 'Category' },
     { id: 'customer', label: 'Customer' },
@@ -46,6 +50,10 @@ export default function App() {
         return <AddPlanPage />;
       case 'seller':
         return <SellerPage />;
+      case 'store':
+        return <StoresPage />;
+      case 'storedetails':
+        return <StoreDetailsPage />;
       case 'product':
         return <ProductsPage />;
       case 'category':
@@ -55,7 +63,7 @@ export default function App() {
       case 'driver':
         return <DriverPage />;
       case 'admin':
-        return <AdminPage/>;
+        return <AdminPage />;
       case 'serviceprovider':
         return <PlaceholderPage pageName="Service Provider" />;
       case 'notification':
