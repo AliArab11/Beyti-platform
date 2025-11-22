@@ -185,29 +185,10 @@ export const deleteMembershipPlan = async (id) => {
 };
 
 // --- Admin APIs ---
-
-/**
- * Get all admin profiles
- * @returns {Promise<Array>} - Array of all admin profiles
- */
 export const getAdmins = async () => {
   return await fetchAPI('/AdminProfiles');
 };
 
-/**
- * Get a single admin profile by ID
- * @param {number} id - Admin profile ID
- * @returns {Promise<object>} - Admin profile object
- */
-export const getAdmin = async (id) => {
-  return await fetchAPI(`/AdminProfiles/${id}`);
-};
-
-/**
- * Create a new admin profile
- * @param {object} data - Admin profile data
- * @returns {Promise<object>} - Created admin profile object
- */
 export const createAdmin = async (data) => {
   return await fetchAPI('/AdminProfiles', {
     method: 'POST',
@@ -215,12 +196,6 @@ export const createAdmin = async (data) => {
   });
 };
 
-/**
- * Update an existing admin profile
- * @param {number} id - Admin profile ID to update
- * @param {object} data - Updated admin profile data
- * @returns {Promise<object>} - Updated admin profile object
- */
 export const updateAdmin = async (id, data) => {
   return await fetchAPI(`/AdminProfiles/${id}`, {
     method: 'PUT',
@@ -228,16 +203,54 @@ export const updateAdmin = async (id, data) => {
   });
 };
 
-/**
- * Delete an admin profile
- * @param {number} id - Admin profile ID to delete
- * @returns {Promise<null>} - Returns null on successful deletion
- */
-export const deleteAdmin = async (id) => {
-  return await fetchAPI(`/AdminProfiles/${id}`, {
-    method: 'DELETE',
+// --- User Management (FR1) ---
+
+export const getUsers = async (role = null) => {
+  const query = role && role !== 'All' ? `?role=${role}` : '';
+  return await fetchAPI(`/AdminDashboard/Users${query}`);
+};
+
+export const getUser = async (id) => {
+  return await fetchAPI(`/AdminDashboard/Users/${id}`);
+};
+
+export const createUser = async (data) => {
+  return await fetchAPI('/AdminDashboard/Users', {
+    method: 'POST',
+    body: JSON.stringify(data),
   });
 };
+
+export const updateUser = async (id, data) => {
+  return await fetchAPI(`/AdminDashboard/Users/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+export const toggleUserStatus = async (id) => {
+  return await fetchAPI(`/AdminDashboard/Users/${id}/toggle`, {
+    method: 'PATCH',
+  });
+};
+
+// --- Service Provider Requests ---
+export const getServiceProviderRequests = async () => {
+  return await fetchAPI('/AdminDashboard/ServiceProviderRequests');
+};
+
+export const approveServiceProviderRequest = async (id) => {
+  return await fetchAPI(`/AdminDashboard/ServiceProviderRequests/${id}/approve`, {
+    method: 'PATCH',
+  });
+};
+
+export const rejectServiceProviderRequest = async (id) => {
+  return await fetchAPI(`/AdminDashboard/ServiceProviderRequests/${id}/reject`, {
+    method: 'PATCH',
+  });
+};
+
 
 // --- Seller APIs ---
 
@@ -347,5 +360,28 @@ export const updateProduct = async (id, data) => {
 export const deleteProduct = async (id) => {
   return await fetchAPI(`/Products/${id}`, {
     method: 'DELETE',
+  });
+};
+
+// --- Service Providers ---
+export const getServiceProviders = async () => {
+  return await fetchAPI('/ServiceProviders');
+};
+
+export const getServiceProvider = async (id) => {
+  return await fetchAPI(`/ServiceProviders/${id}`);
+};
+
+export const createServiceProvider = async (data) => {
+  return await fetchAPI('/ServiceProviders', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export const updateServiceProvider = async (id, data) => {
+  return await fetchAPI(`/ServiceProviders/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
   });
 };

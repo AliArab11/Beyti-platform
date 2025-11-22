@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using BeytiDB.Data;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
+using System.Text.Json;
 
 namespace Beyti_Backend.Controllers.Api
 {
@@ -41,40 +43,29 @@ namespace Beyti_Backend.Controllers.Api
             return adminProfile;
         }
 
-        // PUT: api/AdminProfiles/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutAdminProfile(int id, AdminProfile adminProfile)
-        {
-            if (id != adminProfile.Id)
-            {
-                return BadRequest();
-            }
+      
 
-            _context.Entry(adminProfile).State = EntityState.Modified;
+[HttpPut("{id}")]
+    public async Task<IActionResult> PutAdminProfile(int id, JsonElement body)
+    {
+        var admin = await _context.AdminProfiles.FindAsync(id);
+        if (admin == null) return NotFound();
 
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!AdminProfileExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
+        // Update only the fields that are provided
+        if (body.TryGetProperty("title", out var titleProp))
+            admin.Title = titleProp.GetString();
 
-            return NoContent();
-        }
+        if (body.TryGetProperty("permissions", out var permissionsProp))
+            admin.Permissions = permissionsProp.GetString();
 
-        // POST: api/AdminProfiles
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPost]
+        await _context.SaveChangesAsync();
+        return Ok(admin);
+    }
+
+
+    // POST: api/AdminProfiles
+    // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
+    [HttpPost]
         public async Task<ActionResult<AdminProfile>> PostAdminProfile(AdminProfile adminProfile)
         {
             _context.AdminProfiles.Add(adminProfile);
@@ -83,21 +74,32 @@ namespace Beyti_Backend.Controllers.Api
             return CreatedAtAction("GetAdminProfile", new { id = adminProfile.Id }, adminProfile);
         }
 
-        // DELETE: api/AdminProfiles/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteAdminProfile(int id)
+        [HttpPatch("Admin/{adminId}/toggle")]
+        public async Task<IActionResult> ToggleAdminStatus(int adminId)
         {
-            var adminProfile = await _context.AdminProfiles.FindAsync(id);
-            if (adminProfile == null)
-            {
-                return NotFound();
-            }
+            var admin = await _context.AdminProfiles
+                .Include(a => a.UserProfile)
+                .FirstOrDefaultAsync(a => a.Id == adminId);
 
-            _context.AdminProfiles.Remove(adminProfile);
+            if (admin == null)
+                return NotFound("Admin not found.");
+
+            // Toggle UserProfile status
+            admin.UserProfile.Status = admin.UserProfile.Status == "Active"
+                ? "Inactive"
+                : "Active";
+
+            admin.UserProfile.UpdatedAt = DateTime.UtcNow;
+
             await _context.SaveChangesAsync();
 
-            return NoContent();
+            return Ok(new
+            {
+                admin.Id,
+                admin.UserProfile.Status
+            });
         }
+
 
         private bool AdminProfileExists(int id)
         {

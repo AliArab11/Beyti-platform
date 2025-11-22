@@ -3,7 +3,9 @@ import RegistrationPage from "./Pages/Registration";
 import MembershipPage from "./Pages/Membership";
 import AddPlanPage from "./Pages/Membership/AddPlan";
 import AdminPage from './Pages/Admin/AdminPage';
-
+import ServiceProviderPage from "./Pages/ServiceProvider";
+import AdminUsersPage from './Pages/Admin/AdminDash'; // your new dashboard
+import ServiceProviderRequests from './Pages/Admin/ServiceProviderRequests.jsx';
 import SellerPage from "./Pages/Seller";
 import ProductsPage from "./Pages/Product/Products";
 
@@ -31,6 +33,8 @@ export default function App() {
     { id: 'admin', label: 'Admin' },
     { id: 'serviceprovider', label: 'Service Provider' },
     { id: 'notification', label: 'Notification' },
+    { id: 'admindashboard', label: 'Admin Dashboard'},
+     { id: 'servicerequest', label: 'Service Request'}
   ];
 
   const renderPage = () => {
@@ -52,7 +56,11 @@ export default function App() {
       case 'admin':
         return <AdminPage/>;
       case 'serviceprovider':
-        return <PlaceholderPage pageName="Service Provider" />;
+        return < ServiceProviderPage />;
+      case 'admindashboard' :
+        return < AdminUsersPage />;
+      case 'servicerequest' :
+        return <ServiceProviderRequests />
       case 'notification':
         return <PlaceholderPage pageName="Notification" />;
       default:
