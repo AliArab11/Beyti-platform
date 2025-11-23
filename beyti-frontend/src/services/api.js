@@ -251,7 +251,81 @@ export const rejectServiceProviderRequest = async (id) => {
   });
 };
 
+// --- Dashboard Statistics ---
+export const getDashboardStatistics = async () => {
+  return await fetchAPI('/AdminDashboard/Statistics');
+};
 
+// --- Flagged Users ---
+export const getFlaggedUsers = async () => {
+  return await fetchAPI('/AdminDashboard/FlaggedUsers');
+};
+
+export const getUserViolations = async (userId) => {
+  return await fetchAPI(`/AdminDashboard/UserViolations/${userId}`);
+};
+
+export const suspendUser = async (userId, reason) => {
+  return await fetchAPI(`/AdminDashboard/SuspendUser/${userId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ reason }),
+  });
+};
+
+export const reactivateUser = async (userId) => {
+  return await fetchAPI(`/AdminDashboard/ReactivateUser/${userId}`, {
+    method: 'PUT',
+  });
+};
+
+export const warnUser = async (userId, message) => {
+  return await fetchAPI(`/AdminDashboard/WarnUser/${userId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ message }),
+  });
+};
+
+// --- Product Moderation ---
+export const getModerationStatistics = async () => {
+  return await fetchAPI('/ProductModeration/Statistics');
+};
+
+export const getProductsForModeration = async (isActive = null, search = null, sellerId = null) => {
+  let query = [];
+  if (isActive !== null) query.push(`isActive=${isActive}`);
+  if (search) query.push(`search=${encodeURIComponent(search)}`);
+  if (sellerId) query.push(`sellerId=${sellerId}`);
+  
+  const queryString = query.length > 0 ? `?${query.join('&')}` : '';
+  return await fetchAPI(`/ProductModeration/Products${queryString}`);
+};
+
+export const getProductDetails = async (id) => {
+  return await fetchAPI(`/ProductModeration/Products/${id}`);
+};
+
+export const approveProduct = async (id) => {
+  return await fetchAPI(`/ProductModeration/Products/${id}/approve`, {
+    method: 'PUT',
+  });
+};
+
+export const suspendProduct = async (id, reason) => {
+  return await fetchAPI(`/ProductModeration/Products/${id}/suspend`, {
+    method: 'PUT',
+    body: JSON.stringify({ reason }),
+  });
+};
+
+export const deleteProducts = async (id) => {
+  return await fetchAPI(`/ProductModeration/Products/${id}`, {
+    method: 'DELETE',
+  });
+};
+
+export const checkFlaggedKeywords = async (text) => {
+  return await fetchAPI(`/ProductModeration/FlaggedKeywords?text=${encodeURIComponent(text)}`);
+};
 // --- Seller APIs ---
 
 /**
