@@ -5,7 +5,9 @@ import {
   updateSeller, 
   deleteSeller, 
   createAddress, 
-  createSellerAddress 
+  createSellerAddress,
+  getSellerOrders,
+  updateOrder
 } from "../../services/api";
 
 const Sellers = () => {
@@ -42,6 +44,16 @@ const Sellers = () => {
 
   // Expanded row state
   const [expandedRows, setExpandedRows] = useState(new Set());
+
+  // Orders modal
+  const [ordersModal, setOrdersModal] = useState({ show: false, sellerId: null, sellerName: "", orders: [], loading: false, error: null });
+  const [statusModal, setStatusModal] = useState({ show: false, orderId: null, currentStatus: "", loading: false, error: null });
+  const [orderStatusFilter, setOrderStatusFilter] = useState("all");
+  const [expandedOrderRows, setExpandedOrderRows] = useState(new Set());
+  const [activeTab, setActiveTab] = useState("orders"); // "orders" or "products"
+
+  const [productsWithReviews, setProductsWithReviews] = useState([]);
+  const [expandedProducts, setExpandedProducts] = useState(new Set());
 
   useEffect(() => {
     fetchSellers();
@@ -126,7 +138,6 @@ const Sellers = () => {
     setAddAddressError(null);
 
     try {
-      // 1️⃣ Create the address
       const newAddress = await createAddress({
         Label: null,
         Street: addressStreet,
@@ -139,15 +150,11 @@ const Sellers = () => {
         IsDefault: false
       });
 
-      console.log("Address created:", newAddress);
-
-      // 2️⃣ Link address to seller
       await createSellerAddress({
         SellerId: parseInt(selectedSellerId),
         AddressId: newAddress.id
       });
 
-      // Clear form
       setSelectedSellerId("");
       setAddressStreet("");
       setAddressCity("");
@@ -156,8 +163,6 @@ const Sellers = () => {
       setAddressPostalCode("");
 
       await fetchSellers();
-      
-      // Show success message
       setAddAddressError(null);
     } catch (err) {
       console.error("Full error:", err);
@@ -166,6 +171,156 @@ const Sellers = () => {
       setAdding(false);
     }
   };
+
+  // --- Orders Management ---
+ const openOrdersModal = async (sellerId, sellerName) => {
+  setOrdersModal({ show: true, sellerId, sellerName, orders: [], loading: true, error: null });
+  setOrderStatusFilter("all");
+  setExpandedOrderRows(new Set());
+  setActiveTab("orders");
+  setProductsWithReviews([]);
+  setExpandedProducts(new Set());
+  
+  try {
+    const data = await getSellerOrders(sellerId);
+    
+    // Fetch reviews for all products in all orders
+    const ordersWithReviews = await Promise.all(
+      (data || []).map(async (order) => {
+        const itemsWithReviews = await Promise.all(
+          (order.orderItems || []).map(async (item) => {
+            try {
+              const reviews = await fetch(`https://localhost:7062/api/Reviews?productId=${item.productId}`);
+              const reviewData = await reviews.json();
+              const productReviews = reviewData.filter(r => r.orderId === order.id && r.productId === item.productId);
+              return { ...item, reviews: productReviews || [], orderId: order.id, orderDate: order.createdAt };
+            } catch {
+              return { ...item, reviews: [], orderId: order.id, orderDate: order.createdAt };
+            }
+          })
+        );
+        return { ...order, orderItems: itemsWithReviews };
+      })
+    );
+    
+    // Group products with their reviews
+    const productMap = new Map();
+    ordersWithReviews.forEach(order => {
+      order.orderItems?.forEach(item => {
+        if (!productMap.has(item.productId)) {
+          productMap.set(item.productId, {
+            productId: item.productId,
+            productName: item.productName,
+            totalOrders: 0,
+            totalReviews: 0,
+            reviews: []
+          });
+        }
+        const product = productMap.get(item.productId);
+        product.totalOrders++;
+        if (item.reviews && item.reviews.length > 0) {
+          product.totalReviews += item.reviews.length;
+          item.reviews.forEach(review => {
+            product.reviews.push({
+              ...review,
+              orderId: item.orderId,
+              orderDate: item.orderDate
+            });
+          });
+        }
+      });
+    });
+    
+    const productsArray = Array.from(productMap.values());
+    setProductsWithReviews(productsArray);
+    setOrdersModal(prev => ({ ...prev, orders: ordersWithReviews, loading: false }));
+  } catch (err) {
+    setOrdersModal(prev => ({ ...prev, error: err.message || "Failed to load orders", loading: false }));
+  }
+};
+
+ const closeOrdersModal = () => {
+  setOrdersModal({ show: false, sellerId: null, sellerName: "", orders: [], loading: false, error: null });
+  setOrderStatusFilter("all");
+  setExpandedOrderRows(new Set());
+  setActiveTab("orders");
+  setProductsWithReviews([]);
+  setExpandedProducts(new Set());
+};
+
+  const openStatusModal = (orderId, currentStatus) => {
+    setStatusModal({ show: true, orderId, currentStatus, loading: false, error: null });
+  };
+
+  const closeStatusModal = () => {
+    setStatusModal({ show: false, orderId: null, currentStatus: "", loading: false, error: null });
+  };
+
+  const handleUpdateStatus = async (newStatus) => {
+    setStatusModal(prev => ({ ...prev, loading: true }));
+    try {
+      await updateOrder(statusModal.orderId, { Status: newStatus });
+      setOrdersModal(prev => ({
+        ...prev,
+        orders: prev.orders.map(o => o.id === statusModal.orderId ? { ...o, status: newStatus } : o)
+      }));
+      closeStatusModal();
+    } catch (err) {
+      setStatusModal(prev => ({ ...prev, error: err.message || "Failed to update status", loading: false }));
+    }
+  };
+
+  const toggleOrderRow = (orderId) => {
+  const newExpanded = new Set(expandedOrderRows);
+  if (newExpanded.has(orderId)) {
+    newExpanded.delete(orderId);
+  } else {
+    newExpanded.add(orderId);
+  }
+  setExpandedOrderRows(newExpanded);
+};
+
+const toggleProductRow = (productId) => {
+  const newExpanded = new Set(expandedProducts);
+  if (newExpanded.has(productId)) {
+    newExpanded.delete(productId);
+  } else {
+    newExpanded.add(productId);
+  }
+  setExpandedProducts(newExpanded);
+};
+
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case "placed":
+        return "bg-blue-100 text-blue-800";
+      case "processing":
+        return "bg-yellow-100 text-yellow-800";
+      case "completed":
+        return "bg-green-100 text-green-800";
+      case "cancelled":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const getPaymentColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case "paid":
+        return "bg-green-100 text-green-800";
+      case "pending":
+        return "bg-orange-100 text-orange-800";
+      case "failed":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const filteredOrders = ordersModal.orders.filter(order => {
+    return orderStatusFilter === "all" || order.status?.toLowerCase() === orderStatusFilter.toLowerCase();
+  });
 
   const toggleRow = (sellerId) => {
     const newExpanded = new Set(expandedRows);
@@ -356,7 +511,10 @@ const Sellers = () => {
                               </span>
                             </td>
                             <td className="px-6 py-4 text-right">
-                              <div className="flex gap-2 justify-end">
+                              <div className="flex gap-2 justify-end flex-wrap">
+                                <button onClick={() => openOrdersModal(seller.id, seller.storeName)} className="!bg-purple-600 hover:!bg-purple-700 !text-white px-4 py-2 rounded-lg font-semibold text-sm" title="Manage Orders">
+                                  📦 Manage Orders
+                                </button>
                                 <button onClick={() => startEdit(seller)} className="!bg-yellow-500 hover:!bg-yellow-600 !text-white p-2 rounded-lg" title="Edit Seller">
                                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -444,6 +602,305 @@ const Sellers = () => {
                   Cancel
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Orders Modal */}
+        {ordersModal.show && (
+  <div className="fixed inset-0 !bg-black !bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="!bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] flex flex-col">
+      {/* Header */}
+      <div className="flex justify-between items-center p-6 border-b border-gray-200">
+        <h3 className="text-2xl font-bold !text-gray-900">Manage: {ordersModal.sellerName}</h3>
+        <button onClick={closeOrdersModal} className="!text-gray-500 hover:!text-gray-700 text-2xl">×</button>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex border-b border-gray-200 px-6">
+        <button
+          onClick={() => setActiveTab("orders")}
+          className={`px-6 py-3 font-semibold transition-colors border-b-2 ${
+            activeTab === "orders"
+              ? "!border-blue-600 !text-blue-600"
+              : "!border-transparent !text-gray-600 hover:!text-gray-900"
+          }`}
+        >
+          📦 Orders ({ordersModal.orders.length})
+        </button>
+        <button
+          onClick={() => setActiveTab("products")}
+          className={`px-6 py-3 font-semibold transition-colors border-b-2 ${
+            activeTab === "products"
+              ? "!border-blue-600 !text-blue-600"
+              : "!border-transparent !text-gray-600 hover:!text-gray-900"
+          }`}
+        >
+          ⭐ Products & Reviews ({productsWithReviews.length})
+        </button>
+      </div>
+
+      {/* Content Area */}
+      <div className="flex-1 overflow-y-auto p-6">
+        {ordersModal.error && (
+          <div className="mb-4 p-4 rounded-lg !bg-red-50 border-l-4 border-red-500">
+            <p className="text-sm !text-red-700">{ordersModal.error}</p>
+          </div>
+        )}
+
+        {ordersModal.loading ? (
+          <div className="flex justify-center py-8">
+            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-r-transparent"></div>
+          </div>
+        ) : (
+          <>
+            {/* Orders Tab */}
+            {activeTab === "orders" && (
+              <>
+                {/* Filter */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium !text-gray-700 mb-2">Filter by Status</label>
+                  <select
+                    value={orderStatusFilter}
+                    onChange={e => setOrderStatusFilter(e.target.value)}
+                    className="w-full md:w-48 !border-2 !border-gray-400 rounded-lg p-2 !text-black !bg-white"
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="placed">Placed</option>
+                    <option value="processing">Processing</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+
+                {/* Orders List */}
+                {filteredOrders.length > 0 ? (
+                  <div className="space-y-4">
+                    {filteredOrders.map(order => (
+                      <div key={order.id} className="!bg-gray-50 rounded-lg border border-gray-200">
+                        <div className="p-4 flex justify-between items-center cursor-pointer" onClick={() => toggleOrderRow(order.id)}>
+                          <div className="flex items-center gap-4">
+                            <svg className={`w-5 h-5 !text-gray-600 transition-transform ${expandedOrderRows.has(order.id) ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                            <div>
+                              <p className="font-semibold !text-gray-900">Order #{order.id}</p>
+                              <p className="text-sm !text-gray-600">{new Date(order.createdAt).toLocaleDateString()}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(order.status)}`}>
+                              {order.status || "N/A"}
+                            </span>
+                            <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${getPaymentColor(order.paymentStatus)}`}>
+                              {order.paymentStatus || "N/A"}
+                            </span>
+                            <p className="font-bold !text-gray-900">${order.totalAmount?.toFixed(2) || "0.00"}</p>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); openStatusModal(order.id, order.status); }}
+                              className="!bg-blue-600 hover:!bg-blue-700 !text-white px-3 py-1 rounded text-sm font-medium"
+                            >
+                              Change Status
+                            </button>
+                          </div>
+                        </div>
+
+                        {expandedOrderRows.has(order.id) && (
+                          <div className="p-4 border-t border-gray-200 !bg-white">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                              <div>
+                                <p className="text-xs !text-gray-600 mb-1">Customer</p>
+                                <p className="text-sm font-medium !text-gray-900">{order.customerName || "N/A"}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs !text-gray-600 mb-1">Fulfillment</p>
+                                <p className="text-sm font-medium !text-gray-900">{order.fulfillmentType || "N/A"}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs !text-gray-600 mb-1">Payment Method</p>
+                                <p className="text-sm font-medium !text-gray-900">{order.paymentMethod || "N/A"}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs !text-gray-600 mb-1">Delivery Fee</p>
+                                <p className="text-sm font-medium !text-gray-900">${order.deliveryFee?.toFixed(2) || "0.00"}</p>
+                              </div>
+                            </div>
+
+                            {order.orderItems && order.orderItems.length > 0 && (
+                              <div>
+                                <h4 className="font-semibold !text-gray-900 mb-3">Order Items:</h4>
+                                <div className="space-y-2">
+                                  {order.orderItems.map((item, idx) => (
+                                    <div key={idx} className="p-3 !bg-gray-50 rounded-lg">
+                                      <div className="flex justify-between items-center">
+                                        <div className="flex-1">
+                                          <p className="text-sm font-medium !text-gray-900">{item.productName || "Product"}</p>
+                                          <p className="text-xs !text-gray-600">SKU: {item.variantSKU || "N/A"} • Qty: {item.qty}</p>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                          <p className="text-sm font-semibold !text-gray-900">${item.lineTotal?.toFixed(2) || "0.00"}</p>
+                                          {item.reviews && item.reviews.length > 0 && (
+                                            <span className="!bg-yellow-100 !text-yellow-700 px-3 py-1 rounded text-xs font-medium">
+                                              ⭐ {item.reviews.length} Review{item.reviews.length !== 1 ? 's' : ''}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {item.reviews && item.reviews.length > 0 && (
+                                        <div className="mt-3 space-y-2">
+                                          {item.reviews.map((review, reviewIdx) => (
+                                            <div key={reviewIdx} className="p-3 !bg-white rounded-lg border border-gray-200">
+                                              <div className="flex items-center gap-2 mb-2">
+                                                <span className="text-xs font-semibold !text-gray-700">Customer Review:</span>
+                                                <div className="flex">
+                                                  {[1, 2, 3, 4, 5].map(star => (
+                                                    <span key={star} className={`text-sm ${star <= review.rating ? '!text-yellow-400' : '!text-gray-300'}`}>
+                                                      ★
+                                                    </span>
+                                                  ))}
+                                                </div>
+                                                <span className="text-xs !text-gray-600">
+                                                  {new Date(review.createdAt).toLocaleDateString()}
+                                                </span>
+                                              </div>
+                                              <p className="text-sm !text-gray-700 italic">"{review.comment}"</p>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="!text-gray-600">No orders found</p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Products & Reviews Tab */}
+            {activeTab === "products" && (
+              <>
+                {productsWithReviews.length > 0 ? (
+                  <div className="space-y-4">
+                    {productsWithReviews.map(product => (
+                      <div key={product.productId} className="!bg-gray-50 rounded-lg border border-gray-200">
+                        <div className="p-4 flex justify-between items-center cursor-pointer" onClick={() => toggleProductRow(product.productId)}>
+                          <div className="flex items-center gap-4">
+                            <svg className={`w-5 h-5 !text-gray-600 transition-transform ${expandedProducts.has(product.productId) ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                            <div>
+                              <p className="font-semibold !text-gray-900">{product.productName}</p>
+                              <p className="text-sm !text-gray-600">Product ID: {product.productId}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <span className="inline-flex px-3 py-1 text-xs font-medium rounded-full !bg-blue-100 !text-blue-800">
+                              {product.totalOrders} Order{product.totalOrders !== 1 ? 's' : ''}
+                            </span>
+                            <span className="inline-flex px-3 py-1 text-xs font-medium rounded-full !bg-yellow-100 !text-yellow-700">
+                              ⭐ {product.totalReviews} Review{product.totalReviews !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        </div>
+
+                        {expandedProducts.has(product.productId) && (
+                          <div className="p-4 border-t border-gray-200 !bg-white">
+                            {product.reviews.length > 0 ? (
+                              <div className="space-y-3">
+                                <h4 className="font-semibold !text-gray-900 mb-3">Customer Reviews:</h4>
+                                {product.reviews.map((review, idx) => (
+                                  <div key={idx} className="p-4 !bg-gray-50 rounded-lg border border-gray-200">
+                                    <div className="flex items-center justify-between mb-3">
+                                      <div className="flex items-center gap-3">
+                                        <div className="flex">
+                                          {[1, 2, 3, 4, 5].map(star => (
+                                            <span key={star} className={`text-lg ${star <= review.rating ? '!text-yellow-400' : '!text-gray-300'}`}>
+                                              ★
+                                            </span>
+                                          ))}
+                                        </div>
+                                        <span className="text-sm font-semibold !text-gray-900">{review.customerName || "Anonymous"}</span>
+                                      </div>
+                                      <div className="text-right">
+                                        <p className="text-xs !text-gray-600">{new Date(review.createdAt).toLocaleDateString()}</p>
+                                        <p className="text-xs !text-gray-500">Order #{review.orderId}</p>
+                                      </div>
+                                    </div>
+                                    <p className="text-sm !text-gray-700">"{review.comment}"</p>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-center py-4">
+                                <p className="!text-gray-600">No reviews yet for this product</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="!text-gray-600">No products with reviews found</p>
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  </div>
+)}
+
+        {/* Status Update Modal */}
+        {statusModal.show && (
+          <div className="fixed inset-0 !bg-black !bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="!bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+              <div className="flex items-center mb-4">
+                <div className="!bg-blue-100 p-3 rounded-full">
+                  <svg className="w-6 h-6 !text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="ml-3 text-xl font-bold !text-gray-900">Update Order Status</h3>
+              </div>
+              <p className="!text-gray-600 mb-4">Current Status: <strong className="!text-gray-900">{statusModal.currentStatus}</strong></p>
+
+              {statusModal.error && (
+                <div className="mb-4 p-3 rounded-lg !bg-red-50 border-l-4 border-red-500">
+                  <p className="text-sm !text-red-700">{statusModal.error}</p>
+                </div>
+              )}
+
+              <div className="space-y-2 mb-6">
+                {["Placed", "Processing", "Completed", "Cancelled"].map(status => (
+                  <button
+                    key={status}
+                    onClick={() => handleUpdateStatus(status)}
+                    disabled={statusModal.loading || status === statusModal.currentStatus}
+                    className="w-full !bg-blue-600 hover:!bg-blue-700 !text-white py-2 px-4 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition"
+                  >
+                    {statusModal.loading ? "Updating..." : `Mark as ${status}`}
+                  </button>
+                ))}
+              </div>
+
+              <button onClick={closeStatusModal} disabled={statusModal.loading} className="w-full !bg-gray-300 hover:!bg-gray-400 !text-gray-900 py-2 px-4 rounded-lg font-medium">
+                Close
+              </button>
             </div>
           </div>
         )}

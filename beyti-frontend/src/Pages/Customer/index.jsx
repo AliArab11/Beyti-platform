@@ -5,16 +5,40 @@ import {
   updateCustomer,
   deleteCustomer,
   createAddress,
-  createCustomerAddress
+  createCustomerAddress,
+  getCustomerOrders,
+  createReview
 } from "../../services/api";
+
+// Custom Toast Component - ADD THIS HERE (OUTSIDE)
+const Toast = ({ message, type, onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onClose();
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  const bgColor = type === 'success' ? '!bg-green-500' : '!bg-red-500';
+  const icon = type === 'success' ? '✓' : '✕';
+
+  return (
+    <div className={`fixed top-4 right-4 z-[9999] ${bgColor} !text-white px-6 py-4 rounded-lg shadow-lg flex items-center gap-3 animate-slide-in`}>
+      <span className="text-xl font-bold">{icon}</span>
+      <span className="font-medium">{message}</span>
+      <button onClick={onClose} className="ml-2 hover:!text-gray-200">✕</button>
+    </div>
+  );
+};
 
 const Customers = () => {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   // Toggle between adding customer or address
-  const [addingMode, setAddingMode] = useState("customer"); // "customer" or "address"
+  const [addingMode, setAddingMode] = useState("customer");
 
   // Customer form fields
   const [fullName, setFullName] = useState("");
@@ -43,6 +67,22 @@ const Customers = () => {
   // Expanded row state
   const [expandedRows, setExpandedRows] = useState(new Set());
 
+  // Orders modal state
+  const [ordersModal, setOrdersModal] = useState({ show: false, customerId: null, customerName: "", orders: [], loading: false, error: null });
+  const [expandedOrderRows, setExpandedOrderRows] = useState(new Set());
+  
+  // Review modal state
+  const [reviewModal, setReviewModal] = useState({ 
+    show: false, 
+    orderId: null, 
+    productId: null,
+    productName: "",
+    rating: 5, 
+    comment: "", 
+    loading: false, 
+    error: null 
+  });
+
   useEffect(() => {
     fetchCustomers();
   }, []);
@@ -60,6 +100,14 @@ const Customers = () => {
     }
   };
 
+const showToast = (message, type = 'success') => {
+  setToast({ show: true, message, type });
+};
+
+const hideToast = () => {
+  setToast({ show: false, message: '', type: 'success' });
+};
+
   // --- Customer APIs ---
   const handleAddCustomer = async (e) => {
     e.preventDefault();
@@ -70,8 +118,10 @@ const Customers = () => {
       await fetchCustomers();
       setFullName("");
       setPhone("");
+      showToast('Customer added successfully!', 'success'); // ADD THIS
     } catch (err) {
       setAddError(err.message || "Failed to add customer");
+      showToast(errorMsg, 'error'); 
     } finally {
       setAdding(false);
     }
@@ -82,11 +132,11 @@ const Customers = () => {
     e.preventDefault();
     setAdding(true);
     setAddAddressError(null);
+    showToast('Address added successfully!', 'success'); 
 
     try {
       if (!selectedCustomerId) throw new Error("Select a customer");
 
-      // 1️⃣ Create the address with all fields
       const newAddress = await createAddress({
         Label: null,
         Street: addressStreet,
@@ -98,16 +148,12 @@ const Customers = () => {
         Longitude: null,
         IsDefault: false
       });
-      
-      console.log("Address created:", newAddress);
 
-      // 2️⃣ Link the address to the customer
       await createCustomerAddress({
         CustomerId: parseInt(selectedCustomerId),
         AddressId: newAddress.id
       });
 
-      // Clear form
       setSelectedCustomerId("");
       setAddressStreet("");
       setAddressCity("");
@@ -116,12 +162,11 @@ const Customers = () => {
       setAddressPostalCode("");
       
       await fetchCustomers();
-      
-      // Show success message
       setAddAddressError(null);
     } catch (err) {
       console.error("Full error:", err);
       setAddAddressError(err.message || "Failed to add address");
+      showToast(errorMsg, 'error');
     } finally {
       setAdding(false);
     }
@@ -147,8 +192,10 @@ const Customers = () => {
       await updateCustomer(editingId, { FullName: editFullName, Phone: editPhone });
       await fetchCustomers();
       cancelEdit();
+      showToast('Customer updated successfully!', 'success');
     } catch (err) {
       setEditError(err.message || "Failed to edit customer");
+      showToast(errorMsg, 'error');
     }
   };
 
@@ -165,8 +212,10 @@ const Customers = () => {
       await deleteCustomer(deleteConfirm.id);
       setCustomers(customers.filter((c) => c.id !== deleteConfirm.id));
       cancelDelete();
+      showToast('Customer deleted successfully!', 'success');
     } catch (err) {
       alert(err.message || "Failed to delete customer");
+      showToast(errorMsg, 'error');
     }
   };
 
@@ -178,6 +227,147 @@ const Customers = () => {
       newExpanded.add(customerId);
     }
     setExpandedRows(newExpanded);
+  };
+
+// --- Orders Management ---
+const openOrdersModal = async (customerId, customerName) => {
+  setOrdersModal({ show: true, customerId, customerName, orders: [], loading: true, error: null });
+  try {
+    const data = await getCustomerOrders(customerId);
+    
+    // Fetch reviews for all products in all orders
+    const ordersWithReviews = await Promise.all(
+      (data || []).map(async (order) => {
+        const itemsWithReviews = await Promise.all(
+          (order.orderItems || []).map(async (item) => {
+            try {
+              // Fetch reviews for this product
+              const reviews = await fetch(`https://localhost:7062/api/Reviews?productId=${item.productId}&customerId=${customerId}`);
+              const reviewData = await reviews.json();
+              // Find review for this specific order
+              const orderReview = reviewData.find(r => r.orderId === order.id && r.productId === item.productId);
+              return { ...item, review: orderReview || null };
+            } catch {
+              return { ...item, review: null };
+            }
+          })
+        );
+        return { ...order, orderItems: itemsWithReviews };
+      })
+    );
+    
+    setOrdersModal(prev => ({ ...prev, orders: ordersWithReviews, loading: false }));
+  } catch (err) {
+    setOrdersModal(prev => ({ ...prev, error: err.message || "Failed to load orders", loading: false }));
+  }
+};
+
+  const closeOrdersModal = () => {
+    setOrdersModal({ show: false, customerId: null, customerName: "", orders: [], loading: false, error: null });
+    setExpandedOrderRows(new Set());
+  };
+
+  const toggleOrderRow = (orderId) => {
+    const newExpanded = new Set(expandedOrderRows);
+    if (newExpanded.has(orderId)) {
+      newExpanded.delete(orderId);
+    } else {
+      newExpanded.add(orderId);
+    }
+    setExpandedOrderRows(newExpanded);
+  };
+
+  // --- Review Management ---
+  const openReviewModal = (orderId, productId, productName) => {
+    setReviewModal({ 
+      show: true, 
+      orderId, 
+      productId,
+      productName,
+      rating: 5, 
+      comment: "", 
+      loading: false, 
+      error: null 
+    });
+  };
+
+  const closeReviewModal = () => {
+    setReviewModal({ 
+      show: false, 
+      orderId: null, 
+      productId: null,
+      productName: "",
+      rating: 5, 
+      comment: "", 
+      loading: false, 
+      error: null 
+    });
+  };
+
+  const handleSubmitReview = async () => {
+  if (!reviewModal.comment.trim()) {
+    showToast("Please write a comment", 'error');
+    setReviewModal(prev => ({ ...prev, error: "Please write a comment" }));
+    return;
+  }
+
+  setReviewModal(prev => ({ ...prev, loading: true, error: null }));
+  try {
+    await createReview({
+      OrderId: reviewModal.orderId,
+      ProductId: reviewModal.productId,
+      CustomerId: ordersModal.customerId,
+      Rating: reviewModal.rating,
+      Comment: reviewModal.comment
+    });
+    
+    showToast('Review submitted successfully! ⭐', 'success');
+    closeReviewModal();
+    
+    // Refresh orders WITH reviews
+    const data = await getCustomerOrders(ordersModal.customerId);
+    const ordersWithReviews = await Promise.all(
+      (data || []).map(async (order) => {
+        const itemsWithReviews = await Promise.all(
+          (order.orderItems || []).map(async (item) => {
+            try {
+              const reviews = await fetch(`https://localhost:7062/api/Reviews?productId=${item.productId}&customerId=${ordersModal.customerId}`);
+              const reviewData = await reviews.json();
+              const orderReview = reviewData.find(r => r.orderId === order.id && r.productId === item.productId);
+              return { ...item, review: orderReview || null };
+            } catch {
+              return { ...item, review: null };
+            }
+          })
+        );
+        return { ...order, orderItems: itemsWithReviews };
+      })
+    );
+    setOrdersModal(prev => ({ ...prev, orders: ordersWithReviews }));
+  } catch (err) {
+    const errorMsg = err.message || "Failed to submit review";
+    setReviewModal(prev => ({ ...prev, error: errorMsg, loading: false }));
+    showToast(errorMsg, 'error');
+  }
+};
+
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case "placed": return "bg-blue-100 text-blue-800";
+      case "processing": return "bg-yellow-100 text-yellow-800";
+      case "completed": return "bg-green-100 text-green-800";
+      case "cancelled": return "bg-red-100 text-red-800";
+      default: return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const getPaymentColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case "paid": return "bg-green-100 text-green-800";
+      case "pending": return "bg-orange-100 text-orange-800";
+      case "failed": return "bg-red-100 text-red-800";
+      default: return "bg-gray-100 text-gray-800";
+    }
   };
 
   const inputClasses = "w-full !border-2 !border-gray-400 rounded-lg p-3 !text-black !bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:!border-blue-500";
@@ -199,10 +389,7 @@ const Customers = () => {
         <div className="max-w-md w-full !bg-white shadow-lg rounded-lg p-6 border-l-4 border-red-500">
           <h2 className="text-xl font-semibold !text-gray-800 mb-2">Error Loading Customers</h2>
           <p className="!text-gray-600 mb-4">{error}</p>
-          <button
-            onClick={fetchCustomers}
-            className="w-full !bg-blue-600 hover:!bg-blue-700 !text-white py-2 px-4 rounded-lg"
-          >
+          <button onClick={fetchCustomers} className="w-full !bg-blue-600 hover:!bg-blue-700 !text-white py-2 px-4 rounded-lg">
             Retry
           </button>
         </div>
@@ -212,6 +399,25 @@ const Customers = () => {
 
   return (
     <div className="min-h-screen !bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
+        <style>{`
+      @keyframes slide-in {
+        from {
+          transform: translateX(100%);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+      .animate-slide-in {
+        animation: slide-in 0.3s ease-out;
+      }
+    `}</style>
+
+    {toast.show && (
+      <Toast message={toast.message} type={toast.type} onClose={hideToast} />
+    )}
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
@@ -243,38 +449,20 @@ const Customers = () => {
                 <label className="block text-sm font-medium !text-gray-700 mb-2">
                   Full Name <span className="!text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  required
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className={inputClasses}
-                  placeholder="Enter full name"
-                />
+                <input type="text" required value={fullName} onChange={(e) => setFullName(e.target.value)} className={inputClasses} placeholder="Enter full name" />
               </div>
               <div>
                 <label className="block text-sm font-medium !text-gray-700 mb-2">Phone</label>
-                <input
-                  type="text"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className={inputClasses}
-                  placeholder="Enter phone number"
-                />
+                <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClasses} placeholder="Enter phone number" />
               </div>
               <div className="flex items-end">
-                <button
-                  type="submit"
-                  disabled={adding}
-                  className="w-full !bg-blue-600 hover:!bg-blue-700 !text-white py-3 px-6 rounded-lg font-semibold disabled:opacity-50"
-                >
+                <button type="submit" disabled={adding} className="w-full !bg-blue-600 hover:!bg-blue-700 !text-white py-3 px-6 rounded-lg font-semibold disabled:opacity-50">
                   {adding ? "Adding..." : "Add Customer"}
                 </button>
               </div>
             </form>
           </div>
         ) : (
-          // Add Address Form
           <div className="!bg-white shadow-lg rounded-xl border border-gray-200 p-6 mb-6">
             <h2 className="text-2xl font-semibold !text-gray-900 mb-4">Add Address</h2>
             {addAddressError && (
@@ -285,95 +473,38 @@ const Customers = () => {
             <form onSubmit={handleAddAddress} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium !text-gray-700 mb-2">
-                    Customer <span className="!text-red-500">*</span>
-                  </label>
-                  <select
-                    required
-                    value={selectedCustomerId}
-                    onChange={(e) => setSelectedCustomerId(e.target.value)}
-                    className={inputClasses}
-                  >
+                  <label className="block text-sm font-medium !text-gray-700 mb-2">Customer <span className="!text-red-500">*</span></label>
+                  <select required value={selectedCustomerId} onChange={(e) => setSelectedCustomerId(e.target.value)} className={inputClasses}>
                     <option value="">Select Customer</option>
-                    {customers.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.fullName}
-                      </option>
-                    ))}
+                    {customers.map((c) => <option key={c.id} value={c.id}>{c.fullName}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium !text-gray-700 mb-2">
-                    Street <span className="!text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={addressStreet}
-                    onChange={(e) => setAddressStreet(e.target.value)}
-                    required
-                    className={inputClasses}
-                    placeholder="Enter street address"
-                  />
+                  <label className="block text-sm font-medium !text-gray-700 mb-2">Street <span className="!text-red-500">*</span></label>
+                  <input type="text" value={addressStreet} onChange={(e) => setAddressStreet(e.target.value)} required className={inputClasses} placeholder="Enter street address" />
                 </div>
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium !text-gray-700 mb-2">
-                    City <span className="!text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={addressCity}
-                    onChange={(e) => setAddressCity(e.target.value)}
-                    required
-                    className={inputClasses}
-                    placeholder="Enter city"
-                  />
+                  <label className="block text-sm font-medium !text-gray-700 mb-2">City <span className="!text-red-500">*</span></label>
+                  <input type="text" value={addressCity} onChange={(e) => setAddressCity(e.target.value)} required className={inputClasses} placeholder="Enter city" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium !text-gray-700 mb-2">
-                    Country <span className="!text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={addressCountry}
-                    onChange={(e) => setAddressCountry(e.target.value)}
-                    required
-                    className={inputClasses}
-                    placeholder="Enter country"
-                  />
+                  <label className="block text-sm font-medium !text-gray-700 mb-2">Country <span className="!text-red-500">*</span></label>
+                  <input type="text" value={addressCountry} onChange={(e) => setAddressCountry(e.target.value)} required className={inputClasses} placeholder="Enter country" />
                 </div>
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium !text-gray-700 mb-2">Region</label>
-                  <input
-                    type="text"
-                    value={addressRegion}
-                    onChange={(e) => setAddressRegion(e.target.value)}
-                    className={inputClasses}
-                    placeholder="Enter region (optional)"
-                  />
+                  <input type="text" value={addressRegion} onChange={(e) => setAddressRegion(e.target.value)} className={inputClasses} placeholder="Enter region (optional)" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium !text-gray-700 mb-2">Postal Code</label>
-                  <input
-                    type="text"
-                    value={addressPostalCode}
-                    onChange={(e) => setAddressPostalCode(e.target.value)}
-                    className={inputClasses}
-                    placeholder="Enter postal code (optional)"
-                  />
+                  <input type="text" value={addressPostalCode} onChange={(e) => setAddressPostalCode(e.target.value)} className={inputClasses} placeholder="Enter postal code (optional)" />
                 </div>
               </div>
-
-              <button
-                type="submit"
-                disabled={adding}
-                className="w-full !bg-blue-600 hover:!bg-blue-700 !text-white py-3 px-6 rounded-lg font-semibold disabled:opacity-50"
-              >
+              <button type="submit" disabled={adding} className="w-full !bg-blue-600 hover:!bg-blue-700 !text-white py-3 px-6 rounded-lg font-semibold disabled:opacity-50">
                 {adding ? "Adding Address..." : "Add Address"}
               </button>
             </form>
@@ -392,21 +523,11 @@ const Customers = () => {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="!bg-gray-50">
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-semibold !text-gray-600 uppercase tracking-wider w-12">
-                      
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold !text-gray-600 uppercase tracking-wider">
-                      Full Name
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold !text-gray-600 uppercase tracking-wider">
-                      Phone
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold !text-gray-600 uppercase tracking-wider">
-                      Addresses
-                    </th>
-                    <th className="px-6 py-4 text-right text-xs font-semibold !text-gray-600 uppercase tracking-wider">
-                      Actions
-                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold !text-gray-600 uppercase tracking-wider w-12"></th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold !text-gray-600 uppercase tracking-wider">Full Name</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold !text-gray-600 uppercase tracking-wider">Phone</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold !text-gray-600 uppercase tracking-wider">Addresses</th>
+                    <th className="px-6 py-4 text-right text-xs font-semibold !text-gray-600 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="!bg-white divide-y divide-gray-200">
@@ -417,37 +538,16 @@ const Customers = () => {
                           <>
                             <td className="px-6 py-4"></td>
                             <td className="px-6 py-4">
-                              <input
-                                type="text"
-                                required
-                                value={editFullName}
-                                onChange={(e) => setEditFullName(e.target.value)}
-                                className={inputClasses}
-                              />
+                              <input type="text" required value={editFullName} onChange={(e) => setEditFullName(e.target.value)} className={inputClasses} />
                             </td>
                             <td className="px-6 py-4">
-                              <input
-                                type="text"
-                                value={editPhone}
-                                onChange={(e) => setEditPhone(e.target.value)}
-                                className={inputClasses}
-                              />
+                              <input type="text" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} className={inputClasses} />
                             </td>
                             <td className="px-6 py-4"></td>
                             <td className="px-6 py-4 text-right">
                               <div className="flex gap-2 justify-end">
-                                <button
-                                  onClick={handleEditCustomer}
-                                  className="!bg-green-600 hover:!bg-green-700 !text-white px-4 py-2 rounded-lg font-semibold"
-                                >
-                                  Save
-                                </button>
-                                <button
-                                  onClick={cancelEdit}
-                                  className="!bg-gray-500 hover:!bg-gray-600 !text-white px-4 py-2 rounded-lg font-semibold"
-                                >
-                                  Cancel
-                                </button>
+                                <button onClick={handleEditCustomer} className="!bg-green-600 hover:!bg-green-700 !text-white px-4 py-2 rounded-lg font-semibold">Save</button>
+                                <button onClick={cancelEdit} className="!bg-gray-500 hover:!bg-gray-600 !text-white px-4 py-2 rounded-lg font-semibold">Cancel</button>
                               </div>
                             </td>
                           </>
@@ -455,16 +555,8 @@ const Customers = () => {
                           <>
                             <td className="px-6 py-4">
                               {customer.customerAddresses && customer.customerAddresses.length > 0 && (
-                                <button
-                                  onClick={() => toggleRow(customer.id)}
-                                  className="!text-gray-600 hover:!text-blue-600"
-                                >
-                                  <svg
-                                    className={`w-5 h-5 transition-transform ${expandedRows.has(customer.id) ? 'rotate-90' : ''}`}
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                  >
+                                <button onClick={() => toggleRow(customer.id)} className="!text-gray-600 hover:!text-blue-600">
+                                  <svg className={`w-5 h-5 transition-transform ${expandedRows.has(customer.id) ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                   </svg>
                                 </button>
@@ -482,21 +574,16 @@ const Customers = () => {
                               </span>
                             </td>
                             <td className="px-6 py-4 text-right">
-                              <div className="flex gap-2 justify-end">
-                                <button
-                                  onClick={() => startEdit(customer)}
-                                  className="!bg-yellow-500 hover:!bg-yellow-600 !text-white p-2 rounded-lg"
-                                  title="Edit Customer"
-                                >
+                              <div className="flex gap-2 justify-end flex-wrap">
+                                <button onClick={() => openOrdersModal(customer.id, customer.fullName)} className="!bg-purple-600 hover:!bg-purple-700 !text-white px-4 py-2 rounded-lg font-semibold text-sm" title="View Orders">
+                                  📦 Orders
+                                </button>
+                                <button onClick={() => startEdit(customer)} className="!bg-yellow-500 hover:!bg-yellow-600 !text-white p-2 rounded-lg" title="Edit Customer">
                                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                   </svg>
                                 </button>
-                                <button
-                                  onClick={() => confirmDelete(customer.id, customer.fullName)}
-                                  className="!bg-red-600 hover:!bg-red-700 !text-white p-2 rounded-lg"
-                                  title="Delete Customer"
-                                >
+                                <button onClick={() => confirmDelete(customer.id, customer.fullName)} className="!bg-red-600 hover:!bg-red-700 !text-white p-2 rounded-lg" title="Delete Customer">
                                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                   </svg>
@@ -572,15 +659,207 @@ const Customers = () => {
               Are you sure you want to delete <strong className="!text-gray-900">"{deleteConfirm.name}"</strong>? This action cannot be undone.
             </p>
             <div className="flex gap-3">
-              <button
-                onClick={handleDelete}
-                className="flex-1 !bg-red-600 hover:!bg-red-700 !text-white py-3 px-4 rounded-lg font-semibold"
+              <button onClick={handleDelete} className="flex-1 !bg-red-600 hover:!bg-red-700 !text-white py-3 px-4 rounded-lg font-semibold">Delete</button>
+              <button onClick={cancelDelete} className="flex-1 !bg-gray-500 hover:!bg-gray-600 !text-white py-3 px-4 rounded-lg font-semibold">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Orders Modal */}
+      {ordersModal.show && (
+        <div className="fixed inset-0 !bg-black !bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="!bg-white rounded-xl shadow-2xl max-w-5xl w-full p-6 my-8">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-2xl font-bold !text-gray-900">Orders for {ordersModal.customerName}</h3>
+              <button onClick={closeOrdersModal} className="!text-gray-500 hover:!text-gray-700 text-2xl">×</button>
+            </div>
+
+            {ordersModal.error && (
+              <div className="mb-4 p-4 rounded-lg !bg-red-50 border-l-4 border-red-500">
+                <p className="text-sm !text-red-700">{ordersModal.error}</p>
+              </div>
+            )}
+
+            {ordersModal.loading ? (
+              <div className="flex justify-center py-8">
+                <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-r-transparent"></div>
+              </div>
+            ) : ordersModal.orders.length > 0 ? (
+              <div className="space-y-4">
+                {ordersModal.orders.map(order => (
+                  <div key={order.id} className="!bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="p-4 flex justify-between items-center cursor-pointer" onClick={() => toggleOrderRow(order.id)}>
+                      <div className="flex items-center gap-4">
+                        <svg className={`w-5 h-5 !text-gray-600 transition-transform ${expandedOrderRows.has(order.id) ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                        <div>
+                          <p className="font-semibold !text-gray-900">Order #{order.id}</p>
+                          <p className="text-sm !text-gray-600">{new Date(order.createdAt).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(order.status)}`}>
+                          {order.status || "N/A"}
+                        </span>
+                        <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${getPaymentColor(order.paymentStatus)}`}>
+                          {order.paymentStatus || "N/A"}
+                        </span>
+                        <p className="font-bold !text-gray-900">${order.totalAmount?.toFixed(2) || "0.00"}</p>
+                      </div>
+                    </div>
+
+                    {expandedOrderRows.has(order.id) && (
+                      <div className="p-4 border-t border-gray-200 !bg-white">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                          <div>
+                            <p className="text-xs !text-gray-600 mb-1">Seller</p>
+                            <p className="text-sm font-medium !text-gray-900">{order.sellerName || "N/A"}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs !text-gray-600 mb-1">Fulfillment</p>
+                            <p className="text-sm font-medium !text-gray-900">{order.fulfillmentType || "N/A"}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs !text-gray-600 mb-1">Payment Method</p>
+                            <p className="text-sm font-medium !text-gray-900">{order.paymentMethod || "N/A"}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs !text-gray-600 mb-1">Delivery Fee</p>
+                            <p className="text-sm font-medium !text-gray-900">${order.deliveryFee?.toFixed(2) || "0.00"}</p>
+                          </div>
+                        </div>
+
+                        {order.orderItems && order.orderItems.length > 0 && (
+                          <div>
+                            <h4 className="font-semibold !text-gray-900 mb-3">Order Items:</h4>
+                            <div className="space-y-2">
+                              {order.orderItems.map((item, idx) => (
+                                <div key={idx} className="p-3 !bg-gray-50 rounded-lg">
+                                    {/* Product Info Row */}
+                                    <div className="flex justify-between items-center">
+                                    <div className="flex-1">
+                                        <p className="text-sm font-medium !text-gray-900">{item.productName || "Product"}</p>
+                                        <p className="text-xs !text-gray-600">SKU: {item.variantSKU || "N/A"} • Qty: {item.qty}</p>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <p className="text-sm font-semibold !text-gray-900">${item.lineTotal?.toFixed(2) || "0.00"}</p>
+                                        {order.status?.toLowerCase() === 'completed' && !item.review && (
+                                        <button 
+                                            onClick={() => openReviewModal(order.id, item.productId, item.productName)}
+                                            className="!bg-blue-600 hover:!bg-blue-700 !text-white px-3 py-1 rounded text-xs font-medium"
+                                        >
+                                            ⭐ Review
+                                        </button>
+                                        )}
+                                        {item.review && (
+                                        <span className="!bg-green-100 !text-green-700 px-3 py-1 rounded text-xs font-medium">
+                                            ✓ Reviewed
+                                        </span>
+                                        )}
+                                    </div>
+                                    </div>
+                                     {/* Review Display - THIS IS THE NEW PART */}
+                                    {item.review && (
+                                    <div className="mt-3 p-3 !bg-white rounded-lg border border-gray-200">
+                                        <div className="flex items-center gap-2 mb-2">
+                                        <span className="text-xs font-semibold !text-gray-700">Your Review:</span>
+                                        <div className="flex">
+                                            {[1, 2, 3, 4, 5].map(star => (
+                                            <span key={star} className={`text-sm ${star <= item.review.rating ? '!text-yellow-400' : '!text-gray-300'}`}>
+                                                ★
+                                            </span>
+                                            ))}
+                                        </div>
+                                        <span className="text-xs !text-gray-600">
+                                            {new Date(item.review.createdAt).toLocaleDateString()}
+                                        </span>
+                                        </div>
+                                        <p className="text-sm !text-gray-700 italic">"{item.review.comment}"</p>
+                                    </div>
+                                    )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="!text-gray-600">No orders found for this customer</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Review Modal */}
+      {reviewModal.show && (
+        <div className="fixed inset-0 !bg-black !bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="!bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+            <div className="flex items-center mb-4">
+              <div className="!bg-yellow-100 p-3 rounded-full">
+                <svg className="w-6 h-6 !text-yellow-600" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                </svg>
+              </div>
+              <h3 className="ml-3 text-xl font-bold !text-gray-900">Write a Review</h3>
+            </div>
+            
+            <p className="!text-gray-600 mb-4">Product: <strong className="!text-gray-900">{reviewModal.productName}</strong></p>
+
+            {reviewModal.error && (
+              <div className="mb-4 p-3 rounded-lg !bg-red-50 border-l-4 border-red-500">
+                <p className="text-sm !text-red-700">{reviewModal.error}</p>
+              </div>
+            )}
+
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-sm font-medium !text-gray-700 mb-2">Rating</label>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5].map(star => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setReviewModal(prev => ({ ...prev, rating: star }))}
+                      className={`text-3xl ${star <= reviewModal.rating ? '!text-yellow-400' : '!text-gray-300'} hover:!text-yellow-400 transition`}
+                    >
+                      ★
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium !text-gray-700 mb-2">Comment</label>
+                <textarea
+                  value={reviewModal.comment}
+                  onChange={(e) => setReviewModal(prev => ({ ...prev, comment: e.target.value }))}
+                  rows="4"
+                  className="w-full !border-2 !border-gray-400 rounded-lg p-3 !text-black !bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Share your experience with this product..."
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button 
+                onClick={handleSubmitReview} 
+                disabled={reviewModal.loading}
+                className="flex-1 !bg-blue-600 hover:!bg-blue-700 !text-white py-3 px-4 rounded-lg font-semibold disabled:opacity-50"
               >
-                Delete
+                {reviewModal.loading ? "Submitting..." : "Submit Review"}
               </button>
-              <button
-                onClick={cancelDelete}
-                className="flex-1 !bg-gray-500 hover:!bg-gray-600 !text-white py-3 px-4 rounded-lg font-semibold"
+              <button 
+                onClick={closeReviewModal} 
+                disabled={reviewModal.loading}
+                className="flex-1 !bg-gray-300 hover:!bg-gray-400 !text-gray-900 py-3 px-4 rounded-lg font-semibold"
               >
                 Cancel
               </button>

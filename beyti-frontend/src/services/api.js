@@ -370,6 +370,76 @@ export const getSubCategoryDropdown = async () => {
   return await fetchAPI('/Products/subcategories-dropdown');
 };
 
+// --- Product Variant APIs ---
+
+/**
+ * Get color values for dropdown
+ * @returns {Promise<Array>} - Array of color objects
+ */
+export const getColorValues = async () => {
+  return await fetchAPI('/ProductVariants/colors');
+};
+
+/**
+ * Get size values for dropdown
+ * @returns {Promise<Array>} - Array of size objects
+ */
+export const getSizeValues = async () => {
+  return await fetchAPI('/ProductVariants/sizes');
+};
+
+/**
+ * Get all variants for a specific product
+ * @param {number} productId - Product ID
+ * @returns {Promise<Array>} - Array of product variant objects
+ */
+export const getProductVariants = async (productId) => {
+  return await fetchAPI(`/ProductVariants?productId=${productId}`);
+};
+
+/**
+ * Create a new product variant
+ * @param {object} data - Variant payload
+ *   Example: {
+ *     ProductId,
+ *     ColorValue (optional string),
+ *     SizeValue (optional string),
+ *     SKU (optional),
+ *     Price (optional, uses base price if null),
+ *     StockQty
+ *   }
+ * @returns {Promise<object>} - Created variant object
+ */
+export const createProductVariant = async (data) => {
+  return await fetchAPI('/ProductVariants', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Update a product variant
+ * @param {number} id - Variant ID
+ * @param {object} data - Updated variant fields
+ * @returns {Promise<object>} - Updated variant object
+ */
+export const updateProductVariant = async (id, data) => {
+  return await fetchAPI(`/ProductVariants/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Delete a product variant
+ * @param {number} id - Variant ID to delete
+ * @returns {Promise<null>} - Returns null on success
+ */
+export const deleteProductVariant = async (id) => {
+  return await fetchAPI(`/ProductVariants/${id}`, {
+    method: 'DELETE',
+  });
+};
 // --- Category APIs ---
 
 /**
@@ -477,6 +547,351 @@ export const updateSubCategory = async (id, data) => {
 export const deleteSubCategory = async (id) => {
   return await fetchAPI(`/SubCategories/${id}`, {
     method: 'DELETE',
+  });
+};
+
+// --- Order APIs ---
+
+/**
+ * Get all orders
+ * @param {number} [customerId] - Optional: Filter by customer ID
+ * @param {number} [sellerId] - Optional: Filter by seller ID
+ * @returns {Promise<Array>} - Array of order objects with full details
+ */
+export const getOrders = async (customerId = null, sellerId = null) => {
+  let url = '/Orders';
+  const params = new URLSearchParams();
+  
+  if (customerId) params.append('customerId', customerId);
+  if (sellerId) params.append('sellerId', sellerId);
+  
+  if (params.toString()) {
+    url += `?${params.toString()}`;
+  }
+  
+  return await fetchAPI(url);
+};
+
+/**
+ * Get a single order by ID
+ * @param {number} id - Order ID
+ * @returns {Promise<object>} - Order object with full details including items
+ */
+export const getOrder = async (id) => {
+  return await fetchAPI(`/Orders/${id}`);
+};
+
+/**
+ * Create a new order
+ * @param {object} data - Order payload
+ *   Example: {
+ *     CustomerId: number,
+ *     SellerId: number,
+ *     DeliveryAddressId: number | null,
+ *     PickupAddressId: number | null,
+ *     PaymentMethod: string, // "Cash", "Card", "Online"
+ *     PaymentStatus: string, // "Pending", "Paid", "Failed"
+ *     FulfillmentType: string, // "Delivery", "Pickup"
+ *     Status: string, // "Placed", "Processing", "Completed", "Cancelled"
+ *     SubtotalAmount: number,
+ *     DeliveryFee: number,
+ *     TotalAmount: number
+ *   }
+ * @returns {Promise<object>} - Created order object
+ */
+export const createOrder = async (data) => {
+  return await fetchAPI('/Orders', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Update an order (for status changes, payment updates)
+ * @param {number} id - Order ID
+ * @param {object} data - Updated order fields
+ *   Example: {
+ *     PaymentStatus: string,
+ *     Status: string,
+ *     DeliveryFee: number,
+ *     TotalAmount: number
+ *   }
+ * @returns {Promise<null>} - Returns null on success
+ */
+export const updateOrder = async (id, data) => {
+  return await fetchAPI(`/Orders/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Delete an order
+ * @param {number} id - Order ID to delete
+ * @returns {Promise<null>} - Returns null on success
+ */
+export const deleteOrder = async (id) => {
+  return await fetchAPI(`/Orders/${id}`, {
+    method: 'DELETE',
+  });
+};
+
+// --- Order Item APIs ---
+
+/**
+ * Get all order items
+ * @param {number} [orderId] - Optional: Filter by order ID
+ * @returns {Promise<Array>} - Array of order item objects
+ */
+export const getOrderItems = async (orderId = null) => {
+  let url = '/OrderItems';
+  
+  if (orderId) {
+    url += `?orderId=${orderId}`;
+  }
+  
+  return await fetchAPI(url);
+};
+
+/**
+ * Get a single order item by ID
+ * @param {number} id - Order Item ID
+ * @returns {Promise<object>} - Order item object with product details
+ */
+export const getOrderItem = async (id) => {
+  return await fetchAPI(`/OrderItems/${id}`);
+};
+
+/**
+ * Create a new order item
+ * @param {object} data - Order item payload
+ *   Example: {
+ *     OrderId: number,
+ *     ProductVariantId: number,
+ *     Qty: number,
+ *     UnitPrice: number
+ *   }
+ * @returns {Promise<object>} - Created order item object
+ */
+export const createOrderItem = async (data) => {
+  return await fetchAPI('/OrderItems', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Update an order item (for quantity or price changes)
+ * @param {number} id - Order Item ID
+ * @param {object} data - Updated order item fields
+ *   Example: {
+ *     Qty: number,
+ *     UnitPrice: number
+ *   }
+ * @returns {Promise<null>} - Returns null on success
+ */
+export const updateOrderItem = async (id, data) => {
+  return await fetchAPI(`/OrderItems/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Delete an order item
+ * @param {number} id - Order Item ID to delete
+ * @returns {Promise<null>} - Returns null on success
+ */
+export const deleteOrderItem = async (id) => {
+  return await fetchAPI(`/OrderItems/${id}`, {
+    method: 'DELETE',
+  });
+};
+
+// --- Helper/Utility Functions ---
+
+/**
+ * Get orders for a specific customer
+ * @param {number} customerId - Customer ID
+ * @returns {Promise<Array>} - Array of orders for the customer
+ */
+export const getCustomerOrders = async (customerId) => {
+  return await getOrders(customerId, null);
+};
+
+/**
+ * Get orders for a specific seller/store
+ * @param {number} sellerId - Seller ID
+ * @returns {Promise<Array>} - Array of orders for the seller
+ */
+export const getSellerOrders = async (sellerId) => {
+  return await getOrders(null, sellerId);
+};
+
+/**
+ * Get all items for a specific order
+ * @param {number} orderId - Order ID
+ * @returns {Promise<Array>} - Array of order items
+ */
+export const getOrderItemsByOrder = async (orderId) => {
+  return await getOrderItems(orderId);
+};
+
+/**
+ * Create a complete order with items (convenience function)
+ * @param {object} orderData - Order data
+ * @param {Array} items - Array of order items
+ *   Example items: [{ ProductVariantId, Qty, UnitPrice }, ...]
+ * @returns {Promise<object>} - Created order with items
+ */
+export const createCompleteOrder = async (orderData, items) => {
+  try {
+    // Create the order first
+    const createdOrder = await createOrder(orderData);
+    
+    // Create all order items
+    const itemPromises = items.map(item => 
+      createOrderItem({
+        OrderId: createdOrder.id,
+        ProductVariantId: item.ProductVariantId,
+        Qty: item.Qty,
+        UnitPrice: item.UnitPrice
+      })
+    );
+    
+    const createdItems = await Promise.all(itemPromises);
+    
+    return {
+      order: createdOrder,
+      items: createdItems
+    };
+  } catch (error) {
+    console.error('Error creating complete order:', error);
+    throw error;
+  }
+};
+
+// --- Review APIs ---
+
+/**
+ * Get all reviews
+ * @param {number} [productId] - Optional: Filter by product ID
+ * @param {number} [customerId] - Optional: Filter by customer ID
+ * @returns {Promise<Array>} - Array of review objects
+ */
+export const getReviews = async (productId = null, customerId = null) => {
+  let url = '/Reviews';
+  const params = new URLSearchParams();
+  
+  if (productId) params.append('productId', productId);
+  if (customerId) params.append('customerId', customerId);
+  
+  if (params.toString()) {
+    url += `?${params.toString()}`;
+  }
+  
+  return await fetchAPI(url);
+};
+
+/**
+ * Get a single review by ID
+ * @param {number} id - Review ID
+ * @returns {Promise<object>} - Review object with customer and product details
+ */
+export const getReview = async (id) => {
+  return await fetchAPI(`/Reviews/${id}`);
+};
+
+
+/**
+ * Create a new review
+ * @param {object} data - Review payload
+ *   Example: {
+ *     OrderId: number,
+ *     ProductId: number,
+ *     CustomerId: number,
+ *     Rating: number, // 1-5
+ *     Comment: string
+ *   }
+ * @returns {Promise<object>} - Created review object
+ */
+export const createReview = async (data) => {
+  return await fetchAPI('/Reviews', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Update a review (for hiding/unhiding by seller)
+ * @param {number} id - Review ID
+ * @param {object} data - Updated review fields
+ *   Example: {
+ *     IsCommentHiddenBySeller: boolean,
+ *     HiddenReason: string
+ *   }
+ * @returns {Promise<null>} - Returns null on success
+ */
+export const updateReview = async (id, data) => {
+  return await fetchAPI(`/Reviews/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Delete a review
+ * @param {number} id - Review ID to delete
+ * @returns {Promise<null>} - Returns null on success
+ */
+export const deleteReview = async (id) => {
+  return await fetchAPI(`/Reviews/${id}`, {
+    method: 'DELETE',
+  });
+};
+
+// --- Helper/Utility Functions ---
+
+/**
+ * Get reviews for a specific product
+ * @param {number} productId - Product ID
+ * @returns {Promise<Array>} - Array of reviews for the product
+ */
+export const getProductReviews = async (productId) => {
+  return await getReviews(productId, null);
+};
+
+/**
+ * Get reviews by a specific customer
+ * @param {number} customerId - Customer ID
+ * @returns {Promise<Array>} - Array of reviews by the customer
+ */
+export const getCustomerReviews = async (customerId) => {
+  return await getReviews(null, customerId);
+};
+
+/**
+ * Hide a review (seller action)
+ * @param {number} reviewId - Review ID
+ * @param {string} reason - Reason for hiding the review
+ * @returns {Promise<null>} - Returns null on success
+ */
+export const hideReview = async (reviewId, reason) => {
+  return await updateReview(reviewId, {
+    IsCommentHiddenBySeller: true,
+    HiddenReason: reason
+  });
+};
+
+/**
+ * Unhide a review (seller action)
+ * @param {number} reviewId - Review ID
+ * @returns {Promise<null>} - Returns null on success
+ */
+export const unhideReview = async (reviewId) => {
+  return await updateReview(reviewId, {
+    IsCommentHiddenBySeller: false,
+    HiddenReason: null
   });
 };
 
