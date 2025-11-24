@@ -1,11 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using BeytiDB.Data;
+using Beyti_Backend.Services;
 
 namespace Beyti_Backend.Controllers.Api
 {
@@ -14,73 +10,75 @@ namespace Beyti_Backend.Controllers.Api
     public class NotificationsController : ControllerBase
     {
         private readonly BeytiContext _context;
+        private readonly INotificationService _notificationService;
 
-        public NotificationsController(BeytiContext context)
+        public NotificationsController(BeytiContext context, INotificationService notificationService)
         {
             _context = context;
+            _notificationService = notificationService;
         }
 
-        // GET: api/Notifications
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<Notification>>> GetNotifications()
+        // GET: api/Notifications/user/5
+        [HttpGet("user/{userId}")]
+        public async Task<ActionResult<IEnumerable<Notification>>> GetUserNotifications(int userId)
         {
-            return await _context.Notifications.ToListAsync();
+            var notifications = await _context.Notifications
+                .Where(n => n.RecipientUserId == userId)
+                .OrderByDescending(n => n.CreatedAt)
+                .ToListAsync();
+
+            return Ok(notifications);
         }
 
-        // GET: api/Notifications/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Notification>> GetNotification(int id)
+        // GET: api/Notifications/user/5/unread
+        [HttpGet("user/{userId}/unread")]
+        public async Task<ActionResult<IEnumerable<Notification>>> GetUnreadNotifications(int userId)
+        {
+            var notifications = await _context.Notifications
+                .Where(n => n.RecipientUserId == userId && !n.IsRead)
+                .OrderByDescending(n => n.CreatedAt)
+                .ToListAsync();
+
+            return Ok(notifications);
+        }
+
+        // GET: api/Notifications/user/5/unread/count
+        [HttpGet("user/{userId}/unread/count")]
+        public async Task<ActionResult<int>> GetUnreadCount(int userId)
+        {
+            var count = await _context.Notifications
+                .CountAsync(n => n.RecipientUserId == userId && !n.IsRead);
+
+            return Ok(count);
+        }
+
+        // PUT: api/Notifications/5/read
+        [HttpPut("{id}/read")]
+        public async Task<IActionResult> MarkAsRead(int id)
         {
             var notification = await _context.Notifications.FindAsync(id);
+            if (notification == null) return NotFound();
 
-            if (notification == null)
-            {
-                return NotFound();
-            }
-
-            return notification;
-        }
-
-        // PUT: api/Notifications/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutNotification(int id, Notification notification)
-        {
-            if (id != notification.Id)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(notification).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!NotificationExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return NoContent();
-        }
-
-        // POST: api/Notifications
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPost]
-        public async Task<ActionResult<Notification>> PostNotification(Notification notification)
-        {
-            _context.Notifications.Add(notification);
+            notification.IsRead = true;
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetNotification", new { id = notification.Id }, notification);
+            return Ok(notification);
+        }
+
+        // PUT: api/Notifications/user/5/read-all
+        [HttpPut("user/{userId}/read-all")]
+        public async Task<IActionResult> MarkAllAsRead(int userId)
+        {
+            var notifications = await _context.Notifications
+                .Where(n => n.RecipientUserId == userId && !n.IsRead)
+                .ToListAsync();
+
+            foreach (var n in notifications)
+                n.IsRead = true;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = $"Marked {notifications.Count} notifications as read." });
         }
 
         // DELETE: api/Notifications/5
@@ -88,20 +86,12 @@ namespace Beyti_Backend.Controllers.Api
         public async Task<IActionResult> DeleteNotification(int id)
         {
             var notification = await _context.Notifications.FindAsync(id);
-            if (notification == null)
-            {
-                return NotFound();
-            }
+            if (notification == null) return NotFound();
 
             _context.Notifications.Remove(notification);
             await _context.SaveChangesAsync();
 
             return NoContent();
-        }
-
-        private bool NotificationExists(int id)
-        {
-            return _context.Notifications.Any(e => e.Id == id);
         }
     }
 }

@@ -1,21 +1,18 @@
 import { useEffect, useState } from 'react';
-import { getAdmins, createAdmin, updateAdmin, deleteAdmin } from '../../services/api';
+import { getAdmins, createAdmin, updateAdmin } from '../../services/api';
 
 export default function AdminPage() {
   const [admins, setAdmins] = useState([]);
-  const [formData, setFormData] = useState({
-    title: '',
-    permissions: ''
-  });
+  const [formData, setFormData] = useState({ title: '', permissions: '' });
   const [editingId, setEditingId] = useState(null);
 
-  // Fetch admins from API
+  // Fetch all admins
   const fetchAdmins = async () => {
     try {
       const data = await getAdmins();
       setAdmins(data);
-    } catch (error) {
-      console.error('Failed to fetch admins:', error);
+    } catch (err) {
+      console.error('Error fetching admins:', err);
     }
   };
 
@@ -23,55 +20,35 @@ export default function AdminPage() {
     fetchAdmins();
   }, []);
 
-  // Handle form submit
+  // Handle form submit (create/update)
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    const payload = {
-      title: formData.title,
-      permissions: formData.permissions, // send as string
-      userProfileId: 2 // make sure this ID exists in your backend
-    };
-
-    console.log('Submitting payload:', payload);
-
     try {
       if (editingId) {
-        await updateAdmin(editingId, payload);
+        await updateAdmin(editingId, formData);
         setEditingId(null);
       } else {
-        await createAdmin(payload);
+        await createAdmin(formData);
       }
-
       setFormData({ title: '', permissions: '' });
       fetchAdmins();
-    } catch (error) {
-      console.error('Failed to submit admin:', error);
-      alert('Failed to submit admin. Check console for details.');
+    } catch (err) {
+      console.error('Error saving admin:', err);
+      alert('Error saving admin. Check console.');
     }
   };
 
-  // Edit admin
-  const handleEdit = (admin) => {
-    setEditingId(admin.id);
-    setFormData({
-      title: admin.title,
-      permissions: admin.permissions || ''
-    });
-  };
-
-  // Delete admin
-  const handleDelete = async (id) => {
-    if (confirm('Are you sure you want to delete this admin?')) {
-      try {
-        await deleteAdmin(id);
-        fetchAdmins();
-      } catch (error) {
-        console.error('Failed to delete admin:', error);
-        alert('Failed to delete admin. Check console for details.');
-      }
-    }
-  };
+  // In handleEdit, store the full admin
+const handleEdit = (admin) => {
+  setEditingId(admin.id);
+  setFormData({
+    id: admin.id,
+    userProfileId: admin.userProfileId,
+    title: admin.title,
+    permissions: admin.permissions || '',
+    createdAt: admin.createdAt
+  });
+};
 
   return (
     <div className="p-6">
@@ -81,28 +58,21 @@ export default function AdminPage() {
       <form onSubmit={handleSubmit} className="mb-6 space-y-2">
         <input
           type="text"
-          name="title"
           placeholder="Title"
           value={formData.title}
           onChange={(e) => setFormData({ ...formData, title: e.target.value })}
           className="border px-2 py-1 rounded w-full"
           required
         />
-
         <input
           type="text"
-          name="permissions"
           placeholder="Permissions (comma separated)"
           value={formData.permissions}
           onChange={(e) => setFormData({ ...formData, permissions: e.target.value })}
           className="border px-2 py-1 rounded w-full"
           required
         />
-
-        <button
-          type="submit"
-          className="bg-blue-600 text-white px-4 py-2 rounded"
-        >
+        <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded">
           {editingId ? 'Update Admin' : 'Add Admin'}
         </button>
       </form>
@@ -115,7 +85,7 @@ export default function AdminPage() {
             <th className="border px-2 py-1">UserProfileId</th>
             <th className="border px-2 py-1">Title</th>
             <th className="border px-2 py-1">Permissions</th>
-            <th className="border px-2 py-1">CreatedAt</th>
+            <th className="border px-2 py-1">Created At</th>
             <th className="border px-2 py-1">Actions</th>
           </tr>
         </thead>
@@ -126,19 +96,13 @@ export default function AdminPage() {
               <td className="border px-2 py-1">{admin.userProfileId}</td>
               <td className="border px-2 py-1">{admin.title}</td>
               <td className="border px-2 py-1">{admin.permissions}</td>
-              <td className="border px-2 py-1">{admin.createdAt}</td>
-              <td className="border px-2 py-1 space-x-2">
+              <td className="border px-2 py-1">{new Date(admin.createdAt).toLocaleString()}</td>
+              <td className="border px-2 py-1">
                 <button
                   onClick={() => handleEdit(admin)}
                   className="bg-yellow-400 text-white px-2 py-1 rounded"
                 >
                   Edit
-                </button>
-                <button
-                  onClick={() => handleDelete(admin.id)}
-                  className="bg-red-600 text-white px-2 py-1 rounded"
-                >
-                  Delete
                 </button>
               </td>
             </tr>

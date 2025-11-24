@@ -1,16 +1,23 @@
 using Microsoft.EntityFrameworkCore;
 using BeytiDB.Data;
+using Beyti_SignalR;
+using Beyti_Backend.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddDbContext<BeytiContext>();
-
 builder.Services.AddControllers();
+
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Add SignalR
+builder.Services.AddSignalR();
+
+// Add NotificationService
+builder.Services.AddScoped<INotificationService, NotificationService>();
 
 builder.Services.AddCors(options =>
 {
@@ -22,6 +29,7 @@ builder.Services.AddCors(options =>
               .AllowCredentials();
     });
 });
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -39,5 +47,8 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Map SignalR Hub
+app.MapHub<NotificationHub>("/notificationHub");
 
 app.Run();
