@@ -1,25 +1,73 @@
 import { useState, useEffect } from "react";
-import { getSellers } from "../../services/api";
+
+const FIXED_DELIVERY_FEE = 5.00;
 
 const StoresPage = () => {
   const [sellers, setSellers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedStoreId, setSelectedStoreId] = useState(null);
   const [selectedStore, setSelectedStore] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(null);
+  
+  const [customers, setCustomers] = useState([]);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [showCustomerModal, setShowCustomerModal] = useState(true);
+  const [loadingCustomers, setLoadingCustomers] = useState(true);
+  const [customerSearchQuery, setCustomerSearchQuery] = useState("");
+
+  // Checkout modal state
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [checkoutProduct, setCheckoutProduct] = useState(null);
+  const [quantity, setQuantity] = useState(1);
+  const [selectedDeliveryAddress, setSelectedDeliveryAddress] = useState("");
+  const [fulfillmentType, setFulfillmentType] = useState("Delivery");
+  const [paymentMethod, setPaymentMethod] = useState("Cash");
+  const [placingOrder, setPlacingOrder] = useState(false);
+  const [orderError, setOrderError] = useState(null);
 
   useEffect(() => {
-    fetchSellers();
+    fetchCustomers();
   }, []);
+
+  useEffect(() => {
+    if (selectedCustomer) {
+      fetchSellers();
+    }
+  }, [selectedCustomer]);
+
+  const fetchCustomers = async () => {
+    try {
+      setLoadingCustomers(true);
+      const response = await fetch('https://localhost:7062/api/Customers');
+      
+      if (!response.ok) {
+        throw new Error('Failed to load customers');
+      }
+
+      const data = await response.json();
+      setCustomers(data);
+    } catch (err) {
+      console.error("Error loading customers:", err);
+      alert("Failed to load customers: " + err.message);
+    } finally {
+      setLoadingCustomers(false);
+    }
+  };
 
   const fetchSellers = async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await getSellers();
+      const response = await fetch('https://localhost:7062/api/Sellers');
+      
+      if (!response.ok) {
+        throw new Error('Failed to load sellers');
+      }
+
+      const data = await response.json();
       setSellers(data);
     } catch (err) {
       setError(err.message || "Failed to load stores");
@@ -63,9 +111,343 @@ const StoresPage = () => {
     setSelectedProduct(null);
   };
 
+  const handleCustomerSelect = (customer) => {
+    setSelectedCustomer(customer);
+    setShowCustomerModal(false);
+  };
+
+  const handleChangeCustomer = () => {
+    setShowCustomerModal(true);
+    setSelectedStoreId(null);
+    setSelectedStore(null);
+  };
+
+  const handleSkipCustomerSelection = () => {
+    setShowCustomerModal(false);
+    setSelectedCustomer(null);
+  };
+
+  const handleAddToCart = (product) => {
+    if (!selectedCustomer) {
+      alert("Please select a customer first!");
+      setShowCustomerModal(true);
+      return;
+    }
+
+    setCheckoutProduct(product);
+    setQuantity(1);
+    setSelectedDeliveryAddress("");
+    setFulfillmentType("Delivery");
+    setPaymentMethod("Cash");
+    setOrderError(null);
+    setShowCheckoutModal(true);
+  };
+
+  const closeCheckoutModal = () => {
+    setShowCheckoutModal(false);
+    setCheckoutProduct(null);
+    setQuantity(1);
+    setSelectedDeliveryAddress("");
+    setOrderError(null);
+  };
+
+  const calculateSubtotal = () => {
+    if (!checkoutProduct) return 0;
+    return checkoutProduct.basePrice * quantity;
+  };
+
+  const calculateTotal = () => {
+    const subtotal = calculateSubtotal();
+    const deliveryFee = fulfillmentType === "Delivery" ? FIXED_DELIVERY_FEE : 0;
+    return subtotal + deliveryFee;
+  };
+
+  const handlePlaceOrder = async () => {
+    try {
+      setPlacingOrder(true);
+      setOrderError(null);
+
+      // Validation
+      if (fulfillmentType === "Delivery" && !selectedDeliveryAddress) {
+        setOrderError("Please select a delivery address");
+        return;
+      }
+
+      // Get pickup address (seller's first address)
+      const pickupAddressId = selectedStore.sellerAddresses?.[0]?.addressId || null;
+
+      const subtotal = calculateSubtotal();
+      const deliveryFee = fulfillmentType === "Delivery" ? FIXED_DELIVERY_FEE : 0;
+      const total = calculateTotal();
+
+      // Create order - Note the PascalCase for C# API
+      const orderData = {
+        CustomerId: selectedCustomer.id,
+        SellerId: selectedStore.id,
+        DeliveryAddressId: fulfillmentType === "Delivery" ? parseInt(selectedDeliveryAddress) : null,
+        PickupAddressId: pickupAddressId,
+        PaymentMethod: paymentMethod,
+        PaymentStatus: "Pending",
+        FulfillmentType: fulfillmentType,
+        Status: "Placed",
+        SubtotalAmount: subtotal,
+        DeliveryFee: deliveryFee,
+        TotalAmount: total,
+        CreatedAt: new Date().toISOString(),
+        UpdatedAt: new Date().toISOString()
+      };
+
+      console.log("Creating order:", orderData);
+
+      const orderResponse = await fetch('https://localhost:7062/api/Orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(orderData),
+      });
+
+      if (!orderResponse.ok) {
+        const errorText = await orderResponse.text();
+        throw new Error(`Failed to create order: ${errorText}`);
+      }
+
+      const createdOrder = await orderResponse.json();
+      console.log("Order created:", createdOrder);
+
+      // Now we need to get or create a product variant
+      // First, check if product has any variants
+      let variantId = null;
+      
+      try {
+        const variantsResponse = await fetch(`https://localhost:7062/api/ProductVariants?productId=${checkoutProduct.id}`);
+        
+        if (variantsResponse.ok) {
+          const variants = await variantsResponse.json();
+          
+          if (variants && variants.length > 0) {
+            // Use the first variant
+            variantId = variants[0].id;
+            console.log("Using existing variant:", variantId);
+          } else {
+            // Create a default variant for this product
+            console.log("No variants found, creating default variant...");
+            const createVariantResponse = await fetch('https://localhost:7062/api/ProductVariants', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                ProductId: checkoutProduct.id,
+                ColorValue: null,
+                SizeValue: null,
+                SKU: `DEFAULT-${checkoutProduct.id}`,
+                Price: checkoutProduct.basePrice,
+                StockQty: 999
+              }),
+            });
+
+            if (createVariantResponse.ok) {
+              const newVariant = await createVariantResponse.json();
+              variantId = newVariant.id;
+              console.log("Created default variant:", variantId);
+            } else {
+              throw new Error("Failed to create default variant");
+            }
+          }
+        }
+      } catch (variantError) {
+        console.error("Error handling variants:", variantError);
+        alert(`Order created (ID: ${createdOrder.id}) but couldn't add product details. Please contact support.`);
+        closeCheckoutModal();
+        closeProductModal();
+        return;
+      }
+
+      if (!variantId) {
+        alert(`Order created (ID: ${createdOrder.id}) but couldn't add product details. Please contact support.`);
+        closeCheckoutModal();
+        closeProductModal();
+        return;
+      }
+
+      // Create order item with the variant
+      const orderItemData = {
+        OrderId: createdOrder.id,
+        ProductVariantId: variantId,
+        Qty: quantity,
+        UnitPrice: checkoutProduct.basePrice
+      };
+
+      console.log("Creating order item:", orderItemData);
+
+      const orderItemResponse = await fetch('https://localhost:7062/api/OrderItems', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(orderItemData),
+      });
+
+      if (!orderItemResponse.ok) {
+        const errorText = await orderItemResponse.text();
+        console.error("OrderItem creation failed:", errorText);
+        alert(`Order created (ID: ${createdOrder.id}) but couldn't add item details. Error: ${errorText}`);
+      } else {
+        const createdOrderItem = await orderItemResponse.json();
+        console.log("Order item created:", createdOrderItem);
+        
+        // Success message with order details
+        alert(`✅ Order placed successfully!\n\nOrder ID: ${createdOrder.id}\nTotal: ${total.toFixed(2)}\nPayment: ${paymentMethod}\nFulfillment: ${fulfillmentType}`);
+      }
+
+      // Close modals and reset
+      closeCheckoutModal();
+      closeProductModal();
+
+    } catch (err) {
+      console.error("Error placing order:", err);
+      setOrderError(err.message || "Failed to place order");
+    } finally {
+      setPlacingOrder(false);
+    }
+  };
+
   const filteredSellers = sellers.filter(seller =>
     seller.storeName.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const filteredCustomers = customers.filter(customer =>
+    customer.fullName?.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
+    customer.email?.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
+    customer.phone?.toLowerCase().includes(customerSearchQuery.toLowerCase())
+  );
+
+  // Customer Selection Modal
+  if (showCustomerModal) {
+    return (
+      <div className="fixed inset-0 !bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="!bg-white rounded-3xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden animate-fadeIn relative">
+          {/* Close Button */}
+          <button
+            onClick={handleSkipCustomerSelection}
+            className="absolute top-6 right-6 z-10 !bg-gray-200 hover:!bg-gray-300 !text-gray-700 p-3 rounded-full shadow-lg transition-all transform hover:scale-110"
+            title="Skip customer selection"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+
+          {/* Header */}
+          <div className="!bg-gradient-to-r !from-blue-600 !to-purple-600 p-10 text-center relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 !bg-white/10 rounded-full blur-3xl -mr-32 -mt-32"></div>
+            <div className="absolute bottom-0 left-0 w-64 h-64 !bg-white/10 rounded-full blur-3xl -ml-32 -mb-32"></div>
+            
+            <div className="relative">
+              <div className="!bg-white/20 backdrop-blur-sm w-28 h-28 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl">
+                <svg className="w-14 h-14 !text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+              <h2 className="text-5xl font-black !text-white mb-3">Select Customer</h2>
+              <p className="text-2xl !text-white/90 font-medium">Choose who will be placing this order</p>
+              <p className="text-lg !text-white/70 font-medium mt-2">or skip to browse without a customer</p>
+            </div>
+          </div>
+
+          {/* Search Bar */}
+          <div className="p-8 border-b-2 border-gray-100">
+            <div className="relative">
+              <input
+                type="text"
+                value={customerSearchQuery}
+                onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                placeholder="Search by name, email, or phone..."
+                className="w-full !bg-gray-50 !text-gray-900 placeholder-gray-400 px-8 py-5 pl-16 rounded-2xl border-2 !border-gray-200 focus:!border-blue-500 focus:outline-none text-lg font-medium transition-all shadow-sm focus:shadow-lg"
+              />
+              <svg className="absolute left-6 top-1/2 transform -translate-y-1/2 w-7 h-7 !text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            {filteredCustomers.length > 0 && (
+              <p className="mt-4 !text-gray-600 text-sm font-medium text-center">
+                {filteredCustomers.length} customer{filteredCustomers.length !== 1 ? 's' : ''} found
+              </p>
+            )}
+          </div>
+
+          {/* Customer List */}
+          <div className="p-8 overflow-y-auto max-h-[50vh]">
+            {loadingCustomers ? (
+              <div className="text-center py-16">
+                <div className="relative w-20 h-20 mx-auto mb-6">
+                  <div className="w-20 h-20 border-4 !border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                  <div className="absolute inset-0 w-20 h-20 border-4 !border-transparent border-r-purple-600 rounded-full animate-spin" style={{animationDirection: 'reverse', animationDuration: '1s'}}></div>
+                </div>
+                <p className="text-xl font-bold !text-gray-800">Loading customers...</p>
+              </div>
+            ) : filteredCustomers.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {filteredCustomers.map((customer) => (
+                  <button
+                    key={customer.id}
+                    onClick={() => handleCustomerSelect(customer)}
+                    className="group !bg-gradient-to-br !from-gray-50 !to-blue-50 hover:!from-blue-100 hover:!to-purple-100 rounded-2xl p-6 text-left border-2 !border-gray-200 hover:!border-blue-400 transition-all transform hover:scale-105 shadow-lg hover:shadow-2xl"
+                  >
+                    <div className="flex items-start gap-5">
+                      <div className="!bg-gradient-to-br !from-blue-600 !to-purple-600 p-4 rounded-xl shadow-lg group-hover:rotate-6 transition-transform flex-shrink-0">
+                        <svg className="w-7 h-7 !text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-2xl font-black !text-gray-900 mb-3 group-hover:!text-blue-600 transition-colors truncate">
+                          {customer.fullName || 'Unnamed Customer'}
+                        </h3>
+                        {customer.email && (
+                          <div className="!bg-white px-4 py-2 rounded-lg mb-2 flex items-center gap-2 shadow-sm">
+                            <svg className="w-5 h-5 !text-blue-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                            <span className="!text-gray-700 text-sm font-medium truncate">{customer.email}</span>
+                          </div>
+                        )}
+                        {customer.phone && (
+                          <div className="!bg-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm">
+                            <svg className="w-5 h-5 !text-blue-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                            </svg>
+                            <span className="!text-gray-700 text-sm font-medium truncate">{customer.phone}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-16">
+                <div className="!bg-gradient-to-br !from-gray-100 !to-blue-100 w-32 h-32 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+                  <svg className="w-16 h-16 !text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-3xl font-black !text-gray-900 mb-3">No Customers Found</h3>
+                <p className="!text-gray-600 text-lg mb-8">Try adjusting your search or add new customers</p>
+                <button 
+                  onClick={() => setCustomerSearchQuery("")}
+                  className="!bg-gradient-to-r !from-blue-600 !to-purple-600 hover:!from-blue-700 hover:!to-purple-700 !text-white px-8 py-4 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+                >
+                  Clear Search
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -110,6 +492,35 @@ const StoresPage = () => {
     return (
       <div className="min-h-screen !bg-gradient-to-br !from-slate-50 !via-blue-50 !to-indigo-100 py-8 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
+          {/* Customer Info Bar */}
+          {selectedCustomer && (
+            <div className="mb-6 !bg-gradient-to-r !from-blue-600 !to-purple-600 rounded-2xl p-5 shadow-2xl flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="!bg-white/20 backdrop-blur-sm p-3 rounded-xl shadow-lg">
+                  <svg className="w-7 h-7 !text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm !text-white/90 font-bold mb-1">Ordering for</p>
+                  <p className="text-2xl font-black !text-white">{selectedCustomer.fullName}</p>
+                  {selectedCustomer.email && (
+                    <p className="text-sm !text-white/80 font-medium mt-1">{selectedCustomer.email}</p>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={handleChangeCustomer}
+                className="!bg-white hover:!bg-gray-100 !text-blue-600 px-6 py-3 rounded-xl font-bold shadow-lg transition-all transform hover:scale-105 flex items-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+                Change Customer
+              </button>
+            </div>
+          )}
+
           {/* Back Button */}
           <button
             onClick={handleBackToStores}
@@ -221,16 +632,27 @@ const StoresPage = () => {
                       </div>
                     )}
 
-                    <button 
-                      onClick={() => handleProductClick(product)}
-                      className="w-full !bg-gradient-to-r !from-blue-600 !to-purple-600 hover:!from-blue-700 hover:!to-purple-700 !text-white font-bold py-4 rounded-2xl shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 flex items-center justify-center gap-2"
-                    >
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                      View Details
-                    </button>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => handleProductClick(product)}
+                        className="flex-1 !bg-gradient-to-r !from-gray-600 !to-gray-700 hover:!from-gray-700 hover:!to-gray-800 !text-white font-bold py-4 rounded-2xl shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 flex items-center justify-center gap-2"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                        View
+                      </button>
+                      <button 
+                        onClick={() => handleAddToCart(product)}
+                        className="flex-1 !bg-gradient-to-r !from-blue-600 !to-purple-600 hover:!from-blue-700 hover:!to-purple-700 !text-white font-bold py-4 rounded-2xl shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 flex items-center justify-center gap-2"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        Order
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -256,8 +678,8 @@ const StoresPage = () => {
 
         {/* Product Details Modal */}
         {selectedProduct && (
-          <div className="fixed inset-0 !bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fadeIn">
-            <div className="!bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto relative transform animate-slideUp">
+          <div className="fixed inset-0 !bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
+            <div className="!bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto relative">
               {/* Close Button */}
               <button
                 onClick={closeProductModal}
@@ -361,11 +783,14 @@ const StoresPage = () => {
 
                   {/* Action Buttons */}
                   <div className="flex gap-4 pt-6">
-                    <button className="flex-1 !bg-gradient-to-r !from-blue-600 !to-purple-600 hover:!from-blue-700 hover:!to-purple-700 !text-white font-bold py-4 rounded-2xl shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 flex items-center justify-center gap-3">
+                    <button 
+                      onClick={() => handleAddToCart(selectedProduct)}
+                      className="flex-1 !bg-gradient-to-r !from-blue-600 !to-purple-600 hover:!from-blue-700 hover:!to-purple-700 !text-white font-bold py-4 rounded-2xl shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 flex items-center justify-center gap-3"
+                    >
                       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                       </svg>
-                      Add to Cart
+                      Order Now
                     </button>
                     <button 
                       onClick={closeProductModal}
@@ -379,6 +804,216 @@ const StoresPage = () => {
             </div>
           </div>
         )}
+
+        {/* Checkout Modal */}
+        {showCheckoutModal && checkoutProduct && (
+          <div className="fixed inset-0 !bg-black/70 backdrop-blur-md flex items-center justify-center z-[60] p-4">
+            <div className="!bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto relative">
+              {/* Close Button */}
+              <button
+                onClick={closeCheckoutModal}
+                className="absolute top-6 right-6 !bg-gray-200 hover:!bg-gray-300 !text-gray-700 p-3 rounded-full shadow-lg transition-all transform hover:scale-110 z-10"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+
+              {/* Header */}
+              <div className="!bg-gradient-to-r !from-blue-600 !to-purple-600 p-8 text-center">
+                <div className="!bg-white/20 backdrop-blur-sm w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-10 h-10 !text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                </div>
+                <h2 className="text-4xl font-black !text-white mb-2">Complete Your Order</h2>
+                <p className="text-xl !text-white/90 font-medium">Just a few more details</p>
+              </div>
+
+              {/* Form Content */}
+              <div className="p-8 space-y-6">
+                {orderError && (
+                  <div className="!bg-red-50 border-l-4 !border-red-500 p-4 rounded-lg">
+                    <p className="!text-red-700 font-medium">{orderError}</p>
+                  </div>
+                )}
+
+                {/* Product Summary */}
+                <div className="!bg-gradient-to-br !from-gray-50 !to-blue-50 p-6 rounded-2xl border-2 !border-gray-200">
+                  <h3 className="text-xl font-black !text-gray-900 mb-4">Product</h3>
+                  <div className="flex items-center gap-4">
+                    <div className="!bg-gradient-to-br !from-blue-100 !to-purple-100 w-20 h-20 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <svg className="w-10 h-10 !text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-lg font-black !text-gray-900">{checkoutProduct.name}</p>
+                      <p className="text-2xl font-black !text-blue-600">${checkoutProduct.basePrice.toFixed(2)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quantity */}
+                <div>
+                  <label className="block text-sm font-bold !text-gray-900 mb-3">
+                    Quantity
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <button
+                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                      className="!bg-gray-200 hover:!bg-gray-300 !text-gray-800 w-12 h-12 rounded-xl font-bold text-xl transition-all transform hover:scale-110"
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      min="1"
+                      value={quantity}
+                      onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-24 text-center !border-2 !border-gray-300 rounded-xl p-3 !text-gray-900 font-bold text-xl focus:!border-blue-500 focus:outline-none"
+                    />
+                    <button
+                      onClick={() => setQuantity(quantity + 1)}
+                      className="!bg-gray-200 hover:!bg-gray-300 !text-gray-800 w-12 h-12 rounded-xl font-bold text-xl transition-all transform hover:scale-110"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                {/* Fulfillment Type */}
+                <div>
+                  <label className="block text-sm font-bold !text-gray-900 mb-3">
+                    Fulfillment Type <span className="!text-red-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      onClick={() => setFulfillmentType("Delivery")}
+                      className={`p-4 rounded-xl border-2 font-bold transition-all transform hover:scale-105 ${
+                        fulfillmentType === "Delivery"
+                          ? "!bg-blue-600 !border-blue-600 !text-white shadow-lg"
+                          : "!bg-white !border-gray-300 !text-gray-700 hover:!border-blue-400"
+                      }`}
+                    >
+                      <svg className="w-8 h-8 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                      </svg>
+                      Delivery
+                    </button>
+                    <button
+                      onClick={() => setFulfillmentType("Pickup")}
+                      className={`p-4 rounded-xl border-2 font-bold transition-all transform hover:scale-105 ${
+                        fulfillmentType === "Pickup"
+                          ? "!bg-blue-600 !border-blue-600 !text-white shadow-lg"
+                          : "!bg-white !border-gray-300 !text-gray-700 hover:!border-blue-400"
+                      }`}
+                    >
+                      <svg className="w-8 h-8 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                      </svg>
+                      Pickup
+                    </button>
+                  </div>
+                </div>
+
+                {/* Delivery Address (only if Delivery selected) */}
+                {fulfillmentType === "Delivery" && (
+                  <div>
+                    <label className="block text-sm font-bold !text-gray-900 mb-3">
+                      Delivery Address <span className="!text-red-500">*</span>
+                    </label>
+                    {selectedCustomer?.customerAddresses && selectedCustomer.customerAddresses.length > 0 ? (
+                      <select
+                        value={selectedDeliveryAddress}
+                        onChange={(e) => setSelectedDeliveryAddress(e.target.value)}
+                        className="w-full !border-2 !border-gray-300 rounded-xl p-4 !text-gray-900 font-medium focus:!border-blue-500 focus:outline-none"
+                        required
+                      >
+                        <option value="">Select delivery address</option>
+                        {selectedCustomer.customerAddresses.map((ca) => (
+                          <option key={ca.id} value={ca.address?.id}>
+                            {ca.address?.street}, {ca.address?.city}, {ca.address?.country}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="!bg-yellow-50 border-l-4 !border-yellow-500 p-4 rounded-lg">
+                        <p className="!text-yellow-700 font-medium">
+                          This customer has no addresses. Please add an address first.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Payment Method */}
+                <div>
+                  <label className="block text-sm font-bold !text-gray-900 mb-3">
+                    Payment Method <span className="!text-red-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-3 gap-4">
+                    {["Cash", "Card", "Online"].map((method) => (
+                      <button
+                        key={method}
+                        onClick={() => setPaymentMethod(method)}
+                        className={`p-4 rounded-xl border-2 font-bold transition-all transform hover:scale-105 ${
+                          paymentMethod === method
+                            ? "!bg-purple-600 !border-purple-600 !text-white shadow-lg"
+                            : "!bg-white !border-gray-300 !text-gray-700 hover:!border-purple-400"
+                        }`}
+                      >
+                        {method}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Order Summary */}
+                <div className="!bg-gradient-to-br !from-blue-50 !to-purple-50 p-6 rounded-2xl border-2 !border-blue-200">
+                  <h3 className="text-xl font-black !text-gray-900 mb-4">Order Summary</h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="!text-gray-700 font-medium">Subtotal ({quantity}x)</span>
+                      <span className="!text-gray-900 font-bold text-lg">${calculateSubtotal().toFixed(2)}</span>
+                    </div>
+                    {fulfillmentType === "Delivery" && (
+                      <div className="flex justify-between items-center">
+                        <span className="!text-gray-700 font-medium">Delivery Fee</span>
+                        <span className="!text-gray-900 font-bold text-lg">${FIXED_DELIVERY_FEE.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="border-t-2 border-blue-200 pt-3 flex justify-between items-center">
+                      <span className="!text-gray-900 font-black text-xl">Total</span>
+                      <span className="!text-blue-600 font-black text-3xl">${calculateTotal().toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Place Order Button */}
+                <button
+                  onClick={handlePlaceOrder}
+                  disabled={placingOrder || (fulfillmentType === "Delivery" && !selectedDeliveryAddress)}
+                  className="w-full !bg-gradient-to-r !from-blue-600 !to-purple-600 hover:!from-blue-700 hover:!to-purple-700 !text-white font-black py-5 rounded-2xl shadow-xl hover:shadow-2xl transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed text-xl flex items-center justify-center gap-3"
+                >
+                  {placingOrder ? (
+                    <>
+                      <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Placing Order...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Place Order
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -387,6 +1022,35 @@ const StoresPage = () => {
   return (
     <div className="min-h-screen !bg-gradient-to-br !from-blue-50 !via-indigo-50 !to-purple-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
+        {/* Customer Info Bar */}
+        {selectedCustomer && (
+          <div className="mb-8 !bg-gradient-to-r !from-blue-600 !to-purple-600 rounded-2xl p-5 shadow-2xl flex items-center justify-between max-w-3xl mx-auto">
+            <div className="flex items-center gap-4">
+              <div className="!bg-white/20 backdrop-blur-sm p-3 rounded-xl shadow-lg">
+                <svg className="w-7 h-7 !text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm !text-white/90 font-bold mb-1">Ordering for</p>
+                <p className="text-2xl font-black !text-white">{selectedCustomer.fullName}</p>
+                {selectedCustomer.email && (
+                  <p className="text-sm !text-white/80 font-medium mt-1">{selectedCustomer.email}</p>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={handleChangeCustomer}
+              className="!bg-white hover:!bg-gray-100 !text-blue-600 px-6 py-3 rounded-xl font-bold shadow-lg transition-all transform hover:scale-105 flex items-center gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+              </svg>
+              Change
+            </button>
+          </div>
+        )}
+
         {/* Hero Header */}
         <div className="text-center mb-12">
           <h1 className="text-6xl md:text-7xl font-black !text-gray-900 mb-4">
