@@ -23,10 +23,10 @@ public partial class Address
     public string City { get; set; } = null!;
 
     [StringLength(100)]
-    public string? Governorate { get; set; }
+    public string? Region { get; set; }  // Changed from Governorate
 
     [StringLength(20)]
-    public string? Block { get; set; }
+    public string? PostalCode { get; set; }  // Changed from Block
 
     [StringLength(60)]
     public string Country { get; set; } = null!;

@@ -6,8 +6,13 @@ import AdminPage from './Pages/Admin/AdminPage';
 import ServiceProviderPage from "./Pages/ServiceProvider";
 import AdminUsersPage from './Pages/Admin/AdminDash'; 
 import ServiceProviderRequests from './Pages/Admin/ServiceProviderRequests.jsx';
+import CustomerPage from "./Pages/Customer";
 import SellerPage from "./Pages/Seller";
+import StoresPage from "./Pages/Seller/Store";
+import StoreDetailsPage from "./Pages/Seller/StoreDetails";
 import ProductsPage from "./Pages/Product/Products";
+import CategoryPage from "./Pages/Product/Categories";
+import DriverPage from "./Pages/Driver";
 
 // Placeholder components for pages that don't exist yet
 const PlaceholderPage = ({ pageName }) => (
@@ -21,13 +26,16 @@ const PlaceholderPage = ({ pageName }) => (
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState('registration');
+  const [selectedStoreId, setSelectedStoreId] = useState(null);
 
   const navItems = [
     { id: 'registration', label: 'Registration' },
     { id: 'membership', label: 'Membership' },
     { id: 'addplan', label: 'Add Plan' },
     { id: 'seller', label: 'Seller' },
+    { id: 'store', label: 'Store' },
     { id: 'product', label: 'Product' },
+    { id: 'category', label: 'Category' },
     { id: 'customer', label: 'Customer' },
     { id: 'driver', label: 'Driver' },
     { id: 'admin', label: 'Admin' },
@@ -47,14 +55,20 @@ export default function App() {
         return <AddPlanPage />;
       case 'seller':
         return <SellerPage />;
+      case 'store':
+        return <StoresPage />;
+      case 'storedetails':
+        return <StoreDetailsPage />;
       case 'product':
         return <ProductsPage />;
+      case 'category':
+        return <CategoryPage />;
       case 'customer':
-        return <PlaceholderPage pageName="Customer" />;
+        return <CustomerPage />;
       case 'driver':
-        return <PlaceholderPage pageName="Driver" />;
+        return <DriverPage />;
       case 'admin':
-        return <AdminPage/>;
+        return <AdminPage />;
       case 'serviceprovider':
         return < ServiceProviderPage />;
       case 'admindashboard' :

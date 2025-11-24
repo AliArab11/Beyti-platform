@@ -19,6 +19,11 @@ namespace Beyti_Backend.Controllers.Api
         {
             _context = context;
         }
+        public class CreateCustomerAddressDto
+        {
+            public int CustomerId { get; set; }
+            public int AddressId { get; set; }
+        }
 
         // GET: api/CustomerAddresses
         [HttpGet]
@@ -75,8 +80,14 @@ namespace Beyti_Backend.Controllers.Api
         // POST: api/CustomerAddresses
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<CustomerAddress>> PostCustomerAddress(CustomerAddress customerAddress)
+        public async Task<ActionResult<CustomerAddress>> PostCustomerAddress(CreateCustomerAddressDto dto)
         {
+            var customerAddress = new CustomerAddress
+            {
+                CustomerId = dto.CustomerId,
+                AddressId = dto.AddressId
+            };
+
             _context.CustomerAddresses.Add(customerAddress);
             await _context.SaveChangesAsync();
 
