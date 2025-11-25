@@ -28,6 +28,13 @@ const StoresPage = () => {
   const [placingOrder, setPlacingOrder] = useState(false);
   const [orderError, setOrderError] = useState(null);
 
+  const [productVariants, setProductVariants] = useState([]);
+  const [selectedVariant, setSelectedVariant] = useState(null);
+  const [loadingVariants, setLoadingVariants] = useState(false);
+
+  const [productReviews, setProductReviews] = useState([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+
   useEffect(() => {
     fetchCustomers();
   }, []);
@@ -105,11 +112,16 @@ const StoresPage = () => {
 
   const handleProductClick = (product) => {
     setSelectedProduct(product);
+    fetchProductReviews(product.id); 
+    fetchProductVariants(product.id);
   };
 
   const closeProductModal = () => {
-    setSelectedProduct(null);
-  };
+  setSelectedProduct(null);
+  setProductReviews([]); // Clear reviews
+  setProductVariants([]); // Clear variants
+  setSelectedVariant(null); // Clear selected variant
+};
 
   const handleCustomerSelect = (customer) => {
     setSelectedCustomer(customer);
@@ -142,6 +154,38 @@ const StoresPage = () => {
     setOrderError(null);
     setShowCheckoutModal(true);
   };
+  const fetchProductReviews = async (productId) => {
+  try {
+    setLoadingReviews(true);
+    const response = await fetch(`https://localhost:7062/api/Reviews?productId=${productId}`);
+    if (response.ok) {
+      const data = await response.json();
+      setProductReviews(data);
+    }
+  } catch (err) {
+    console.error("Error loading reviews:", err);
+  } finally {
+    setLoadingReviews(false);
+  }
+};
+
+const fetchProductVariants = async (productId) => {
+  try {
+    setLoadingVariants(true);
+    const response = await fetch(`https://localhost:7062/api/ProductVariants?productId=${productId}`);
+    if (response.ok) {
+      const data = await response.json();
+      setProductVariants(data);
+      if (data.length > 0) {
+        setSelectedVariant(data[0]); // Select first variant by default
+      }
+    }
+  } catch (err) {
+    console.error("Error loading variants:", err);
+  } finally {
+    setLoadingVariants(false);
+  }
+};
 
   const closeCheckoutModal = () => {
     setShowCheckoutModal(false);
@@ -494,16 +538,16 @@ const StoresPage = () => {
         <div className="max-w-7xl mx-auto">
           {/* Customer Info Bar */}
           {selectedCustomer && (
-            <div className="mb-6 !bg-gradient-to-r !from-blue-600 !to-purple-600 rounded-2xl p-5 shadow-2xl flex items-center justify-between">
+            <div className="mb-6 !bg-gradient-to-r !from-blue-600 !to-purple-600 rounded-2xl p-3 shadow-2xl flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="!bg-white/20 backdrop-blur-sm p-3 rounded-xl shadow-lg">
-                  <svg className="w-7 h-7 !text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-5 h-5 !text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
                 </div>
                 <div>
                   <p className="text-sm !text-white/90 font-bold mb-1">Ordering for</p>
-                  <p className="text-2xl font-black !text-white">{selectedCustomer.fullName}</p>
+                  <p className="text-lg font-black !text-white">{selectedCustomer.fullName}</p>
                   {selectedCustomer.email && (
                     <p className="text-sm !text-white/80 font-medium mt-1">{selectedCustomer.email}</p>
                   )}
@@ -589,8 +633,8 @@ const StoresPage = () => {
 
           {/* Products Header */}
           <div className="mb-8 text-center">
-            <h2 className="text-4xl font-black !text-gray-900 mb-3">Our Products</h2>
-            <p className="text-xl !text-gray-600 font-medium">
+            <h2 className="text-3xl font-black !text-gray-900 mb-3">Our Products</h2>
+            <p className="text-base !text-gray-600 font-medium">
               {selectedStore.products && selectedStore.products.length > 0 
                 ? `Browse our collection of ${selectedStore.products.length} product${selectedStore.products.length !== 1 ? 's' : ''}`
                 : 'No products available at the moment'
@@ -603,7 +647,7 @@ const StoresPage = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {selectedStore.products.map((product) => (
                 <div key={product.id} className="group !bg-white rounded-3xl overflow-hidden shadow-xl hover:shadow-2xl border-2 !border-gray-100 hover:!border-blue-300 transition-all transform hover:scale-105">
-                  <div className="relative !bg-gradient-to-br !from-blue-100 !via-purple-100 !to-pink-100 h-64 flex items-center justify-center overflow-hidden">
+                  <div className="relative !bg-gradient-to-br !from-blue-100 !via-purple-100 !to-pink-100 h-48 flex items-center justify-center overflow-hidden">
                     <div className="absolute inset-0 !bg-gradient-to-br !from-blue-500/20 !to-purple-500/20 group-hover:scale-110 transition-transform"></div>
                     <svg className="w-32 h-32 !text-white/50 relative z-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
@@ -613,8 +657,8 @@ const StoresPage = () => {
                     </div>
                   </div>
 
-                  <div className="p-6">
-                    <h3 className="text-2xl font-black !text-gray-900 mb-3 line-clamp-2 group-hover:!text-blue-600 transition-colors">
+                  <div className="p-4">
+                    <h3 className="text-lg font-black !text-gray-900 mb-3 line-clamp-2 group-hover:!text-blue-600 transition-colors">
                       {product.name}
                     </h3>
 
@@ -635,7 +679,7 @@ const StoresPage = () => {
                     <div className="flex gap-2">
                       <button 
                         onClick={() => handleProductClick(product)}
-                        className="flex-1 !bg-gradient-to-r !from-gray-600 !to-gray-700 hover:!from-gray-700 hover:!to-gray-800 !text-white font-bold py-4 rounded-2xl shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 flex items-center justify-center gap-2"
+                        className="flex-1 !bg-gradient-to-r !from-gray-600 !to-gray-700 hover:!from-gray-700 hover:!to-gray-800 !text-white font-bold py-3 rounded-2xl shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 flex items-center justify-center gap-2"
                       >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -645,7 +689,7 @@ const StoresPage = () => {
                       </button>
                       <button 
                         onClick={() => handleAddToCart(product)}
-                        className="flex-1 !bg-gradient-to-r !from-blue-600 !to-purple-600 hover:!from-blue-700 hover:!to-purple-700 !text-white font-bold py-4 rounded-2xl shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 flex items-center justify-center gap-2"
+                        className="flex-1 !bg-gradient-to-r !from-blue-600 !to-purple-600 hover:!from-blue-700 hover:!to-purple-700 !text-white font-bold py-3 rounded-2xl shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 flex items-center justify-center gap-2"
                       >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -691,9 +735,9 @@ const StoresPage = () => {
               </button>
 
               {/* Modal Content */}
-              <div className="p-8">
+              <div className="p-6">
                 {/* Product Image */}
-                <div className="relative !bg-gradient-to-br !from-blue-100 !via-purple-100 !to-pink-100 h-96 flex items-center justify-center rounded-3xl overflow-hidden mb-8">
+                <div className="relative !bg-gradient-to-br !from-blue-100 !via-purple-100 !to-pink-100 h-64 flex items-center justify-center rounded-3xl overflow-hidden mb-8">
                   <div className="absolute inset-0 !bg-gradient-to-br !from-blue-500/20 !to-purple-500/20"></div>
                   <svg className="w-48 h-48 !text-white/50 relative z-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
@@ -706,7 +750,7 @@ const StoresPage = () => {
                 {/* Product Info */}
                 <div className="space-y-6">
                   <div>
-                    <h2 className="text-5xl font-black !text-gray-900 mb-4">{selectedProduct.name}</h2>
+                    <h2 className="text-3xl font-black !text-gray-900 mb-4">{selectedProduct.name}</h2>
                     {selectedProduct.subCategory && (
                       <div className="flex flex-wrap gap-3 mb-4">
                         <span className="!bg-gradient-to-r !from-blue-100 !to-purple-100 !text-blue-800 text-sm font-bold px-6 py-2 rounded-full border-2 !border-blue-200">
@@ -743,7 +787,9 @@ const StoresPage = () => {
                         </svg>
                         <h4 className="font-black !text-gray-900">Price</h4>
                       </div>
-                      <p className="text-3xl font-black !text-blue-600">${selectedProduct.basePrice.toFixed(2)}</p>
+                      <p className="text-3xl font-black !text-blue-600">
+                        ${(selectedVariant?.price || selectedProduct.basePrice).toFixed(2)}
+                      </p>
                     </div>
 
                     <div className="!bg-gradient-to-br !from-purple-50 !to-pink-50 p-6 rounded-2xl border-2 !border-purple-100">
@@ -781,11 +827,86 @@ const StoresPage = () => {
                     )}
                   </div>
 
+                                    {/* Variants Section */}
+                  {productVariants.length > 0 && (
+                    <div className="!bg-blue-50 p-4 rounded-xl border-2 !border-blue-100">
+                      <h3 className="text-lg font-bold !text-gray-900 mb-3">Available Options</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {productVariants.map((variant) => (
+                          <button
+                            key={variant.id}
+                            onClick={() => setSelectedVariant(variant)}
+                            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                              selectedVariant?.id === variant.id
+                                ? '!bg-blue-600 !text-white shadow-lg'
+                                : '!bg-white !text-gray-700 border-2 !border-gray-200 hover:!border-blue-400'
+                            }`}
+                          >
+                            {variant.colorValue && <span>{variant.colorValue}</span>}
+                            {variant.colorValue && variant.sizeValue && <span> / </span>}
+                            {variant.sizeValue && <span>{variant.sizeValue}</span>}
+                            {variant.price && <span className="ml-2 font-bold">${variant.price.toFixed(2)}</span>}
+                          </button>
+                        ))}
+                      </div>
+                      {selectedVariant && (
+                        <div className="mt-3 text-sm !text-gray-600">
+                          <span className="font-medium">Stock: </span>
+                          <span className={selectedVariant.stockQty > 0 ? '!text-green-600 font-bold' : '!text-red-600 font-bold'}>
+                            {selectedVariant.stockQty > 0 ? `${selectedVariant.stockQty} available` : 'Out of stock'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Reviews Section */}
+                  <div className="!bg-gray-50 p-4 rounded-xl border-2 !border-gray-100">
+                    <h3 className="text-lg font-bold !text-gray-900 mb-3 flex items-center gap-2">
+                      <svg className="w-5 h-5 !text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                      Customer Reviews ({productReviews.length})
+                    </h3>
+                    
+                    {loadingReviews ? (
+                      <div className="flex items-center justify-center py-4">
+                        <div className="w-6 h-6 border-2 !border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                        <p className="ml-3 text-gray-600">Loading reviews...</p>
+                      </div>
+                    ) : productReviews.length > 0 ? (
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {productReviews.map((review) => (
+                          <div key={review.id} className="!bg-white p-3 rounded-lg border !border-gray-200">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-bold !text-gray-900 text-sm">{review.customerName}</span>
+                              <div className="flex items-center gap-1">
+                                {[...Array(5)].map((_, i) => (
+                                  <svg key={i} className={`w-4 h-4 ${i < review.rating ? '!text-yellow-500' : '!text-gray-300'}`} fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                  </svg>
+                                ))}
+                              </div>
+                            </div>
+                            {review.comment && (
+                              <p className="!text-gray-600 text-sm">{review.comment}</p>
+                            )}
+                            <p className="!text-gray-400 text-xs mt-2">
+                              {new Date(review.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="!text-gray-500 text-sm">No reviews yet. Be the first to review!</p>
+                    )}
+                  </div>
+
                   {/* Action Buttons */}
                   <div className="flex gap-4 pt-6">
                     <button 
                       onClick={() => handleAddToCart(selectedProduct)}
-                      className="flex-1 !bg-gradient-to-r !from-blue-600 !to-purple-600 hover:!from-blue-700 hover:!to-purple-700 !text-white font-bold py-4 rounded-2xl shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 flex items-center justify-center gap-3"
+                      className="flex-1 !bg-gradient-to-r !from-blue-600 !to-purple-600 hover:!from-blue-700 hover:!to-purple-700 !text-white font-bold py-3 rounded-2xl shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 flex items-center justify-center gap-3"
                     >
                       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -1033,7 +1154,7 @@ const StoresPage = () => {
               </div>
               <div>
                 <p className="text-sm !text-white/90 font-bold mb-1">Ordering for</p>
-                <p className="text-2xl font-black !text-white">{selectedCustomer.fullName}</p>
+                <p className="text-lg font-black !text-white">{selectedCustomer.fullName}</p>
                 {selectedCustomer.email && (
                   <p className="text-sm !text-white/80 font-medium mt-1">{selectedCustomer.email}</p>
                 )}
@@ -1104,13 +1225,13 @@ const StoresPage = () => {
               <button
                 key={seller.id}
                 onClick={() => handleStoreClick(seller.id)}
-                className="group !bg-white rounded-3xl shadow-xl hover:shadow-2xl border-2 !border-gray-100 hover:!border-blue-300 p-8 text-left transition-all transform hover:scale-105 relative overflow-hidden"
+                className="group !bg-white rounded-3xl shadow-xl hover:shadow-2xl border-2 !border-gray-100 hover:!border-blue-300 p-4 text-left transition-all transform hover:scale-105 relative overflow-hidden"
               >
                 <div className="absolute top-0 right-0 w-32 h-32 !bg-gradient-to-br !from-blue-400 !to-purple-400 rounded-full blur-3xl opacity-0 group-hover:opacity-20 transition-opacity"></div>
                 
                 <div className="relative flex items-start justify-between mb-6">
-                  <div className="!bg-gradient-to-br !from-blue-600 !to-purple-600 p-5 rounded-2xl shadow-lg group-hover:rotate-12 transition-transform">
-                    <svg className="w-10 h-10 !text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="!bg-gradient-to-br !from-blue-600 !to-purple-600 p-3 rounded-2xl shadow-lg group-hover:rotate-12 transition-transform">
+                    <svg className="w-8 h-8 !text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
                   </div>
@@ -1121,7 +1242,7 @@ const StoresPage = () => {
                   )}
                 </div>
 
-                <h3 className="text-3xl font-black !text-gray-900 mb-4 group-hover:!text-blue-600 transition-colors">
+                <h3 className="text-xl font-black !text-gray-900 mb-4 group-hover:!text-blue-600 transition-colors">
                   {seller.storeName}
                 </h3>
                 
