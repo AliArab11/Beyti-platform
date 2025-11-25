@@ -1238,55 +1238,136 @@ const EditMapModal = () => {
         ) : (
           <>
             {/* Orders Tab */}
-            {activeTab === "orders" && (
-              <>
-                {/* Filter */}
-                <div className="mb-4">
-                  <label className="block text-sm font-medium !text-gray-700 mb-2">Filter by Status</label>
-                  <select
-                    value={orderStatusFilter}
-                    onChange={e => setOrderStatusFilter(e.target.value)}
-                    className="w-full md:w-48 !border-2 !border-gray-400 rounded-lg p-2 !text-black !bg-white"
-                  >
-                    <option value="all">All Statuses</option>
-                    <option value="placed">Placed</option>
-                    <option value="processing">Processing</option>
-                    <option value="completed">Completed</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
-                </div>
+              {activeTab === "orders" && (
+                <>
+                  {/* Filter */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium !text-gray-700 mb-2">Filter by Status</label>
+                    <select
+                      value={orderStatusFilter}
+                      onChange={e => setOrderStatusFilter(e.target.value)}
+                      className="w-full md:w-48 !border-2 !border-gray-400 rounded-lg p-2 !text-black !bg-white"
+                    >
+                      <option value="all">All Statuses</option>
+                      <option value="placed">Placed (Needs Response)</option>
+                      <option value="accepted">Accepted</option>
+                      <option value="preparing">Preparing</option>
+                      <option value="ready for pickup">Ready for Pickup</option>
+                      <option value="completed">Completed</option>
+                      <option value="cancelled">Cancelled/Declined</option>
+                    </select>
+                  </div>
 
-                {/* Orders List */}
-                {filteredOrders.length > 0 ? (
-                  <div className="space-y-4">
-                    {filteredOrders.map(order => (
-                      <div key={order.id} className="!bg-gray-50 rounded-lg border border-gray-200">
-                        <div className="p-4 flex justify-between items-center cursor-pointer" onClick={() => toggleOrderRow(order.id)}>
-                          <div className="flex items-center gap-4">
-                            <svg className={`w-5 h-5 !text-gray-600 transition-transform ${expandedOrderRows.has(order.id) ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                            <div>
-                              <p className="font-semibold !text-gray-900">Order #{order.id}</p>
-                              <p className="text-sm !text-gray-600">{new Date(order.createdAt).toLocaleDateString()}</p>
+                  {/* Orders List */}
+                  {filteredOrders.length > 0 ? (
+                    <div className="space-y-4">
+                      {filteredOrders.map(order => (
+                        <div key={order.id} className="!bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="p-4 flex justify-between items-center cursor-pointer" onClick={() => toggleOrderRow(order.id)}>
+                            <div className="flex items-center gap-4">
+                              <svg className={`w-5 h-5 !text-gray-600 transition-transform ${expandedOrderRows.has(order.id) ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                              <div>
+                                <p className="font-semibold !text-gray-900">Order #{order.id}</p>
+                                <p className="text-sm !text-gray-600">{new Date(order.createdAt).toLocaleDateString()}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(order.status)}`}>
+                                {order.status || "N/A"}
+                              </span>
+                              <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${getPaymentColor(order.paymentStatus)}`}>
+                                {order.paymentStatus || "N/A"}
+                              </span>
+                              <p className="font-bold !text-gray-900">${order.totalAmount?.toFixed(2) || "0.00"}</p>
+                              
+                              {/* Action Buttons Based on Status */}
+                              {order.status?.toLowerCase() === "placed" && (
+                                <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                                  <button
+                                    onClick={async () => {
+                                      try {
+                                        await fetch(`https://localhost:7062/api/Orders/${order.id}/seller-response`, {
+                                          method: 'PUT',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({ Status: "Accepted" })
+                                        });
+                                        await openOrdersModal(ordersModal.sellerId, ordersModal.sellerName);
+                                      } catch (err) {
+                                        alert("Failed to accept order");
+                                      }
+                                    }}
+                                    className="!bg-green-600 hover:!bg-green-700 !text-white px-3 py-1 rounded text-sm font-medium"
+                                  >
+                                    ✓ Accept
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      if (confirm("Decline this order?")) {
+                                        try {
+                                          await fetch(`https://localhost:7062/api/Orders/${order.id}/seller-response`, {
+                                            method: 'PUT',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ Status: "Cancelled" })
+                                          });
+                                          await openOrdersModal(ordersModal.sellerId, ordersModal.sellerName);
+                                        } catch (err) {
+                                          alert("Failed to decline order");
+                                        }
+                                      }
+                                    }}
+                                    className="!bg-red-600 hover:!bg-red-700 !text-white px-3 py-1 rounded text-sm font-medium"
+                                  >
+                                    ✕ Decline
+                                  </button>
+                                </div>
+                              )}
+                              
+                              {(order.status?.toLowerCase() === "accepted" || order.status?.toLowerCase() === "preparing") && (
+                                <button
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    const newStatus = order.status?.toLowerCase() === "accepted" ? "Preparing" : "Ready for Pickup";
+                                    try {
+                                      await fetch(`https://localhost:7062/api/Orders/${order.id}/update-seller-status`, {
+                                        method: 'PUT',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ Status: newStatus })
+                                      });
+                                      await openOrdersModal(ordersModal.sellerId, ordersModal.sellerName);
+                                    } catch (err) {
+                                      alert("Failed to update status");
+                                    }
+                                  }}
+                                  className="!bg-blue-600 hover:!bg-blue-700 !text-white px-3 py-1 rounded text-sm font-medium"
+                                >
+                                  {order.status?.toLowerCase() === "accepted" ? "→ Start Preparing" : "→ Ready for Pickup"}
+                                </button>
+                              )}
+                              
+                              {order.status?.toLowerCase() === "ready for pickup" && order.fulfillmentType === "Pickup" && (
+                                <button
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    try {
+                                      await fetch(`https://localhost:7062/api/Orders/${order.id}/update-seller-status`, {
+                                        method: 'PUT',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ Status: "Completed" })
+                                      });
+                                      await openOrdersModal(ordersModal.sellerId, ordersModal.sellerName);
+                                    } catch (err) {
+                                      alert("Failed to complete order");
+                                    }
+                                  }}
+                                  className="!bg-green-600 hover:!bg-green-700 !text-white px-3 py-1 rounded text-sm font-medium"
+                                >
+                                  ✓ Mark Completed
+                                </button>
+                              )}
                             </div>
                           </div>
-                          <div className="flex items-center gap-4">
-                            <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(order.status)}`}>
-                              {order.status || "N/A"}
-                            </span>
-                            <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${getPaymentColor(order.paymentStatus)}`}>
-                              {order.paymentStatus || "N/A"}
-                            </span>
-                            <p className="font-bold !text-gray-900">${order.totalAmount?.toFixed(2) || "0.00"}</p>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); openStatusModal(order.id, order.status); }}
-                              className="!bg-blue-600 hover:!bg-blue-700 !text-white px-3 py-1 rounded text-sm font-medium"
-                            >
-                              Change Status
-                            </button>
-                          </div>
-                        </div>
 
                         {expandedOrderRows.has(order.id) && (
                           <div className="p-4 border-t border-gray-200 !bg-white">
