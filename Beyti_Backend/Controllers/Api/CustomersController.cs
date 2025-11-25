@@ -46,7 +46,9 @@ namespace Beyti_Backend.Controllers.Api
                             ca.Address.City,
                             ca.Address.Region,
                             ca.Address.PostalCode,
-                            ca.Address.Country
+                            ca.Address.Country,
+                            ca.Address.Latitude,    
+                            ca.Address.Longitude    
                         }
                     })
                 })
