@@ -1,11 +1,17 @@
-import { useState, useEffect, Fragment } from "react";
+import { useState, useEffect, Fragment, useRef } from "react";
+import "leaflet/dist/leaflet.css";
+import { MapContainer, TileLayer, Marker, useMapEvents, Popup }  from "react-leaflet";
 import {
   getCustomers,
   createCustomer,
   updateCustomer,
   deleteCustomer,
   createAddress,
+  deleteAddress,
+  updateAddress,
+  updateCustomerAddress,
   createCustomerAddress,
+  deleteCustomerAddress,
   getCustomerOrders,
   createReview
 } from "../../services/api";
@@ -55,12 +61,98 @@ const Customers = () => {
   const [addressPostalCode, setAddressPostalCode] = useState("");
   const [addAddressError, setAddAddressError] = useState(null);
 
+  // Map modal state
+const [mapModal, setMapModal] = useState({
+  show: false,
+  lat: null,
+  lng: null,
+  loading: false,
+  addressResult: null,
+});
+const [viewMapModal, setViewMapModal] = useState({ show: false, lat: null, lng: null });
+const [savedLocation, setSavedLocation] = useState(null);
+
+// Outside of your main component
+const ViewMapModal = ({ lat, lng, onClose, address }) => {
+  
+   const mapRef = useRef();
+
+    if (!lat || !lng) return null;
+
+  const handleResetView = () => {
+    if (mapRef.current) {
+      mapRef.current.setView([lat, lng], 15);
+    }
+  };
+
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-auto p-4 flex flex-col">
+        <h2 className="text-xl font-bold mb-3">Address Location</h2>
+
+        <div className="flex-1">
+          <MapContainer
+            center={[lat, lng]}
+            zoom={15}
+            scrollWheelZoom={true}
+            dragging={true}
+            doubleClickZoom={true}
+            zoomControl={true}
+            style={{ height: "400px", width: "100%" }}
+            ref={mapRef}
+          >
+            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            <Marker position={[lat, lng]}>
+            <Popup>
+                <div className="text-sm">
+                {address?.street && <div><strong>Street:</strong> {address.street}</div>}
+                {address?.city && <div><strong>City:</strong> {address.city}</div>}
+                {address?.region && <div><strong>Region:</strong> {address.region}</div>}
+                {address?.country && <div><strong>Country:</strong> {address.country}</div>}
+                {address?.postalCode && <div><strong>Postal Code:</strong> {address.postalCode}</div>}
+                </div>
+            </Popup>
+            </Marker>
+          </MapContainer>
+        </div>
+
+        <div className="mt-4 flex gap-2">
+          <button
+            onClick={handleResetView}
+            className="flex-1 !bg-red-600 hover:!bg-red-700 text-white py-2 rounded-lg"
+          >
+            Reset View
+          </button>
+          <button
+            onClick={onClose}
+            className="flex-1 !bg-red-600 hover:!bg-red-700 text-white py-2 rounded-lg"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
   // Edit state
   const [editingId, setEditingId] = useState(null);
   const [editFullName, setEditFullName] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editError, setEditError] = useState(null);
-
+  // Address edit/delete state
+  const [editingAddressId, setEditingAddressId] = useState(null);
+  const [editAddressStreet, setEditAddressStreet] = useState("");
+  const [editAddressCity, setEditAddressCity] = useState("");
+  const [editAddressCountry, setEditAddressCountry] = useState("");
+  const [editAddressRegion, setEditAddressRegion] = useState("");
+  const [editAddressPostalCode, setEditAddressPostalCode] = useState("");
+  const [editAddressError, setEditAddressError] = useState(null);
+  const [deleteAddressConfirm, setDeleteAddressConfirm] = useState({ show: false, addressId: null, customerId: null });   
+  const [editSavedLocation, setEditSavedLocation] = useState(null); 
+  const [editMapModal, setEditMapModal] = useState({ show: false }); 
   // Delete confirmation
   const [deleteConfirm, setDeleteConfirm] = useState({ show: false, id: null, name: '' });
 
@@ -144,8 +236,8 @@ const hideToast = () => {
         Region: addressRegion || null,
         PostalCode: addressPostalCode || null,
         Country: addressCountry,
-        Latitude: null,
-        Longitude: null,
+        Latitude: savedLocation?.lat,     
+        Longitude: savedLocation?.lng,    
         IsDefault: false
       });
 
@@ -171,7 +263,92 @@ const hideToast = () => {
       setAdding(false);
     }
   };
+// --- Address Edit/Delete Functions ---
+const startEditAddress = (address) => {
+  setEditingAddressId(address.id);
+  setEditAddressStreet(address.street || "");
+  setEditAddressCity(address.city || "");
+  setEditAddressCountry(address.country || "");
+  setEditAddressRegion(address.region || "");
+  setEditAddressPostalCode(address.postalCode || "");
+  setEditAddressError(null);
+  
+  if (address.latitude && address.longitude) {
+    setEditSavedLocation({
+      lat: parseFloat(address.latitude),
+      lng: parseFloat(address.longitude)
+    });
+  } else {
+    setEditSavedLocation(null);
+  }
+};
 
+const cancelEditAddress = () => {
+  setEditingAddressId(null);
+  setEditAddressStreet("");
+  setEditAddressCity("");
+  setEditAddressCountry("");
+  setEditAddressRegion("");
+  setEditAddressPostalCode("");
+  setEditAddressError(null);
+  setEditSavedLocation(null);
+};
+
+const handleEditAddress = async (addressId) => {
+  try {
+    await updateAddress(addressId, {
+      Street: editAddressStreet,
+      City: editAddressCity,
+      Country: editAddressCountry,
+      Region: editAddressRegion || null,
+      PostalCode: editAddressPostalCode || null,
+      Latitude: editSavedLocation?.lat || null,  
+      Longitude: editSavedLocation?.lng || null,
+    });
+    await fetchCustomers();
+    cancelEditAddress();
+    showToast('Address updated successfully!', 'success');
+  } catch (err) {
+    setEditAddressError(err.message || "Failed to update address");
+    showToast(err.message || "Failed to update address", 'error');
+  }
+};
+
+const confirmDeleteAddress = (addressId, customerId) => {
+  setDeleteAddressConfirm({ show: true, addressId, customerId });
+};
+
+const cancelDeleteAddress = () => {
+  setDeleteAddressConfirm({ show: false, addressId: null, customerId: null });
+};
+
+const handleDeleteAddress = async () => {
+  try {
+    const { addressId, customerId } = deleteAddressConfirm;
+    
+    // Find the customer and the junction table record
+    const customer = customers.find(c => c.id === customerId);
+    const customerAddressLink = customer?.customerAddresses?.find(
+      ca => ca.address?.id === addressId
+    );
+    
+    if (!customerAddressLink) {
+      throw new Error("Address link not found");
+    }
+    
+    // First delete the relationship using the junction table's ID
+    await deleteCustomerAddress(customerAddressLink.id);
+    
+    // Then delete the address itself
+    await deleteAddress(addressId);
+    
+    await fetchCustomers();
+    cancelDeleteAddress();
+    showToast('Address deleted successfully!', 'success');
+  } catch (err) {
+    showToast(err.message || "Failed to delete address", 'error');
+  }
+};
   const startEdit = (customer) => {
     setEditingId(customer.id);
     setEditFullName(customer.fullName);
@@ -397,6 +574,186 @@ const openOrdersModal = async (customerId, customerName) => {
     );
   }
 
+  // 🌍 MAP MODAL (Leaflet)
+
+
+const LocationSelector = ({ onSelect }) => {
+  useMapEvents({
+    click(e) {
+      onSelect(e.latlng);
+    }
+  });
+  return null;
+};
+
+const MapModal = () => {
+  const [tempLocation, setTempLocation] = useState(null); // temporary marker
+
+  if (!mapModal.show) return null;
+
+  const handleSave = async () => {
+  if (!tempLocation) {
+    showToast("Please pick a location on the map", "error");
+    return;
+  }
+
+  setMapModal(prev => ({ ...prev, loading: true }));
+  try {
+    const { lat, lng } = tempLocation;
+
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
+    );
+    const data = await res.json();
+    const addr = data.address || {};
+
+    setAddressStreet(addr.road || "");
+    setAddressCity(addr.city || addr.town || addr.village || "");
+    setAddressCountry(addr.country || "");
+    setAddressRegion(addr.state || "");
+    setAddressPostalCode(addr.postcode || "");
+
+    // ✅ Store the saved location for backend
+    setSavedLocation({ lat, lng });
+
+    showToast("Location saved!", "success");
+  } catch (err) {
+    showToast("Failed to fetch location details", "error");
+  } finally {
+    setMapModal(prev => ({ ...prev, loading: false }));
+  }
+};
+
+  const LocationSelector = () => {
+    useMapEvents({
+      click(e) {
+        setTempLocation(e.latlng); // just move the temp marker, do NOT save yet
+      }
+    });
+    return null;
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-6">
+      <div className="bg-white rounded-xl shadow-xl p-4 max-w-3xl w-full">
+        <h2 className="text-xl font-bold mb-3">Pick Location on Map</h2>
+
+        <MapContainer
+          center={[26.0667, 50.5577]}
+          zoom={12}
+          style={{ height: "400px", width: "100%" }}
+        >
+          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <LocationSelector />
+          {tempLocation && <Marker position={[tempLocation.lat, tempLocation.lng]} />}
+        </MapContainer>
+
+        <div className="mt-4 flex gap-2">
+          <button
+            onClick={handleSave}
+            className="flex-1 !bg-green-600 hover:!bg-green-700 text-white py-2 rounded-lg"
+          >
+            Save Location
+          </button>
+          <button
+            onClick={() => setMapModal({ show: false })}
+            className="flex-1 !bg-red-600 hover:!bg-red-700 text-white py-2 rounded-lg"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Edit Map Modal for updating address coordinates
+const EditMapModal = () => {
+  const [tempLocation, setTempLocation] = useState(editSavedLocation);
+
+  if (!editMapModal.show) return null;
+
+  const handleSave = async () => {
+    if (!tempLocation) {
+      showToast("Please pick a location on the map", "error");
+      return;
+    }
+
+    setEditMapModal(prev => ({ ...prev, loading: true }));
+    try {
+      const { lat, lng } = tempLocation;
+
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
+      );
+      const data = await res.json();
+      const addr = data.address || {};
+
+      // Update the edit form fields
+      setEditAddressStreet(addr.road || editAddressStreet);
+      setEditAddressCity(addr.city || addr.town || addr.village || editAddressCity);
+      setEditAddressCountry(addr.country || editAddressCountry);
+      setEditAddressRegion(addr.state || editAddressRegion);
+      setEditAddressPostalCode(addr.postcode || editAddressPostalCode);
+
+      // Save the location
+      setEditSavedLocation({ lat, lng });
+
+      showToast("Location updated!", "success");
+      setEditMapModal({ show: false });
+    } catch (err) {
+      showToast("Failed to fetch location details", "error");
+    } finally {
+      setEditMapModal(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  const LocationSelector = () => {
+    useMapEvents({
+      click(e) {
+        setTempLocation(e.latlng);
+      }
+    });
+    return null;
+  };
+
+  const centerLocation = tempLocation || editSavedLocation || [26.0667, 50.5577];
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex justify-center items-center p-6">
+      <div className="bg-white rounded-xl shadow-xl p-4 max-w-3xl w-full">
+        <h2 className="text-xl font-bold mb-3">Update Location on Map</h2>
+
+        <MapContainer
+          center={[centerLocation.lat || centerLocation[0], centerLocation.lng || centerLocation[1]]}
+          zoom={15}
+          style={{ height: "400px", width: "100%" }}
+        >
+          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <LocationSelector />
+          {tempLocation && <Marker position={[tempLocation.lat, tempLocation.lng]} />}
+        </MapContainer>
+
+        <div className="mt-4 flex gap-2">
+          <button
+            onClick={handleSave}
+            className="flex-1 !bg-green-600 hover:!bg-green-700 text-white py-2 rounded-lg"
+          >
+            Update Location
+          </button>
+          <button
+            onClick={() => setEditMapModal({ show: false })}
+            className="flex-1 !bg-red-600 hover:!bg-red-700 text-white py-2 rounded-lg"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
   return (
     <div className="min-h-screen !bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
         <style>{`
@@ -418,6 +775,17 @@ const openOrdersModal = async (customerId, customerName) => {
     {toast.show && (
       <Toast message={toast.message} type={toast.type} onClose={hideToast} />
     )}
+    <MapModal />
+    <EditMapModal />
+        {viewMapModal.show && (
+        <ViewMapModal
+            lat={viewMapModal.lat}
+            lng={viewMapModal.lng}
+            address={viewMapModal.address}
+            onClose={() => setViewMapModal({ show: false, lat: null, lng: null })}
+        />
+        )}
+
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
@@ -483,6 +851,16 @@ const openOrdersModal = async (customerId, customerName) => {
                   <label className="block text-sm font-medium !text-gray-700 mb-2">Street <span className="!text-red-500">*</span></label>
                   <input type="text" value={addressStreet} onChange={(e) => setAddressStreet(e.target.value)} required className={inputClasses} placeholder="Enter street address" />
                 </div>
+                <div className="mt-2">
+                    <button
+                        type="button"
+                        onClick={() => setMapModal({ show: true })}
+                        className="!bg-green-600 hover:!bg-green-700 !text-white px-4 py-2 rounded-lg font-semibold"
+                    >
+                        📍 Pick from Map
+                    </button>
+                    </div>
+
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -595,37 +973,164 @@ const openOrdersModal = async (customerId, customerName) => {
                       </tr>
                       
                       {/* Expanded Address Details */}
-                      {expandedRows.has(customer.id) && customer.customerAddresses && customer.customerAddresses.length > 0 && (
-                        <tr className="!bg-gray-50">
-                          <td colSpan="5" className="px-6 py-4">
-                            <div className="ml-8 space-y-3">
-                              <h4 className="font-semibold !text-gray-900 mb-3">Addresses:</h4>
-                              {customer.customerAddresses.map((ca, idx) => (
-                                <div key={idx} className="!bg-white p-4 rounded-lg border border-gray-200">
-                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                                    <div>
-                                      <span className="font-medium !text-gray-600">Street:</span>
-                                      <p className="!text-gray-900">{ca.address?.street || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                      <span className="font-medium !text-gray-600">City:</span>
-                                      <p className="!text-gray-900">{ca.address?.city || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                      <span className="font-medium !text-gray-600">Region:</span>
-                                      <p className="!text-gray-900">{ca.address?.region || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                      <span className="font-medium !text-gray-600">Country:</span>
-                                      <p className="!text-gray-900">{ca.address?.country || 'N/A'}</p>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </td>
-                        </tr>
-                      )}
+{expandedRows.has(customer.id) && customer.customerAddresses && customer.customerAddresses.length > 0 && (
+  <tr className="!bg-gray-50">
+    <td colSpan="5" className="px-6 py-4">
+      <div className="ml-8 space-y-3">
+        <h4 className="font-semibold !text-gray-900 mb-3">Addresses:</h4>
+        {customer.customerAddresses.map((ca, idx) => (
+          <div key={idx} className="!bg-white p-4 rounded-lg border border-gray-200">
+            {editingAddressId === ca.address?.id ? (
+  // EDIT MODE
+  <div className="space-y-3">
+    {editAddressError && (
+      <div className="p-3 rounded-lg !bg-red-50 border-l-4 border-red-500">
+        <p className="text-sm !text-red-700">{editAddressError}</p>
+      </div>
+    )}
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div>
+        <label className="block text-xs font-medium !text-gray-600 mb-1">Street</label>
+        <input
+          type="text"
+          value={editAddressStreet}
+          onChange={(e) => setEditAddressStreet(e.target.value)}
+          className="w-full !border-2 !border-gray-400 rounded-lg p-2 text-sm !text-black !bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Street"
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium !text-gray-600 mb-1">City</label>
+        <input
+          type="text"
+          value={editAddressCity}
+          onChange={(e) => setEditAddressCity(e.target.value)}
+          className="w-full !border-2 !border-gray-400 rounded-lg p-2 text-sm !text-black !bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="City"
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium !text-gray-600 mb-1">Region</label>
+        <input
+          type="text"
+          value={editAddressRegion}
+          onChange={(e) => setEditAddressRegion(e.target.value)}
+          className="w-full !border-2 !border-gray-400 rounded-lg p-2 text-sm !text-black !bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Region"
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium !text-gray-600 mb-1">Country</label>
+        <input
+          type="text"
+          value={editAddressCountry}
+          onChange={(e) => setEditAddressCountry(e.target.value)}
+          className="w-full !border-2 !border-gray-400 rounded-lg p-2 text-sm !text-black !bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Country"
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium !text-gray-600 mb-1">Postal Code</label>
+        <input
+          type="text"
+          value={editAddressPostalCode}
+          onChange={(e) => setEditAddressPostalCode(e.target.value)}
+          className="w-full !border-2 !border-gray-400 rounded-lg p-2 text-sm !text-black !bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Postal Code"
+        />
+      </div>
+      {/* ✅ ADD THIS - Show current location status */}
+      <div className="flex items-center">
+        <button
+          type="button"
+          onClick={() => setEditMapModal({ show: true })}
+          className="!bg-green-600 hover:!bg-green-700 !text-white px-4 py-2 rounded-lg font-semibold text-sm"
+        >
+          📍 {editSavedLocation ? 'Update Location' : 'Add Location'}
+        </button>
+        {editSavedLocation && (
+          <span className="ml-2 text-xs !text-green-600">✓ Location set</span>
+        )}
+      </div>
+    </div>
+    <div className="flex gap-2">
+      <button
+        onClick={() => handleEditAddress(ca.address.id)}
+        className="!bg-green-600 hover:!bg-green-700 text-white px-4 py-2 rounded-lg font-semibold text-sm"
+      >
+        Save Changes
+      </button>
+      <button
+        onClick={cancelEditAddress}
+        className="!bg-gray-500 hover:!bg-gray-600 text-white px-4 py-2 rounded-lg font-semibold text-sm"
+      >
+        Cancel
+      </button>
+    </div>
+  </div>
+            ) : (
+              // VIEW MODE
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-3">
+                  <div>
+                    <span className="font-medium !text-gray-600">Street:</span>
+                    <p className="!text-gray-900">{ca.address?.street || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium !text-gray-600">City:</span>
+                    <p className="!text-gray-900">{ca.address?.city || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium !text-gray-600">Region:</span>
+                    <p className="!text-gray-900">{ca.address?.region || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium !text-gray-600">Country:</span>
+                    <p className="!text-gray-900">{ca.address?.country || 'N/A'}</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      const lat = ca.address?.latitude || ca.address?.Latitude || ca.address?.lat;
+                      const lng = ca.address?.longitude || ca.address?.Longitude || ca.address?.lng;
+                      
+                      if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
+                        setViewMapModal({ 
+                          show: true, 
+                          lat: parseFloat(lat), 
+                          lng: parseFloat(lng), 
+                          address: ca.address
+                        });
+                      } else {
+                        showToast("No coordinates saved for this address", "error");
+                      }
+                    }}
+                    className="!bg-blue-600 hover:!bg-blue-700 text-white px-3 py-1 rounded-lg font-semibold text-sm"
+                  >
+                    📍 View on Map
+                  </button>
+                  <button
+                    onClick={() => startEditAddress(ca.address)}
+                    className="!bg-yellow-500 hover:!bg-yellow-600 text-white px-3 py-1 rounded-lg font-semibold text-sm"
+                  >
+                    ✏️ Edit
+                  </button>
+                  <button
+                    onClick={() => confirmDeleteAddress(ca.address.id, customer.id)}
+                    className="!bg-red-600 hover:!bg-red-700 text-white px-3 py-1 rounded-lg font-semibold text-sm"
+                    >
+                    🗑️ Delete
+                    </button>
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+    </td>
+  </tr>
+)}
                     </Fragment>
                   ))}
                 </tbody>
@@ -642,6 +1147,38 @@ const openOrdersModal = async (customerId, customerName) => {
           )}
         </div>
       </div>
+      {/* Delete Address Confirmation Modal */}
+{deleteAddressConfirm.show && (
+  <div className="fixed inset-0 !bg-black !bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="!bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+      <div className="flex items-center mb-4">
+        <div className="!bg-red-100 p-3 rounded-full">
+          <svg className="w-6 h-6 !text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </div>
+        <h3 className="ml-3 text-xl font-bold !text-gray-900">Delete Address</h3>
+      </div>
+      <p className="!text-gray-600 mb-6">
+        Are you sure you want to delete this address? This action cannot be undone.
+      </p>
+      <div className="flex gap-3">
+        <button 
+          onClick={handleDeleteAddress} 
+          className="flex-1 !bg-red-600 hover:!bg-red-700 !text-white py-3 px-4 rounded-lg font-semibold"
+        >
+          Delete Address
+        </button>
+        <button 
+          onClick={cancelDeleteAddress} 
+          className="flex-1 !bg-gray-500 hover:!bg-gray-600 !text-white py-3 px-4 rounded-lg font-semibold"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm.show && (
