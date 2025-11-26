@@ -11,6 +11,7 @@ import {
   updateAddress,
   updateSellerAddress,
   createSellerAddress,
+  deleteSellerAddress,
   getSellerOrders,
   updateOrder
 } from "../../services/api";

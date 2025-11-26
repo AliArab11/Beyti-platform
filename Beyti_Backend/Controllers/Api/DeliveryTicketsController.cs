@@ -39,9 +39,8 @@ namespace Beyti_Backend.Controllers.Api
                         .ThenInclude(s => s.UserProfile)
                 .Include(dt => dt.Order)
                     .ThenInclude(o => o.Seller)
-                        .ThenInclude(s => s.SellerAddresses)  // ADD THIS LINE
-                            .ThenInclude(sa => sa.Address)     // ADD THIS LINE
-                .Include(dt => dt.PickupAddress)
+                        .ThenInclude(s => s.SellerAddresses)  
+                            .ThenInclude(sa => sa.Address)     
                 .Include(dt => dt.DeliveryAddress)
                 .Include(dt => dt.Driver)
                     .ThenInclude(d => d.UserProfile)
