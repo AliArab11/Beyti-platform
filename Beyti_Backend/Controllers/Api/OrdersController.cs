@@ -20,7 +20,7 @@ namespace Beyti_Backend.Controllers.Api
             _context = context;
         }
 
-        // DTO for creating orders - ADD THIS!
+        // DTO for creating orders 
         public class CreateOrderDto
         {
             public int CustomerId { get; set; }
