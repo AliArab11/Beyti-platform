@@ -39,6 +39,7 @@ const Toast = ({ message, type, onClose }) => {
 
 const Customers = () => {
   const [customers, setCustomers] = useState([]);
+  const [customersWithCounts, setCustomersWithCounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -162,6 +163,7 @@ const ViewMapModal = ({ lat, lng, onClose, address }) => {
   // Orders modal state
   const [ordersModal, setOrdersModal] = useState({ show: false, customerId: null, customerName: "", orders: [], loading: false, error: null });
   const [expandedOrderRows, setExpandedOrderRows] = useState(new Set());
+  const [orderTab, setOrderTab] = useState("active"); // "active", "completed", "cancelled"
   
   // Review modal state
   const [reviewModal, setReviewModal] = useState({ 
@@ -180,17 +182,34 @@ const ViewMapModal = ({ lat, lng, onClose, address }) => {
   }, []);
 
   const fetchCustomers = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await getCustomers();
-      setCustomers(data);
-    } catch (err) {
-      setError(err.message || "Failed to load customers");
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    setLoading(true);
+    setError(null);
+    const data = await getCustomers();
+    
+    // Fetch order counts for each customer
+    const customersWithCounts = await Promise.all(
+      data.map(async (customer) => {
+        try {
+          const orders = await getCustomerOrders(customer.id);
+          // Count orders that are "Ready for Pickup" or "Picked Up" (active orders customer should know about)
+          const activeOrderCount = orders.filter(o => 
+            ["ready for pickup", "picked up"].includes(o.status?.toLowerCase())
+          ).length;
+          return { ...customer, activeOrderCount };
+        } catch {
+          return { ...customer, activeOrderCount: 0 };
+        }
+      })
+    );
+    
+    setCustomers(customersWithCounts);
+  } catch (err) {
+    setError(err.message || "Failed to load customers");
+  } finally {
+    setLoading(false);
+  }
+};
 
 const showToast = (message, type = 'success') => {
   setToast({ show: true, message, type });
@@ -409,6 +428,7 @@ const handleDeleteAddress = async () => {
 // --- Orders Management ---
 const openOrdersModal = async (customerId, customerName) => {
   setOrdersModal({ show: true, customerId, customerName, orders: [], loading: true, error: null });
+  setOrderTab("active"); // Set default tab
   try {
     const data = await getCustomerOrders(customerId);
     
@@ -418,10 +438,8 @@ const openOrdersModal = async (customerId, customerName) => {
         const itemsWithReviews = await Promise.all(
           (order.orderItems || []).map(async (item) => {
             try {
-              // Fetch reviews for this product
               const reviews = await fetch(`https://localhost:7062/api/Reviews?productId=${item.productId}&customerId=${customerId}`);
               const reviewData = await reviews.json();
-              // Find review for this specific order
               const orderReview = reviewData.find(r => r.orderId === order.id && r.productId === item.productId);
               return { ...item, review: orderReview || null };
             } catch {
@@ -953,8 +971,17 @@ const EditMapModal = () => {
                             </td>
                             <td className="px-6 py-4 text-right">
                               <div className="flex gap-2 justify-end flex-wrap">
-                                <button onClick={() => openOrdersModal(customer.id, customer.fullName)} className="!bg-purple-600 hover:!bg-purple-700 !text-white px-4 py-2 rounded-lg font-semibold text-sm" title="View Orders">
-                                  📦 Orders
+                                <button 
+                                onClick={() => openOrdersModal(customer.id, customer.fullName)} 
+                                className="!bg-purple-600 hover:!bg-purple-700 !text-white px-4 py-2 rounded-lg font-semibold text-sm relative" 
+                                title="View Orders"
+                                >
+                                📦 Orders
+                                {customer.activeOrderCount > 0 && (
+                                    <span className="absolute -top-2 -right-2 !bg-red-500 !text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center">
+                                    {customer.activeOrderCount}
+                                    </span>
+                                )}
                                 </button>
                                 <button onClick={() => startEdit(customer)} className="!bg-yellow-500 hover:!bg-yellow-600 !text-white p-2 rounded-lg" title="Edit Customer">
                                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1204,136 +1231,203 @@ const EditMapModal = () => {
       )}
 
       {/* Orders Modal */}
-      {ordersModal.show && (
+        {ordersModal.show && (
         <div className="fixed inset-0 !bg-black !bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="!bg-white rounded-xl shadow-2xl max-w-5xl w-full p-6 my-8">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-2xl font-bold !text-gray-900">Orders for {ordersModal.customerName}</h3>
-              <button onClick={closeOrdersModal} className="!text-gray-500 hover:!text-gray-700 text-2xl">×</button>
+            <div className="!bg-white rounded-xl shadow-2xl max-w-5xl w-full my-8">
+            {/* Header */}
+            <div className="flex justify-between items-center p-6 border-b border-gray-200">
+                <div>
+                <h3 className="text-2xl font-bold !text-gray-900">Orders for {ordersModal.customerName}</h3>
+                <p className="text-sm !text-gray-600 mt-1">Track and review your orders</p>
+                </div>
+                <button onClick={closeOrdersModal} className="!text-gray-500 hover:!text-gray-700 text-2xl">×</button>
             </div>
 
-            {ordersModal.error && (
-              <div className="mb-4 p-4 rounded-lg !bg-red-50 border-l-4 border-red-500">
-                <p className="text-sm !text-red-700">{ordersModal.error}</p>
-              </div>
-            )}
+            {/* Tabs */}
+            <div className="flex border-b border-gray-200 px-6">
+                <button
+                onClick={() => setOrderTab("active")}
+                className={`px-6 py-3 font-semibold transition-colors border-b-2 relative ${
+                    orderTab === "active"
+                    ? "!border-blue-600 !text-blue-600"
+                    : "!border-transparent !text-gray-600 hover:!text-gray-900"
+                }`}
+                >
+                🔔 Active Orders
+                {(() => {
+                    const activeCount = ordersModal.orders.filter(o => 
+                    ["placed", "accepted", "preparing", "ready for pickup", "picked up"].includes(o.status?.toLowerCase())
+                    ).length;
+                    return activeCount > 0 && (
+                    <span className="absolute -top-1 -right-1 !bg-blue-500 !text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                        {activeCount}
+                    </span>
+                    );
+                })()}
+                </button>
+                <button
+                onClick={() => setOrderTab("completed")}
+                className={`px-6 py-3 font-semibold transition-colors border-b-2 ${
+                    orderTab === "completed"
+                    ? "!border-blue-600 !text-blue-600"
+                    : "!border-transparent !text-gray-600 hover:!text-gray-900"
+                }`}
+                >
+                ✓ Completed
+                </button>
+                <button
+                onClick={() => setOrderTab("cancelled")}
+                className={`px-6 py-3 font-semibold transition-colors border-b-2 ${
+                    orderTab === "cancelled"
+                    ? "!border-blue-600 !text-blue-600"
+                    : "!border-transparent !text-gray-600 hover:!text-gray-900"
+                }`}
+                >
+                ✕ Cancelled
+                </button>
+            </div>
 
-            {ordersModal.loading ? (
-              <div className="flex justify-center py-8">
-                <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-r-transparent"></div>
-              </div>
-            ) : ordersModal.orders.length > 0 ? (
-              <div className="space-y-4">
-                {ordersModal.orders.map(order => (
-                  <div key={order.id} className="!bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="p-4 flex justify-between items-center cursor-pointer" onClick={() => toggleOrderRow(order.id)}>
-                      <div className="flex items-center gap-4">
-                        <svg className={`w-5 h-5 !text-gray-600 transition-transform ${expandedOrderRows.has(order.id) ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                        <div>
-                          <p className="font-semibold !text-gray-900">Order #{order.id}</p>
-                          <p className="text-sm !text-gray-600">{new Date(order.createdAt).toLocaleDateString()}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(order.status)}`}>
-                          {order.status || "N/A"}
-                        </span>
-                        <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${getPaymentColor(order.paymentStatus)}`}>
-                          {order.paymentStatus || "N/A"}
-                        </span>
-                        <p className="font-bold !text-gray-900">${order.totalAmount?.toFixed(2) || "0.00"}</p>
-                      </div>
-                    </div>
+            {/* Content */}
+            <div className="p-6 max-h-[60vh] overflow-y-auto">
+                {ordersModal.error && (
+                <div className="mb-4 p-4 rounded-lg !bg-red-50 border-l-4 border-red-500">
+                    <p className="text-sm !text-red-700">{ordersModal.error}</p>
+                </div>
+                )}
 
-                    {expandedOrderRows.has(order.id) && (
-                      <div className="p-4 border-t border-gray-200 !bg-white">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                          <div>
-                            <p className="text-xs !text-gray-600 mb-1">Seller</p>
-                            <p className="text-sm font-medium !text-gray-900">{order.sellerName || "N/A"}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs !text-gray-600 mb-1">Fulfillment</p>
-                            <p className="text-sm font-medium !text-gray-900">{order.fulfillmentType || "N/A"}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs !text-gray-600 mb-1">Payment Method</p>
-                            <p className="text-sm font-medium !text-gray-900">{order.paymentMethod || "N/A"}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs !text-gray-600 mb-1">Delivery Fee</p>
-                            <p className="text-sm font-medium !text-gray-900">${order.deliveryFee?.toFixed(2) || "0.00"}</p>
-                          </div>
-                        </div>
+                {ordersModal.loading ? (
+                <div className="flex justify-center py-8">
+                    <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-r-transparent"></div>
+                </div>
+                ) : (() => {
+                // Filter orders based on active tab
+                let filteredOrders = [];
+                if (orderTab === "active") {
+                    filteredOrders = ordersModal.orders.filter(o => 
+                    ["placed", "accepted", "preparing", "ready for pickup", "picked up"].includes(o.status?.toLowerCase())
+                    );
+                } else if (orderTab === "completed") {
+                    filteredOrders = ordersModal.orders.filter(o => o.status?.toLowerCase() === "completed");
+                } else if (orderTab === "cancelled") {
+                    filteredOrders = ordersModal.orders.filter(o => o.status?.toLowerCase() === "cancelled");
+                }
 
-                        {order.orderItems && order.orderItems.length > 0 && (
-                          <div>
-                            <h4 className="font-semibold !text-gray-900 mb-3">Order Items:</h4>
-                            <div className="space-y-2">
-                              {order.orderItems.map((item, idx) => (
-                                <div key={idx} className="p-3 !bg-gray-50 rounded-lg">
-                                    {/* Product Info Row */}
-                                    <div className="flex justify-between items-center">
-                                    <div className="flex-1">
-                                        <p className="text-sm font-medium !text-gray-900">{item.productName || "Product"}</p>
-                                        <p className="text-xs !text-gray-600">SKU: {item.variantSKU || "N/A"} • Qty: {item.qty}</p>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <p className="text-sm font-semibold !text-gray-900">${item.lineTotal?.toFixed(2) || "0.00"}</p>
-                                        {order.status?.toLowerCase() === 'completed' && !item.review && (
-                                        <button 
-                                            onClick={() => openReviewModal(order.id, item.productId, item.productName)}
-                                            className="!bg-blue-600 hover:!bg-blue-700 !text-white px-3 py-1 rounded text-xs font-medium"
-                                        >
-                                            ⭐ Review
-                                        </button>
-                                        )}
-                                        {item.review && (
-                                        <span className="!bg-green-100 !text-green-700 px-3 py-1 rounded text-xs font-medium">
-                                            ✓ Reviewed
-                                        </span>
-                                        )}
-                                    </div>
-                                    </div>
-                                     {/* Review Display - THIS IS THE NEW PART */}
-                                    {item.review && (
-                                    <div className="mt-3 p-3 !bg-white rounded-lg border border-gray-200">
-                                        <div className="flex items-center gap-2 mb-2">
-                                        <span className="text-xs font-semibold !text-gray-700">Your Review:</span>
-                                        <div className="flex">
-                                            {[1, 2, 3, 4, 5].map(star => (
-                                            <span key={star} className={`text-sm ${star <= item.review.rating ? '!text-yellow-400' : '!text-gray-300'}`}>
-                                                ★
-                                            </span>
-                                            ))}
-                                        </div>
-                                        <span className="text-xs !text-gray-600">
-                                            {new Date(item.review.createdAt).toLocaleDateString()}
-                                        </span>
-                                        </div>
-                                        <p className="text-sm !text-gray-700 italic">"{item.review.comment}"</p>
-                                    </div>
-                                    )}
-                                </div>
-                              ))}
+                return filteredOrders.length > 0 ? (
+                    <div className="space-y-4">
+                    {filteredOrders.map(order => (
+                        <div key={order.id} className="!bg-gray-50 rounded-lg border border-gray-200">
+                        <div className="p-4 flex justify-between items-center cursor-pointer" onClick={() => toggleOrderRow(order.id)}>
+                            <div className="flex items-center gap-4">
+                            <svg className={`w-5 h-5 !text-gray-600 transition-transform ${expandedOrderRows.has(order.id) ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                            <div>
+                                <p className="font-semibold !text-gray-900">Order #{order.id}</p>
+                                <p className="text-sm !text-gray-600">{new Date(order.createdAt).toLocaleDateString()}</p>
                             </div>
-                          </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                            <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(order.status)}`}>
+                                {order.status || "N/A"}
+                            </span>
+                            <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${getPaymentColor(order.paymentStatus)}`}>
+                                {order.paymentStatus || "N/A"}
+                            </span>
+                            <p className="font-bold !text-gray-900">${order.totalAmount?.toFixed(2) || "0.00"}</p>
+                            </div>
+                        </div>
+
+                        {expandedOrderRows.has(order.id) && (
+                            <div className="p-4 border-t border-gray-200 !bg-white">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                                <div>
+                                <p className="text-xs !text-gray-600 mb-1">Seller</p>
+                                <p className="text-sm font-medium !text-gray-900">{order.sellerName || "N/A"}</p>
+                                </div>
+                                <div>
+                                <p className="text-xs !text-gray-600 mb-1">Fulfillment</p>
+                                <p className="text-sm font-medium !text-gray-900">{order.fulfillmentType || "N/A"}</p>
+                                </div>
+                                <div>
+                                <p className="text-xs !text-gray-600 mb-1">Payment Method</p>
+                                <p className="text-sm font-medium !text-gray-900">{order.paymentMethod || "N/A"}</p>
+                                </div>
+                                <div>
+                                <p className="text-xs !text-gray-600 mb-1">Delivery Fee</p>
+                                <p className="text-sm font-medium !text-gray-900">${order.deliveryFee?.toFixed(2) || "0.00"}</p>
+                                </div>
+                            </div>
+
+                            {order.orderItems && order.orderItems.length > 0 && (
+                                <div>
+                                <h4 className="font-semibold !text-gray-900 mb-3">Order Items:</h4>
+                                <div className="space-y-2">
+                                    {order.orderItems.map((item, idx) => (
+                                    <div key={idx} className="p-3 !bg-gray-50 rounded-lg">
+                                        <div className="flex justify-between items-center">
+                                        <div className="flex-1">
+                                            <p className="text-sm font-medium !text-gray-900">{item.productName || "Product"}</p>
+                                            <p className="text-xs !text-gray-600">SKU: {item.variantSKU || "N/A"} • Qty: {item.qty}</p>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <p className="text-sm font-semibold !text-gray-900">${item.lineTotal?.toFixed(2) || "0.00"}</p>
+                                            {order.status?.toLowerCase() === 'completed' && !item.review && (
+                                            <button 
+                                                onClick={() => openReviewModal(order.id, item.productId, item.productName)}
+                                                className="!bg-blue-600 hover:!bg-blue-700 !text-white px-3 py-1 rounded text-xs font-medium"
+                                            >
+                                                ⭐ Review
+                                            </button>
+                                            )}
+                                            {item.review && (
+                                            <span className="!bg-green-100 !text-green-700 px-3 py-1 rounded text-xs font-medium">
+                                                ✓ Reviewed
+                                            </span>
+                                            )}
+                                        </div>
+                                        </div>
+                                        {item.review && (
+                                        <div className="mt-3 p-3 !bg-white rounded-lg border border-gray-200">
+                                            <div className="flex items-center gap-2 mb-2">
+                                            <span className="text-xs font-semibold !text-gray-700">Your Review:</span>
+                                            <div className="flex">
+                                                {[1, 2, 3, 4, 5].map(star => (
+                                                <span key={star} className={`text-sm ${star <= item.review.rating ? '!text-yellow-400' : '!text-gray-300'}`}>
+                                                    ★
+                                                </span>
+                                                ))}
+                                            </div>
+                                            <span className="text-xs !text-gray-600">
+                                                {new Date(item.review.createdAt).toLocaleDateString()}
+                                            </span>
+                                            </div>
+                                            <p className="text-sm !text-gray-700 italic">"{item.review.comment}"</p>
+                                        </div>
+                                        )}
+                                    </div>
+                                    ))}
+                                </div>
+                                </div>
+                            )}
+                            </div>
                         )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="!text-gray-600">No orders found for this customer</p>
-              </div>
-            )}
-          </div>
+                        </div>
+                    ))}
+                    </div>
+                ) : (
+                    <div className="text-center py-8">
+                    <p className="!text-gray-600">
+                        {orderTab === "active" && "No active orders"}
+                        {orderTab === "completed" && "No completed orders"}
+                        {orderTab === "cancelled" && "No cancelled orders"}
+                    </p>
+                    </div>
+                );
+                })()}
+            </div>
+            </div>
         </div>
-      )}
+        )}
 
       {/* Review Modal */}
       {reviewModal.show && (

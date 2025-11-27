@@ -254,13 +254,15 @@ const clearCart = () => {
 
  
 
-  const fetchProductReviews = async (productId) => {
+const fetchProductReviews = async (productId) => {
   try {
     setLoadingReviews(true);
     const response = await fetch(`https://localhost:7062/api/Reviews?productId=${productId}`);
     if (response.ok) {
       const data = await response.json();
-      setProductReviews(data);
+      // Filter out reviews that are hidden by seller
+      const visibleReviews = data.filter(review => !review.isCommentHiddenBySeller);
+      setProductReviews(visibleReviews);
     }
   } catch (err) {
     console.error("Error loading reviews:", err);
