@@ -29,13 +29,13 @@ public partial class ServiceProvider
     public decimal? MaxServicePrice { get; set; }
 
     [StringLength(20)]
-    public string Status { get; set; } = null!;
+    public string Status { get; set; } = "Active";
 
     [Precision(3)]
     public DateTime? VerifiedAt { get; set; }
 
     [Precision(3)]
-    public DateTime CreatedAt { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     [Precision(3)]
     public DateTime UpdatedAt { get; set; }

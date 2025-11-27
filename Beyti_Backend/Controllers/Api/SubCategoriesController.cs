@@ -15,6 +15,11 @@ namespace Beyti_Backend.Controllers.Api
     {
         private readonly BeytiContext _context;
 
+        public class SubCategoryCreateDto
+        {
+            public string Name { get; set; } = null!;
+            public int CategoryId { get; set; }
+        }
         public SubCategoriesController(BeytiContext context)
         {
             _context = context;
@@ -75,13 +80,26 @@ namespace Beyti_Backend.Controllers.Api
         // POST: api/SubCategories
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<SubCategory>> PostSubCategory(SubCategory subCategory)
+        public async Task<ActionResult<SubCategory>> PostSubCategory(SubCategoryCreateDto dto)
         {
+            if (!_context.Categories.Any(c => c.Id == dto.CategoryId))
+                return BadRequest("Invalid CategoryId");
+
+            var subCategory = new SubCategory
+            {
+                Name = dto.Name,
+                CategoryId = dto.CategoryId,
+                IsActive = true,
+                CreatedAt = DateTime.Now
+            };
+
             _context.SubCategories.Add(subCategory);
             await _context.SaveChangesAsync();
 
             return CreatedAtAction("GetSubCategory", new { id = subCategory.Id }, subCategory);
         }
+
+
 
         // DELETE: api/SubCategories/5
         [HttpDelete("{id}")]

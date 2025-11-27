@@ -15,6 +15,19 @@ namespace Beyti_Backend.Controllers.Api
     {
         private readonly BeytiContext _context;
 
+        public class CategoryDto
+        {
+            public int Id { get; set; }
+            public string Name { get; set; } = null!;
+            public List<SubCategoryDto> SubCategories { get; set; } = new();
+        }
+
+        public class SubCategoryDto
+        {
+            public int Id { get; set; }
+            public string Name { get; set; } = null!;
+        }
+
         public CategoriesController(BeytiContext context)
         {
             _context = context;
@@ -22,10 +35,25 @@ namespace Beyti_Backend.Controllers.Api
 
         // GET: api/Categories
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Category>>> GetCategories()
+        public async Task<ActionResult<IEnumerable<CategoryDto>>> GetCategories()
         {
-            return await _context.Categories.ToListAsync();
+            var categories = await _context.Categories
+                .Include(c => c.SubCategories)
+                .Select(c => new CategoryDto
+                {
+                    Id = c.Id,
+                    Name = c.Name,
+                    SubCategories = c.SubCategories.Select(sc => new SubCategoryDto
+                    {
+                        Id = sc.Id,
+                        Name = sc.Name
+                    }).ToList()
+                })
+                .ToListAsync();
+
+            return categories;
         }
+
 
         // GET: api/Categories/5
         [HttpGet("{id}")]
