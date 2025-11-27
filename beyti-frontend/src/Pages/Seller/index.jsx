@@ -91,6 +91,10 @@ const Sellers = () => {
   const [expandedOrderRows, setExpandedOrderRows] = useState(new Set());
   const [activeTab, setActiveTab] = useState("orders"); // "orders" or "products"
 
+  
+  const [orderTab, setOrderTab] = useState("requests"); // "requests", "ongoing", "history"
+  const [requestCount, setRequestCount] = useState(0);
+
   const [productsWithReviews, setProductsWithReviews] = useState([]);
   const [expandedProducts, setExpandedProducts] = useState(new Set());
  
@@ -182,22 +186,59 @@ const ViewMapModal = ({ lat, lng, onClose, address }) => {
 };
 
 
-  useEffect(() => {
-    fetchSellers();
-  }, []);
 
-  const fetchSellers = async () => {
+ const fetchSellers = async () => {
+  try {
+    const data = await getSellers();
+    
+    // Fetch request counts for each seller
+    const sellersWithCounts = await Promise.all(
+      data.map(async (seller) => {
+        try {
+          const orders = await getSellerOrders(seller.id);
+          const requestCount = orders.filter(o => o.status?.toLowerCase() === "placed").length;
+          return { ...seller, requestCount };
+        } catch {
+          return { ...seller, requestCount: 0 };
+        }
+      })
+    );
+    
+    setSellers(sellersWithCounts);
+  } catch (err) {
+    setError(err.message || "Failed to load sellers");
+  }
+}; 
+
+useEffect(() => {
+  const loadData = async () => {
     try {
       setLoading(true);
-      setError(null);
       const data = await getSellers();
-      setSellers(data);
+      
+      // Now fetch request counts for each seller
+      const sellersWithCounts = await Promise.all(
+        data.map(async (seller) => {
+          try {
+            const orders = await getSellerOrders(seller.id);
+            const requestCount = orders.filter(o => o.status?.toLowerCase() === "placed").length;
+            return { ...seller, requestCount };
+          } catch {
+            return { ...seller, requestCount: 0 };
+          }
+        })
+      );
+      
+      setSellers(sellersWithCounts);
     } catch (err) {
       setError(err.message || "Failed to load sellers");
     } finally {
       setLoading(false);
     }
   };
+  
+  loadData();
+}, []);
 
   // --- Seller APIs ---
   const handleAddSeller = async () => {
@@ -387,17 +428,23 @@ const ViewMapModal = ({ lat, lng, onClose, address }) => {
   };
 
 
-  // --- Orders Management ---
- const openOrdersModal = async (sellerId, sellerName) => {
+const openOrdersModal = async (sellerId, sellerName, keepCurrentTab = false) => {
+  const currentTab = keepCurrentTab ? orderTab : "requests";
+  
   setOrdersModal({ show: true, sellerId, sellerName, orders: [], loading: true, error: null });
   setOrderStatusFilter("all");
   setExpandedOrderRows(new Set());
   setActiveTab("orders");
   setProductsWithReviews([]);
   setExpandedProducts(new Set());
+  setOrderTab(currentTab); // Use current or default tab
   
   try {
     const data = await getSellerOrders(sellerId);
+    
+    // Count pending requests
+    const pendingRequests = (data || []).filter(o => o.status?.toLowerCase() === "placed").length;
+    setRequestCount(pendingRequests);
     
     // Fetch reviews for all products in all orders
     const ordersWithReviews = await Promise.all(
@@ -937,9 +984,14 @@ const EditMapModal = () => {
                             </td>
                             <td className="px-6 py-4 text-right">
                               <div className="flex gap-2 justify-end flex-wrap">
-                                <button onClick={() => openOrdersModal(seller.id, seller.storeName)} className="!bg-purple-600 hover:!bg-purple-700 !text-white px-4 py-2 rounded-lg font-semibold text-sm" title="Manage Orders">
-                                  📦 Manage Orders
-                                </button>
+                                <button onClick={() => openOrdersModal(seller.id, seller.storeName)} className="!bg-purple-600 hover:!bg-purple-700 !text-white px-4 py-2 rounded-lg font-semibold text-sm relative" title="Manage Orders">
+                                    📦 Manage Orders
+                                    {sellers.find(s => s.id === seller.id)?.requestCount > 0 && (
+                                      <span className="absolute -top-2 -right-2 !bg-red-500 !text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center">
+                                        {sellers.find(s => s.id === seller.id)?.requestCount || 0}
+                                      </span>
+                                    )}
+                                  </button>
                                 <button onClick={() => startEdit(seller)} className="!bg-yellow-500 hover:!bg-yellow-600 !text-white p-2 rounded-lg" title="Edit Seller">
                                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -1241,216 +1293,320 @@ const EditMapModal = () => {
             {/* Orders Tab */}
               {activeTab === "orders" && (
                 <>
-                  {/* Filter */}
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium !text-gray-700 mb-2">Filter by Status</label>
-                    <select
-                      value={orderStatusFilter}
-                      onChange={e => setOrderStatusFilter(e.target.value)}
-                      className="w-full md:w-48 !border-2 !border-gray-400 rounded-lg p-2 !text-black !bg-white"
+                  {/* Order Sub-Tabs */}
+                  <div className="flex gap-2 mb-6 border-b border-gray-200 pb-2">
+                    <button
+                      onClick={() => setOrderTab("requests")}
+                      className={`px-4 py-2 font-semibold rounded-t-lg transition-colors relative ${
+                        orderTab === "requests"
+                          ? "!bg-blue-100 !text-blue-700 border-b-2 !border-blue-600"
+                          : "!bg-gray-100 !text-gray-600 hover:!bg-gray-200"
+                      }`}
                     >
-                      <option value="all">All Statuses</option>
-                      <option value="placed">Placed (Needs Response)</option>
-                      <option value="accepted">Accepted</option>
-                      <option value="preparing">Preparing</option>
-                      <option value="ready for pickup">Ready for Pickup</option>
-                      <option value="completed">Completed</option>
-                      <option value="cancelled">Cancelled/Declined</option>
-                    </select>
+                      🔔 Requests
+                      {requestCount > 0 && (
+                        <span className="absolute -top-1 -right-1 !bg-red-500 !text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                          {requestCount}
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => setOrderTab("ongoing")}
+                      className={`px-4 py-2 font-semibold rounded-t-lg transition-colors relative ${
+                        orderTab === "ongoing"
+                          ? "!bg-blue-100 !text-blue-700 border-b-2 !border-blue-600"
+                          : "!bg-gray-100 !text-gray-600 hover:!bg-gray-200"
+                      }`}
+                    >
+                      🔄 Ongoing
+                      {(() => {
+                        const ongoingCount = ordersModal.orders.filter(o => 
+                          ["accepted", "preparing", "ready for pickup"].includes(o.status?.toLowerCase())
+                        ).length;
+                        return ongoingCount > 0 && (
+                          <span className="absolute -top-1 -right-1 !bg-orange-500 !text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                            {ongoingCount}
+                          </span>
+                        );
+                      })()}
+                    </button>
+                    <button
+                      onClick={() => setOrderTab("history")}
+                      className={`px-4 py-2 font-semibold rounded-t-lg transition-colors ${
+                        orderTab === "history"
+                          ? "!bg-blue-100 !text-blue-700 border-b-2 !border-blue-600"
+                          : "!bg-gray-100 !text-gray-600 hover:!bg-gray-200"
+                      }`}
+                    >
+                      📜 History
+                    </button>
                   </div>
 
-                  {/* Orders List */}
-                  {filteredOrders.length > 0 ? (
-                    <div className="space-y-4">
-                      {filteredOrders.map(order => (
-                        <div key={order.id} className="!bg-gray-50 rounded-lg border border-gray-200">
-                          <div className="p-4 flex justify-between items-center cursor-pointer" onClick={() => toggleOrderRow(order.id)}>
-                            <div className="flex items-center gap-4">
-                              <svg className={`w-5 h-5 !text-gray-600 transition-transform ${expandedOrderRows.has(order.id) ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                              </svg>
-                              <div>
-                                <p className="font-semibold !text-gray-900">Order #{order.id}</p>
-                                <p className="text-sm !text-gray-600">{new Date(order.createdAt).toLocaleDateString()}</p>
+                  {/* Filter Orders Based on Sub-Tab */}
+                  {(() => {
+                    let tabFilteredOrders = [];
+                    if (orderTab === "requests") {
+                      tabFilteredOrders = ordersModal.orders.filter(o => o.status?.toLowerCase() === "placed");
+                    } else if (orderTab === "ongoing") {
+                      tabFilteredOrders = ordersModal.orders.filter(o => 
+                        ["accepted", "preparing", "ready for pickup"].includes(o.status?.toLowerCase())
+                      );
+                    } else if (orderTab === "history") {
+                      tabFilteredOrders = ordersModal.orders.filter(o => 
+                        ["completed", "cancelled"].includes(o.status?.toLowerCase())
+                      );
+                    }
+
+                    return tabFilteredOrders.length > 0 ? (
+                      <div className="space-y-4">
+                        {tabFilteredOrders.map(order => (
+                          <div key={order.id} className="!bg-gray-50 rounded-lg border border-gray-200">
+                            <div className="p-4 flex justify-between items-center cursor-pointer" onClick={() => toggleOrderRow(order.id)}>
+                              <div className="flex items-center gap-4">
+                                <svg className={`w-5 h-5 !text-gray-600 transition-transform ${expandedOrderRows.has(order.id) ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                                <div>
+                                  <p className="font-semibold !text-gray-900">Order #{order.id}</p>
+                                  <p className="text-sm !text-gray-600">{new Date(order.createdAt).toLocaleDateString()}</p>
+                                </div>
                               </div>
-                            </div>
-                            <div className="flex items-center gap-4">
-                              <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(order.status)}`}>
-                                {order.status || "N/A"}
-                              </span>
-                              <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${getPaymentColor(order.paymentStatus)}`}>
-                                {order.paymentStatus || "N/A"}
-                              </span>
-                              <p className="font-bold !text-gray-900">${order.totalAmount?.toFixed(2) || "0.00"}</p>
-                              
-                              {/* Action Buttons Based on Status */}
-                              {order.status?.toLowerCase() === "placed" && (
-                                <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                                  <button
-                                    onClick={async () => {
-                                      try {
-                                        await fetch(`https://localhost:7062/api/Orders/${order.id}/seller-response`, {
-                                          method: 'PUT',
-                                          headers: { 'Content-Type': 'application/json' },
-                                          body: JSON.stringify({ Status: "Accepted" })
-                                        });
-                                        await openOrdersModal(ordersModal.sellerId, ordersModal.sellerName);
-                                      } catch (err) {
-                                        alert("Failed to accept order");
-                                      }
-                                    }}
-                                    className="!bg-green-600 hover:!bg-green-700 !text-white px-3 py-1 rounded text-sm font-medium"
-                                  >
-                                    ✓ Accept
-                                  </button>
-                                  <button
-                                    onClick={async () => {
-                                      if (confirm("Decline this order?")) {
+                              <div className="flex items-center gap-4">
+                                <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(order.status)}`}>
+                                  {order.status || "N/A"}
+                                </span>
+                                <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${getPaymentColor(order.paymentStatus)}`}>
+                                  {order.paymentStatus || "N/A"}
+                                </span>
+                                <p className="font-bold !text-gray-900">${order.totalAmount?.toFixed(2) || "0.00"}</p>
+                                
+                                {/* Action Buttons Based on Status */}
+                                {order.status?.toLowerCase() === "placed" && (
+                                  <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                                    <button
+                                      onClick={async () => {
                                         try {
                                           await fetch(`https://localhost:7062/api/Orders/${order.id}/seller-response`, {
                                             method: 'PUT',
                                             headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({ Status: "Cancelled" })
+                                            body: JSON.stringify({ Status: "Accepted" })
                                           });
-                                          await openOrdersModal(ordersModal.sellerId, ordersModal.sellerName);
+                                          await openOrdersModal(ordersModal.sellerId, ordersModal.sellerName, true);
+                                          await fetchSellers(); 
                                         } catch (err) {
-                                          alert("Failed to decline order");
+                                          alert("Failed to accept order");
                                         }
+                                      }}
+                                      className="!bg-green-600 hover:!bg-green-700 !text-white px-3 py-1 rounded text-sm font-medium"
+                                    >
+                                      ✓ Accept
+                                    </button>
+                                    <button
+                                      onClick={async () => {
+                                        if (confirm("Decline this order?")) {
+                                          try {
+                                            await fetch(`https://localhost:7062/api/Orders/${order.id}/seller-response`, {
+                                              method: 'PUT',
+                                              headers: { 'Content-Type': 'application/json' },
+                                              body: JSON.stringify({ Status: "Cancelled" })
+                                            });
+                                            await openOrdersModal(ordersModal.sellerId, ordersModal.sellerName, true);
+                                            await fetchSellers(); 
+                                          } catch (err) {
+                                            alert("Failed to decline order");
+                                          }
+                                        }
+                                      }}
+                                      className="!bg-red-600 hover:!bg-red-700 !text-white px-3 py-1 rounded text-sm font-medium"
+                                    >
+                                      ✕ Decline
+                                    </button>
+                                  </div>
+                                )}
+                                
+                                {(order.status?.toLowerCase() === "accepted" || order.status?.toLowerCase() === "preparing") && (
+                                  <button
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      const newStatus = order.status?.toLowerCase() === "accepted" ? "Preparing" : "Ready for Pickup";
+                                      try {
+                                        await fetch(`https://localhost:7062/api/Orders/${order.id}/update-seller-status`, {
+                                          method: 'PUT',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({ Status: newStatus })
+                                        });
+                                        await openOrdersModal(ordersModal.sellerId, ordersModal.sellerName, true);
+                                        await fetchSellers(); 
+                                      } catch (err) {
+                                        alert("Failed to update status");
                                       }
                                     }}
-                                    className="!bg-red-600 hover:!bg-red-700 !text-white px-3 py-1 rounded text-sm font-medium"
+                                    className="!bg-blue-600 hover:!bg-blue-700 !text-white px-3 py-1 rounded text-sm font-medium"
                                   >
-                                    ✕ Decline
+                                    {order.status?.toLowerCase() === "accepted" ? "→ Start Preparing" : "→ Ready for Pickup"}
                                   </button>
+                                )}
+                                
+                                {order.status?.toLowerCase() === "ready for pickup" && order.fulfillmentType === "Pickup" && (
+                                  <button
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      try {
+                                        await fetch(`https://localhost:7062/api/Orders/${order.id}/update-seller-status`, {
+                                          method: 'PUT',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({ Status: "Completed" })
+                                        });
+                                        await openOrdersModal(ordersModal.sellerId, ordersModal.sellerName, true);
+                                        await fetchSellers(); 
+                                      } catch (err) {
+                                        alert("Failed to complete order");
+                                      }
+                                    }}
+                                    className="!bg-green-600 hover:!bg-green-700 !text-white px-3 py-1 rounded text-sm font-medium"
+                                  >
+                                    ✓ Mark Completed
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            {expandedOrderRows.has(order.id) && (
+                              <div className="p-4 border-t border-gray-200 !bg-white">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                                  <div>
+                                    <p className="text-xs !text-gray-600 mb-1">Customer</p>
+                                    <p className="text-sm font-medium !text-gray-900">{order.customerName || "N/A"}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs !text-gray-600 mb-1">Fulfillment</p>
+                                    <p className="text-sm font-medium !text-gray-900">{order.fulfillmentType || "N/A"}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs !text-gray-600 mb-1">Payment Method</p>
+                                    <p className="text-sm font-medium !text-gray-900">{order.paymentMethod || "N/A"}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs !text-gray-600 mb-1">Delivery Fee</p>
+                                    <p className="text-sm font-medium !text-gray-900">${order.deliveryFee?.toFixed(2) || "0.00"}</p>
+                                  </div>
                                 </div>
-                              )}
-                              
-                              {(order.status?.toLowerCase() === "accepted" || order.status?.toLowerCase() === "preparing") && (
-                                <button
-                                  onClick={async (e) => {
-                                    e.stopPropagation();
-                                    const newStatus = order.status?.toLowerCase() === "accepted" ? "Preparing" : "Ready for Pickup";
-                                    try {
-                                      await fetch(`https://localhost:7062/api/Orders/${order.id}/update-seller-status`, {
-                                        method: 'PUT',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ Status: newStatus })
-                                      });
-                                      await openOrdersModal(ordersModal.sellerId, ordersModal.sellerName);
-                                    } catch (err) {
-                                      alert("Failed to update status");
-                                    }
-                                  }}
-                                  className="!bg-blue-600 hover:!bg-blue-700 !text-white px-3 py-1 rounded text-sm font-medium"
-                                >
-                                  {order.status?.toLowerCase() === "accepted" ? "→ Start Preparing" : "→ Ready for Pickup"}
-                                </button>
-                              )}
-                              
-                              {order.status?.toLowerCase() === "ready for pickup" && order.fulfillmentType === "Pickup" && (
-                                <button
-                                  onClick={async (e) => {
-                                    e.stopPropagation();
-                                    try {
-                                      await fetch(`https://localhost:7062/api/Orders/${order.id}/update-seller-status`, {
-                                        method: 'PUT',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ Status: "Completed" })
-                                      });
-                                      await openOrdersModal(ordersModal.sellerId, ordersModal.sellerName);
-                                    } catch (err) {
-                                      alert("Failed to complete order");
-                                    }
-                                  }}
-                                  className="!bg-green-600 hover:!bg-green-700 !text-white px-3 py-1 rounded text-sm font-medium"
-                                >
-                                  ✓ Mark Completed
-                                </button>
-                              )}
-                            </div>
-                          </div>
 
-                        {expandedOrderRows.has(order.id) && (
-                          <div className="p-4 border-t border-gray-200 !bg-white">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                              <div>
-                                <p className="text-xs !text-gray-600 mb-1">Customer</p>
-                                <p className="text-sm font-medium !text-gray-900">{order.customerName || "N/A"}</p>
-                              </div>
-                              <div>
-                                <p className="text-xs !text-gray-600 mb-1">Fulfillment</p>
-                                <p className="text-sm font-medium !text-gray-900">{order.fulfillmentType || "N/A"}</p>
-                              </div>
-                              <div>
-                                <p className="text-xs !text-gray-600 mb-1">Payment Method</p>
-                                <p className="text-sm font-medium !text-gray-900">{order.paymentMethod || "N/A"}</p>
-                              </div>
-                              <div>
-                                <p className="text-xs !text-gray-600 mb-1">Delivery Fee</p>
-                                <p className="text-sm font-medium !text-gray-900">${order.deliveryFee?.toFixed(2) || "0.00"}</p>
-                              </div>
-                            </div>
+                                {order.orderItems && order.orderItems.length > 0 && (
+                                  <div>
+                                    <h4 className="font-semibold !text-gray-900 mb-3">Order Items:</h4>
+                                    <div className="space-y-2">
+                                      {order.orderItems.map((item, idx) => (
+                                        <div key={idx} className="p-3 !bg-gray-50 rounded-lg">
+                                          <div className="flex justify-between items-center">
+                                            <div className="flex-1">
+                                              <p className="text-sm font-medium !text-gray-900">{item.productName || "Product"}</p>
+                                              <p className="text-xs !text-gray-600">SKU: {item.variantSKU || "N/A"} • Qty: {item.qty}</p>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                              <p className="text-sm font-semibold !text-gray-900">${item.lineTotal?.toFixed(2) || "0.00"}</p>
+                                              {item.reviews && item.reviews.length > 0 && (
+                                                <span className="!bg-yellow-100 !text-yellow-700 px-3 py-1 rounded text-xs font-medium">
+                                                  ⭐ {item.reviews.length} Review{item.reviews.length !== 1 ? 's' : ''}
+                                                </span>
+                                              )}
+                                            </div>
+                                          </div>
 
-                            {order.orderItems && order.orderItems.length > 0 && (
-                              <div>
-                                <h4 className="font-semibold !text-gray-900 mb-3">Order Items:</h4>
-                                <div className="space-y-2">
-                                  {order.orderItems.map((item, idx) => (
-                                    <div key={idx} className="p-3 !bg-gray-50 rounded-lg">
-                                      <div className="flex justify-between items-center">
-                                        <div className="flex-1">
-                                          <p className="text-sm font-medium !text-gray-900">{item.productName || "Product"}</p>
-                                          <p className="text-xs !text-gray-600">SKU: {item.variantSKU || "N/A"} • Qty: {item.qty}</p>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                          <p className="text-sm font-semibold !text-gray-900">${item.lineTotal?.toFixed(2) || "0.00"}</p>
                                           {item.reviews && item.reviews.length > 0 && (
-                                            <span className="!bg-yellow-100 !text-yellow-700 px-3 py-1 rounded text-xs font-medium">
-                                              ⭐ {item.reviews.length} Review{item.reviews.length !== 1 ? 's' : ''}
-                                            </span>
+                                            <div className="mt-3 space-y-2">
+                                              {item.reviews.map((review, reviewIdx) => (
+                                                <div key={reviewIdx} className={`p-3 rounded-lg border ${review.isCommentHiddenBySeller ? '!bg-red-50 border-red-300' : '!bg-white border-gray-200'}`}>
+                                                  <div className="flex items-center justify-between mb-2">
+                                                    <div className="flex items-center gap-2">
+                                                      <span className="text-xs font-semibold !text-gray-700">Customer Review:</span>
+                                                      <div className="flex">
+                                                        {[1, 2, 3, 4, 5].map(star => (
+                                                          <span key={star} className={`text-sm ${star <= review.rating ? '!text-yellow-400' : '!text-gray-300'}`}>
+                                                            ★
+                                                          </span>
+                                                        ))}
+                                                      </div>
+                                                      <span className="text-xs !text-gray-600">
+                                                        {new Date(review.createdAt).toLocaleDateString()}
+                                                      </span>
+                                                      {review.isCommentHiddenBySeller && (
+                                                        <span className="!bg-red-500 !text-white px-2 py-1 rounded text-xs font-bold">
+                                                          🚫 HIDDEN
+                                                        </span>
+                                                      )}
+                                                    </div>
+                                                    <button
+                                                      onClick={async (e) => {
+                                                        e.stopPropagation();
+                                                        const reason = review.isCommentHiddenBySeller 
+                                                          ? null 
+                                                          : prompt("Please provide a reason for hiding this review:");
+                                                        
+                                                        if (reason === null && !review.isCommentHiddenBySeller) {
+                                                          // User cancelled the prompt
+                                                          return;
+                                                        }
+                                                        
+                                                        if (!review.isCommentHiddenBySeller && (!reason || reason.trim() === "")) {
+                                                          showToast("Please provide a reason for hiding the review", "error");
+                                                          return;
+                                                        }
+                                                        
+                                                        if (confirm(review.isCommentHiddenBySeller ? "Unhide this review?" : `Hide this review?\nReason: ${reason}`)) {
+                                                          try {
+                                                            await fetch(`https://localhost:7062/api/Reviews/${review.id}`, {
+                                                              method: 'PUT',
+                                                              headers: { 'Content-Type': 'application/json' },
+                                                              body: JSON.stringify({ 
+                                                                IsCommentHiddenBySeller: !review.isCommentHiddenBySeller,
+                                                                HiddenReason: review.isCommentHiddenBySeller ? null : reason.trim()
+                                                              })
+                                                            });
+                                                            showToast(review.isCommentHiddenBySeller ? 'Review unhidden successfully!' : 'Review hidden successfully!', 'success');
+                                                            await openOrdersModal(ordersModal.sellerId, ordersModal.sellerName, true);
+                                                          } catch (err) {
+                                                            showToast('Failed to update review', 'error');
+                                                          }
+                                                        }
+                                                      }}
+                                                      className={`${review.isCommentHiddenBySeller ? '!bg-green-600 hover:!bg-green-700' : '!bg-red-600 hover:!bg-red-700'} !text-white px-2 py-1 rounded text-xs font-semibold`}
+                                                    >
+                                                      {review.isCommentHiddenBySeller ? '👁️ Unhide' : '🚫 Hide'}
+                                                    </button>
+                                                  </div>
+                                                  <p className={`text-sm italic ${review.isCommentHiddenBySeller ? '!text-gray-500 line-through' : '!text-gray-700'}`}>
+                                                    "{review.comment}"
+                                                  </p>
+                                                  {review.isCommentHiddenBySeller && review.hiddenReason && (
+                                                    <p className="text-xs !text-red-600 mt-2 italic">Reason: {review.hiddenReason}</p>
+                                                  )}
+                                                </div>
+                                              ))}
+                                            </div>
                                           )}
                                         </div>
-                                      </div>
-
-                                      {item.reviews && item.reviews.length > 0 && (
-                                        <div className="mt-3 space-y-2">
-                                          {item.reviews.map((review, reviewIdx) => (
-                                            <div key={reviewIdx} className="p-3 !bg-white rounded-lg border border-gray-200">
-                                              <div className="flex items-center gap-2 mb-2">
-                                                <span className="text-xs font-semibold !text-gray-700">Customer Review:</span>
-                                                <div className="flex">
-                                                  {[1, 2, 3, 4, 5].map(star => (
-                                                    <span key={star} className={`text-sm ${star <= review.rating ? '!text-yellow-400' : '!text-gray-300'}`}>
-                                                      ★
-                                                    </span>
-                                                  ))}
-                                                </div>
-                                                <span className="text-xs !text-gray-600">
-                                                  {new Date(review.createdAt).toLocaleDateString()}
-                                                </span>
-                                              </div>
-                                              <p className="text-sm !text-gray-700 italic">"{review.comment}"</p>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      )}
+                                      ))}
                                     </div>
-                                  ))}
-                                </div>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
-                        )}
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <p className="!text-gray-600">No orders found</p>
-                  </div>
-                )}
-              </>
-            )}
+                    ) : (
+                      <div className="text-center py-8">
+                        <p className="!text-gray-600">
+                          {orderTab === "requests" && "No pending order requests"}
+                          {orderTab === "ongoing" && "No ongoing orders"}
+                          {orderTab === "history" && "No order history"}
+                        </p>
+                      </div>
+                    );
+                  })()}
+                </>
+              )}
 
             {/* Products & Reviews Tab */}
             {activeTab === "products" && (
@@ -1485,7 +1641,7 @@ const EditMapModal = () => {
                               <div className="space-y-3">
                                 <h4 className="font-semibold !text-gray-900 mb-3">Customer Reviews:</h4>
                                 {product.reviews.map((review, idx) => (
-                                  <div key={idx} className="p-4 !bg-gray-50 rounded-lg border border-gray-200">
+                                  <div key={idx} className={`p-4 rounded-lg border ${review.isCommentHiddenBySeller ? '!bg-red-50 border-red-300' : '!bg-gray-50 border-gray-200'}`}>
                                     <div className="flex items-center justify-between mb-3">
                                       <div className="flex items-center gap-3">
                                         <div className="flex">
@@ -1496,13 +1652,63 @@ const EditMapModal = () => {
                                           ))}
                                         </div>
                                         <span className="text-sm font-semibold !text-gray-900">{review.customerName || "Anonymous"}</span>
+                                        {review.isCommentHiddenBySeller && (
+                                          <span className="!bg-red-500 !text-white px-2 py-1 rounded text-xs font-bold">
+                                            🚫 HIDDEN
+                                          </span>
+                                        )}
                                       </div>
-                                      <div className="text-right">
-                                        <p className="text-xs !text-gray-600">{new Date(review.createdAt).toLocaleDateString()}</p>
-                                        <p className="text-xs !text-gray-500">Order #{review.orderId}</p>
+                                      <div className="text-right flex items-center gap-3">
+                                        <div>
+                                          <p className="text-xs !text-gray-600">{new Date(review.createdAt).toLocaleDateString()}</p>
+                                          <p className="text-xs !text-gray-500">Order #{review.orderId}</p>
+                                        </div>
+                                        <button
+                                          onClick={async (e) => {
+                                            e.stopPropagation();
+                                            const reason = review.isCommentHiddenBySeller 
+                                              ? null 
+                                              : prompt("Please provide a reason for hiding this review:");
+                                            
+                                            if (reason === null && !review.isCommentHiddenBySeller) {
+                                              // User cancelled the prompt
+                                              return;
+                                            }
+                                            
+                                            if (!review.isCommentHiddenBySeller && (!reason || reason.trim() === "")) {
+                                              showToast("Please provide a reason for hiding the review", "error");
+                                              return;
+                                            }
+                                            
+                                            if (confirm(review.isCommentHiddenBySeller ? "Unhide this review?" : `Hide this review?\nReason: ${reason}`)) {
+                                              try {
+                                                await fetch(`https://localhost:7062/api/Reviews/${review.id}`, {
+                                                  method: 'PUT',
+                                                  headers: { 'Content-Type': 'application/json' },
+                                                  body: JSON.stringify({ 
+                                                    IsCommentHiddenBySeller: !review.isCommentHiddenBySeller,
+                                                    HiddenReason: review.isCommentHiddenBySeller ? null : reason.trim()
+                                                  })
+                                                });
+                                                showToast(review.isCommentHiddenBySeller ? 'Review unhidden successfully!' : 'Review hidden successfully!', 'success');
+                                                await openOrdersModal(ordersModal.sellerId, ordersModal.sellerName, true);
+                                              } catch (err) {
+                                                showToast('Failed to update review', 'error');
+                                              }
+                                            }
+                                          }}
+                                          className={`${review.isCommentHiddenBySeller ? '!bg-green-600 hover:!bg-green-700' : '!bg-red-600 hover:!bg-red-700'} !text-white px-3 py-1 rounded text-xs font-semibold`}
+                                        >
+                                          {review.isCommentHiddenBySeller ? '👁️ Unhide' : '🚫 Hide'}
+                                        </button>
                                       </div>
                                     </div>
-                                    <p className="text-sm !text-gray-700">"{review.comment}"</p>
+                                    <p className={`text-sm ${review.isCommentHiddenBySeller ? '!text-gray-500 line-through' : '!text-gray-700'}`}>
+                                      "{review.comment}"
+                                    </p>
+                                    {review.isCommentHiddenBySeller && review.hiddenReason && (
+                                      <p className="text-xs !text-red-600 mt-2 italic">Reason: {review.hiddenReason}</p>
+                                    )}
                                   </div>
                                 ))}
                               </div>
