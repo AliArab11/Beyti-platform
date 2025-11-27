@@ -203,6 +203,12 @@ export const updateAdmin = async (id, data) => {
   });
 };
 
+export const toggleAdminStatus = async (id) => {
+  return await fetchAPI(`/AdminProfiles/${id}/toggle`, {
+    method: 'PATCH',
+  });
+};
+
 // --- User Management (FR1) ---
 
 export const getUsers = async (role = null) => {
@@ -456,6 +462,12 @@ export const getServiceProvider = async (id) => {
 
 export const createServiceProvider = async (data) => {
   return await fetchAPI('/ServiceProviders', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+  
 /**
  * Get sellers for dropdown (Store selector)
  * @returns {Promise<Array>} - Array [{ id, storeName }]
@@ -1195,4 +1207,77 @@ export const deleteDriver = async (id) => {
   return await fetchAPI(`/Drivers/${id}`, {
     method: 'DELETE',
   });
+};
+
+
+// --- Service Provider Dashboard ---
+
+// Profile
+export const getProviderProfile = async (userProfileId) => {
+  return await fetchAPI(`/ServiceProviderDashboard/Profile/${userProfileId}`);
+};
+
+// Categories & Services
+export const getServiceCategories = async () => {
+  return await fetchAPI('/ServiceProviderDashboard/Categories');
+};
+
+export const getMyServices = async (serviceProviderId) => {
+  return await fetchAPI(`/ServiceProviderDashboard/MyServices/${serviceProviderId}`);
+};
+
+export const addService = async (data) => {
+  return await fetchAPI('/ServiceProviderDashboard/AddService', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export const updateService = async (serviceCatalogId, data) => {
+  return await fetchAPI(`/ServiceProviderDashboard/UpdateService/${serviceCatalogId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+export const toggleServiceStatus = async (serviceCatalogId) => {
+  return await fetchAPI(`/ServiceProviderDashboard/ToggleService/${serviceCatalogId}`, {
+    method: 'PUT',
+  });
+};
+
+// Time Slots / Schedule
+export const getProviderTimeSlots = async (serviceProviderId) => {
+  return await fetchAPI(`/ServiceProviderDashboard/TimeSlots/${serviceProviderId}`);
+};
+
+export const addTimeSlot = async (data) => {
+  return await fetchAPI('/ServiceProviderDashboard/AddTimeSlot', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export const deleteTimeSlot = async (timeSlotId) => {
+  return await fetchAPI(`/ServiceProviderDashboard/DeleteTimeSlot/${timeSlotId}`, {
+    method: 'DELETE',
+  });
+};
+
+// Bookings
+export const getProviderBookings = async (serviceProviderId, status = null) => {
+  const query = status ? `?status=${status}` : '';
+  return await fetchAPI(`/ServiceProviderDashboard/Bookings/${serviceProviderId}${query}`);
+};
+
+export const updateBookingStatus = async (bookingId, data) => {
+  return await fetchAPI(`/ServiceProviderDashboard/UpdateBookingStatus/${bookingId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+// Statistics
+export const getProviderStatistics = async (serviceProviderId) => {
+  return await fetchAPI(`/ServiceProviderDashboard/Statistics/${serviceProviderId}`);
 };
