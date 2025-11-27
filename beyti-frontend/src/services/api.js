@@ -456,6 +456,18 @@ export const getServiceProvider = async (id) => {
 
 export const createServiceProvider = async (data) => {
   return await fetchAPI('/ServiceProviders', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export const updateServiceProvider = async (id, data) => {
+  return await fetchAPI(`/ServiceProviders/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
 /**
  * Get sellers for dropdown (Store selector)
  * @returns {Promise<Array>} - Array [{ id, storeName }]
@@ -515,12 +527,6 @@ export const createProductVariant = async (data) => {
   });
 };
 
-export const updateServiceProvider = async (id, data) => {
-  return await fetchAPI(`/ServiceProviders/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(data),
-  });
-};
 /**
  * Update a product variant
  * @param {number} id - Variant ID
