@@ -13,6 +13,7 @@ import StoreDetailsPage from "./Pages/Seller/StoreDetails";
 import ProductsPage from "./Pages/Product/Products";
 import CategoryPage from "./Pages/Product/Categories";
 import DriverPage from "./Pages/Driver";
+import DesignSystemDemo from './components/DesignSystemDemo';
 
 // Placeholder components for pages that don't exist yet
 const PlaceholderPage = ({ pageName }) => (
@@ -42,7 +43,8 @@ export default function App() {
     { id: 'serviceprovider', label: 'Service Provider' },
     { id: 'notification', label: 'Notification' },
     { id: 'admindashboard', label: 'Admin Dashboard'},
-     { id: 'servicerequest', label: 'Service Request'}
+     { id: 'servicerequest', label: 'Service Request'},
+     { id: 'DesignDemo', label: 'Design Demo'}
   ];
 
   const renderPage = () => {
@@ -77,6 +79,8 @@ export default function App() {
         return <ServiceProviderRequests />
       case 'notification':
         return <PlaceholderPage pageName="Notification" />;
+      case 'DesignDemo':
+        return <DesignSystemDemo />;
       default:
         return <RegistrationPage />;
     }
