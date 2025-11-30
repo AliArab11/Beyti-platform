@@ -20,6 +20,19 @@ namespace Beyti_Backend.Controllers.Api
             _context = context;
         }
 
+        public class CreateAddressDto
+        {
+            public string? Label { get; set; }
+            public string Street { get; set; }
+            public string City { get; set; }
+            public string? Region { get; set; }        // Changed from Governorate
+            public string? PostalCode { get; set; }    // Changed from Block
+            public string Country { get; set; }
+            public decimal? Latitude { get; set; }
+            public decimal? Longitude { get; set; }
+            public bool IsDefault { get; set; }
+        }
+
         // GET: api/Addresses
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Address>>> GetAddresses()
@@ -75,13 +88,30 @@ namespace Beyti_Backend.Controllers.Api
         // POST: api/Addresses
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Address>> PostAddress(Address address)
+        public async Task<ActionResult<Address>> PostAddress(CreateAddressDto dto)
         {
+            var address = new Address
+            {
+                Label = dto.Label,
+                Street = dto.Street,
+                City = dto.City,
+                Region = dto.Region,              // Changed from Governorate
+                PostalCode = dto.PostalCode,      // Changed from Block
+                Country = dto.Country,
+                Latitude = dto.Latitude,
+                Longitude = dto.Longitude,
+                IsDefault = dto.IsDefault,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
             _context.Addresses.Add(address);
             await _context.SaveChangesAsync();
 
             return CreatedAtAction("GetAddress", new { id = address.Id }, address);
         }
+
 
         // DELETE: api/Addresses/5
         [HttpDelete("{id}")]

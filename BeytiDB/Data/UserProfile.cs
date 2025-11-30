@@ -29,6 +29,8 @@ public partial class UserProfile
     [Precision(3)]
     public DateTime UpdatedAt { get; set; }
 
+  
+
     [InverseProperty("UserProfile")]
     public virtual AdminProfile? AdminProfile { get; set; }
 
