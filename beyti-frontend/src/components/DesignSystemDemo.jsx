@@ -10,6 +10,12 @@ import Button from './Button';
 import CRUDButton from './CRUDButton';
 import NavigationButton from './NavigationButton';
 import AnalyticsCard from './AnalyticsCard';
+import StatusChip from './StatusChip';
+import FilterDropdown from './FilterDropdown';
+import { Table, TableHeader, TableBody, TableRow } from './Table';
+import CardChecklist from './CardChecklist';
+import PageHeader from './PageHeader';
+import SidebarProfile from './SidebarProfile';
 
 const DesignSystemDemo = () => {
   return (
@@ -252,6 +258,175 @@ const DesignSystemDemo = () => {
     { value: '0', label: 'Confirmed' },
     { value: '0', label: 'Pending' }
   ]}
+/>`}</code>
+              </pre>
+            </div>
+
+            {/* 4. Status Chips */}
+            <div>
+              <h3 className="text-card-h2 text-charcoal-600 mb-4">4. Status Chips</h3>
+              <p className="text-body-regular text-charcoal-400 mb-4">
+                Pill-shaped status indicators (36px height, hug contents width)
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <StatusChip variant="brand">Role</StatusChip>
+                <StatusChip variant="success">Active</StatusChip>
+                <StatusChip variant="error">Suspended</StatusChip>
+                <StatusChip variant="danger">Pending</StatusChip>
+                <StatusChip variant="neutral">Inactive</StatusChip>
+              </div>
+              <pre className="bg-cream-50 p-4 rounded-md overflow-x-auto mt-4">
+                <code>{`<StatusChip variant="brand">Role</StatusChip>
+<StatusChip variant="success">Active</StatusChip>
+<StatusChip variant="error">Suspended</StatusChip>
+<StatusChip variant="danger">Pending</StatusChip>
+<StatusChip variant="neutral">Inactive</StatusChip>`}</code>
+              </pre>
+            </div>
+
+            {/* 5. Filter Dropdown */}
+            <div>
+              <h3 className="text-card-h2 text-charcoal-600 mb-4">5. Filter Dropdown</h3>
+              <p className="text-body-regular text-charcoal-400 mb-4">
+                Dropdown selector (140px x 42px) for filtering data
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <FilterDropdown label="Filter:" value="All" options={['All', 'Active', 'Inactive', 'Pending']} />
+                <FilterDropdown label="Status:" value="Approved" options={['All', 'Approved', 'Rejected']} />
+              </div>
+              <pre className="bg-cream-50 p-4 rounded-md overflow-x-auto mt-4">
+                <code>{`<FilterDropdown
+  label="Filter:"
+  value="All"
+  options={['All', 'Active', 'Inactive']}
+  onChange={(value) => console.log(value)}
+/>`}</code>
+              </pre>
+            </div>
+
+            {/* 6. Table */}
+            <div>
+              <h3 className="text-card-h2 text-charcoal-600 mb-4">6. Table</h3>
+              <p className="text-body-regular text-charcoal-400 mb-4">
+                Complete table system with header, rows, filters, and actions
+              </p>
+              <Table
+                title="Table Title"
+                filters={[
+                  { label: 'Filter:', value: 'All', options: ['All', 'Active', 'Inactive'] },
+                  { label: 'Status:', value: 'All', options: ['All', 'Approved', 'Pending'] }
+                ]}
+                actionButton={<CRUDButton variant="success">Add New User</CRUDButton>}
+              >
+                <TableHeader columns={['Column name 1', 'Column name 2', 'Column name 3', 'Status', 'Action']} />
+                <TableBody>
+                  <TableRow
+                    data={['Data name 1', 'Data name 2', 'Data name 3', <StatusChip variant="success">Active</StatusChip>]}
+                    actions={
+                      <>
+                        <CRUDButton variant="success">Review</CRUDButton>
+                        <CRUDButton variant="error">Reject</CRUDButton>
+                      </>
+                    }
+                  />
+                  <TableRow
+                    data={['Data name 1', 'Data name 2', 'Data name 3', <StatusChip variant="danger">Pending</StatusChip>]}
+                    actions={
+                      <>
+                        <CRUDButton variant="success">Review</CRUDButton>
+                        <CRUDButton variant="error">Reject</CRUDButton>
+                      </>
+                    }
+                  />
+                </TableBody>
+              </Table>
+              <pre className="bg-cream-50 p-4 rounded-md overflow-x-auto mt-4">
+                <code>{`<Table
+  title="Table Title"
+  filters={[...]}
+  actionButton={<CRUDButton variant="success">Add New</CRUDButton>}
+>
+  <TableHeader columns={['Name', 'Email', 'Status', 'Action']} />
+  <TableBody>
+    <TableRow
+      data={['John Doe', 'john@example.com', <StatusChip variant="success">Active</StatusChip>]}
+      actions={<CRUDButton variant="success">Edit</CRUDButton>}
+    />
+  </TableBody>
+</Table>`}</code>
+              </pre>
+            </div>
+
+            {/* 7. Card Checklist */}
+            <div>
+              <h3 className="text-card-h2 text-charcoal-600 mb-4">7. Card Checklist</h3>
+              <p className="text-body-regular text-charcoal-400 mb-4">
+                Checklist card with completed and pending items
+              </p>
+              <div className="max-w-md">
+                <CardChecklist
+                  title="Card title"
+                  subheading="Subheading"
+                  items={[
+                    { text: 'Body Content', completed: true },
+                    { text: 'Body Content', completed: true },
+                    { text: 'Body Content', completed: true },
+                    { text: 'Body Content', completed: false },
+                    { text: 'Body Content', completed: false }
+                  ]}
+                />
+              </div>
+              <pre className="bg-cream-50 p-4 rounded-md overflow-x-auto mt-4">
+                <code>{`<CardChecklist
+  title="Card title"
+  subheading="Subheading"
+  items={[
+    { text: 'Complete task 1', completed: true },
+    { text: 'Pending task 2', completed: false }
+  ]}
+/>`}</code>
+              </pre>
+            </div>
+
+            {/* 8. Page Header */}
+            <div>
+              <h3 className="text-card-h2 text-charcoal-600 mb-4">8. Page Header</h3>
+              <p className="text-body-regular text-charcoal-400 mb-4">
+                Top page header with title, search, notifications, and user menu
+              </p>
+              <div className="border border-grey-stroke rounded-lg overflow-hidden">
+                <PageHeader
+                  title="Page Title"
+                  withSearch
+                  notificationCount={3}
+                  userName="Ali"
+                  userRole="Super Admin"
+                />
+              </div>
+              <pre className="bg-cream-50 p-4 rounded-md overflow-x-auto mt-4">
+                <code>{`<PageHeader
+  title="Page Title"
+  withSearch
+  notificationCount={3}
+  userName="Ali"
+  userRole="Super Admin"
+/>`}</code>
+              </pre>
+            </div>
+
+            {/* 9. Sidebar Profile */}
+            <div>
+              <h3 className="text-card-h2 text-charcoal-600 mb-4">9. Sidebar Profile</h3>
+              <p className="text-body-regular text-charcoal-400 mb-4">
+                User profile section for sidebar bottom
+              </p>
+              <div className="bg-sage-500 p-4 rounded-lg max-w-xs">
+                <SidebarProfile userName="Ali" userRole="Super Admin" />
+              </div>
+              <pre className="bg-cream-50 p-4 rounded-md overflow-x-auto mt-4">
+                <code>{`<SidebarProfile
+  userName="Ali"
+  userRole="Super Admin"
 />`}</code>
               </pre>
             </div>
