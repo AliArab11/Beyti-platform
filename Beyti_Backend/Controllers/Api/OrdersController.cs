@@ -20,7 +20,7 @@ namespace Beyti_Backend.Controllers.Api
             _context = context;
         }
 
-        // DTO for creating orders - ADD THIS!
+        // DTO for creating orders 
         public class CreateOrderDto
         {
             public int CustomerId { get; set; }
@@ -42,6 +42,12 @@ namespace Beyti_Backend.Controllers.Api
             public decimal? DeliveryFee { get; set; }
             public decimal? TotalAmount { get; set; }
         }
+        public class SellerOrderResponseDto
+        {
+            public string? Status { get; set; }
+            public string? SellerNote { get; set; }
+        }
+
 
         // GET: api/Orders
         [HttpGet]
@@ -194,6 +200,78 @@ namespace Beyti_Backend.Controllers.Api
             await _context.SaveChangesAsync();
 
             return CreatedAtAction("GetOrder", new { id = order.Id }, order);
+        }
+
+        // PUT: api/Orders/{id}/seller-response
+        [HttpPut("{id}/seller-response")]
+        public async Task<IActionResult> SellerResponseToOrder(int id, [FromBody] SellerOrderResponseDto dto)
+        {
+            try
+            {
+                var order = await _context.Orders
+                    .Include(o => o.DeliveryTicket)
+                    .FirstOrDefaultAsync(o => o.Id == id);
+
+                if (order == null)
+                    return NotFound();
+
+                order.Status = dto.Status;
+                order.UpdatedAt = DateTime.UtcNow;
+
+                // If order is accepted and it's a delivery, create a delivery ticket
+                if (dto.Status == "Accepted" && order.FulfillmentType == "Delivery")
+                {
+                    var deliveryTicket = new DeliveryTicket
+                    {
+                        OrderId = order.Id,
+                        PickupAddressId = order.PickupAddressId,
+                        DeliveryAddressId = order.DeliveryAddressId,
+                        Status = "Pending",
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+                    _context.DeliveryTickets.Add(deliveryTicket);
+                }
+
+                await _context.SaveChangesAsync();
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error updating order", error = ex.Message });
+            }
+        }
+
+        // PUT: api/Orders/{id}/update-seller-status
+        [HttpPut("{id}/update-seller-status")]
+        public async Task<IActionResult> UpdateSellerStatus(int id, [FromBody] UpdateOrderDto dto)
+        {
+            try
+            {
+                var order = await _context.Orders
+                    .Include(o => o.DeliveryTicket)
+                    .FirstOrDefaultAsync(o => o.Id == id);
+
+                if (order == null)
+                    return NotFound();
+
+                order.Status = dto.Status;
+                order.UpdatedAt = DateTime.UtcNow;
+
+                // If status is "Ready for Pickup" and it's a delivery, update delivery ticket
+                if (dto.Status == "Ready for Pickup" && order.FulfillmentType == "Delivery" && order.DeliveryTicket != null)
+                {
+                    order.DeliveryTicket.Status = "Available";
+                    order.DeliveryTicket.UpdatedAt = DateTime.UtcNow;
+                }
+
+                await _context.SaveChangesAsync();
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error updating status", error = ex.Message });
+            }
         }
 
         // DELETE: api/Orders/5

@@ -1,11 +1,17 @@
-import { useState, useEffect, Fragment } from "react";
+import { useState, useEffect, Fragment, useRef } from "react";
+import "leaflet/dist/leaflet.css";
+import { MapContainer, TileLayer, Marker, useMapEvents, Popup }  from "react-leaflet";
 import {
   getCustomers,
   createCustomer,
   updateCustomer,
   deleteCustomer,
   createAddress,
+  deleteAddress,
+  updateAddress,
+  updateCustomerAddress,
   createCustomerAddress,
+  deleteCustomerAddress,
   getCustomerOrders,
   createReview
 } from "../../services/api";
@@ -33,6 +39,7 @@ const Toast = ({ message, type, onClose }) => {
 
 const Customers = () => {
   const [customers, setCustomers] = useState([]);
+  const [customersWithCounts, setCustomersWithCounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -55,12 +62,98 @@ const Customers = () => {
   const [addressPostalCode, setAddressPostalCode] = useState("");
   const [addAddressError, setAddAddressError] = useState(null);
 
+  // Map modal state
+const [mapModal, setMapModal] = useState({
+  show: false,
+  lat: null,
+  lng: null,
+  loading: false,
+  addressResult: null,
+});
+const [viewMapModal, setViewMapModal] = useState({ show: false, lat: null, lng: null });
+const [savedLocation, setSavedLocation] = useState(null);
+
+// Outside of your main component
+const ViewMapModal = ({ lat, lng, onClose, address }) => {
+  
+   const mapRef = useRef();
+
+    if (!lat || !lng) return null;
+
+  const handleResetView = () => {
+    if (mapRef.current) {
+      mapRef.current.setView([lat, lng], 15);
+    }
+  };
+
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-auto p-4 flex flex-col">
+        <h2 className="text-xl font-bold mb-3">Address Location</h2>
+
+        <div className="flex-1">
+          <MapContainer
+            center={[lat, lng]}
+            zoom={15}
+            scrollWheelZoom={true}
+            dragging={true}
+            doubleClickZoom={true}
+            zoomControl={true}
+            style={{ height: "400px", width: "100%" }}
+            ref={mapRef}
+          >
+            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            <Marker position={[lat, lng]}>
+            <Popup>
+                <div className="text-sm">
+                {address?.street && <div><strong>Street:</strong> {address.street}</div>}
+                {address?.city && <div><strong>City:</strong> {address.city}</div>}
+                {address?.region && <div><strong>Region:</strong> {address.region}</div>}
+                {address?.country && <div><strong>Country:</strong> {address.country}</div>}
+                {address?.postalCode && <div><strong>Postal Code:</strong> {address.postalCode}</div>}
+                </div>
+            </Popup>
+            </Marker>
+          </MapContainer>
+        </div>
+
+        <div className="mt-4 flex gap-2">
+          <button
+            onClick={handleResetView}
+            className="flex-1 !bg-red-600 hover:!bg-red-700 text-white py-2 rounded-lg"
+          >
+            Reset View
+          </button>
+          <button
+            onClick={onClose}
+            className="flex-1 !bg-red-600 hover:!bg-red-700 text-white py-2 rounded-lg"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
   // Edit state
   const [editingId, setEditingId] = useState(null);
   const [editFullName, setEditFullName] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editError, setEditError] = useState(null);
-
+  // Address edit/delete state
+  const [editingAddressId, setEditingAddressId] = useState(null);
+  const [editAddressStreet, setEditAddressStreet] = useState("");
+  const [editAddressCity, setEditAddressCity] = useState("");
+  const [editAddressCountry, setEditAddressCountry] = useState("");
+  const [editAddressRegion, setEditAddressRegion] = useState("");
+  const [editAddressPostalCode, setEditAddressPostalCode] = useState("");
+  const [editAddressError, setEditAddressError] = useState(null);
+  const [deleteAddressConfirm, setDeleteAddressConfirm] = useState({ show: false, addressId: null, customerId: null });   
+  const [editSavedLocation, setEditSavedLocation] = useState(null); 
+  const [editMapModal, setEditMapModal] = useState({ show: false }); 
   // Delete confirmation
   const [deleteConfirm, setDeleteConfirm] = useState({ show: false, id: null, name: '' });
 
@@ -70,6 +163,7 @@ const Customers = () => {
   // Orders modal state
   const [ordersModal, setOrdersModal] = useState({ show: false, customerId: null, customerName: "", orders: [], loading: false, error: null });
   const [expandedOrderRows, setExpandedOrderRows] = useState(new Set());
+  const [orderTab, setOrderTab] = useState("active"); // "active", "completed", "cancelled"
   
   // Review modal state
   const [reviewModal, setReviewModal] = useState({ 
@@ -88,17 +182,34 @@ const Customers = () => {
   }, []);
 
   const fetchCustomers = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await getCustomers();
-      setCustomers(data);
-    } catch (err) {
-      setError(err.message || "Failed to load customers");
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    setLoading(true);
+    setError(null);
+    const data = await getCustomers();
+    
+    // Fetch order counts for each customer
+    const customersWithCounts = await Promise.all(
+      data.map(async (customer) => {
+        try {
+          const orders = await getCustomerOrders(customer.id);
+          // Count orders that are "Ready for Pickup" or "Picked Up" (active orders customer should know about)
+          const activeOrderCount = orders.filter(o => 
+            ["ready for pickup", "picked up"].includes(o.status?.toLowerCase())
+          ).length;
+          return { ...customer, activeOrderCount };
+        } catch {
+          return { ...customer, activeOrderCount: 0 };
+        }
+      })
+    );
+    
+    setCustomers(customersWithCounts);
+  } catch (err) {
+    setError(err.message || "Failed to load customers");
+  } finally {
+    setLoading(false);
+  }
+};
 
 const showToast = (message, type = 'success') => {
   setToast({ show: true, message, type });
@@ -144,8 +255,8 @@ const hideToast = () => {
         Region: addressRegion || null,
         PostalCode: addressPostalCode || null,
         Country: addressCountry,
-        Latitude: null,
-        Longitude: null,
+        Latitude: savedLocation?.lat,     
+        Longitude: savedLocation?.lng,    
         IsDefault: false
       });
 
@@ -171,7 +282,92 @@ const hideToast = () => {
       setAdding(false);
     }
   };
+// --- Address Edit/Delete Functions ---
+const startEditAddress = (address) => {
+  setEditingAddressId(address.id);
+  setEditAddressStreet(address.street || "");
+  setEditAddressCity(address.city || "");
+  setEditAddressCountry(address.country || "");
+  setEditAddressRegion(address.region || "");
+  setEditAddressPostalCode(address.postalCode || "");
+  setEditAddressError(null);
+  
+  if (address.latitude && address.longitude) {
+    setEditSavedLocation({
+      lat: parseFloat(address.latitude),
+      lng: parseFloat(address.longitude)
+    });
+  } else {
+    setEditSavedLocation(null);
+  }
+};
 
+const cancelEditAddress = () => {
+  setEditingAddressId(null);
+  setEditAddressStreet("");
+  setEditAddressCity("");
+  setEditAddressCountry("");
+  setEditAddressRegion("");
+  setEditAddressPostalCode("");
+  setEditAddressError(null);
+  setEditSavedLocation(null);
+};
+
+const handleEditAddress = async (addressId) => {
+  try {
+    await updateAddress(addressId, {
+      Street: editAddressStreet,
+      City: editAddressCity,
+      Country: editAddressCountry,
+      Region: editAddressRegion || null,
+      PostalCode: editAddressPostalCode || null,
+      Latitude: editSavedLocation?.lat || null,  
+      Longitude: editSavedLocation?.lng || null,
+    });
+    await fetchCustomers();
+    cancelEditAddress();
+    showToast('Address updated successfully!', 'success');
+  } catch (err) {
+    setEditAddressError(err.message || "Failed to update address");
+    showToast(err.message || "Failed to update address", 'error');
+  }
+};
+
+const confirmDeleteAddress = (addressId, customerId) => {
+  setDeleteAddressConfirm({ show: true, addressId, customerId });
+};
+
+const cancelDeleteAddress = () => {
+  setDeleteAddressConfirm({ show: false, addressId: null, customerId: null });
+};
+
+const handleDeleteAddress = async () => {
+  try {
+    const { addressId, customerId } = deleteAddressConfirm;
+    
+    // Find the customer and the junction table record
+    const customer = customers.find(c => c.id === customerId);
+    const customerAddressLink = customer?.customerAddresses?.find(
+      ca => ca.address?.id === addressId
+    );
+    
+    if (!customerAddressLink) {
+      throw new Error("Address link not found");
+    }
+    
+    // First delete the relationship using the junction table's ID
+    await deleteCustomerAddress(customerAddressLink.id);
+    
+    // Then delete the address itself
+    await deleteAddress(addressId);
+    
+    await fetchCustomers();
+    cancelDeleteAddress();
+    showToast('Address deleted successfully!', 'success');
+  } catch (err) {
+    showToast(err.message || "Failed to delete address", 'error');
+  }
+};
   const startEdit = (customer) => {
     setEditingId(customer.id);
     setEditFullName(customer.fullName);
@@ -232,6 +428,7 @@ const hideToast = () => {
 // --- Orders Management ---
 const openOrdersModal = async (customerId, customerName) => {
   setOrdersModal({ show: true, customerId, customerName, orders: [], loading: true, error: null });
+  setOrderTab("active"); // Set default tab
   try {
     const data = await getCustomerOrders(customerId);
     
@@ -241,10 +438,8 @@ const openOrdersModal = async (customerId, customerName) => {
         const itemsWithReviews = await Promise.all(
           (order.orderItems || []).map(async (item) => {
             try {
-              // Fetch reviews for this product
               const reviews = await fetch(`https://localhost:7062/api/Reviews?productId=${item.productId}&customerId=${customerId}`);
               const reviewData = await reviews.json();
-              // Find review for this specific order
               const orderReview = reviewData.find(r => r.orderId === order.id && r.productId === item.productId);
               return { ...item, review: orderReview || null };
             } catch {
@@ -397,6 +592,186 @@ const openOrdersModal = async (customerId, customerName) => {
     );
   }
 
+  // 🌍 MAP MODAL (Leaflet)
+
+
+const LocationSelector = ({ onSelect }) => {
+  useMapEvents({
+    click(e) {
+      onSelect(e.latlng);
+    }
+  });
+  return null;
+};
+
+const MapModal = () => {
+  const [tempLocation, setTempLocation] = useState(null); // temporary marker
+
+  if (!mapModal.show) return null;
+
+  const handleSave = async () => {
+  if (!tempLocation) {
+    showToast("Please pick a location on the map", "error");
+    return;
+  }
+
+  setMapModal(prev => ({ ...prev, loading: true }));
+  try {
+    const { lat, lng } = tempLocation;
+
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
+    );
+    const data = await res.json();
+    const addr = data.address || {};
+
+    setAddressStreet(addr.road || "");
+    setAddressCity(addr.city || addr.town || addr.village || "");
+    setAddressCountry(addr.country || "");
+    setAddressRegion(addr.state || "");
+    setAddressPostalCode(addr.postcode || "");
+
+    // ✅ Store the saved location for backend
+    setSavedLocation({ lat, lng });
+
+    showToast("Location saved!", "success");
+  } catch (err) {
+    showToast("Failed to fetch location details", "error");
+  } finally {
+    setMapModal(prev => ({ ...prev, loading: false }));
+  }
+};
+
+  const LocationSelector = () => {
+    useMapEvents({
+      click(e) {
+        setTempLocation(e.latlng); // just move the temp marker, do NOT save yet
+      }
+    });
+    return null;
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-6">
+      <div className="bg-white rounded-xl shadow-xl p-4 max-w-3xl w-full">
+        <h2 className="text-xl font-bold mb-3">Pick Location on Map</h2>
+
+        <MapContainer
+          center={[26.0667, 50.5577]}
+          zoom={12}
+          style={{ height: "400px", width: "100%" }}
+        >
+          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <LocationSelector />
+          {tempLocation && <Marker position={[tempLocation.lat, tempLocation.lng]} />}
+        </MapContainer>
+
+        <div className="mt-4 flex gap-2">
+          <button
+            onClick={handleSave}
+            className="flex-1 !bg-green-600 hover:!bg-green-700 text-white py-2 rounded-lg"
+          >
+            Save Location
+          </button>
+          <button
+            onClick={() => setMapModal({ show: false })}
+            className="flex-1 !bg-red-600 hover:!bg-red-700 text-white py-2 rounded-lg"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Edit Map Modal for updating address coordinates
+const EditMapModal = () => {
+  const [tempLocation, setTempLocation] = useState(editSavedLocation);
+
+  if (!editMapModal.show) return null;
+
+  const handleSave = async () => {
+    if (!tempLocation) {
+      showToast("Please pick a location on the map", "error");
+      return;
+    }
+
+    setEditMapModal(prev => ({ ...prev, loading: true }));
+    try {
+      const { lat, lng } = tempLocation;
+
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
+      );
+      const data = await res.json();
+      const addr = data.address || {};
+
+      // Update the edit form fields
+      setEditAddressStreet(addr.road || editAddressStreet);
+      setEditAddressCity(addr.city || addr.town || addr.village || editAddressCity);
+      setEditAddressCountry(addr.country || editAddressCountry);
+      setEditAddressRegion(addr.state || editAddressRegion);
+      setEditAddressPostalCode(addr.postcode || editAddressPostalCode);
+
+      // Save the location
+      setEditSavedLocation({ lat, lng });
+
+      showToast("Location updated!", "success");
+      setEditMapModal({ show: false });
+    } catch (err) {
+      showToast("Failed to fetch location details", "error");
+    } finally {
+      setEditMapModal(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  const LocationSelector = () => {
+    useMapEvents({
+      click(e) {
+        setTempLocation(e.latlng);
+      }
+    });
+    return null;
+  };
+
+  const centerLocation = tempLocation || editSavedLocation || [26.0667, 50.5577];
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex justify-center items-center p-6">
+      <div className="bg-white rounded-xl shadow-xl p-4 max-w-3xl w-full">
+        <h2 className="text-xl font-bold mb-3">Update Location on Map</h2>
+
+        <MapContainer
+          center={[centerLocation.lat || centerLocation[0], centerLocation.lng || centerLocation[1]]}
+          zoom={15}
+          style={{ height: "400px", width: "100%" }}
+        >
+          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <LocationSelector />
+          {tempLocation && <Marker position={[tempLocation.lat, tempLocation.lng]} />}
+        </MapContainer>
+
+        <div className="mt-4 flex gap-2">
+          <button
+            onClick={handleSave}
+            className="flex-1 !bg-green-600 hover:!bg-green-700 text-white py-2 rounded-lg"
+          >
+            Update Location
+          </button>
+          <button
+            onClick={() => setEditMapModal({ show: false })}
+            className="flex-1 !bg-red-600 hover:!bg-red-700 text-white py-2 rounded-lg"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
   return (
     <div className="min-h-screen !bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
         <style>{`
@@ -418,6 +793,17 @@ const openOrdersModal = async (customerId, customerName) => {
     {toast.show && (
       <Toast message={toast.message} type={toast.type} onClose={hideToast} />
     )}
+    <MapModal />
+    <EditMapModal />
+        {viewMapModal.show && (
+        <ViewMapModal
+            lat={viewMapModal.lat}
+            lng={viewMapModal.lng}
+            address={viewMapModal.address}
+            onClose={() => setViewMapModal({ show: false, lat: null, lng: null })}
+        />
+        )}
+
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
@@ -483,6 +869,16 @@ const openOrdersModal = async (customerId, customerName) => {
                   <label className="block text-sm font-medium !text-gray-700 mb-2">Street <span className="!text-red-500">*</span></label>
                   <input type="text" value={addressStreet} onChange={(e) => setAddressStreet(e.target.value)} required className={inputClasses} placeholder="Enter street address" />
                 </div>
+                <div className="mt-2">
+                    <button
+                        type="button"
+                        onClick={() => setMapModal({ show: true })}
+                        className="!bg-green-600 hover:!bg-green-700 !text-white px-4 py-2 rounded-lg font-semibold"
+                    >
+                        📍 Pick from Map
+                    </button>
+                    </div>
+
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -575,8 +971,17 @@ const openOrdersModal = async (customerId, customerName) => {
                             </td>
                             <td className="px-6 py-4 text-right">
                               <div className="flex gap-2 justify-end flex-wrap">
-                                <button onClick={() => openOrdersModal(customer.id, customer.fullName)} className="!bg-purple-600 hover:!bg-purple-700 !text-white px-4 py-2 rounded-lg font-semibold text-sm" title="View Orders">
-                                  📦 Orders
+                                <button 
+                                onClick={() => openOrdersModal(customer.id, customer.fullName)} 
+                                className="!bg-purple-600 hover:!bg-purple-700 !text-white px-4 py-2 rounded-lg font-semibold text-sm relative" 
+                                title="View Orders"
+                                >
+                                📦 Orders
+                                {customer.activeOrderCount > 0 && (
+                                    <span className="absolute -top-2 -right-2 !bg-red-500 !text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center">
+                                    {customer.activeOrderCount}
+                                    </span>
+                                )}
                                 </button>
                                 <button onClick={() => startEdit(customer)} className="!bg-yellow-500 hover:!bg-yellow-600 !text-white p-2 rounded-lg" title="Edit Customer">
                                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -595,37 +1000,164 @@ const openOrdersModal = async (customerId, customerName) => {
                       </tr>
                       
                       {/* Expanded Address Details */}
-                      {expandedRows.has(customer.id) && customer.customerAddresses && customer.customerAddresses.length > 0 && (
-                        <tr className="!bg-gray-50">
-                          <td colSpan="5" className="px-6 py-4">
-                            <div className="ml-8 space-y-3">
-                              <h4 className="font-semibold !text-gray-900 mb-3">Addresses:</h4>
-                              {customer.customerAddresses.map((ca, idx) => (
-                                <div key={idx} className="!bg-white p-4 rounded-lg border border-gray-200">
-                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                                    <div>
-                                      <span className="font-medium !text-gray-600">Street:</span>
-                                      <p className="!text-gray-900">{ca.address?.street || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                      <span className="font-medium !text-gray-600">City:</span>
-                                      <p className="!text-gray-900">{ca.address?.city || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                      <span className="font-medium !text-gray-600">Region:</span>
-                                      <p className="!text-gray-900">{ca.address?.region || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                      <span className="font-medium !text-gray-600">Country:</span>
-                                      <p className="!text-gray-900">{ca.address?.country || 'N/A'}</p>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </td>
-                        </tr>
-                      )}
+{expandedRows.has(customer.id) && customer.customerAddresses && customer.customerAddresses.length > 0 && (
+  <tr className="!bg-gray-50">
+    <td colSpan="5" className="px-6 py-4">
+      <div className="ml-8 space-y-3">
+        <h4 className="font-semibold !text-gray-900 mb-3">Addresses:</h4>
+        {customer.customerAddresses.map((ca, idx) => (
+          <div key={idx} className="!bg-white p-4 rounded-lg border border-gray-200">
+            {editingAddressId === ca.address?.id ? (
+  // EDIT MODE
+  <div className="space-y-3">
+    {editAddressError && (
+      <div className="p-3 rounded-lg !bg-red-50 border-l-4 border-red-500">
+        <p className="text-sm !text-red-700">{editAddressError}</p>
+      </div>
+    )}
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div>
+        <label className="block text-xs font-medium !text-gray-600 mb-1">Street</label>
+        <input
+          type="text"
+          value={editAddressStreet}
+          onChange={(e) => setEditAddressStreet(e.target.value)}
+          className="w-full !border-2 !border-gray-400 rounded-lg p-2 text-sm !text-black !bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Street"
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium !text-gray-600 mb-1">City</label>
+        <input
+          type="text"
+          value={editAddressCity}
+          onChange={(e) => setEditAddressCity(e.target.value)}
+          className="w-full !border-2 !border-gray-400 rounded-lg p-2 text-sm !text-black !bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="City"
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium !text-gray-600 mb-1">Region</label>
+        <input
+          type="text"
+          value={editAddressRegion}
+          onChange={(e) => setEditAddressRegion(e.target.value)}
+          className="w-full !border-2 !border-gray-400 rounded-lg p-2 text-sm !text-black !bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Region"
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium !text-gray-600 mb-1">Country</label>
+        <input
+          type="text"
+          value={editAddressCountry}
+          onChange={(e) => setEditAddressCountry(e.target.value)}
+          className="w-full !border-2 !border-gray-400 rounded-lg p-2 text-sm !text-black !bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Country"
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium !text-gray-600 mb-1">Postal Code</label>
+        <input
+          type="text"
+          value={editAddressPostalCode}
+          onChange={(e) => setEditAddressPostalCode(e.target.value)}
+          className="w-full !border-2 !border-gray-400 rounded-lg p-2 text-sm !text-black !bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Postal Code"
+        />
+      </div>
+      {/* ✅ ADD THIS - Show current location status */}
+      <div className="flex items-center">
+        <button
+          type="button"
+          onClick={() => setEditMapModal({ show: true })}
+          className="!bg-green-600 hover:!bg-green-700 !text-white px-4 py-2 rounded-lg font-semibold text-sm"
+        >
+          📍 {editSavedLocation ? 'Update Location' : 'Add Location'}
+        </button>
+        {editSavedLocation && (
+          <span className="ml-2 text-xs !text-green-600">✓ Location set</span>
+        )}
+      </div>
+    </div>
+    <div className="flex gap-2">
+      <button
+        onClick={() => handleEditAddress(ca.address.id)}
+        className="!bg-green-600 hover:!bg-green-700 text-white px-4 py-2 rounded-lg font-semibold text-sm"
+      >
+        Save Changes
+      </button>
+      <button
+        onClick={cancelEditAddress}
+        className="!bg-gray-500 hover:!bg-gray-600 text-white px-4 py-2 rounded-lg font-semibold text-sm"
+      >
+        Cancel
+      </button>
+    </div>
+  </div>
+            ) : (
+              // VIEW MODE
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-3">
+                  <div>
+                    <span className="font-medium !text-gray-600">Street:</span>
+                    <p className="!text-gray-900">{ca.address?.street || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium !text-gray-600">City:</span>
+                    <p className="!text-gray-900">{ca.address?.city || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium !text-gray-600">Region:</span>
+                    <p className="!text-gray-900">{ca.address?.region || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium !text-gray-600">Country:</span>
+                    <p className="!text-gray-900">{ca.address?.country || 'N/A'}</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      const lat = ca.address?.latitude || ca.address?.Latitude || ca.address?.lat;
+                      const lng = ca.address?.longitude || ca.address?.Longitude || ca.address?.lng;
+                      
+                      if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
+                        setViewMapModal({ 
+                          show: true, 
+                          lat: parseFloat(lat), 
+                          lng: parseFloat(lng), 
+                          address: ca.address
+                        });
+                      } else {
+                        showToast("No coordinates saved for this address", "error");
+                      }
+                    }}
+                    className="!bg-blue-600 hover:!bg-blue-700 text-white px-3 py-1 rounded-lg font-semibold text-sm"
+                  >
+                    📍 View on Map
+                  </button>
+                  <button
+                    onClick={() => startEditAddress(ca.address)}
+                    className="!bg-yellow-500 hover:!bg-yellow-600 text-white px-3 py-1 rounded-lg font-semibold text-sm"
+                  >
+                    ✏️ Edit
+                  </button>
+                  <button
+                    onClick={() => confirmDeleteAddress(ca.address.id, customer.id)}
+                    className="!bg-red-600 hover:!bg-red-700 text-white px-3 py-1 rounded-lg font-semibold text-sm"
+                    >
+                    🗑️ Delete
+                    </button>
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+    </td>
+  </tr>
+)}
                     </Fragment>
                   ))}
                 </tbody>
@@ -642,6 +1174,38 @@ const openOrdersModal = async (customerId, customerName) => {
           )}
         </div>
       </div>
+      {/* Delete Address Confirmation Modal */}
+{deleteAddressConfirm.show && (
+  <div className="fixed inset-0 !bg-black !bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="!bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+      <div className="flex items-center mb-4">
+        <div className="!bg-red-100 p-3 rounded-full">
+          <svg className="w-6 h-6 !text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </div>
+        <h3 className="ml-3 text-xl font-bold !text-gray-900">Delete Address</h3>
+      </div>
+      <p className="!text-gray-600 mb-6">
+        Are you sure you want to delete this address? This action cannot be undone.
+      </p>
+      <div className="flex gap-3">
+        <button 
+          onClick={handleDeleteAddress} 
+          className="flex-1 !bg-red-600 hover:!bg-red-700 !text-white py-3 px-4 rounded-lg font-semibold"
+        >
+          Delete Address
+        </button>
+        <button 
+          onClick={cancelDeleteAddress} 
+          className="flex-1 !bg-gray-500 hover:!bg-gray-600 !text-white py-3 px-4 rounded-lg font-semibold"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm.show && (
@@ -667,136 +1231,203 @@ const openOrdersModal = async (customerId, customerName) => {
       )}
 
       {/* Orders Modal */}
-      {ordersModal.show && (
+        {ordersModal.show && (
         <div className="fixed inset-0 !bg-black !bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="!bg-white rounded-xl shadow-2xl max-w-5xl w-full p-6 my-8">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-2xl font-bold !text-gray-900">Orders for {ordersModal.customerName}</h3>
-              <button onClick={closeOrdersModal} className="!text-gray-500 hover:!text-gray-700 text-2xl">×</button>
+            <div className="!bg-white rounded-xl shadow-2xl max-w-5xl w-full my-8">
+            {/* Header */}
+            <div className="flex justify-between items-center p-6 border-b border-gray-200">
+                <div>
+                <h3 className="text-2xl font-bold !text-gray-900">Orders for {ordersModal.customerName}</h3>
+                <p className="text-sm !text-gray-600 mt-1">Track and review your orders</p>
+                </div>
+                <button onClick={closeOrdersModal} className="!text-gray-500 hover:!text-gray-700 text-2xl">×</button>
             </div>
 
-            {ordersModal.error && (
-              <div className="mb-4 p-4 rounded-lg !bg-red-50 border-l-4 border-red-500">
-                <p className="text-sm !text-red-700">{ordersModal.error}</p>
-              </div>
-            )}
+            {/* Tabs */}
+            <div className="flex border-b border-gray-200 px-6">
+                <button
+                onClick={() => setOrderTab("active")}
+                className={`px-6 py-3 font-semibold transition-colors border-b-2 relative ${
+                    orderTab === "active"
+                    ? "!border-blue-600 !text-blue-600"
+                    : "!border-transparent !text-gray-600 hover:!text-gray-900"
+                }`}
+                >
+                🔔 Active Orders
+                {(() => {
+                    const activeCount = ordersModal.orders.filter(o => 
+                    ["placed", "accepted", "preparing", "ready for pickup", "picked up"].includes(o.status?.toLowerCase())
+                    ).length;
+                    return activeCount > 0 && (
+                    <span className="absolute -top-1 -right-1 !bg-blue-500 !text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                        {activeCount}
+                    </span>
+                    );
+                })()}
+                </button>
+                <button
+                onClick={() => setOrderTab("completed")}
+                className={`px-6 py-3 font-semibold transition-colors border-b-2 ${
+                    orderTab === "completed"
+                    ? "!border-blue-600 !text-blue-600"
+                    : "!border-transparent !text-gray-600 hover:!text-gray-900"
+                }`}
+                >
+                ✓ Completed
+                </button>
+                <button
+                onClick={() => setOrderTab("cancelled")}
+                className={`px-6 py-3 font-semibold transition-colors border-b-2 ${
+                    orderTab === "cancelled"
+                    ? "!border-blue-600 !text-blue-600"
+                    : "!border-transparent !text-gray-600 hover:!text-gray-900"
+                }`}
+                >
+                ✕ Cancelled
+                </button>
+            </div>
 
-            {ordersModal.loading ? (
-              <div className="flex justify-center py-8">
-                <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-r-transparent"></div>
-              </div>
-            ) : ordersModal.orders.length > 0 ? (
-              <div className="space-y-4">
-                {ordersModal.orders.map(order => (
-                  <div key={order.id} className="!bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="p-4 flex justify-between items-center cursor-pointer" onClick={() => toggleOrderRow(order.id)}>
-                      <div className="flex items-center gap-4">
-                        <svg className={`w-5 h-5 !text-gray-600 transition-transform ${expandedOrderRows.has(order.id) ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                        <div>
-                          <p className="font-semibold !text-gray-900">Order #{order.id}</p>
-                          <p className="text-sm !text-gray-600">{new Date(order.createdAt).toLocaleDateString()}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(order.status)}`}>
-                          {order.status || "N/A"}
-                        </span>
-                        <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${getPaymentColor(order.paymentStatus)}`}>
-                          {order.paymentStatus || "N/A"}
-                        </span>
-                        <p className="font-bold !text-gray-900">${order.totalAmount?.toFixed(2) || "0.00"}</p>
-                      </div>
-                    </div>
+            {/* Content */}
+            <div className="p-6 max-h-[60vh] overflow-y-auto">
+                {ordersModal.error && (
+                <div className="mb-4 p-4 rounded-lg !bg-red-50 border-l-4 border-red-500">
+                    <p className="text-sm !text-red-700">{ordersModal.error}</p>
+                </div>
+                )}
 
-                    {expandedOrderRows.has(order.id) && (
-                      <div className="p-4 border-t border-gray-200 !bg-white">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                          <div>
-                            <p className="text-xs !text-gray-600 mb-1">Seller</p>
-                            <p className="text-sm font-medium !text-gray-900">{order.sellerName || "N/A"}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs !text-gray-600 mb-1">Fulfillment</p>
-                            <p className="text-sm font-medium !text-gray-900">{order.fulfillmentType || "N/A"}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs !text-gray-600 mb-1">Payment Method</p>
-                            <p className="text-sm font-medium !text-gray-900">{order.paymentMethod || "N/A"}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs !text-gray-600 mb-1">Delivery Fee</p>
-                            <p className="text-sm font-medium !text-gray-900">${order.deliveryFee?.toFixed(2) || "0.00"}</p>
-                          </div>
-                        </div>
+                {ordersModal.loading ? (
+                <div className="flex justify-center py-8">
+                    <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-r-transparent"></div>
+                </div>
+                ) : (() => {
+                // Filter orders based on active tab
+                let filteredOrders = [];
+                if (orderTab === "active") {
+                    filteredOrders = ordersModal.orders.filter(o => 
+                    ["placed", "accepted", "preparing", "ready for pickup", "picked up"].includes(o.status?.toLowerCase())
+                    );
+                } else if (orderTab === "completed") {
+                    filteredOrders = ordersModal.orders.filter(o => o.status?.toLowerCase() === "completed");
+                } else if (orderTab === "cancelled") {
+                    filteredOrders = ordersModal.orders.filter(o => o.status?.toLowerCase() === "cancelled");
+                }
 
-                        {order.orderItems && order.orderItems.length > 0 && (
-                          <div>
-                            <h4 className="font-semibold !text-gray-900 mb-3">Order Items:</h4>
-                            <div className="space-y-2">
-                              {order.orderItems.map((item, idx) => (
-                                <div key={idx} className="p-3 !bg-gray-50 rounded-lg">
-                                    {/* Product Info Row */}
-                                    <div className="flex justify-between items-center">
-                                    <div className="flex-1">
-                                        <p className="text-sm font-medium !text-gray-900">{item.productName || "Product"}</p>
-                                        <p className="text-xs !text-gray-600">SKU: {item.variantSKU || "N/A"} • Qty: {item.qty}</p>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <p className="text-sm font-semibold !text-gray-900">${item.lineTotal?.toFixed(2) || "0.00"}</p>
-                                        {order.status?.toLowerCase() === 'completed' && !item.review && (
-                                        <button 
-                                            onClick={() => openReviewModal(order.id, item.productId, item.productName)}
-                                            className="!bg-blue-600 hover:!bg-blue-700 !text-white px-3 py-1 rounded text-xs font-medium"
-                                        >
-                                            ⭐ Review
-                                        </button>
-                                        )}
-                                        {item.review && (
-                                        <span className="!bg-green-100 !text-green-700 px-3 py-1 rounded text-xs font-medium">
-                                            ✓ Reviewed
-                                        </span>
-                                        )}
-                                    </div>
-                                    </div>
-                                     {/* Review Display - THIS IS THE NEW PART */}
-                                    {item.review && (
-                                    <div className="mt-3 p-3 !bg-white rounded-lg border border-gray-200">
-                                        <div className="flex items-center gap-2 mb-2">
-                                        <span className="text-xs font-semibold !text-gray-700">Your Review:</span>
-                                        <div className="flex">
-                                            {[1, 2, 3, 4, 5].map(star => (
-                                            <span key={star} className={`text-sm ${star <= item.review.rating ? '!text-yellow-400' : '!text-gray-300'}`}>
-                                                ★
-                                            </span>
-                                            ))}
-                                        </div>
-                                        <span className="text-xs !text-gray-600">
-                                            {new Date(item.review.createdAt).toLocaleDateString()}
-                                        </span>
-                                        </div>
-                                        <p className="text-sm !text-gray-700 italic">"{item.review.comment}"</p>
-                                    </div>
-                                    )}
-                                </div>
-                              ))}
+                return filteredOrders.length > 0 ? (
+                    <div className="space-y-4">
+                    {filteredOrders.map(order => (
+                        <div key={order.id} className="!bg-gray-50 rounded-lg border border-gray-200">
+                        <div className="p-4 flex justify-between items-center cursor-pointer" onClick={() => toggleOrderRow(order.id)}>
+                            <div className="flex items-center gap-4">
+                            <svg className={`w-5 h-5 !text-gray-600 transition-transform ${expandedOrderRows.has(order.id) ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                            <div>
+                                <p className="font-semibold !text-gray-900">Order #{order.id}</p>
+                                <p className="text-sm !text-gray-600">{new Date(order.createdAt).toLocaleDateString()}</p>
                             </div>
-                          </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                            <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(order.status)}`}>
+                                {order.status || "N/A"}
+                            </span>
+                            <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${getPaymentColor(order.paymentStatus)}`}>
+                                {order.paymentStatus || "N/A"}
+                            </span>
+                            <p className="font-bold !text-gray-900">${order.totalAmount?.toFixed(2) || "0.00"}</p>
+                            </div>
+                        </div>
+
+                        {expandedOrderRows.has(order.id) && (
+                            <div className="p-4 border-t border-gray-200 !bg-white">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                                <div>
+                                <p className="text-xs !text-gray-600 mb-1">Seller</p>
+                                <p className="text-sm font-medium !text-gray-900">{order.sellerName || "N/A"}</p>
+                                </div>
+                                <div>
+                                <p className="text-xs !text-gray-600 mb-1">Fulfillment</p>
+                                <p className="text-sm font-medium !text-gray-900">{order.fulfillmentType || "N/A"}</p>
+                                </div>
+                                <div>
+                                <p className="text-xs !text-gray-600 mb-1">Payment Method</p>
+                                <p className="text-sm font-medium !text-gray-900">{order.paymentMethod || "N/A"}</p>
+                                </div>
+                                <div>
+                                <p className="text-xs !text-gray-600 mb-1">Delivery Fee</p>
+                                <p className="text-sm font-medium !text-gray-900">${order.deliveryFee?.toFixed(2) || "0.00"}</p>
+                                </div>
+                            </div>
+
+                            {order.orderItems && order.orderItems.length > 0 && (
+                                <div>
+                                <h4 className="font-semibold !text-gray-900 mb-3">Order Items:</h4>
+                                <div className="space-y-2">
+                                    {order.orderItems.map((item, idx) => (
+                                    <div key={idx} className="p-3 !bg-gray-50 rounded-lg">
+                                        <div className="flex justify-between items-center">
+                                        <div className="flex-1">
+                                            <p className="text-sm font-medium !text-gray-900">{item.productName || "Product"}</p>
+                                            <p className="text-xs !text-gray-600">SKU: {item.variantSKU || "N/A"} • Qty: {item.qty}</p>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <p className="text-sm font-semibold !text-gray-900">${item.lineTotal?.toFixed(2) || "0.00"}</p>
+                                            {order.status?.toLowerCase() === 'completed' && !item.review && (
+                                            <button 
+                                                onClick={() => openReviewModal(order.id, item.productId, item.productName)}
+                                                className="!bg-blue-600 hover:!bg-blue-700 !text-white px-3 py-1 rounded text-xs font-medium"
+                                            >
+                                                ⭐ Review
+                                            </button>
+                                            )}
+                                            {item.review && (
+                                            <span className="!bg-green-100 !text-green-700 px-3 py-1 rounded text-xs font-medium">
+                                                ✓ Reviewed
+                                            </span>
+                                            )}
+                                        </div>
+                                        </div>
+                                        {item.review && (
+                                        <div className="mt-3 p-3 !bg-white rounded-lg border border-gray-200">
+                                            <div className="flex items-center gap-2 mb-2">
+                                            <span className="text-xs font-semibold !text-gray-700">Your Review:</span>
+                                            <div className="flex">
+                                                {[1, 2, 3, 4, 5].map(star => (
+                                                <span key={star} className={`text-sm ${star <= item.review.rating ? '!text-yellow-400' : '!text-gray-300'}`}>
+                                                    ★
+                                                </span>
+                                                ))}
+                                            </div>
+                                            <span className="text-xs !text-gray-600">
+                                                {new Date(item.review.createdAt).toLocaleDateString()}
+                                            </span>
+                                            </div>
+                                            <p className="text-sm !text-gray-700 italic">"{item.review.comment}"</p>
+                                        </div>
+                                        )}
+                                    </div>
+                                    ))}
+                                </div>
+                                </div>
+                            )}
+                            </div>
                         )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="!text-gray-600">No orders found for this customer</p>
-              </div>
-            )}
-          </div>
+                        </div>
+                    ))}
+                    </div>
+                ) : (
+                    <div className="text-center py-8">
+                    <p className="!text-gray-600">
+                        {orderTab === "active" && "No active orders"}
+                        {orderTab === "completed" && "No completed orders"}
+                        {orderTab === "cancelled" && "No cancelled orders"}
+                    </p>
+                    </div>
+                );
+                })()}
+            </div>
+            </div>
         </div>
-      )}
+        )}
 
       {/* Review Modal */}
       {reviewModal.show && (

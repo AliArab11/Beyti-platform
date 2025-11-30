@@ -1280,4 +1280,78 @@ export const updateBookingStatus = async (bookingId, data) => {
 // Statistics
 export const getProviderStatistics = async (serviceProviderId) => {
   return await fetchAPI(`/ServiceProviderDashboard/Statistics/${serviceProviderId}`);
+// --- Delivery Ticket APIs ---
+
+/**
+ * Get all delivery tickets (with optional filters)
+ * @param {object} params - Optional query parameters (driverId, status)
+ * @returns {Promise<Array>} - Array of delivery tickets
+ */
+export const getDeliveryTickets = async (params = {}) => {
+  const queryString = new URLSearchParams(params).toString();
+  return await fetchAPI(`/DeliveryTickets${queryString ? `?${queryString}` : ''}`);
+};
+
+/**
+ * Get a single delivery ticket by ID
+ * @param {number} id - Delivery ticket ID
+ * @returns {Promise<object>} - Delivery ticket object with full details
+ */
+export const getDeliveryTicket = async (id) => {
+  return await fetchAPI(`/DeliveryTickets/${id}`);
+};
+
+/**
+ * Accept a delivery ticket and assign to driver
+ * @param {number} id - Delivery ticket ID
+ * @param {number} driverId - Driver ID accepting the ticket
+ * @returns {Promise<object|null>} - Response or null for 204
+ */
+export const acceptDeliveryTicket = async (id, driverId) => {
+  return await fetchAPI(`/DeliveryTickets/${id}/accept`, {
+    method: 'PUT',
+    body: JSON.stringify({ DriverId: driverId })
+  });
+};
+
+/**
+ * Update delivery ticket status (Picked Up, Delivered, etc.)
+ * @param {number} id - Delivery ticket ID
+ * @param {string} status - New status
+ * @returns {Promise<object|null>} - Response or null for 204
+ */
+export const updateDeliveryStatus = async (id, status) => {
+  return await fetchAPI(`/DeliveryTickets/${id}/update-status`, {
+    method: 'PUT',
+    body: JSON.stringify({ Status: status })
+  });
+};
+
+// --- Seller Order Management APIs ---
+
+/**
+ * Seller responds to an order (Accept/Reject)
+ * @param {number} orderId - Order ID
+ * @param {string} status - Status (Accepted/Rejected)
+ * @param {string|null} sellerNote - Optional note from seller
+ * @returns {Promise<object|null>} - Response or null for 204
+ */
+export const sellerRespondToOrder = async (orderId, status, sellerNote = null) => {
+  return await fetchAPI(`/Orders/${orderId}/seller-response`, {
+    method: 'PUT',
+    body: JSON.stringify({ Status: status, SellerNote: sellerNote })
+  });
+};
+
+/**
+ * Update seller order status (In Progress, Ready for Pickup, etc.)
+ * @param {number} orderId - Order ID
+ * @param {string} status - New status
+ * @returns {Promise<object|null>} - Response or null for 204
+ */
+export const updateSellerOrderStatus = async (orderId, status) => {
+  return await fetchAPI(`/Orders/${orderId}/update-seller-status`, {
+    method: 'PUT',
+    body: JSON.stringify({ Status: status })
+  });
 };

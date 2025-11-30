@@ -55,14 +55,25 @@ namespace Beyti_Backend.Controllers.Api
         }
 
         // PUT: api/Addresses/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutAddress(int id, Address address)
+        public async Task<IActionResult> PutAddress(int id, CreateAddressDto dto)
         {
-            if (id != address.Id)
+            var address = await _context.Addresses.FindAsync(id);
+
+            if (address == null)
             {
-                return BadRequest();
+                return NotFound();
             }
+
+            // Update only the fields provided
+            address.Street = dto.Street;
+            address.City = dto.City;
+            address.Region = dto.Region;
+            address.PostalCode = dto.PostalCode;
+            address.Country = dto.Country;
+            address.Latitude = dto.Latitude;
+            address.Longitude = dto.Longitude;
+            address.UpdatedAt = DateTime.UtcNow;
 
             _context.Entry(address).State = EntityState.Modified;
 
