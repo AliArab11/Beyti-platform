@@ -1280,6 +1280,8 @@ export const updateBookingStatus = async (bookingId, data) => {
 // Statistics
 export const getProviderStatistics = async (serviceProviderId) => {
   return await fetchAPI(`/ServiceProviderDashboard/Statistics/${serviceProviderId}`);
+};
+
 // --- Delivery Ticket APIs ---
 
 /**
