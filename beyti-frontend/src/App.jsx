@@ -13,6 +13,9 @@ import StoreDetailsPage from "./Pages/Seller/StoreDetails";
 import ProductsPage from "./Pages/Product/Products";
 import CategoryPage from "./Pages/Product/Categories";
 import DriverPage from "./Pages/Driver";
+import DesignSystemDemo from './components/DesignSystemDemo';
+import DashboardTemplate from './Pages/DashboardTemplate';
+import AdminUserManagementNew from './Pages/Admin/AdminUserManagementNew';
 
 // Placeholder components for pages that don't exist yet
 const PlaceholderPage = ({ pageName }) => (
@@ -42,7 +45,10 @@ export default function App() {
     { id: 'serviceprovider', label: 'Service Provider' },
     { id: 'notification', label: 'Notification' },
     { id: 'admindashboard', label: 'Admin Dashboard'},
-     { id: 'servicerequest', label: 'Service Request'}
+     { id: 'servicerequest', label: 'Service Request'},
+     { id: 'DesignDemo', label: 'Design Demo'},
+     { id: 'DashboardTemplate', label: 'Dashboard Template'},
+     { id: 'AdminUserManagementNew', label: 'User Management (New)'}
   ];
 
   const renderPage = () => {
@@ -77,6 +83,12 @@ export default function App() {
         return <ServiceProviderRequests />
       case 'notification':
         return <PlaceholderPage pageName="Notification" />;
+      case 'DesignDemo':
+        return <DesignSystemDemo />;
+      case 'DashboardTemplate':
+        return <DashboardTemplate />;
+      case 'AdminUserManagementNew':
+        return <AdminUserManagementNew />;
       default:
         return <RegistrationPage />;
     }

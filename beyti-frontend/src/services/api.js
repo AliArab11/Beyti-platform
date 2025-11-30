@@ -456,6 +456,11 @@ export const getServiceProvider = async (id) => {
 
 export const createServiceProvider = async (data) => {
   return await fetchAPI('/ServiceProviders', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
 /**
  * Get sellers for dropdown (Store selector)
  * @returns {Promise<Array>} - Array [{ id, storeName }]
