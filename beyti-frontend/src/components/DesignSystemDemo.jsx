@@ -7,6 +7,9 @@
 
 import React from 'react';
 import Button from './Button';
+import CRUDButton from './CRUDButton';
+import NavigationButton from './NavigationButton';
+import AnalyticsCard from './AnalyticsCard';
 
 const DesignSystemDemo = () => {
   return (
@@ -137,6 +140,120 @@ const DesignSystemDemo = () => {
                   <p className="text-label-medium text-charcoal-600">danger-text</p>
                 </div>
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* NEW COMPONENTS - From PDF Specifications */}
+        <section className="bg-grey-200 rounded-lg p-8 shadow-soft-lift">
+          <h2 className="text-display-h2 text-charcoal-600 mb-6">Component Library - From Specifications</h2>
+
+          <div className="space-y-12">
+            {/* 1. CRUD Buttons */}
+            <div>
+              <h3 className="text-card-h2 text-charcoal-600 mb-4">1. CRUD Buttons</h3>
+              <p className="text-body-regular text-charcoal-400 mb-4">
+                Fixed-width buttons (150px x 42px) for CRUD operations
+              </p>
+              <div className="flex flex-wrap gap-4">
+                <CRUDButton variant="success">Accept</CRUDButton>
+                <CRUDButton variant="error">Reject</CRUDButton>
+                <CRUDButton variant="danger">Pending</CRUDButton>
+                <CRUDButton variant="neutral">View</CRUDButton>
+                <CRUDButton variant="outline">Accept</CRUDButton>
+              </div>
+              <pre className="bg-cream-50 p-4 rounded-md overflow-x-auto mt-4">
+                <code>{`<CRUDButton variant="success">Accept</CRUDButton>
+<CRUDButton variant="error">Reject</CRUDButton>
+<CRUDButton variant="danger">Pending</CRUDButton>
+<CRUDButton variant="neutral">View</CRUDButton>
+<CRUDButton variant="outline">Accept</CRUDButton>`}</code>
+              </pre>
+            </div>
+
+            {/* 2. Navigation Buttons */}
+            <div>
+              <h3 className="text-card-h2 text-charcoal-600 mb-4">2. Navigation Buttons</h3>
+              <p className="text-body-regular text-charcoal-400 mb-4">
+                Sidebar navigation buttons (220px x 44px) with selected state
+              </p>
+              <div className="bg-sage-500 p-6 rounded-lg space-y-2 inline-block">
+                <NavigationButton
+                  icon={
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    </svg>
+                  }
+                >
+                  Dashboard
+                </NavigationButton>
+                <NavigationButton
+                  selected
+                  icon={
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    </svg>
+                  }
+                >
+                  Dashboard
+                </NavigationButton>
+              </div>
+              <pre className="bg-cream-50 p-4 rounded-md overflow-x-auto mt-4">
+                <code>{`<NavigationButton icon={<HomeIcon />}>Dashboard</NavigationButton>
+<NavigationButton selected icon={<HomeIcon />}>Dashboard</NavigationButton>`}</code>
+              </pre>
+            </div>
+
+            {/* 3. Analytics Cards */}
+            <div>
+              <h3 className="text-card-h2 text-charcoal-600 mb-4">3. Analytics Cards</h3>
+              <p className="text-body-regular text-charcoal-400 mb-4">
+                Flexible metric display cards with single or multiple values
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
+                {/* Single metric with description */}
+                <AnalyticsCard
+                  title="Card title"
+                  metrics={[{ value: '0', label: 'Last 30 Days' }]}
+                />
+
+                {/* Multiple metrics side by side */}
+                <AnalyticsCard
+                  title="Card title"
+                  metrics={[
+                    { value: '0', label: 'Confirmed' },
+                    { value: '0', label: 'Pending' }
+                  ]}
+                />
+
+                {/* Single metric without extra label */}
+                <AnalyticsCard
+                  title="Card title"
+                  metrics={[{ value: '0' }]}
+                />
+
+                {/* Real data example */}
+                <AnalyticsCard
+                  title="Total Orders"
+                  metrics={[{ value: '127', label: 'Last 30 Days' }]}
+                />
+              </div>
+              <pre className="bg-cream-50 p-4 rounded-md overflow-x-auto mt-4">
+                <code>{`// Single metric
+<AnalyticsCard
+  title="Card title"
+  metrics={[{ value: '0', label: 'Last 30 Days' }]}
+/>
+
+// Multiple metrics
+<AnalyticsCard
+  title="Card title"
+  metrics={[
+    { value: '0', label: 'Confirmed' },
+    { value: '0', label: 'Pending' }
+  ]}
+/>`}</code>
+              </pre>
             </div>
           </div>
         </section>
