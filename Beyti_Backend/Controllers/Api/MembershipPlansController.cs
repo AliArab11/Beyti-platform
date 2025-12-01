@@ -41,17 +41,23 @@ namespace Beyti_Backend.Controllers.Api
             return membershipPlan;
         }
 
-        // PUT: api/MembershipPlans/5
+        // PUT: api/MembershipPlans/update/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutMembershipPlan(int id, MembershipPlan membershipPlan)
+        [HttpPut("update/{id}")]
+        public async Task<ActionResult<MembershipPlan>> UpdateMembershipPlan(int id, MembershipPlan membershipPlan)
         {
-            if (id != membershipPlan.Id)
+            var existingPlan = await _context.MembershipPlans.FindAsync(id);
+            if (existingPlan == null)
             {
-                return BadRequest();
+                return NotFound();
             }
 
-            _context.Entry(membershipPlan).State = EntityState.Modified;
+            // Update properties
+            existingPlan.Name = membershipPlan.Name;
+            existingPlan.Description = membershipPlan.Description;
+            existingPlan.MonthlyPrice = membershipPlan.MonthlyPrice;
+            existingPlan.DurationDays = membershipPlan.DurationDays;
+            existingPlan.IsActive = membershipPlan.IsActive;
 
             try
             {
@@ -69,7 +75,7 @@ namespace Beyti_Backend.Controllers.Api
                 }
             }
 
-            return NoContent();
+            return Ok(existingPlan);
         }
 
         // POST: api/MembershipPlans
@@ -83,8 +89,8 @@ namespace Beyti_Backend.Controllers.Api
             return CreatedAtAction("GetMembershipPlan", new { id = membershipPlan.Id }, membershipPlan);
         }
 
-        // DELETE: api/MembershipPlans/5
-        [HttpDelete("{id}")]
+        // DELETE: api/MembershipPlans/delete/5
+        [HttpDelete("delete/{id}")]
         public async Task<IActionResult> DeleteMembershipPlan(int id)
         {
             var membershipPlan = await _context.MembershipPlans.FindAsync(id);
@@ -97,6 +103,38 @@ namespace Beyti_Backend.Controllers.Api
             await _context.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        // PATCH: api/MembershipPlans/toggle/5
+        [HttpPatch("toggle/{id}")]
+        public async Task<ActionResult<MembershipPlan>> ToggleMembershipPlanStatus(int id)
+        {
+            var membershipPlan = await _context.MembershipPlans.FindAsync(id);
+            if (membershipPlan == null)
+            {
+                return NotFound();
+            }
+
+            // Toggle the IsActive status
+            membershipPlan.IsActive = !membershipPlan.IsActive;
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!MembershipPlanExists(id))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
+
+            return Ok(membershipPlan);
         }
 
         private bool MembershipPlanExists(int id)

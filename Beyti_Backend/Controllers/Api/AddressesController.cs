@@ -55,11 +55,12 @@ namespace Beyti_Backend.Controllers.Api
         }
 
         // PUT: api/Addresses/5
+        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
         public async Task<IActionResult> PutAddress(int id, CreateAddressDto dto)
         {
+            // Retrieve the existing entity
             var address = await _context.Addresses.FindAsync(id);
-
             if (address == null)
             {
                 return NotFound();

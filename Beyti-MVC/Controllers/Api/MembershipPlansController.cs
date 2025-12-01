@@ -172,5 +172,34 @@ namespace Beyti_MVC.Controllers.Api
                 return StatusCode(500, new { message = "An unexpected error occurred.", error = ex.Message });
             }
         }
+
+        // PATCH: api/MembershipPlans/toggle/5
+        [HttpPatch("toggle/{id}")]
+        public async Task<ActionResult<MembershipPlan>> ToggleMembershipPlanStatus(int id)
+        {
+            try
+            {
+                var membershipPlan = await _context.MembershipPlans.FindAsync(id);
+                if (membershipPlan == null)
+                {
+                    return NotFound(new { message = $"Membership plan with ID {id} not found." });
+                }
+
+                // Toggle the IsActive status
+                membershipPlan.IsActive = !membershipPlan.IsActive;
+
+                await _context.SaveChangesAsync();
+
+                return Ok(membershipPlan);
+            }
+            catch (DbUpdateException ex)
+            {
+                return StatusCode(500, new { message = "An error occurred while toggling the membership plan status.", error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "An unexpected error occurred.", error = ex.Message });
+            }
+        }
     }
 }
