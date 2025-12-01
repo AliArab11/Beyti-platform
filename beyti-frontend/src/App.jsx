@@ -36,6 +36,7 @@ export default function App() {
     { id: 'membership', label: 'Membership' },
     { id: 'addplan', label: 'Add Plan' },
     { id: 'seller', label: 'Seller' },
+    { id: 'storedetails', label: 'Store Details' },
     { id: 'store', label: 'Store' },
     { id: 'product', label: 'Product' },
     { id: 'category', label: 'Category' },
