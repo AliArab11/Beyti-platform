@@ -30,6 +30,12 @@ namespace Beyti_Backend.Controllers.Api
             public string? Comment { get; set; }
         }
 
+        public class UpdateReviewDto
+        {
+            public bool IsCommentHiddenBySeller { get; set; }
+            public string? HiddenReason { get; set; }
+        }
+
         // GET: api/Reviews
         [HttpGet]
         public async Task<ActionResult<IEnumerable<object>>> GetReviews([FromQuery] int? productId, [FromQuery] int? customerId)
@@ -174,7 +180,7 @@ namespace Beyti_Backend.Controllers.Api
 
         // PUT: api/Reviews/5 (for hiding/unhiding reviews by seller)
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutReview(int id, [FromBody] dynamic updateData)
+        public async Task<IActionResult> PutReview(int id, [FromBody] UpdateReviewDto updateData)
         {
             var review = await _context.Reviews.FindAsync(id);
             if (review == null)
@@ -184,16 +190,9 @@ namespace Beyti_Backend.Controllers.Api
 
             try
             {
-                if (updateData.IsCommentHiddenBySeller != null)
-                {
-                    review.IsCommentHiddenBySeller = (bool)updateData.IsCommentHiddenBySeller;
-                    review.HiddenAt = review.IsCommentHiddenBySeller ? DateTime.UtcNow : null;
-                }
-
-                if (updateData.HiddenReason != null)
-                {
-                    review.HiddenReason = updateData.HiddenReason;
-                }
+                review.IsCommentHiddenBySeller = updateData.IsCommentHiddenBySeller;
+                review.HiddenAt = updateData.IsCommentHiddenBySeller ? DateTime.UtcNow : null;
+                review.HiddenReason = updateData.HiddenReason;
 
                 await _context.SaveChangesAsync();
                 return NoContent();

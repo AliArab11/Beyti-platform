@@ -115,17 +115,32 @@ const ViewMapModal = ({ lat, lng, onClose, address }) => {
   }, []);
 
   const fetchDrivers = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await getDrivers();
-      setDrivers(data);
-    } catch (err) {
-      setError(err.message || "Failed to load drivers");
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    setLoading(true);
+    setError(null);
+    const data = await getDrivers();
+    
+    // Fetch available job counts for each driver
+    const driversWithCounts = await Promise.all(
+      data.map(async (driver) => {
+        try {
+          const allTickets = await getDeliveryTickets();
+          // Count available tickets (not assigned to anyone)
+          const availableCount = allTickets.filter(t => t.status === "Available" && !t.driverId).length;
+          return { ...driver, availableJobCount: availableCount };
+        } catch {
+          return { ...driver, availableJobCount: 0 };
+        }
+      })
+    );
+    
+    setDrivers(driversWithCounts);
+  } catch (err) {
+    setError(err.message || "Failed to load drivers");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleAddDriver = async (e) => {
     e.preventDefault();
@@ -363,7 +378,17 @@ const handleUpdateTicketStatus = async (ticketId, newStatus) => {
                       <td className="px-6 py-3 text-black">{driver.status}</td>
                       <td className="px-6 py-3 text-right">
                         <div className="flex gap-2 justify-end">
-                          <button onClick={() => openDriverJobsModal(driver.id, driver.fullName)} className="bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700">Jobs</button>
+                          <button 
+                            onClick={() => openDriverJobsModal(driver.id, driver.fullName)} 
+                            className="bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 relative"
+                          >
+                            Jobs
+                            {driver.availableJobCount > 0 && (
+                              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                                {driver.availableJobCount}
+                              </span>
+                            )}
+                          </button>
                           <button onClick={() => startEdit(driver)} className="bg-green-600 text-white px-3 py-1 rounded-lg hover:bg-green-700">Edit</button>
                           <button onClick={() => handleDelete(driver.id)} className="bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700">Delete</button>
                         </div>
@@ -397,23 +422,33 @@ const handleUpdateTicketStatus = async (ticketId, newStatus) => {
       <div className="flex border-b border-gray-200 px-6">
         <button
           onClick={() => setJobTab("available")}
-          className={`px-6 py-3 font-semibold transition-colors border-b-2 ${
+          className={`px-6 py-3 font-semibold transition-colors border-b-2 relative ${
             jobTab === "available"
               ? "border-blue-600 text-blue-600"
               : "border-transparent text-gray-600 hover:text-gray-900"
           }`}
         >
-          📋 Available Requests ({availableTickets.length})
+          📋 Available Requests
+          {availableTickets.length > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center animate-pulse">
+              {availableTickets.length}
+            </span>
+          )}
         </button>
         <button
           onClick={() => setJobTab("current")}
-          className={`px-6 py-3 font-semibold transition-colors border-b-2 ${
+          className={`px-6 py-3 font-semibold transition-colors border-b-2 relative ${
             jobTab === "current"
               ? "border-blue-600 text-blue-600"
               : "border-transparent text-gray-600 hover:text-gray-900"
           }`}
         >
-          🚚 Current Order ({currentTickets.length})
+          🚚 Current Order
+          {currentTickets.length > 0 && (
+            <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center">
+              {currentTickets.length}
+            </span>
+          )}
         </button>
         <button
           onClick={() => setJobTab("history")}
