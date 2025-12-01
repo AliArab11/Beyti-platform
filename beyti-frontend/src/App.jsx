@@ -17,6 +17,7 @@ import ServiceProviderDashboard from './Beyti-Website/ServiceProvider/ServicePro
 import DesignSystemDemo from './components/DesignSystemDemo';
 import DashboardTemplate from './Pages/DashboardTemplate';
 import AdminUserManagementNew from './Pages/Admin/AdminUserManagementNew';
+import AdminView from './Beyti-Website/Admin/AdminView.jsx';
 
 // Placeholder components for pages that don't exist yet
 const PlaceholderPage = ({ pageName }) => (
@@ -45,6 +46,7 @@ export default function App() {
     { id: 'admin', label: 'Admin' },
     { id: 'serviceprovider', label: 'Service Provider' },
     { id: 'serviceproviderdash', label: 'SP Dashboard' }, // ADD THIS LINE
+    { id: 'adminview', label: 'Ad Dashboard' }, // ADD THIS LINE
     { id: 'notification', label: 'Notification' },
     { id: 'admindashboard', label: 'Admin Dashboard'},
      { id: 'servicerequest', label: 'Service Request'},
@@ -81,6 +83,8 @@ export default function App() {
         return <ServiceProviderPage />;
       case 'serviceproviderdash':  // ADD THIS CASE
         return <ServiceProviderDashboard />;
+         case 'adminview':  // ADD THIS CASE
+        return <AdminView />;
       case 'admindashboard':
         return <AdminUsersPage />;
       case 'servicerequest':

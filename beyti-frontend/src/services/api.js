@@ -245,6 +245,10 @@ export const getServiceProviderRequests = async () => {
   return await fetchAPI('/AdminDashboard/ServiceProviderRequests');
 };
 
+export const getAllServiceProviderRequests = async () => {
+  return await fetchAPI('/AdminDashboard/ServiceProviderRequests');
+};
+
 export const approveServiceProviderRequest = async (id) => {
   return await fetchAPI(`/AdminDashboard/ServiceProviderRequests/${id}/approve`, {
     method: 'PATCH',
@@ -1355,5 +1359,74 @@ export const updateSellerOrderStatus = async (orderId, status) => {
   return await fetchAPI(`/Orders/${orderId}/update-seller-status`, {
     method: 'PUT',
     body: JSON.stringify({ Status: status })
+  });
+};
+
+// --- Service Moderation APIs ---
+
+/**
+ * Get service moderation statistics
+ * @returns {Promise<object>} - Service statistics
+ */
+export const getServiceModerationStatistics = async () => {
+  return await fetchAPI('/ServiceModeration/Statistics');
+};
+
+/**
+ * Get services for moderation with optional filters
+ * @param {boolean|null} isActive - Filter by active status
+ * @param {string|null} search - Search term
+ * @returns {Promise<Array>} - Array of services
+ */
+export const getServicesForModeration = async (isActive = null, search = null) => {
+  let query = [];
+  if (isActive !== null) query.push(`isActive=${isActive}`);
+  if (search) query.push(`search=${encodeURIComponent(search)}`);
+
+  const queryString = query.length > 0 ? `?${query.join('&')}` : '';
+  return await fetchAPI(`/ServiceModeration/Services${queryString}`);
+};
+
+/**
+ * Get detailed service information
+ * @param {number} id - Service ID
+ * @returns {Promise<object>} - Service details
+ */
+export const getServiceDetails = async (id) => {
+  return await fetchAPI(`/ServiceModeration/Services/${id}`);
+};
+
+/**
+ * Approve a service
+ * @param {number} id - Service ID
+ * @returns {Promise<object>} - Response
+ */
+export const approveService = async (id) => {
+  return await fetchAPI(`/ServiceModeration/Services/${id}/approve`, {
+    method: 'PUT',
+  });
+};
+
+/**
+ * Suspend a service with reason
+ * @param {number} id - Service ID
+ * @param {string} reason - Suspension reason
+ * @returns {Promise<object>} - Response
+ */
+export const suspendService = async (id, reason) => {
+  return await fetchAPI(`/ServiceModeration/Services/${id}/suspend`, {
+    method: 'PUT',
+    body: JSON.stringify({ reason }),
+  });
+};
+
+/**
+ * Delete a service
+ * @param {number} id - Service ID
+ * @returns {Promise<object>} - Response
+ */
+export const deleteService = async (id) => {
+  return await fetchAPI(`/ServiceModeration/Services/${id}`, {
+    method: 'DELETE',
   });
 };

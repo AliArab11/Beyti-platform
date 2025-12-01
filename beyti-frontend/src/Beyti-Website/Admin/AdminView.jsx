@@ -1,0 +1,546 @@
+/**
+ * Admin Dashboard - Main View
+ * 
+ * Central dashboard for Beyti platform administration
+ * Displays key metrics, approval queue, and growth analytics
+ */
+
+import React, { useState, useEffect } from 'react';
+import {
+  Warning,
+  CheckCircle,
+  UserPlus,
+  ShieldCheck,
+  Clock
+} from '@phosphor-icons/react';
+import {
+  getDashboardStatistics,
+  getServiceProviderRequests,
+  getUsers,
+  getFlaggedUsers,
+} from '../../services/api';
+
+// Import design system components
+import AnalyticsCard from '../../components/AnalyticsCard';
+import { Table, TableHeader, TableBody, TableRow } from '../../components/Table';
+import StatusChip from '../../components/StatusChip';
+import CRUDButton from '../../components/CRUDButton';
+import PageHeader from '../../components/PageHeader';
+
+// Import sub-pages
+import UsersFlagged from './components/UsersFlagged';
+import UserManagement from './components/UserManagement';
+import RequestApprovals from './components/RequestApprovals';
+import CategoryModeration from './components/CategoryModeration';
+import ProductModeration from './components/ProductModeration';
+import ServiceModeration from './components/ServiceModeration';
+import AdminSidebar from './components/AdminSidebar';
+
+const AdminView = () => {
+  // View state for navigation
+  const [currentView, setCurrentView] = useState('dashboard'); 
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    platformRevenue: 0,
+    pendingApprovals: 0,
+    flaggedUsersCount: 0,
+  });
+
+  // State for approval queue
+  const [approvalQueue, setApprovalQueue] = useState([]);
+
+  // State for growth data
+  const [growthData, setGrowthData] = useState({
+    users: 0,
+    sellers: 0,
+    serviceProviders: 0,
+    drivers: 0,
+  });
+
+  // Loading state
+  const [loading, setLoading] = useState(true);
+
+  // Notification count (placeholder for now)
+  const [notificationCount, setNotificationCount] = useState(0);
+
+  // Recent activity state - storing last 3 admin actions
+  const [recentActivity, setRecentActivity] = useState([]);
+
+  // Load recent activity from localStorage
+  const loadRecentActivity = () => {
+    const stored = localStorage.getItem('adminRecentActivity');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        setRecentActivity(parsed.slice(0, 3)); // Only keep last 3
+      } catch (e) {
+        console.error('Error parsing recent activity:', e);
+      }
+    }
+  };
+
+  // Load recent activity on mount and when returning to dashboard
+  useEffect(() => {
+    if (currentView === 'dashboard') {
+      loadRecentActivity();
+    }
+  }, [currentView]);
+
+  // Fetch dashboard data
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      // Only fetch dashboard data when on dashboard view
+      if (currentView !== 'dashboard') return;
+
+      try {
+        setLoading(true);
+
+        // Fetch dashboard statistics
+        const statistics = await getDashboardStatistics();
+        
+        // Fetch all users to calculate growth by role
+        const allUsers = await getUsers();
+        
+        // Fetch pending service provider requests
+        const pendingRequests = await getServiceProviderRequests();
+
+        // Fetch flagged users
+        const flaggedUsers = await getFlaggedUsers();
+
+        // Calculate statistics
+        const totalUsers = allUsers.length;
+        const sellers = allUsers.filter(u => u.roleType === 'Seller').length;
+        const serviceProviders = allUsers.filter(u => u.roleType === 'ServiceProvider').length;
+        const drivers = allUsers.filter(u => u.roleType === 'Driver').length;
+        const customers = allUsers.filter(u => u.roleType === 'Customer').length;
+
+        // Count pending approvals (service providers + sellers if applicable)
+        const pendingApprovals = pendingRequests.filter(r => r.status === 'Pending').length;
+
+        // Count flagged users - use totalFlagged from API response
+        const flaggedUsersCount = flaggedUsers?.totalFlagged || 0;
+
+        // Set statistics
+        setStats({
+          totalUsers,
+          platformRevenue: statistics?.totalRevenue || 0,
+          pendingApprovals,
+          flaggedUsersCount,
+        });
+
+        // Set growth data
+        setGrowthData({
+          users: customers,
+          sellers,
+          serviceProviders,
+          drivers,
+        });
+
+        // Set approval queue (top 5 pending)
+        setApprovalQueue(
+          pendingRequests
+            .filter(r => r.status === 'Pending')
+            .slice(0, 5)
+        );
+
+        // Calculate notification count (pending approvals + flagged users)
+        setNotificationCount(pendingApprovals + flaggedUsersCount);
+
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, [currentView]);
+
+  // Helper function to format time ago
+  const formatTimeAgo = (timestamp) => {
+    const now = new Date();
+    const past = new Date(timestamp);
+    const diffInSeconds = Math.floor((now - past) / 1000);
+
+    if (diffInSeconds < 60) return 'Just now';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`;
+    return past.toLocaleDateString();
+  };
+
+  // Navigation handlers
+  const handleNavigate = (path) => {
+    // Map paths to view states
+    const viewMap = {
+      '/admin': 'dashboard',
+      '/admin/users': 'users',
+      '/admin/approvals': 'approvals',
+      '/admin/flagged-users': 'flagged-users',
+      '/admin/product-moderation': 'product-moderation',
+      '/admin/service-moderation': 'service-moderation',
+      '/admin/category-moderation': 'category-moderation',
+    };
+
+    const view = viewMap[path] || 'dashboard';
+    setCurrentView(view);
+  };
+
+  // Render different views based on currentView
+  if (currentView === 'users') {
+    return <UserManagement onNavigate={handleNavigate} />;
+  }
+
+  if (currentView === 'approvals') {
+    return <RequestApprovals onNavigate={handleNavigate} />;
+  }
+
+  if (currentView === 'flagged-users') {
+    return <UsersFlagged onNavigate={handleNavigate} />;
+  }
+
+  if (currentView === 'product-moderation') {
+    return <ProductModeration onNavigate={handleNavigate} />;
+  }
+
+  if (currentView === 'service-moderation') {
+    return <ServiceModeration onNavigate={handleNavigate} />;
+  }
+
+  if (currentView === 'category-moderation') {
+    return <CategoryModeration onNavigate={handleNavigate} />;
+  }
+
+  return (
+    <div className="flex min-h-screen bg-cream-50">
+      {/* Sidebar */}
+      <AdminSidebar currentPage="dashboard" onNavigate={handleNavigate} />
+
+      {/* Main Content */}
+      <div className="flex-1 ml-[250px] flex flex-col">
+        {/* Header */}
+        <PageHeader
+          title="Admin Dashboard"
+          notificationCount={notificationCount}
+          userName="Admin User"
+          userRole="Super Admin"
+        />
+
+        {/* Main Content Area */}
+        <main className="flex-1 p-8 overflow-y-auto">
+          <div className="max-w-7xl mx-auto space-y-8">
+            {/* Top Row - Key Metrics */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <AnalyticsCard
+                title="Total Users"
+                metrics={[
+                  {
+                    value: loading ? '...' : (stats.totalUsers ?? 0).toString(),
+                    label: 'All Platform Users'
+                  }
+                ]}
+              />
+
+              <AnalyticsCard
+                title="Platform Revenue"
+                metrics={[
+                  { 
+                    value: loading ? '...' : `$${stats.platformRevenue.toLocaleString()}`, 
+                    label: 'Total Revenue' 
+                  }
+                ]}
+              />
+
+              <AnalyticsCard
+                title="Pending Approvals"
+                metrics={[
+                  {
+                    value: loading ? '...' : (stats.pendingApprovals ?? 0).toString(),
+                    label: 'Awaiting Review'
+                  }
+                ]}
+              />
+
+              <AnalyticsCard
+                title="Flagged Users"
+                metrics={[
+                  {
+                    value: loading ? '...' : (stats.flaggedUsersCount ?? 0).toString(),
+                    label: 'Require Attention'
+                  }
+                ]}
+              />
+            </div>
+
+            {/* User Growth Comparison */}
+            <div className="bg-white rounded-lg shadow-soft-lift p-6">
+              <h2 className="text-card-h2 text-charcoal-600 mb-6">User Growth by Type</h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                {/* Users (Customers) */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-body-regular text-charcoal-400">Customers</span>
+                    <span className="text-metric-h3 text-charcoal-600">
+                      {loading ? '...' : growthData.users}
+                    </span>
+                  </div>
+                  <div className="w-full bg-cream-100 rounded-full h-2">
+                    <div 
+                      className="bg-sage-500 h-2 rounded-full transition-all duration-500"
+                      style={{ 
+                        width: loading ? '0%' : `${(growthData.users / stats.totalUsers * 100) || 0}%` 
+                      }}
+                    />
+                  </div>
+                  <span className="text-label-medium text-charcoal-400">
+                    {loading ? '0' : ((growthData.users / stats.totalUsers * 100) || 0).toFixed(1)}% of total
+                  </span>
+                </div>
+
+                {/* Sellers */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-body-regular text-charcoal-400">Sellers</span>
+                    <span className="text-metric-h3 text-charcoal-600">
+                      {loading ? '...' : growthData.sellers}
+                    </span>
+                  </div>
+                  <div className="w-full bg-cream-100 rounded-full h-2">
+                    <div 
+                      className="bg-success-btn h-2 rounded-full transition-all duration-500"
+                      style={{ 
+                        width: loading ? '0%' : `${(growthData.sellers / stats.totalUsers * 100) || 0}%` 
+                      }}
+                    />
+                  </div>
+                  <span className="text-label-medium text-charcoal-400">
+                    {loading ? '0' : ((growthData.sellers / stats.totalUsers * 100) || 0).toFixed(1)}% of total
+                  </span>
+                </div>
+
+                {/* Service Providers */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-body-regular text-charcoal-400">Service Providers</span>
+                    <span className="text-metric-h3 text-charcoal-600">
+                      {loading ? '...' : growthData.serviceProviders}
+                    </span>
+                  </div>
+                  <div className="w-full bg-cream-100 rounded-full h-2">
+                    <div 
+                      className="bg-error-btn h-2 rounded-full transition-all duration-500"
+                      style={{ 
+                        width: loading ? '0%' : `${(growthData.serviceProviders / stats.totalUsers * 100) || 0}%` 
+                      }}
+                    />
+                  </div>
+                  <span className="text-label-medium text-charcoal-400">
+                    {loading ? '0' : ((growthData.serviceProviders / stats.totalUsers * 100) || 0).toFixed(1)}% of total
+                  </span>
+                </div>
+
+                {/* Drivers */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-body-regular text-charcoal-400">Drivers</span>
+                    <span className="text-metric-h3 text-charcoal-600">
+                      {loading ? '...' : growthData.drivers}
+                    </span>
+                  </div>
+                  <div className="w-full bg-cream-100 rounded-full h-2">
+                    <div 
+                      className="bg-danger-btn h-2 rounded-full transition-all duration-500"
+                      style={{ 
+                        width: loading ? '0%' : `${(growthData.drivers / stats.totalUsers * 100) || 0}%` 
+                      }}
+                    />
+                  </div>
+                  <span className="text-label-medium text-charcoal-400">
+                    {loading ? '0' : ((growthData.drivers / stats.totalUsers * 100) || 0).toFixed(1)}% of total
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Flagged Users Alert Section */}
+            {stats.flaggedUsersCount > 0 && (
+              <div className="bg-error-bg border-l-4 border-error-btn rounded-lg p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-white rounded-lg">
+                      <Warning size={24} className="text-error-btn" weight="fill" />
+                    </div>
+                    <div>
+                      <h3 className="text-card-h2 text-error-text">
+                        {loading ? '...' : stats.flaggedUsersCount} Flagged User{stats.flaggedUsersCount !== 1 ? 's' : ''}
+                      </h3>
+                      <p className="text-body-regular text-charcoal-400 mt-1">
+                        {stats.flaggedUsersCount === 1 
+                          ? 'There is 1 user that requires immediate attention'
+                          : `There are ${stats.flaggedUsersCount} users that require immediate attention`
+                        }
+                      </p>
+                    </div>
+                  </div>
+                  <CRUDButton 
+                    variant="error"
+                    onClick={() => handleNavigate('/admin/flagged-users')}
+                  >
+                    View Flagged Users
+                  </CRUDButton>
+                </div>
+              </div>
+            )}
+
+            {/* Approval Queue */}
+            <div>
+              <Table
+                title="Approval Queue"
+                actionButton={
+                  <CRUDButton 
+                    variant="success"
+                    onClick={() => handleNavigate('/admin/approvals')}
+                  >
+                    View All
+                  </CRUDButton>
+                }
+              >
+                <TableHeader
+                  columns={[
+                    'Business Name',
+                    'Service Type',
+                    'Submitted',
+                    'Status',
+                    'Action'
+                  ]}
+                />
+                <TableBody>
+                  {loading ? (
+                    <TableRow
+                      data={['Loading...', '', '', '', '']}
+                    />
+                  ) : approvalQueue.length === 0 ? (
+                    <TableRow
+                      data={['No pending approvals', '', '', '', '']}
+                    />
+                  ) : (
+                    approvalQueue.map((request) => (
+                      <TableRow
+                        key={request.id}
+                        data={[
+                          request.businessName || 'N/A',
+                          request.serviceType || 'General',
+                          new Date(request.submittedAt).toLocaleDateString(),
+                          <StatusChip variant="danger">
+                            {request.status}
+                          </StatusChip>,
+                        ]}
+                        actions={
+                          <>
+                            <CRUDButton 
+                              variant="success"
+                              onClick={() => handleNavigate(`/admin/approvals/${request.id}`)}
+                            >
+                              Review
+                            </CRUDButton>
+                          </>
+                        }
+                      />
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Quick Stats Summary */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-white rounded-lg shadow-soft-lift p-6">
+                <h3 className="text-card-h2 text-charcoal-600 mb-4">Platform Overview</h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-body-regular text-charcoal-400">Total Users</span>
+                    <span className="text-body-medium text-charcoal-600 font-semibold">
+                      {loading ? '...' : stats.totalUsers}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-body-regular text-charcoal-400">Active Sellers</span>
+                    <span className="text-body-medium text-charcoal-600 font-semibold">
+                      {loading ? '...' : growthData.sellers}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-body-regular text-charcoal-400">Service Providers</span>
+                    <span className="text-body-medium text-charcoal-600 font-semibold">
+                      {loading ? '...' : growthData.serviceProviders}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-body-regular text-charcoal-400">Active Drivers</span>
+                    <span className="text-body-medium text-charcoal-600 font-semibold">
+                      {loading ? '...' : growthData.drivers}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg shadow-soft-lift p-6">
+                <h3 className="text-card-h2 text-charcoal-600 mb-4">Recent Activity</h3>
+                {loading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sage-500"></div>
+                  </div>
+                ) : recentActivity.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Clock size={48} className="text-charcoal-300 mx-auto mb-3" weight="light" />
+                    <p className="text-body-regular text-charcoal-400">No recent activity</p>
+                    <p className="text-label-medium text-charcoal-300 mt-1">
+                      Admin actions will appear here
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {recentActivity.map((activity, index) => (
+                      <div key={index} className="flex items-start gap-3 pb-4 border-b border-grey-stroke last:border-0 last:pb-0">
+                        {/* Icon based on action type */}
+                        <div className={`p-2 rounded-lg flex-shrink-0 ${
+                          activity.type === 'approval' ? 'bg-success-bg' :
+                          activity.type === 'user_created' ? 'bg-sage-100' :
+                          activity.type === 'suspension' ? 'bg-error-bg' :
+                          'bg-cream-100'
+                        }`}>
+                          {activity.type === 'approval' && <CheckCircle size={20} className="text-success-btn" weight="fill" />}
+                          {activity.type === 'user_created' && <UserPlus size={20} className="text-sage-600" weight="fill" />}
+                          {activity.type === 'suspension' && <Warning size={20} className="text-error-btn" weight="fill" />}
+                          {activity.type === 'moderation' && <ShieldCheck size={20} className="text-sage-600" weight="fill" />}
+                        </div>
+
+                        {/* Activity details */}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-body-medium text-charcoal-600 font-semibold">
+                            {activity.action}
+                          </p>
+                          {activity.details && (
+                            <p className="text-body-regular text-charcoal-400 mt-0.5">
+                              {activity.details}
+                            </p>
+                          )}
+                          <p className="text-label-medium text-charcoal-300 mt-1">
+                            {formatTimeAgo(activity.timestamp)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+};
+
+export default AdminView;
