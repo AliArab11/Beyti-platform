@@ -38,6 +38,23 @@ namespace Beyti_Backend.Controllers.Api
                     .Select(spa => spa.Address)
                     .FirstOrDefault();
 
+                // Build formatted address from available parts
+                string formattedAddress = null;
+                if (primaryAddress != null)
+                {
+                    var addressParts = new List<string>();
+                    if (!string.IsNullOrEmpty(primaryAddress.Street)) addressParts.Add(primaryAddress.Street);
+                    if (!string.IsNullOrEmpty(primaryAddress.City)) addressParts.Add(primaryAddress.City);
+                    if (!string.IsNullOrEmpty(primaryAddress.Region)) addressParts.Add(primaryAddress.Region);
+                    if (!string.IsNullOrEmpty(primaryAddress.PostalCode)) addressParts.Add(primaryAddress.PostalCode);
+                    if (!string.IsNullOrEmpty(primaryAddress.Country)) addressParts.Add(primaryAddress.Country);
+
+                    if (addressParts.Count > 0)
+                    {
+                        formattedAddress = string.Join(", ", addressParts);
+                    }
+                }
+
                 return Ok(new
                 {
                     provider.Id,
@@ -50,7 +67,7 @@ namespace Beyti_Backend.Controllers.Api
                     provider.VerifiedAt,
                     DisplayName = provider.UserProfile.DisplayName,
                     RoleType = provider.UserProfile.RoleType,
-                    Address = primaryAddress != null ? $"{primaryAddress.Street}, {primaryAddress.City}, {primaryAddress.Region}" : null,
+                    Address = formattedAddress,
                     Street = primaryAddress?.Street,
                     City = primaryAddress?.City,
                     Region = primaryAddress?.Region,
@@ -131,15 +148,18 @@ namespace Beyti_Backend.Controllers.Api
                     if (statusValue != "Available" && statusValue != "Busy" && statusValue != "Unavailable")
                         return BadRequest("Invalid status. Must be: Available, Busy, or Unavailable");
 
+                    Console.WriteLine($"[UpdateStatus] Updating ServiceProvider {serviceProviderId} from '{provider.Status}' to '{statusValue}'");
                     provider.Status = statusValue;
                 }
 
                 await _context.SaveChangesAsync();
+                Console.WriteLine($"[UpdateStatus] Successfully saved. Current status: '{provider.Status}'");
 
-                return Ok(new { message = "Status updated successfully" });
+                return Ok(new { message = "Status updated successfully", status = provider.Status });
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"[UpdateStatus] Error: {ex.Message}");
                 return StatusCode(500, new { error = ex.Message });
             }
         }
@@ -163,14 +183,30 @@ namespace Beyti_Backend.Controllers.Api
                 var providerAddress = provider.ServiceProviderAddresses.FirstOrDefault();
                 Address address;
 
+                // Extract required fields first
+                string street = "Not Provided";
+                string city = "Not Provided";
+                string country = "Bahrain";
+
+                if (body.TryGetProperty("Street", out var streetProp) && streetProp.ValueKind != JsonValueKind.Null)
+                    street = streetProp.GetString() ?? "Not Provided";
+
+                if (body.TryGetProperty("City", out var cityProp) && cityProp.ValueKind != JsonValueKind.Null)
+                    city = cityProp.GetString() ?? "Not Provided";
+
+                if (body.TryGetProperty("Country", out var countryProp) && countryProp.ValueKind != JsonValueKind.Null)
+                    country = countryProp.GetString() ?? "Bahrain";
+
                 if (providerAddress == null)
                 {
                     // Create new address if none exists
                     address = new Address
                     {
+                        Street = street,
+                        City = city,
+                        Country = country,
                         IsDefault = true,
                         IsActive = true,
-                        Country = "Kuwait", // Default country
                         CreatedAt = DateTime.UtcNow,
                         UpdatedAt = DateTime.UtcNow
                     };
@@ -188,23 +224,18 @@ namespace Beyti_Backend.Controllers.Api
                 else
                 {
                     address = providerAddress.Address;
+                    // Update required fields
+                    address.Street = street;
+                    address.City = city;
+                    address.Country = country;
                 }
 
-                // Update address fields
-                if (body.TryGetProperty("Street", out var street) && street.ValueKind != JsonValueKind.Null)
-                    address.Street = street.GetString()!;
-
-                if (body.TryGetProperty("City", out var city) && city.ValueKind != JsonValueKind.Null)
-                    address.City = city.GetString()!;
-
+                // Update optional fields
                 if (body.TryGetProperty("Region", out var region) && region.ValueKind != JsonValueKind.Null)
                     address.Region = region.GetString();
 
                 if (body.TryGetProperty("PostalCode", out var postalCode) && postalCode.ValueKind != JsonValueKind.Null)
                     address.PostalCode = postalCode.GetString();
-
-                if (body.TryGetProperty("Country", out var country) && country.ValueKind != JsonValueKind.Null)
-                    address.Country = country.GetString()!;
 
                 if (body.TryGetProperty("Label", out var label) && label.ValueKind != JsonValueKind.Null)
                     address.Label = label.GetString();

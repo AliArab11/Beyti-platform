@@ -284,7 +284,7 @@ const UserManagement = ({ onNavigate }) => {
             </div>
 
             {/* Tabs and Content */}
-            <div className="bg-white rounded-lg shadow-soft-lift">
+            <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none transition-colors">
               <div className="flex flex-wrap border-b border-grey-stroke">
                 <button
                   onClick={() => setActiveSection('all')}

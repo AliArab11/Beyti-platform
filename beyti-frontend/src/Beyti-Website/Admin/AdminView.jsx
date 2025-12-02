@@ -18,6 +18,8 @@ import {
   getServiceProviderRequests,
   getUsers,
   getFlaggedUsers,
+  getUserProfile,
+  updateUserProfile,
 } from '../../services/api';
 
 // Import design system components
@@ -38,7 +40,7 @@ import AdminSidebar from './components/AdminSidebar';
 
 const AdminView = () => {
   // View state for navigation
-  const [currentView, setCurrentView] = useState('dashboard'); 
+  const [currentView, setCurrentView] = useState('dashboard');
   const [stats, setStats] = useState({
     totalUsers: 0,
     platformRevenue: 0,
@@ -66,6 +68,53 @@ const AdminView = () => {
   // Recent activity state - storing last 3 admin actions
   const [recentActivity, setRecentActivity] = useState([]);
 
+  // User profile state
+  const [userProfile, setUserProfile] = useState(null);
+  const [displayName, setDisplayName] = useState("Admin User");
+
+  // Hardcoded login credentials - TODO: Replace with actual authentication/context
+  const userProfileId = 4037; // Logged-in admin's UserProfile ID
+  const adminProfileId = 1006; // Logged-in admin's ID in AdminProfile table
+  const userRole = 'Admin'; // Admin role type
+
+  // Fetch user profile details
+  const fetchUserProfile = async () => {
+    try {
+      const profile = await getUserProfile(userProfileId);
+      if (profile) {
+        // API returns PascalCase, convert to camelCase for frontend use
+        const normalizedProfile = {
+          userProfileId: profile.UserProfileId,
+          displayName: profile.DisplayName,
+          roleType: profile.RoleType,
+          status: profile.Status,
+          phone: profile.Phone,
+          createdAt: profile.CreatedAt,
+          updatedAt: profile.UpdatedAt,
+        };
+
+        setUserProfile(normalizedProfile);
+        if (normalizedProfile.displayName) {
+          setDisplayName(normalizedProfile.displayName);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+  };
+
+  // Handle profile update
+  const handleProfileUpdate = async (updates) => {
+    try {
+      await updateUserProfile(userProfileId, userRole, updates);
+      // Refresh the profile after update
+      await fetchUserProfile();
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      throw error;
+    }
+  };
+
   // Load recent activity from localStorage
   const loadRecentActivity = () => {
     const stored = localStorage.getItem('adminRecentActivity');
@@ -78,6 +127,11 @@ const AdminView = () => {
       }
     }
   };
+
+  // Fetch user profile on mount
+  useEffect(() => {
+    fetchUserProfile();
+  }, [userProfileId]);
 
   // Load recent activity on mount and when returning to dashboard
   useEffect(() => {
@@ -222,13 +276,23 @@ const AdminView = () => {
         <PageHeader
           title="Admin Dashboard"
           notificationCount={notificationCount}
-          userName="Admin User"
+          userName={displayName}
           userRole="Super Admin"
+          userProfile={userProfile}
+          entityId={null} // Admins don't have entity IDs
+          onProfileUpdate={handleProfileUpdate}
         />
 
         {/* Main Content Area */}
         <main className="flex-1 p-8 overflow-y-auto">
           <div className="max-w-7xl mx-auto space-y-8">
+            {/* Welcome Message */}
+            <div className="mb-6">
+              <h2 className="text-2xl font-semibold text-gray-800 dark:text-white">
+                Welcome back, {displayName}!
+              </h2>
+            </div>
+
             {/* Top Row - Key Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <AnalyticsCard
@@ -273,15 +337,15 @@ const AdminView = () => {
             </div>
 
             {/* User Growth Comparison */}
-            <div className="bg-white rounded-lg shadow-soft-lift p-6">
-              <h2 className="text-card-h2 text-charcoal-600 mb-6">User Growth by Type</h2>
+            <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none p-6 transition-colors">
+              <h2 className="text-card-h2 text-charcoal-600 dark:text-white mb-6">User Growth by Type</h2>
               
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 {/* Users (Customers) */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-body-regular text-charcoal-400">Customers</span>
-                    <span className="text-metric-h3 text-charcoal-600">
+                    <span className="text-body-regular text-charcoal-400 dark:text-gray-400">Customers</span>
+                    <span className="text-metric-h3 text-charcoal-600 dark:text-white">
                       {loading ? '...' : growthData.users}
                     </span>
                   </div>
@@ -455,12 +519,12 @@ const AdminView = () => {
 
             {/* Quick Stats Summary */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-white rounded-lg shadow-soft-lift p-6">
-                <h3 className="text-card-h2 text-charcoal-600 mb-4">Platform Overview</h3>
+              <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none p-6 transition-colors">
+                <h3 className="text-card-h2 text-charcoal-600 dark:text-white mb-4">Platform Overview</h3>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-body-regular text-charcoal-400">Total Users</span>
-                    <span className="text-body-medium text-charcoal-600 font-semibold">
+                    <span className="text-body-regular text-charcoal-400 dark:text-gray-400">Total Users</span>
+                    <span className="text-body-medium text-charcoal-600 dark:text-white font-semibold">
                       {loading ? '...' : stats.totalUsers}
                     </span>
                   </div>
@@ -485,8 +549,8 @@ const AdminView = () => {
                 </div>
               </div>
 
-              <div className="bg-white rounded-lg shadow-soft-lift p-6">
-                <h3 className="text-card-h2 text-charcoal-600 mb-4">Recent Activity</h3>
+              <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none p-6 transition-colors">
+                <h3 className="text-card-h2 text-charcoal-600 dark:text-white mb-4">Recent Activity</h3>
                 {loading ? (
                   <div className="flex items-center justify-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sage-500"></div>
@@ -494,8 +558,8 @@ const AdminView = () => {
                 ) : recentActivity.length === 0 ? (
                   <div className="text-center py-8">
                     <Clock size={48} className="text-charcoal-300 mx-auto mb-3" weight="light" />
-                    <p className="text-body-regular text-charcoal-400">No recent activity</p>
-                    <p className="text-label-medium text-charcoal-300 mt-1">
+                    <p className="text-body-regular text-charcoal-400 dark:text-gray-400">No recent activity</p>
+                    <p className="text-label-medium text-charcoal-300 dark:text-gray-500 mt-1">
                       Admin actions will appear here
                     </p>
                   </div>
@@ -518,15 +582,15 @@ const AdminView = () => {
 
                         {/* Activity details */}
                         <div className="flex-1 min-w-0">
-                          <p className="text-body-medium text-charcoal-600 font-semibold">
+                          <p className="text-body-medium text-charcoal-600 dark:text-white font-semibold">
                             {activity.action}
                           </p>
                           {activity.details && (
-                            <p className="text-body-regular text-charcoal-400 mt-0.5">
+                            <p className="text-body-regular text-charcoal-400 dark:text-gray-400 mt-0.5">
                               {activity.details}
                             </p>
                           )}
-                          <p className="text-label-medium text-charcoal-300 mt-1">
+                          <p className="text-label-medium text-charcoal-300 dark:text-gray-500 mt-1">
                             {formatTimeAgo(activity.timestamp)}
                           </p>
                         </div>

@@ -234,8 +234,8 @@ const RequestApprovals = ({ onNavigate }) => {
             </div>
 
             {/* Requests Table */}
-            <div className="bg-white rounded-lg shadow-soft-lift">
-              <div className="p-6 border-b border-grey-stroke">
+            <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none transition-colors">
+              <div className="p-6 border-b border-grey-stroke dark:border-charcoal-500">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   {/* Search Bar */}
                   <div className="flex-1 relative">
@@ -352,13 +352,13 @@ const RequestApprovals = ({ onNavigate }) => {
       {/* Details Modal */}
       {showDetailsModal && selectedRequest && (
         <div className="fixed inset-0 bg-charcoal-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-soft-lift max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift max-w-2xl w-full max-h-[90vh] overflow-y-auto transition-colors">
             {/* Modal Header */}
-            <div className="p-6 border-b border-grey-stroke">
+            <div className="p-6 border-b border-grey-stroke dark:border-charcoal-500">
               <div className="flex justify-between items-start">
                 <div>
-                  <h3 className="text-display-h2 text-charcoal-600">{selectedRequest.businessName || 'N/A'}</h3>
-                  <p className="text-body-regular text-charcoal-400 mt-1">
+                  <h3 className="text-display-h2 text-charcoal-600 dark:text-white">{selectedRequest.businessName || 'N/A'}</h3>
+                  <p className="text-body-regular text-charcoal-400 dark:text-gray-400 mt-1">
                     Request ID: {selectedRequest.id}
                   </p>
                   <div className="mt-3">
@@ -386,7 +386,7 @@ const RequestApprovals = ({ onNavigate }) => {
 
             {/* Modal Body */}
             <div className="p-6">
-              <h4 className="text-card-h2 text-charcoal-600 mb-4">Request Details</h4>
+              <h4 className="text-card-h2 text-charcoal-600 dark:text-white mb-4">Request Details</h4>
 
               <div className="space-y-4">
                 {/* Basic Information */}
@@ -396,8 +396,8 @@ const RequestApprovals = ({ onNavigate }) => {
                   </h5>
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
-                      <span className="text-body-regular text-charcoal-400">Business Name:</span>
-                      <span className="text-body-regular text-charcoal-600 font-semibold">
+                      <span className="text-body-regular text-charcoal-400 dark:text-gray-400">Business Name:</span>
+                      <span className="text-body-regular text-charcoal-600 dark:text-white font-semibold">
                         {selectedRequest.businessName || 'N/A'}
                       </span>
                     </div>

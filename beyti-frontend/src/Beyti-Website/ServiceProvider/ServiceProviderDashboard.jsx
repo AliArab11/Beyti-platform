@@ -3,29 +3,57 @@ import ProviderOverview from './components/ProviderOverview';
 import ServicesManagement from './components/ServicesManagement';
 import ScheduleManagement from './components/ScheduleManagement';
 import BookingsManagement from './components/BookingsManagement';
-import ProfilePage from './components/ProfilePage';
+import ProfilePage from '../../components/ProfilePage';
 import ServiceProviderSidebar from './components/ServiceProviderSidebar';
 import PageHeader from '../../components/PageHeader';
-import { getProviderProfile } from '../../services/api';
+import { getUserProfile, updateUserProfile, updateProviderStatus } from '../../services/api';
 
 export default function ServiceProviderDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [bookingFilter, setBookingFilter] = useState(null);
   const [displayName, setDisplayName] = useState("Service Provider");
   const [userProfile, setUserProfile] = useState(null);
+  const [providerStatus, setProviderStatus] = useState('Available');
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
-  // TODO: Get this from authentication/context
-  const userProfileId = 1031; // Replace with actual logged-in user
-  const serviceProviderId = 6; // Replace with actual provider ID
+  // Hardcoded login credentials - TODO: Replace with actual authentication/context
+  const userProfileId = 1031; // Logged-in service provider's UserProfile ID
+  const serviceProviderId = 6; // Logged-in service provider's ID in ServiceProvider table
 
   // Fetch user profile details
   const fetchUserProfile = async () => {
     try {
-      const profile = await getProviderProfile(userProfileId);
+      const profile = await getUserProfile(userProfileId);
+      console.log('[fetchUserProfile] Received profile:', profile);
       if (profile) {
-        setUserProfile(profile);
-        if (profile.displayName) {
-          setDisplayName(profile.displayName);
+        // API returns PascalCase, convert to camelCase for frontend use
+        const normalizedProfile = {
+          userProfileId: profile.UserProfileId,
+          displayName: profile.DisplayName,
+          roleType: profile.RoleType,
+          status: profile.Status, // This is ServiceProvider.Status from the API
+          phone: profile.Phone,
+          businessName: profile.BusinessName,
+          street: profile.Street,
+          city: profile.City,
+          region: profile.Region,
+          postalCode: profile.PostalCode,
+          country: profile.Country,
+          address: profile.Address,
+          createdAt: profile.CreatedAt,
+          updatedAt: profile.UpdatedAt,
+        };
+
+        console.log('[fetchUserProfile] Normalized profile status:', normalizedProfile.status);
+        setUserProfile(normalizedProfile);
+        if (normalizedProfile.displayName) {
+          setDisplayName(normalizedProfile.displayName);
+        }
+        // Set provider status from profile - this comes from ServiceProvider.Status
+        // The UserProfilesController returns ServiceProvider.Status for service providers
+        if (normalizedProfile.status) {
+          console.log('[fetchUserProfile] Setting providerStatus to:', normalizedProfile.status);
+          setProviderStatus(normalizedProfile.status);
         }
       }
     } catch (error) {
@@ -33,9 +61,39 @@ export default function ServiceProviderDashboard() {
     }
   };
 
+  // Handle profile update
+  const handleProfileUpdate = async (updates) => {
+    try {
+      await updateUserProfile(userProfileId, 'ServiceProvider', updates);
+      // Refresh the profile after update
+      await fetchUserProfile();
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      throw error;
+    }
+  };
+
   useEffect(() => {
     fetchUserProfile();
   }, [userProfileId]);
+
+  // Handle status change
+  const handleStatusChange = async (newStatus) => {
+    const previousStatus = providerStatus;
+    console.log(`[handleStatusChange] Changing status from '${previousStatus}' to '${newStatus}'`);
+    setIsUpdatingStatus(true);
+    try {
+      setProviderStatus(newStatus); // Optimistic update
+      const response = await updateProviderStatus(serviceProviderId, newStatus);
+      console.log('[handleStatusChange] Update response:', response);
+    } catch (error) {
+      console.error('Error updating provider status:', error);
+      // Revert on error
+      setProviderStatus(previousStatus);
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
 
   // Handler for navigating from dashboard stats to bookings with filter
   const handleNavigateToBookings = (status) => {
@@ -70,12 +128,12 @@ export default function ServiceProviderDashboard() {
   };
 
   return (
-    <div className="flex min-h-screen bg-cream-50">
+    <div className="flex min-h-screen bg-cream-50 dark:bg-charcoal-600">
       {/* Sidebar */}
       <ServiceProviderSidebar
         currentPage={activeTab}
         onNavigate={handleNavigate}
-        userName="Service Provider"
+        userName={displayName}
         userRole="Provider"
       />
 
@@ -88,7 +146,9 @@ export default function ServiceProviderDashboard() {
           userName={displayName}
           userRole="Service Provider"
           userProfile={userProfile}
+          entityId={serviceProviderId}
           onProfileClick={() => setActiveTab('profile')}
+          onProfileUpdate={handleProfileUpdate}
         />
 
         {/* Main Content Area */}
@@ -96,10 +156,35 @@ export default function ServiceProviderDashboard() {
           <div className="max-w-7xl mx-auto">
             {activeTab === 'overview' && (
               <>
-                <div className="mb-6">
-                  <h2 className="text-2xl font-semibold text-gray-800">
-                    Welcome back, {displayName}!
-                  </h2>
+                <div className="mb-6 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-semibold text-charcoal-600 dark:text-white">
+                      Welcome back, {displayName}!
+                    </h2>
+                  </div>
+
+                  {/* Status Selector */}
+                  <div className="flex items-center gap-3">
+                    <label className="text-body-regular text-charcoal-600 dark:text-white font-medium">
+                      Your Status:
+                    </label>
+                    <select
+                      value={providerStatus}
+                      onChange={(e) => handleStatusChange(e.target.value)}
+                      disabled={isUpdatingStatus}
+                      className={`px-4 py-2 border border-grey-stroke dark:border-charcoal-500 bg-grey-200 dark:bg-charcoal-600 rounded-md text-body-regular font-medium focus:outline-none focus:ring-2 focus:ring-sage-500 transition-colors ${
+                        providerStatus === 'Available'
+                          ? 'text-success-text'
+                          : providerStatus === 'Busy'
+                          ? 'text-warning-text'
+                          : 'text-error-text'
+                      } ${isUpdatingStatus ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                      <option value="Available">Available</option>
+                      <option value="Busy">Busy</option>
+                      <option value="Unavailable">Unavailable</option>
+                    </select>
+                  </div>
                 </div>
                 <ProviderOverview
                   serviceProviderId={serviceProviderId}
@@ -122,8 +207,9 @@ export default function ServiceProviderDashboard() {
             {activeTab === 'profile' && (
               <ProfilePage
                 userProfile={userProfile}
-                serviceProviderId={serviceProviderId}
-                onProfileUpdate={fetchUserProfile}
+                userRole="ServiceProvider"
+                entityId={serviceProviderId}
+                onProfileUpdate={handleProfileUpdate}
               />
             )}
           </div>

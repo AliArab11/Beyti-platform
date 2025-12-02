@@ -29,7 +29,7 @@ const SidebarProfile = ({
   return (
     <div
       className={`
-        border-t border-sage-700
+        border-t border-sage-700 dark:border-charcoal-400
         p-4
         ${className}
       `}
@@ -39,29 +39,29 @@ const SidebarProfile = ({
         {/* Avatar and Info */}
         <div className="flex items-center gap-3 flex-1 min-w-0">
           {/* Avatar */}
-          <div className="w-10 h-10 rounded-full bg-sage-700 flex items-center justify-center flex-shrink-0 overflow-hidden">
+          <div className="w-10 h-10 rounded-full bg-sage-700 dark:bg-charcoal-400 flex items-center justify-center flex-shrink-0 overflow-hidden">
             {avatarUrl ? (
               <img src={avatarUrl} alt={userName} className="w-full h-full object-cover" />
             ) : (
-              <User size={20} className="text-cream-200" />
+              <User size={20} className="text-cream-200 dark:text-cream-50" />
             )}
           </div>
 
           {/* Name and Role */}
           <div className="flex-1 min-w-0">
-            <p className="text-body-regular text-cream-200 truncate">{userName}</p>
-            <p className="text-label-medium text-cream-100 truncate">{userRole}</p>
+            <p className="text-body-regular text-cream-200 dark:text-cream-50 truncate">{userName}</p>
+            <p className="text-label-medium text-cream-100 dark:text-gray-400 truncate">{userRole}</p>
           </div>
         </div>
 
         {/* Chevron/Collapse Icon */}
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="flex-shrink-0 p-1 hover:bg-sage-700 rounded transition-colors"
+          className="flex-shrink-0 p-1 hover:bg-sage-700 dark:hover:bg-charcoal-400 rounded transition-colors"
         >
           <CaretDown
             size={16}
-            className={`text-cream-200 transition-transform ${
+            className={`text-cream-200 dark:text-cream-50 transition-transform ${
               isExpanded ? 'rotate-180' : ''
             }`}
           />
@@ -70,14 +70,14 @@ const SidebarProfile = ({
 
       {/* Expanded Menu (Optional) */}
       {isExpanded && (
-        <div className="mt-3 pt-3 border-t border-sage-700 space-y-2">
-          <button className="w-full text-left px-3 py-2 text-body-regular text-cream-200 hover:bg-sage-700 rounded transition-colors">
+        <div className="mt-3 pt-3 border-t border-sage-700 dark:border-charcoal-400 space-y-2">
+          <button className="w-full text-left px-3 py-2 text-body-regular text-cream-200 dark:text-cream-50 hover:bg-sage-700 dark:hover:bg-charcoal-400 rounded transition-colors">
             Profile Settings
           </button>
-          <button className="w-full text-left px-3 py-2 text-body-regular text-cream-200 hover:bg-sage-700 rounded transition-colors">
+          <button className="w-full text-left px-3 py-2 text-body-regular text-cream-200 dark:text-cream-50 hover:bg-sage-700 dark:hover:bg-charcoal-400 rounded transition-colors">
             Preferences
           </button>
-          <button className="w-full text-left px-3 py-2 text-body-regular text-error-btn hover:bg-sage-700 rounded transition-colors">
+          <button className="w-full text-left px-3 py-2 text-body-regular text-error-btn dark:text-error-btn hover:bg-sage-700 dark:hover:bg-charcoal-400 rounded transition-colors">
             Logout
           </button>
         </div>

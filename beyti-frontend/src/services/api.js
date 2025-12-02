@@ -1348,6 +1348,72 @@ export const getProviderStatistics = async (serviceProviderId) => {
   return await fetchAPI(`/ServiceProviderDashboard/Statistics/${serviceProviderId}`);
 };
 
+// --- Universal User Profile APIs ---
+
+/**
+ * Get user profile for any user type
+ * Routes to appropriate endpoint based on user role
+ * @param {number} userId - User profile ID
+ * @returns {Promise<object>} - User profile data
+ */
+export const getUserProfile = async (userId) => {
+  // Using UserProfiles/Profile endpoint which works for all user types
+  // Returns role-specific data based on the user's RoleType
+  return await fetchAPI(`/UserProfiles/Profile/${userId}`);
+};
+
+/**
+ * Update user profile for any user type
+ * Routes to appropriate endpoint based on user role
+ * @param {number} userId - User profile ID
+ * @param {string} userRole - User role type (Admin, ServiceProvider, Seller, etc.)
+ * @param {object} updates - Profile updates object
+ * @returns {Promise<object>} - Updated profile data
+ */
+export const updateUserProfile = async (userId, userRole, updates) => {
+  // For now, use ServiceProviderDashboard endpoint for all profile updates
+  // This can be extended to route based on role if needed
+  const profileUpdates = {
+    DisplayName: updates.displayName,
+    Phone: updates.phone,
+  };
+
+  await fetchAPI(`/ServiceProviderDashboard/UpdateProfile/${userId}`, {
+    method: 'PUT',
+    body: JSON.stringify(profileUpdates),
+  });
+
+  // If address updates are provided and user has associated provider/seller/driver ID
+  if (updates.address && updates.entityId) {
+    const addressUpdates = {
+      Street: updates.address.street,
+      City: updates.address.city,
+      Region: updates.address.region,
+      PostalCode: updates.address.postalCode,
+      Country: updates.address.country,
+    };
+
+    // Route address update based on role
+    if (userRole === 'ServiceProvider') {
+      await fetchAPI(`/ServiceProviderDashboard/UpdateAddress/${updates.entityId}`, {
+        method: 'PUT',
+        body: JSON.stringify(addressUpdates),
+      });
+    }
+    // Add other role-specific address updates here if needed
+  }
+
+  // If status update is provided for service providers
+  if (updates.status && updates.entityId && userRole === 'ServiceProvider') {
+    await fetchAPI(`/ServiceProviderDashboard/UpdateStatus/${updates.entityId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ Status: updates.status }),
+    });
+  }
+
+  return { success: true };
+};
+
 // --- Delivery Ticket APIs ---
 
 /**
@@ -1593,4 +1659,35 @@ export const getServiceReviews = async (serviceProviderId = null) => {
     return allReviews.filter(review => review.serviceProviderId === serviceProviderId);
   }
   return await fetchAPI(url);
+};
+
+// Fetch all notifications for user
+export const getUserNotifications = async (userId) => {
+  return await fetchAPI(`/Notifications/user/${userId}`);
+};
+
+// Fetch unread count
+export const getUnreadCount = async (userId) => {
+  return await fetchAPI(`/Notifications/user/${userId}/unread/count`);
+};
+
+// Mark all notifications as read
+export const markAllNotificationsRead = async (userId) => {
+  return await fetchAPI(`/Notifications/user/${userId}/read-all`, {
+    method: 'PUT',
+  });
+};
+
+// Mark single notification as read
+export const markNotificationRead = async (id) => {
+  return await fetchAPI(`/Notifications/${id}/read`, {
+    method: 'PUT',
+  });
+};
+
+// Delete notification
+export const deleteNotification = async (id) => {
+  return await fetchAPI(`/Notifications/${id}`, {
+    method: 'DELETE',
+  });
 };
