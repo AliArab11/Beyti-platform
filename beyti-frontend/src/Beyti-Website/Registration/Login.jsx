@@ -157,7 +157,7 @@ export default function Login() {
           <p className="text-body-regular text-charcoal-400">
             Don't have an account?{' '}
             <a
-              href="/"
+              href="/register"
               className="text-sage-500 hover:text-sage-700 font-medium transition-colors duration-200"
             >
               Sign up

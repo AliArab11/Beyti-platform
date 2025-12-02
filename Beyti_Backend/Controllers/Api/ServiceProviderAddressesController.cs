@@ -72,11 +72,22 @@ namespace Beyti_Backend.Controllers.Api
             return NoContent();
         }
 
-        // POST: api/ServiceProviderAddresses
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPost]
-        public async Task<ActionResult<ServiceProviderAddress>> PostServiceProviderAddress(ServiceProviderAddress serviceProviderAddress)
+        public class CreateServiceProviderAddressDto
         {
+            public int ServiceProviderId { get; set; }
+            public int AddressId { get; set; }
+        }
+
+        // POST: api/ServiceProviderAddresses
+        [HttpPost]
+        public async Task<ActionResult<ServiceProviderAddress>> PostServiceProviderAddress(CreateServiceProviderAddressDto dto)
+        {
+            var serviceProviderAddress = new ServiceProviderAddress
+            {
+                ServiceProviderId = dto.ServiceProviderId,
+                AddressId = dto.AddressId
+            };
+
             _context.ServiceProviderAddresses.Add(serviceProviderAddress);
             await _context.SaveChangesAsync();
 

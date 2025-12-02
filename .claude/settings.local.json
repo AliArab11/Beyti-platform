@@ -6,7 +6,8 @@
       "Bash(findstr:*)",
       "Bash(tree:*)",
       "Bash(test:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(netstat:*)"
     ],
     "deny": [],
     "ask": []

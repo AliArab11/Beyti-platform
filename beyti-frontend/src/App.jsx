@@ -17,6 +17,11 @@ import DesignSystemDemo from './components/DesignSystemDemo';
 import DashboardTemplate from './Pages/DashboardTemplate';
 import AdminUserManagementNew from './Pages/Admin/AdminUserManagementNew';
 import Login from './Beyti-Website/Registration/Login';
+import Register from './Beyti-Website/Registration/Register';
+import RoleSelect from './Beyti-Website/Registration/RoleSelect';
+import SellerOnboarding from './Beyti-Website/Registration/SellerOnboarding';
+import ProviderOnboarding from './Beyti-Website/Registration/ProviderOnboarding';
+import DriverOnboarding from './Beyti-Website/Registration/DriverOnboarding';
 
 // Placeholder components for pages that don't exist yet
 const PlaceholderPage = ({ pageName }) => (
@@ -32,6 +37,7 @@ export default function App() {
   const navItems = [
     { path: '/', label: 'Registration' },
     { path: '/login', label: 'Login' },
+    { path: '/register', label: 'Sign Up' },
     { path: '/membership', label: 'Membership' },
     { path: '/addplan', label: 'Add Plan' },
     { path: '/seller', label: 'Seller' },
@@ -128,6 +134,11 @@ export default function App() {
           <Routes>
             <Route path="/" element={<RegistrationPage />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/role-selection" element={<RoleSelect />} />
+            <Route path="/seller-onboarding" element={<SellerOnboarding />} />
+            <Route path="/provider-onboarding" element={<ProviderOnboarding />} />
+            <Route path="/driver-onboarding" element={<DriverOnboarding />} />
             <Route path="/membership" element={<MembershipPage />} />
             <Route path="/addplan" element={<AddPlanPage />} />
             <Route path="/seller" element={<SellerPage />} />
