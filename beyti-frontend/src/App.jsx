@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
 import RegistrationPage from "./Pages/Registration";
 import MembershipPage from "./Pages/Membership";
 import AddPlanPage from "./Pages/Membership/AddPlan";
@@ -11,6 +12,7 @@ import CustomerPage from "./Pages/Customer";
 import SellerPage from "./Pages/Seller";
 import StoresPage from "./Pages/Seller/Store";
 import StoreDetailsPage from "./Pages/Seller/StoreDetails";
+import SellerDashboardPage from "./Beyti-Website/Seller/SellerDashboard.jsx";
 import ProductsPage from "./Pages/Product/Products";
 import CategoryPage from "./Pages/Product/Categories";
 import DriverPage from "./Pages/Driver";
@@ -18,6 +20,12 @@ import ServiceProviderDashboard from './Beyti-Website/ServiceProvider/ServicePro
 import DesignSystemDemo from './components/DesignSystemDemo';
 import DashboardTemplate from './Pages/DashboardTemplate';
 import AdminUserManagementNew from './Pages/Admin/AdminUserManagementNew';
+import Login from './Beyti-Website/Registration/Login';
+import Register from './Beyti-Website/Registration/Register';
+import RoleSelect from './Beyti-Website/Registration/RoleSelect';
+import SellerOnboarding from './Beyti-Website/Registration/SellerOnboarding';
+import ProviderOnboarding from './Beyti-Website/Registration/ProviderOnboarding';
+import DriverOnboarding from './Beyti-Website/Registration/DriverOnboarding';
 import AdminView from './Beyti-Website/Admin/AdminView.jsx';
 
 // Placeholder components for pages that don't exist yet
@@ -31,104 +39,58 @@ const PlaceholderPage = ({ pageName }) => (
 );
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState('registration');
-  const [selectedStoreId, setSelectedStoreId] = useState(null);
-
   const navItems = [
-    { id: 'registration', label: 'Registration' },
-    { id: 'membership', label: 'Membership' },
-    { id: 'addplan', label: 'Add Plan' },
-    { id: 'seller', label: 'Seller' },
-    { id: 'store', label: 'Store' },
-    { id: 'product', label: 'Product' },
-    { id: 'category', label: 'Category' },
-    { id: 'customer', label: 'Customer' },
-    { id: 'driver', label: 'Driver' },
-    { id: 'admin', label: 'Admin' },
-    { id: 'serviceprovider', label: 'Service Provider' },
-    { id: 'serviceproviderdash', label: 'SP Dashboard' }, // ADD THIS LINE
-    { id: 'adminview', label: 'Ad Dashboard' }, // ADD THIS LINE
-    { id: 'notification', label: 'Notification' },
-    { id: 'admindashboard', label: 'Admin Dashboard'},
-     { id: 'servicerequest', label: 'Service Request'},
-     { id: 'DesignDemo', label: 'Design Demo'},
-     { id: 'DashboardTemplate', label: 'Dashboard Template'},
-     { id: 'AdminUserManagementNew', label: 'User Management (New)'}
+    { path: '/', label: 'Registration' },
+    { path: '/login', label: 'Login' },
+    { path: '/register', label: 'Sign Up' },
+    { path: '/membership', label: 'Membership' },
+    { path: '/addplan', label: 'Add Plan' },
+    { path: '/seller', label: 'Seller' },
+    { path: '/seller-dashboard', label: 'Seller Dashboard' },
+    { path: '/store', label: 'Store' },
+    { path: '/product', label: 'Product' },
+    { path: '/category', label: 'Category' },
+    { path: '/customer', label: 'Customer' },
+    { path: '/driver', label: 'Driver' },
+    { path: '/admin', label: 'Admin' },
+    { path: '/serviceprovider', label: 'Service Provider' },
+    { path: '/serviceprovider-dashboard', label: 'SP Dashboard' },
+    { path: '/admin-view', label: 'Admin Dashboard' },
+    { path: '/notification', label: 'Notification' },
+    { path: '/admindashboard', label: 'Admin Dash (Old)'},
+    { path: '/servicerequest', label: 'Service Request'},
+    { path: '/design-demo', label: 'Design Demo'},
+    { path: '/dashboard-template', label: 'Dashboard Template'},
+    { path: '/user-management', label: 'User Management (New)'}
   ];
-
-  const renderPage = () => {
-    switch (currentPage) {
-      case 'registration':
-        return <RegistrationPage />;
-      case 'membership':
-        return <MembershipPage />;
-      case 'addplan':
-        return <AddPlanPage />;
-      case 'seller':
-        return <SellerPage />;
-      case 'store':
-        return <StoresPage />;
-      case 'storedetails':
-        return <StoreDetailsPage />;
-      case 'product':
-        return <ProductsPage />;
-      case 'category':
-        return <CategoryPage />;
-      case 'customer':
-        return <CustomerPage />;
-      case 'driver':
-        return <DriverPage />;
-      case 'admin':
-        return <AdminPage />;
-      case 'serviceprovider':
-        return <ServiceProviderPage />;
-      case 'serviceproviderdash':  // ADD THIS CASE
-        return <ServiceProviderDashboard />;
-         case 'adminview':  // ADD THIS CASE
-        return <AdminView />;
-      case 'admindashboard':
-        return <AdminUsersPage />;
-      case 'servicerequest':
-        return <ServiceProviderRequests />;
-      case 'notification':
-        return <PlaceholderPage pageName="Notification" />;
-      case 'DesignDemo':
-        return <DesignSystemDemo />;
-      case 'DashboardTemplate':
-        return <DashboardTemplate />;
-      case 'AdminUserManagementNew':
-        return <AdminUserManagementNew />;
-      default:
-        return <RegistrationPage />;
-    }
-  };
-
   return (
-    <ThemeProvider>
-      <div className="min-h-screen bg-gray-50 dark:bg-charcoal-600 transition-colors">
+    <BrowserRouter>
+      <div className="min-h-screen bg-gray-50">
         {/* Navigation Bar */}
-        <nav className="bg-white dark:bg-charcoal-500 border-b border-gray-200 dark:border-charcoal-400 shadow-sm dark:shadow-none sticky top-0 z-50 transition-colors">
+        <nav className="bg-white shadow-md sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
               {/* Logo/Brand */}
               <div className="flex-shrink-0">
-                <h1 className="text-2xl font-bold text-blue-600 dark:text-sage-500">Beyti Platform</h1>
+                <h1 className="text-2xl font-bold text-blue-600">Beyti Platform</h1>
               </div>
 
               {/* Navigation Items */}
               <div className="hidden md:flex items-center space-x-1">
                 {navItems.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => setCurrentPage(item.id)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                      currentPage === item.id
-                        ? 'bg-blue-600 dark:bg-sage-500 text-white shadow-md'
-                        : 'text-gray-700 dark:text-cream-50 hover:bg-gray-100 dark:hover:bg-charcoal-400 hover:text-blue-600 dark:hover:text-sage-100'
-                    }`}
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    className={({ isActive }) =>
+                      `px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                        isActive
+                          ? 'bg-blue-600 text-white shadow-md'
+                          : 'text-gray-700 hover:bg-gray-100 hover:text-blue-600'
+                      }`
+                    }
                   >
                     {item.label}
-                  </button>
+                  </NavLink>
                 ))}
               </div>
 
@@ -139,7 +101,7 @@ export default function App() {
                     const menu = document.getElementById('mobile-menu');
                     menu.classList.toggle('hidden');
                   }}
-                  className="text-gray-700 dark:text-cream-50 hover:text-blue-600 dark:hover:text-sage-500 focus:outline-none"
+                  className="text-gray-700 hover:text-blue-600 focus:outline-none"
                 >
                   <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -150,23 +112,25 @@ export default function App() {
           </div>
 
           {/* Mobile Menu */}
-          <div id="mobile-menu" className="hidden md:hidden bg-white dark:bg-charcoal-500 border-t border-gray-200 dark:border-charcoal-400">
+          <div id="mobile-menu" className="hidden md:hidden bg-white border-t border-gray-200">
             <div className="px-2 pt-2 pb-3 space-y-1">
               {navItems.map((item) => (
-                <button
-                  key={item.id}
+                <NavLink
+                  key={item.path}
+                  to={item.path}
                   onClick={() => {
-                    setCurrentPage(item.id);
                     document.getElementById('mobile-menu').classList.add('hidden');
                   }}
-                  className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                    currentPage === item.id
-                      ? 'bg-blue-600 dark:bg-sage-500 text-white'
-                      : 'text-gray-700 dark:text-cream-50 hover:bg-gray-100 dark:hover:bg-charcoal-400 hover:text-blue-600 dark:hover:text-sage-100'
-                  }`}
+                  className={({ isActive }) =>
+                    `block w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      isActive
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-700 hover:bg-gray-100 hover:text-blue-600'
+                    }`
+                  }
                 >
                   {item.label}
-                </button>
+                </NavLink>
               ))}
             </div>
           </div>
@@ -174,9 +138,37 @@ export default function App() {
 
         {/* Page Content */}
         <main>
-          {renderPage()}
+          <Routes>
+            <Route path="/" element={<RegistrationPage />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/role-selection" element={<RoleSelect />} />
+            <Route path="/seller-onboarding" element={<SellerOnboarding />} />
+            <Route path="/provider-onboarding" element={<ProviderOnboarding />} />
+            <Route path="/driver-onboarding" element={<DriverOnboarding />} />
+            <Route path="/membership" element={<MembershipPage />} />
+            <Route path="/addplan" element={<AddPlanPage />} />
+            <Route path="/seller" element={<SellerPage />} />
+            <Route path="/seller-dashboard" element={<SellerDashboardPage />} />
+            <Route path="/store" element={<StoresPage />} />
+            <Route path="/store/:id" element={<StoreDetailsPage />} />
+            <Route path="/product" element={<ProductsPage />} />
+            <Route path="/category" element={<CategoryPage />} />
+            <Route path="/customer" element={<CustomerPage />} />
+            <Route path="/driver" element={<DriverPage />} />
+            <Route path="/admin" element={<AdminPage />} />
+            <Route path="/serviceprovider" element={<ServiceProviderPage />} />
+            <Route path="/serviceprovider-dashboard" element={<ServiceProviderDashboard />} />
+            <Route path="/admin-view" element={<AdminView />} />
+            <Route path="/admindashboard" element={<AdminUsersPage />} />
+            <Route path="/servicerequest" element={<ServiceProviderRequests />} />
+            <Route path="/notification" element={<PlaceholderPage pageName="Notification" />} />
+            <Route path="/design-demo" element={<DesignSystemDemo />} />
+            <Route path="/dashboard-template" element={<DashboardTemplate />} />
+            <Route path="/user-management" element={<AdminUserManagementNew />} />
+          </Routes>
         </main>
       </div>
-    </ThemeProvider>
+    </BrowserRouter>
   );
 }

@@ -6,8 +6,13 @@ namespace Beyti_Backend.Controllers.Api
 {
     public class CreateDriverDto
     {
-        public string FullName { get; set; }
-        public string Phone { get; set; }
+        public int? UserId { get; set; }
+        public string? FullName { get; set; }
+        public string? VehicleType { get; set; }
+        public string? LicenseNumber { get; set; }
+        public string PhoneNumber { get; set; }
+        public string? Email { get; set; }
+        public bool? IsAvailable { get; set; }
         public string Status { get; set; } = "Active";
     }
 
@@ -66,22 +71,44 @@ namespace Beyti_Backend.Controllers.Api
         {
             try
             {
-                var profile = new UserProfile
-                {
-                    DisplayName = dto.FullName,
-                    RoleType = "Driver",
-                    Status = dto.Status,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
-                };
+                // Check if UserId is provided (for onboarding flow)
+                UserProfile profile;
 
-                _context.UserProfiles.Add(profile);
-                await _context.SaveChangesAsync();
+                if (dto.UserId.HasValue)
+                {
+                    // Find existing UserProfile by IdentityUserId
+                    profile = await _context.UserProfiles
+                        .FirstOrDefaultAsync(up => up.IdentityUserId == dto.UserId.Value.ToString());
+
+                    if (profile == null)
+                    {
+                        return BadRequest(new { error = "User profile not found" });
+                    }
+
+                    // Update profile to Driver role
+                    profile.RoleType = "Driver";
+                    profile.UpdatedAt = DateTime.UtcNow;
+                }
+                else
+                {
+                    // Create new UserProfile (for admin creating drivers)
+                    profile = new UserProfile
+                    {
+                        DisplayName = dto.FullName ?? dto.Email ?? "Driver",
+                        RoleType = "Driver",
+                        Status = dto.Status,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+
+                    _context.UserProfiles.Add(profile);
+                    await _context.SaveChangesAsync();
+                }
 
                 var driver = new Driver
                 {
                     UserProfileId = profile.Id,
-                    Phone = dto.Phone,
+                    Phone = dto.PhoneNumber,
                     Status = dto.Status,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
@@ -95,7 +122,9 @@ namespace Beyti_Backend.Controllers.Api
                     id = driver.Id,
                     fullName = profile.DisplayName,
                     phone = driver.Phone,
-                    status = driver.Status
+                    status = driver.Status,
+                    vehicleType = dto.VehicleType,
+                    licenseNumber = dto.LicenseNumber
                 });
             }
             catch (Exception ex)
@@ -120,7 +149,7 @@ namespace Beyti_Backend.Controllers.Api
                 return NotFound();
 
             driver.UserProfile.DisplayName = dto.FullName;
-            driver.Phone = dto.Phone;
+            driver.Phone = dto.PhoneNumber;
             driver.Status = dto.Status;
             driver.UserProfile.UpdatedAt = DateTime.UtcNow;
             driver.UpdatedAt = DateTime.UtcNow;
