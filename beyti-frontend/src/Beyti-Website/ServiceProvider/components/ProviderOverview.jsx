@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react';
-import { getProviderStatistics, getProviderBookings } from '../../../services/api';
+import { getProviderStatistics, getProviderBookings, getServiceReviews } from '../../../services/api';
+import AnalyticsCard from '../../../components/AnalyticsCard';
+import { Table, TableHeader, TableBody, TableRow } from '../../../components/Table';
+import StatusChip from '../../../components/StatusChip';
+import CRUDButton from '../../../components/CRUDButton';
 
 export default function ProviderOverview({ serviceProviderId, onNavigateToBookings }) {
   const [stats, setStats] = useState(null);
-  const [bookings, setBookings] = useState([]);
+  const [todayBookings, setTodayBookings] = useState([]);
+  const [recentReviews, setRecentReviews] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -13,52 +18,61 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      
-      // Fetch both statistics and all bookings
+
+      // Fetch statistics and bookings
       const [statisticsData, allBookings] = await Promise.all([
         getProviderStatistics(serviceProviderId),
-        getProviderBookings(serviceProviderId) // Get all bookings without filter
+        getProviderBookings(serviceProviderId)
       ]);
 
-      setBookings(allBookings);
+      // Get today's date (start and end of day)
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
 
-      // Calculate additional statistics from bookings
-      const bookingsByStatus = allBookings.reduce((acc, booking) => {
-        acc[booking.status] = (acc[booking.status] || 0) + 1;
-        return acc;
-      }, {});
+      // Filter today's bookings
+      const todaysBookings = allBookings.filter(booking => {
+        const bookingDate = new Date(booking.scheduledDate || booking.createdAt);
+        return bookingDate >= today && bookingDate < tomorrow;
+      });
 
-      // Calculate monthly revenue (bookings from current month)
-      const currentMonth = new Date().getMonth();
-      const currentYear = new Date().getFullYear();
-      const monthlyRevenue = allBookings
-        .filter(b => {
-          const bookingDate = new Date(b.createdAt);
-          return b.status === 'Completed' && 
-                 bookingDate.getMonth() === currentMonth && 
-                 bookingDate.getFullYear() === currentYear;
-        })
-        .reduce((sum, b) => sum + (b.quotedPrice || 0), 0);
+      setTodayBookings(todaysBookings);
 
-      // Calculate pending revenue (Confirmed + InProgress bookings)
-      const pendingRevenue = allBookings
-        .filter(b => ['Confirmed', 'InProgress'].includes(b.status))
-        .reduce((sum, b) => sum + (b.quotedPrice || 0), 0);
+      // Calculate pending requests (PendingQuote status)
+      const pendingRequests = allBookings.filter(b => b.status === 'PendingQuote').length;
 
-      // TODO: Get average rating from reviews when available
-      // For now, we'll set it to null since it's not in the current API
-      const averageRating = null;
+      // Calculate total earnings from completed bookings
+      const totalEarnings = allBookings
+        .filter(b => b.status === 'Completed' && b.quotedPrice)
+        .reduce((sum, booking) => sum + (booking.quotedPrice || 0), 0);
 
-      // Combine statistics
-      const combinedStats = {
-        ...statisticsData,
-        bookingsByStatus,
-        monthlyRevenue,
-        pendingRevenue,
-        averageRating
-      };
+      // Try to fetch reviews filtered by service provider
+      let averageRating = 0;
+      try {
+        const reviews = await getServiceReviews(serviceProviderId);
+        // Sort reviews by creation date and show the last 3
+        const sortedReviews = reviews
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+          .slice(0, 3);
+        setRecentReviews(sortedReviews);
 
-      setStats(combinedStats);
+        // Calculate average rating from all reviews
+        if (reviews.length > 0) {
+          const totalRating = reviews.reduce((sum, review) => sum + (review.overallRating || 0), 0);
+          averageRating = totalRating / reviews.length;
+        }
+      } catch (err) {
+        console.log('Reviews not available:', err);
+      }
+
+      setStats({
+        todayBookings: todaysBookings.length,
+        currentRating: averageRating,
+        pendingRequests,
+        totalEarnings,
+        ...statisticsData
+      });
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
     } finally {
@@ -66,354 +80,234 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
     }
   };
 
-  const handleStatClick = (status) => {
-    if (onNavigateToBookings) {
-      onNavigateToBookings(status);
+  const getStatusVariant = (status) => {
+    switch (status) {
+      case 'Confirmed':
+        return 'success';
+      case 'PendingQuote':
+      case 'DepositPending':
+        return 'danger';
+      case 'InProgress':
+        return 'warning';
+      case 'Completed':
+        return 'success';
+      case 'Canceled':
+      case 'Rejected':
+        return 'error';
+      default:
+        return 'danger';
     }
+  };
+
+  const formatTime = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const renderStarRating = (rating) => {
+    return (
+      <div className="flex items-center gap-1">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <span
+            key={star}
+            className={`text-lg ${star <= rating ? 'text-yellow-500' : 'text-charcoal-300'}`}
+          >
+            ★
+          </span>
+        ))}
+        <span className="text-body-regular text-charcoal-600 ml-2">
+          {rating.toFixed(1)}/5.0
+        </span>
+      </div>
+    );
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sage-500"></div>
       </div>
     );
   }
 
   if (!stats) {
     return (
-      <div className="bg-white rounded-lg shadow-md p-12 text-center">
-        <p className="text-gray-500">Unable to load statistics</p>
+      <div className="bg-white rounded-lg shadow-soft-lift p-12 text-center">
+        <p className="text-body-regular text-charcoal-400">Unable to load statistics</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Welcome Section */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg shadow-lg p-8 text-white">
-        <h2 className="text-3xl font-bold mb-2">Welcome Back! 👋</h2>
-        <p className="text-blue-100">Here's an overview of your service business</p>
-      </div>
-
-      {/* Key Metrics */}
+    <div className="space-y-8">
+      {/* Top Row - Today's Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Total Bookings */}
-        <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-          <div className="flex items-center justify-between mb-3">
-            <div className="bg-blue-100 rounded-full p-3">
-              <span className="text-2xl">📊</span>
-            </div>
-            <span className="text-sm text-gray-500 font-medium">All Time</span>
-          </div>
-          <h3 className="text-gray-600 text-sm font-medium mb-1">Total Bookings</h3>
-          <p className="text-3xl font-bold text-gray-800">{stats.totalBookings || 0}</p>
-        </div>
+        <AnalyticsCard
+          title="Today's Bookings"
+          metrics={[
+            {
+              value: loading ? '...' : stats.todayBookings.toString(),
+              label: 'Scheduled for Today'
+            }
+          ]}
+        />
 
-        {/* Active Services */}
-        <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-          <div className="flex items-center justify-between mb-3">
-            <div className="bg-green-100 rounded-full p-3">
-              <span className="text-2xl">🔧</span>
-            </div>
-            <span className="text-sm text-gray-500 font-medium">Published</span>
-          </div>
-          <h3 className="text-gray-600 text-sm font-medium mb-1">Active Services</h3>
-          <p className="text-3xl font-bold text-gray-800">{stats.activeServices || 0}</p>
-        </div>
+        <AnalyticsCard
+          title="Current Rating"
+          metrics={[
+            {
+              value: loading ? '...' : stats.currentRating > 0 ? stats.currentRating.toFixed(1) : '0.0',
+              label: 'Out of 5.0'
+            }
+          ]}
+        />
 
-        {/* Completed Bookings */}
-        <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-          <div className="flex items-center justify-between mb-3">
-            <div className="bg-purple-100 rounded-full p-3">
-              <span className="text-2xl">✅</span>
-            </div>
-            <span className="text-sm text-gray-500 font-medium">Success</span>
-          </div>
-          <h3 className="text-gray-600 text-sm font-medium mb-1">Completed Services</h3>
-          <p className="text-3xl font-bold text-gray-800">{stats.completedBookings || 0}</p>
-        </div>
+        <AnalyticsCard
+          title="Pending Requests"
+          metrics={[
+            {
+              value: loading ? '...' : stats.pendingRequests.toString(),
+              label: 'Awaiting Quote'
+            }
+          ]}
+        />
 
-        {/* Total Revenue */}
-        <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-          <div className="flex items-center justify-between mb-3">
-            <div className="bg-yellow-100 rounded-full p-3">
-              <span className="text-2xl">💰</span>
-            </div>
-            <span className="text-sm text-gray-500 font-medium">Earnings</span>
-          </div>
-          <h3 className="text-gray-600 text-sm font-medium mb-1">Total Revenue</h3>
-          <p className="text-3xl font-bold text-gray-800">
-            {stats.totalRevenue ? `${stats.totalRevenue.toFixed(2)} BHD` : '0.00 BHD'}
-          </p>
-        </div>
+        <AnalyticsCard
+          title="Total Earnings"
+          metrics={[
+            {
+              value: loading ? '...' : `${stats.totalEarnings.toFixed(2)} BHD`,
+              label: 'From Completed Bookings'
+            }
+          ]}
+        />
       </div>
 
-      {/* Booking Statistics - Clickable Cards */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="mb-6">
-          <h3 className="text-xl font-bold text-gray-800 mb-2">Booking Status Overview</h3>
-          <p className="text-sm text-gray-600">Click on any status to view those bookings</p>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {/* Pending Quote */}
-          <button
-            onClick={() => handleStatClick('PendingQuote')}
-            className="bg-yellow-50 hover:bg-yellow-100 border-2 border-yellow-200 hover:border-yellow-400 rounded-lg p-5 text-center transition-all transform hover:scale-105 cursor-pointer"
-          >
-            <div className="text-3xl mb-2">⏳</div>
-            <div className="text-2xl font-bold text-yellow-700">
-              {stats.bookingsByStatus?.PendingQuote || 0}
-            </div>
-            <div className="text-xs text-yellow-600 font-medium mt-1">Pending Quote</div>
-          </button>
-
-          {/* Deposit Pending */}
-          <button
-            onClick={() => handleStatClick('DepositPending')}
-            className="bg-blue-50 hover:bg-blue-100 border-2 border-blue-200 hover:border-blue-400 rounded-lg p-5 text-center transition-all transform hover:scale-105 cursor-pointer"
-          >
-            <div className="text-3xl mb-2">💳</div>
-            <div className="text-2xl font-bold text-blue-700">
-              {stats.bookingsByStatus?.DepositPending || 0}
-            </div>
-            <div className="text-xs text-blue-600 font-medium mt-1">Deposit Pending</div>
-          </button>
-
-          {/* Confirmed */}
-          <button
-            onClick={() => handleStatClick('Confirmed')}
-            className="bg-green-50 hover:bg-green-100 border-2 border-green-200 hover:border-green-400 rounded-lg p-5 text-center transition-all transform hover:scale-105 cursor-pointer"
-          >
-            <div className="text-3xl mb-2">✅</div>
-            <div className="text-2xl font-bold text-green-700">
-              {stats.bookingsByStatus?.Confirmed || 0}
-            </div>
-            <div className="text-xs text-green-600 font-medium mt-1">Confirmed</div>
-          </button>
-
-          {/* In Progress */}
-          <button
-            onClick={() => handleStatClick('InProgress')}
-            className="bg-purple-50 hover:bg-purple-100 border-2 border-purple-200 hover:border-purple-400 rounded-lg p-5 text-center transition-all transform hover:scale-105 cursor-pointer"
-          >
-            <div className="text-3xl mb-2">🚀</div>
-            <div className="text-2xl font-bold text-purple-700">
-              {stats.bookingsByStatus?.InProgress || 0}
-            </div>
-            <div className="text-xs text-purple-600 font-medium mt-1">In Progress</div>
-          </button>
-
-          {/* Completed */}
-          <button
-            onClick={() => handleStatClick('Completed')}
-            className="bg-gray-50 hover:bg-gray-100 border-2 border-gray-200 hover:border-gray-400 rounded-lg p-5 text-center transition-all transform hover:scale-105 cursor-pointer"
-          >
-            <div className="text-3xl mb-2">🎉</div>
-            <div className="text-2xl font-bold text-gray-700">
-              {stats.bookingsByStatus?.Completed || 0}
-            </div>
-            <div className="text-xs text-gray-600 font-medium mt-1">Completed</div>
-          </button>
-
-          {/* Canceled/Rejected */}
-          <button
-            onClick={() => handleStatClick('Canceled')}
-            className="bg-red-50 hover:bg-red-100 border-2 border-red-200 hover:border-red-400 rounded-lg p-5 text-center transition-all transform hover:scale-105 cursor-pointer"
-          >
-            <div className="text-3xl mb-2">❌</div>
-            <div className="text-2xl font-bold text-red-700">
-              {(stats.bookingsByStatus?.Canceled || 0) + (stats.bookingsByStatus?.Rejected || 0)}
-            </div>
-            <div className="text-xs text-red-600 font-medium mt-1">Canceled/Rejected</div>
-          </button>
-        </div>
+      {/* Today's Bookings Table */}
+      <div>
+        <Table
+          title="Today's Bookings"
+          actionButton={
+            <CRUDButton
+              variant="success"
+              onClick={() => onNavigateToBookings && onNavigateToBookings(null)}
+            >
+              View All Bookings
+            </CRUDButton>
+          }
+        >
+          <TableHeader
+            columns={[
+              'Service',
+              'Customer',
+              'Time',
+              'Status',
+              'Price',
+              'Action'
+            ]}
+          />
+          <TableBody>
+            {loading ? (
+              <TableRow
+                data={['Loading...', '', '', '', '', '']}
+              />
+            ) : todayBookings.length === 0 ? (
+              <TableRow
+                data={['No bookings scheduled for today', '', '', '', '', '']}
+              />
+            ) : (
+              todayBookings.map((booking) => (
+                <TableRow
+                  key={booking.id}
+                  data={[
+                    booking.serviceName || 'N/A',
+                    booking.customerName || 'N/A',
+                    formatTime(booking.scheduledDate || booking.createdAt),
+                    <StatusChip variant={getStatusVariant(booking.status)}>
+                      {booking.status}
+                    </StatusChip>,
+                    booking.quotedPrice ? `${booking.quotedPrice.toFixed(2)} BHD` : 'Pending'
+                  ]}
+                  actions={
+                    <>
+                      <CRUDButton
+                        variant="success"
+                        onClick={() => {/* TODO: Implement view details */}}
+                      >
+                        View
+                      </CRUDButton>
+                    </>
+                  }
+                />
+              ))
+            )}
+          </TableBody>
+        </Table>
       </div>
 
-      {/* Recent Activity / Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Urgent Actions */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <span>🚨</span>
-            Urgent Actions Required
-          </h3>
-          
-          <div className="space-y-3">
-            {stats.bookingsByStatus?.PendingQuote > 0 && (
-              <button
-                onClick={() => handleStatClick('PendingQuote')}
-                className="w-full bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 rounded-lg p-4 text-left transition-colors"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-gray-800">Send Quotes</p>
-                    <p className="text-sm text-gray-600">
-                      {stats.bookingsByStatus.PendingQuote} booking{stats.bookingsByStatus.PendingQuote > 1 ? 's' : ''} waiting for quote
-                    </p>
-                  </div>
-                  <span className="text-2xl">📤</span>
-                </div>
-              </button>
-            )}
-
-            {stats.bookingsByStatus?.InProgress > 0 && (
-              <button
-                onClick={() => handleStatClick('InProgress')}
-                className="w-full bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg p-4 text-left transition-colors"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-gray-800">Services in Progress</p>
-                    <p className="text-sm text-gray-600">
-                      {stats.bookingsByStatus.InProgress} active service{stats.bookingsByStatus.InProgress > 1 ? 's' : ''}
-                    </p>
-                  </div>
-                  <span className="text-2xl">⚡</span>
-                </div>
-              </button>
-            )}
-
-            {stats.bookingsByStatus?.Confirmed > 0 && (
-              <button
-                onClick={() => handleStatClick('Confirmed')}
-                className="w-full bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg p-4 text-left transition-colors"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-gray-800">Confirmed Bookings</p>
-                    <p className="text-sm text-gray-600">
-                      {stats.bookingsByStatus.Confirmed} ready to start
-                    </p>
-                  </div>
-                  <span className="text-2xl">📅</span>
-                </div>
-              </button>
-            )}
-
-            {(!stats.bookingsByStatus?.PendingQuote && !stats.bookingsByStatus?.InProgress && !stats.bookingsByStatus?.Confirmed) && (
-              <div className="text-center py-8">
-                <p className="text-gray-500">✅ No urgent actions required</p>
-                <p className="text-sm text-gray-400 mt-1">You're all caught up!</p>
-              </div>
-            )}
-          </div>
+      {/* Recent Reviews */}
+      <div className="bg-white rounded-lg shadow-soft-lift p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-card-h2 text-charcoal-600">Recent Reviews</h2>
+          {stats.currentRating > 0 && (
+            <div className="flex items-center gap-2">
+              {renderStarRating(stats.currentRating)}
+            </div>
+          )}
         </div>
 
-        {/* Performance Summary */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <span>📈</span>
-            Performance Summary
-          </h3>
-
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sage-500"></div>
+          </div>
+        ) : recentReviews.length === 0 ? (
+          <div className="text-center py-8">
+            <span className="text-5xl text-charcoal-300 mb-3 block">★</span>
+            <p className="text-body-regular text-charcoal-400">No reviews yet</p>
+            <p className="text-label-medium text-charcoal-300 mt-1">
+              Complete services to receive customer reviews
+            </p>
+          </div>
+        ) : (
           <div className="space-y-4">
-            {/* Completion Rate */}
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-medium text-gray-700">Completion Rate</span>
-                <span className="text-sm font-bold text-gray-800">
-                  {stats.totalBookings > 0 
-                    ? Math.round(((stats.completedBookings || 0) / stats.totalBookings) * 100)
-                    : 0}%
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-green-500 h-2 rounded-full transition-all"
-                  style={{
-                    width: `${stats.totalBookings > 0 
-                      ? ((stats.completedBookings || 0) / stats.totalBookings) * 100
-                      : 0}%`
-                  }}
-                ></div>
-              </div>
-            </div>
-
-            {/* Response Rate */}
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-medium text-gray-700">Response Rate</span>
-                <span className="text-sm font-bold text-gray-800">
-                  {stats.totalBookings > 0 
-                    ? Math.round((1 - ((stats.pendingBookings || 0) / stats.totalBookings)) * 100)
-                    : 100}%
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-blue-500 h-2 rounded-full transition-all"
-                  style={{
-                    width: `${stats.totalBookings > 0 
-                      ? (1 - ((stats.pendingBookings || 0) / stats.totalBookings)) * 100
-                      : 100}%`
-                  }}
-                ></div>
-              </div>
-            </div>
-
-            {/* Average Rating - Hidden for now until reviews are implemented */}
-            {stats.averageRating && (
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-medium text-gray-700">Customer Satisfaction</span>
-                  <span className="text-sm font-bold text-gray-800">
-                    {stats.averageRating.toFixed(1)}/5.0
+            {recentReviews.map((review, index) => (
+              <div
+                key={review.id || index}
+                className="pb-4 border-b border-grey-stroke last:border-0 last:pb-0"
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <div>
+                    <p className="text-body-medium text-charcoal-600 font-semibold">
+                      {review.customer?.fullName || 'Customer'}
+                    </p>
+                    <div className="flex items-center gap-0.5 mt-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <span
+                          key={star}
+                          className={`text-sm ${
+                            star <= (review.overallRating || 0)
+                              ? 'text-yellow-500'
+                              : 'text-charcoal-300'
+                          }`}
+                        >
+                          ★
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <span className="text-label-medium text-charcoal-300">
+                    {new Date(review.createdAt).toLocaleDateString()}
                   </span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-yellow-500 h-2 rounded-full transition-all"
-                    style={{
-                      width: `${(stats.averageRating / 5) * 100}%`
-                    }}
-                  ></div>
-                </div>
-              </div>
-            )}
-
-            {/* Revenue Summary */}
-            <div className="mt-6 pt-4 border-t border-gray-200">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="text-center p-3 bg-green-50 rounded-lg">
-                  <p className="text-xs text-gray-600 mb-1">This Month</p>
-                  <p className="text-lg font-bold text-green-600">
-                    {stats.monthlyRevenue ? `${stats.monthlyRevenue.toFixed(2)}` : '0.00'} BHD
+                {review.comment && (
+                  <p className="text-body-regular text-charcoal-400 mt-2">
+                    {review.comment}
                   </p>
-                </div>
-                <div className="text-center p-3 bg-blue-50 rounded-lg">
-                  <p className="text-xs text-gray-600 mb-1">Pending</p>
-                  <p className="text-lg font-bold text-blue-600">
-                    {stats.pendingRevenue ? `${stats.pendingRevenue.toFixed(2)}` : '0.00'} BHD
-                  </p>
-                </div>
+                )}
               </div>
-            </div>
+            ))}
           </div>
-        </div>
-      </div>
-
-      {/* Tips & Recommendations */}
-      <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg shadow-md p-6 border border-indigo-100">
-        <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
-          <span>💡</span>
-          Tips for Success
-        </h3>
-        <ul className="space-y-2 text-sm text-gray-700">
-          <li className="flex items-start gap-2">
-            <span className="text-green-500 mt-0.5">✓</span>
-            <span>Respond to quote requests within 24 hours for better customer satisfaction</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-green-500 mt-0.5">✓</span>
-            <span>Keep your service catalog updated with accurate pricing and descriptions</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-green-500 mt-0.5">✓</span>
-            <span>Maintain high quality service to improve your ratings and get more bookings</span>
-          </li>
-        </ul>
+        )}
       </div>
     </div>
   );

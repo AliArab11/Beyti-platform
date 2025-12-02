@@ -33,6 +33,11 @@ namespace Beyti_Backend.Controllers.Api
                 if (provider == null)
                     return NotFound("Service provider not found");
 
+                // Get primary address if available
+                var primaryAddress = provider.ServiceProviderAddresses
+                    .Select(spa => spa.Address)
+                    .FirstOrDefault();
+
                 return Ok(new
                 {
                     provider.Id,
@@ -44,6 +49,15 @@ namespace Beyti_Backend.Controllers.Api
                     provider.Status,
                     provider.VerifiedAt,
                     DisplayName = provider.UserProfile.DisplayName,
+                    RoleType = provider.UserProfile.RoleType,
+                    Address = primaryAddress != null ? $"{primaryAddress.Street}, {primaryAddress.City}, {primaryAddress.Region}" : null,
+                    Street = primaryAddress?.Street,
+                    City = primaryAddress?.City,
+                    Region = primaryAddress?.Region,
+                    PostalCode = primaryAddress?.PostalCode,
+                    Country = primaryAddress?.Country,
+                    CreatedAt = provider.UserProfile.CreatedAt,
+                    UpdatedAt = provider.UserProfile.UpdatedAt,
                     Addresses = provider.ServiceProviderAddresses.Select(spa => new
                     {
                         spa.Address.Id,
@@ -51,10 +65,154 @@ namespace Beyti_Backend.Controllers.Api
                         spa.Address.Street,
                         spa.Address.City,
                         spa.Address.Region,
+                        spa.Address.PostalCode,
+                        spa.Address.Country,
                         spa.Address.Latitude,
                         spa.Address.Longitude
                     })
                 });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
+
+        // PUT: api/ServiceProviderDashboard/UpdateProfile/5
+        [HttpPut("UpdateProfile/{userProfileId}")]
+        public async Task<IActionResult> UpdateProfile(int userProfileId, JsonElement body)
+        {
+            try
+            {
+                var userProfile = await _context.UserProfiles.FindAsync(userProfileId);
+                if (userProfile == null)
+                    return NotFound("User profile not found");
+
+                // Update display name
+                if (body.TryGetProperty("DisplayName", out var displayName) && displayName.ValueKind != JsonValueKind.Null)
+                    userProfile.DisplayName = displayName.GetString();
+
+                // Update phone (stored in ServiceProvider table)
+                var provider = await _context.ServiceProviders.FirstOrDefaultAsync(sp => sp.UserProfileId == userProfileId);
+                if (provider != null && body.TryGetProperty("Phone", out var phone) && phone.ValueKind != JsonValueKind.Null)
+                {
+                    provider.Phone = phone.GetString();
+                }
+
+                // Note: Email and Address updates would require schema changes
+                // UserProfile table doesn't have Email or DateOfBirth fields
+                // Address is managed in separate Address table via ServiceProviderAddress
+
+                userProfile.UpdatedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+
+                return Ok(new { message = "Profile updated successfully" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
+
+        // PUT: api/ServiceProviderDashboard/UpdateStatus/5
+        [HttpPut("UpdateStatus/{serviceProviderId}")]
+        public async Task<IActionResult> UpdateStatus(int serviceProviderId, JsonElement body)
+        {
+            try
+            {
+                var provider = await _context.ServiceProviders.FindAsync(serviceProviderId);
+                if (provider == null)
+                    return NotFound("Service provider not found");
+
+                if (body.TryGetProperty("Status", out var status) && status.ValueKind != JsonValueKind.Null)
+                {
+                    var statusValue = status.GetString();
+                    // Validate status
+                    if (statusValue != "Available" && statusValue != "Busy" && statusValue != "Unavailable")
+                        return BadRequest("Invalid status. Must be: Available, Busy, or Unavailable");
+
+                    provider.Status = statusValue;
+                }
+
+                await _context.SaveChangesAsync();
+
+                return Ok(new { message = "Status updated successfully" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
+
+        // PUT: api/ServiceProviderDashboard/UpdateAddress/5
+        [HttpPut("UpdateAddress/{serviceProviderId}")]
+        public async Task<IActionResult> UpdateAddress(int serviceProviderId, JsonElement body)
+        {
+            try
+            {
+                // Get the provider with their addresses
+                var provider = await _context.ServiceProviders
+                    .Include(sp => sp.ServiceProviderAddresses)
+                        .ThenInclude(spa => spa.Address)
+                    .FirstOrDefaultAsync(sp => sp.Id == serviceProviderId);
+
+                if (provider == null)
+                    return NotFound("Service provider not found");
+
+                // Get the primary address (first one)
+                var providerAddress = provider.ServiceProviderAddresses.FirstOrDefault();
+                Address address;
+
+                if (providerAddress == null)
+                {
+                    // Create new address if none exists
+                    address = new Address
+                    {
+                        IsDefault = true,
+                        IsActive = true,
+                        Country = "Kuwait", // Default country
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+                    _context.Addresses.Add(address);
+                    await _context.SaveChangesAsync();
+
+                    // Link to service provider
+                    var newProviderAddress = new ServiceProviderAddress
+                    {
+                        ServiceProviderId = serviceProviderId,
+                        AddressId = address.Id
+                    };
+                    _context.ServiceProviderAddresses.Add(newProviderAddress);
+                }
+                else
+                {
+                    address = providerAddress.Address;
+                }
+
+                // Update address fields
+                if (body.TryGetProperty("Street", out var street) && street.ValueKind != JsonValueKind.Null)
+                    address.Street = street.GetString()!;
+
+                if (body.TryGetProperty("City", out var city) && city.ValueKind != JsonValueKind.Null)
+                    address.City = city.GetString()!;
+
+                if (body.TryGetProperty("Region", out var region) && region.ValueKind != JsonValueKind.Null)
+                    address.Region = region.GetString();
+
+                if (body.TryGetProperty("PostalCode", out var postalCode) && postalCode.ValueKind != JsonValueKind.Null)
+                    address.PostalCode = postalCode.GetString();
+
+                if (body.TryGetProperty("Country", out var country) && country.ValueKind != JsonValueKind.Null)
+                    address.Country = country.GetString()!;
+
+                if (body.TryGetProperty("Label", out var label) && label.ValueKind != JsonValueKind.Null)
+                    address.Label = label.GetString();
+
+                address.UpdatedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+
+                return Ok(new { message = "Address updated successfully" });
             }
             catch (Exception ex)
             {

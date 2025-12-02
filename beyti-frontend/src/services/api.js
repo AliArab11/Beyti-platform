@@ -1221,6 +1221,30 @@ export const getProviderProfile = async (userProfileId) => {
   return await fetchAPI(`/ServiceProviderDashboard/Profile/${userProfileId}`);
 };
 
+export const updateProviderProfile = async (userProfileId, data) => {
+  // Update user profile information via ServiceProviderDashboard endpoint
+  return await fetchAPI(`/ServiceProviderDashboard/UpdateProfile/${userProfileId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+export const updateProviderStatus = async (serviceProviderId, status) => {
+  // Update service provider status via ServiceProviderDashboard endpoint
+  return await fetchAPI(`/ServiceProviderDashboard/UpdateStatus/${serviceProviderId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ Status: status }),
+  });
+};
+
+export const updateProviderAddress = async (serviceProviderId, data) => {
+  // Update service provider address via ServiceProviderDashboard endpoint
+  return await fetchAPI(`/ServiceProviderDashboard/UpdateAddress/${serviceProviderId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
 // Categories & Services
 export const getServiceCategories = async () => {
   return await fetchAPI('/ServiceProviderDashboard/Categories');
@@ -1429,4 +1453,21 @@ export const deleteService = async (id) => {
   return await fetchAPI(`/ServiceModeration/Services/${id}`, {
     method: 'DELETE',
   });
+};
+
+// --- Service Review APIs ---
+
+/**
+ * Get all service reviews (optionally filtered by service provider)
+ * @param {number} [serviceProviderId] - Optional: Filter by service provider ID
+ * @returns {Promise<Array>} - Array of service review objects
+ */
+export const getServiceReviews = async (serviceProviderId = null) => {
+  let url = '/ServiceReviews';
+  if (serviceProviderId) {
+    // We'll need to filter client-side or add backend support
+    const allReviews = await fetchAPI(url);
+    return allReviews.filter(review => review.serviceProviderId === serviceProviderId);
+  }
+  return await fetchAPI(url);
 };

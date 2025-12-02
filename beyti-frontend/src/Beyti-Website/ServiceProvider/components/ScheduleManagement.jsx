@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getProviderTimeSlots, addTimeSlot, deleteTimeSlot } from '../../../services/api';
+import CRUDButton from '../../../components/CRUDButton';
+import StatusChip from '../../../components/StatusChip';
 
 export default function ScheduleManagement({ serviceProviderId }) {
   const [timeSlots, setTimeSlots] = useState([]);
@@ -77,42 +79,42 @@ export default function ScheduleManagement({ serviceProviderId }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sage-500"></div>
       </div>
     );
   }
 
   return (
-    <div>
+    <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+      <div className="bg-white rounded-lg shadow-soft-lift p-6">
         <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-2xl font-bold text-gray-800">Weekly Schedule</h2>
-            <p className="text-gray-600 text-sm mt-1">
+            <h2 className="text-card-h2 text-charcoal-600">Weekly Schedule</h2>
+            <p className="text-body-regular text-charcoal-400 mt-1">
               Set your availability for customers to book appointments
             </p>
           </div>
-          <button
+          <CRUDButton
+            variant={showForm ? 'error' : 'success'}
             onClick={() => setShowForm(!showForm)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition"
           >
-            {showForm ? '✕ Close' : '+ Add Time Slot'}
-          </button>
+            {showForm ? 'Close' : 'Add Time Slot'}
+          </CRUDButton>
         </div>
       </div>
 
       {/* Form */}
       {showForm && (
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h3 className="text-lg font-bold text-gray-800 mb-4">Add Time Slot</h3>
+        <div className="bg-white rounded-lg shadow-soft-lift p-6">
+          <h3 className="text-card-h2 text-charcoal-600 mb-6">Add Time Slot</h3>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Day of Week *</label>
+              <label className="block text-body-medium text-charcoal-600 mb-2">Day of Week *</label>
               <select
                 value={formData.dayOfWeek}
                 onChange={(e) => setFormData({ ...formData, dayOfWeek: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-grey-stroke rounded-lg px-4 py-2 text-body-regular focus:ring-2 focus:ring-sage-500 focus:border-sage-500"
                 required
               >
                 <option value="">Select a day</option>
@@ -126,101 +128,92 @@ export default function ScheduleManagement({ serviceProviderId }) {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Start Time *</label>
+                <label className="block text-body-medium text-charcoal-600 mb-2">Start Time *</label>
                 <input
                   type="time"
                   value={formData.startTime}
                   onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-grey-stroke rounded-lg px-4 py-2 text-body-regular focus:ring-2 focus:ring-sage-500 focus:border-sage-500"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">End Time *</label>
+                <label className="block text-body-medium text-charcoal-600 mb-2">End Time *</label>
                 <input
                   type="time"
                   value={formData.endTime}
                   onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-grey-stroke rounded-lg px-4 py-2 text-body-regular focus:ring-2 focus:ring-sage-500 focus:border-sage-500"
                   required
                 />
               </div>
             </div>
 
-            <div className="flex gap-3">
-              <button
-                type="submit"
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition"
-              >
+            <div className="flex gap-3 pt-4">
+              <CRUDButton type="submit" variant="success">
                 Add Time Slot
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowForm(false)}
-                className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-6 py-2 rounded-lg font-medium transition"
-              >
+              </CRUDButton>
+              <CRUDButton type="button" variant="error" onClick={() => setShowForm(false)}>
                 Cancel
-              </button>
+              </CRUDButton>
             </div>
           </form>
         </div>
       )}
 
       {/* Weekly Schedule Display */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="p-6 border-b border-gray-200">
-          <h3 className="text-lg font-bold text-gray-800">Your Availability</h3>
+      {timeSlots.length === 0 ? (
+        <div className="bg-white rounded-lg shadow-soft-lift p-12 text-center">
+          <div className="text-6xl mb-4">📅</div>
+          <p className="text-body-regular text-charcoal-400">No schedule set yet</p>
+          <p className="text-label-medium text-charcoal-300 mt-2">Add time slots to let customers book appointments</p>
         </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow-soft-lift overflow-hidden">
+          <div className="p-6 border-b border-grey-stroke">
+            <h3 className="text-card-h2 text-charcoal-600">Your Availability</h3>
+          </div>
 
-        <div className="divide-y divide-gray-200">
-          {slotsByDay.map((day) => (
-            <div key={day.id} className="p-6">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <h4 className="text-lg font-semibold text-gray-800 mb-3">{day.name}</h4>
-                  
-                  {day.slots.length === 0 ? (
-                    <p className="text-gray-400 text-sm italic">No availability set</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {day.slots.map((slot) => (
-                        <div
-                          key={slot.id}
-                          className="flex items-center justify-between bg-gray-50 rounded-lg p-3"
-                        >
-                          <div className="flex items-center gap-3">
-                            <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                              slot.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                            }`}>
-                              {slot.isActive ? 'Active' : 'Inactive'}
-                            </span>
-                            <span className="text-gray-700 font-medium">
-                              {slot.startTime} - {slot.endTime}
-                            </span>
-                          </div>
-                          <button
-                            onClick={() => handleDelete(slot.id)}
-                            className="text-red-600 hover:text-red-800 text-sm font-medium"
+          <div className="divide-y divide-grey-stroke">
+            {slotsByDay.map((day) => (
+              <div key={day.id} className="p-6">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h4 className="text-card-h3 text-charcoal-600 mb-3">{day.name}</h4>
+
+                    {day.slots.length === 0 ? (
+                      <p className="text-body-regular text-charcoal-300 italic">No availability set</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {day.slots.map((slot) => (
+                          <div
+                            key={slot.id}
+                            className="flex items-center justify-between bg-cream-50 rounded-lg p-3"
                           >
-                            Delete
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                            <div className="flex items-center gap-3">
+                              <StatusChip variant={slot.isActive ? 'success' : 'error'}>
+                                {slot.isActive ? 'Active' : 'Inactive'}
+                              </StatusChip>
+                              <span className="text-body-regular text-charcoal-600 font-medium">
+                                {slot.startTime} - {slot.endTime}
+                              </span>
+                            </div>
+                            <CRUDButton
+                              variant="error"
+                              onClick={() => handleDelete(slot.id)}
+                            >
+                              Delete
+                            </CRUDButton>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {timeSlots.length === 0 && (
-        <div className="bg-white rounded-lg shadow-md p-12 text-center mt-6">
-          <div className="text-6xl mb-4">📅</div>
-          <p className="text-gray-500 text-lg">No schedule set yet</p>
-          <p className="text-gray-400 text-sm mt-2">Add time slots to let customers book appointments</p>
+            ))}
+          </div>
         </div>
       )}
     </div>

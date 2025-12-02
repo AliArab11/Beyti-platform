@@ -28,7 +28,9 @@ const PageHeader = ({
   notificationCount = 0,
   userName = 'User',
   userRole = 'Admin',
+  userProfile = null,
   onUserMenuClick,
+  onProfileClick,
   className = '',
   ...props
 }) => {
@@ -39,6 +41,13 @@ const PageHeader = ({
     setSearchValue(e.target.value);
     if (onSearch) {
       onSearch(e.target.value);
+    }
+  };
+
+  const handleProfileClick = () => {
+    setIsUserMenuOpen(false);
+    if (onProfileClick) {
+      onProfileClick();
     }
   };
 
@@ -119,20 +128,73 @@ const PageHeader = ({
                 className="fixed inset-0 z-10"
                 onClick={() => setIsUserMenuOpen(false)}
               />
-              <div className="absolute top-full right-0 mt-2 w-48 bg-grey-200 border border-grey-stroke rounded-md shadow-soft-lift z-20 overflow-hidden">
-                <div className="px-4 py-3 border-b border-grey-stroke">
-                  <p className="text-body-regular text-charcoal-600 font-medium">{userName}</p>
-                  <p className="text-label-medium text-charcoal-400">{userRole}</p>
+              <div className="absolute top-full right-0 mt-2 w-80 bg-grey-200 border border-grey-stroke rounded-md shadow-soft-lift z-20 overflow-hidden">
+                {/* Profile Details Section */}
+                <div className="px-4 py-4 border-b border-grey-stroke bg-cream-50">
+                  <div className="flex items-start gap-3">
+                    <div className="w-12 h-12 rounded-full bg-sage-500 flex items-center justify-center flex-shrink-0">
+                      <User size={24} weight="fill" className="text-sage-100" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-body-regular text-charcoal-600 font-semibold truncate">
+                        {userProfile?.displayName || userName}
+                      </p>
+                      <p className="text-label-medium text-charcoal-400 mt-0.5">
+                        {userRole}
+                      </p>
+                      {userProfile?.phone && (
+                        <p className="text-label-small text-charcoal-500 mt-1">
+                          {userProfile.phone}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Additional Profile Info */}
+                  {userProfile && (
+                    <div className="mt-3 pt-3 border-t border-grey-stroke space-y-1.5">
+                      {userProfile.address && (
+                        <div className="flex items-start gap-2">
+                          <span className="text-label-small text-charcoal-400 min-w-[60px]">Address:</span>
+                          <span className="text-label-small text-charcoal-600 break-words">
+                            {userProfile.address}
+                          </span>
+                        </div>
+                      )}
+                      {userProfile.createdAt && (
+                        <div className="flex items-start gap-2">
+                          <span className="text-label-small text-charcoal-400 min-w-[60px]">Member Since:</span>
+                          <span className="text-label-small text-charcoal-600">
+                            {new Date(userProfile.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <button className="w-full px-4 py-2 text-left text-body-regular text-charcoal-600 hover:bg-cream-100 transition-colors">
-                  Profile
-                </button>
-                <button className="w-full px-4 py-2 text-left text-body-regular text-charcoal-600 hover:bg-cream-100 transition-colors">
-                  Settings
-                </button>
-                <button className="w-full px-4 py-2 text-left text-body-regular text-error-text hover:bg-error-bg transition-colors">
-                  Logout
-                </button>
+
+                {/* Menu Actions */}
+                <div className="py-1">
+                  <button
+                    onClick={handleProfileClick}
+                    className="w-full px-4 py-2.5 text-left text-body-regular text-charcoal-600 hover:bg-cream-100 transition-colors flex items-center gap-2"
+                  >
+                    <User size={18} className="text-charcoal-500" />
+                    <span>View Profile</span>
+                  </button>
+                  <button className="w-full px-4 py-2.5 text-left text-body-regular text-charcoal-600 hover:bg-cream-100 transition-colors flex items-center gap-2">
+                    <span className="text-charcoal-500">⚙️</span>
+                    <span>Settings</span>
+                  </button>
+                </div>
+
+                {/* Logout Section */}
+                <div className="border-t border-grey-stroke">
+                  <button className="w-full px-4 py-2.5 text-left text-body-regular text-error-text hover:bg-error-bg transition-colors flex items-center gap-2">
+                    <span>🚪</span>
+                    <span>Logout</span>
+                  </button>
+                </div>
               </div>
             </>
           )}
