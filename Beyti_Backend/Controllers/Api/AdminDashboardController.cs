@@ -215,12 +215,13 @@ namespace Beyti_Backend.Controllers.Api
                     p.Id,
                     p.ServiceProviderId,
                     userDisplayName = p.ServiceProvider.UserProfile.DisplayName,
+                    userRoleType = p.ServiceProvider.UserProfile.RoleType,
                     businessName = p.ServiceProvider.BusinessName,
                     p.Status,
                     p.Notes,
-                    p.CreatedAt
+                    p.CreatedAt,
+                    p.UpdatedAt
                 })
-                .Where(p => p.Status == "Pending") // Only pending requests
                 .ToListAsync();
 
             return Ok(requests);

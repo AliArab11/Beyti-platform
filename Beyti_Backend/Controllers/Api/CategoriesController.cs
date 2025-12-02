@@ -19,6 +19,7 @@ namespace Beyti_Backend.Controllers.Api
         {
             public int Id { get; set; }
             public string Name { get; set; } = null!;
+            public bool IsActive { get; set; }
             public List<SubCategoryDto> SubCategories { get; set; } = new();
         }
 
@@ -26,6 +27,19 @@ namespace Beyti_Backend.Controllers.Api
         {
             public int Id { get; set; }
             public string Name { get; set; } = null!;
+            public bool IsActive { get; set; }
+        }
+
+        public class CategoryCreateDto
+        {
+            public string Name { get; set; } = null!;
+            public bool IsActive { get; set; }
+        }
+
+        public class CategoryUpdateDto
+        {
+            public string Name { get; set; } = null!;
+            public bool IsActive { get; set; }
         }
 
         public CategoriesController(BeytiContext context)
@@ -43,10 +57,12 @@ namespace Beyti_Backend.Controllers.Api
                 {
                     Id = c.Id,
                     Name = c.Name,
+                    IsActive = c.IsActive,
                     SubCategories = c.SubCategories.Select(sc => new SubCategoryDto
                     {
                         Id = sc.Id,
-                        Name = sc.Name
+                        Name = sc.Name,
+                        IsActive = sc.IsActive
                     }).ToList()
                 })
                 .ToListAsync();
@@ -70,16 +86,17 @@ namespace Beyti_Backend.Controllers.Api
         }
 
         // PUT: api/Categories/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutCategory(int id, Category category)
+        public async Task<IActionResult> PutCategory(int id, CategoryUpdateDto dto)
         {
-            if (id != category.Id)
+            var category = await _context.Categories.FindAsync(id);
+            if (category == null)
             {
-                return BadRequest();
+                return NotFound();
             }
 
-            _context.Entry(category).State = EntityState.Modified;
+            category.Name = dto.Name;
+            category.IsActive = dto.IsActive;
 
             try
             {
@@ -101,10 +118,16 @@ namespace Beyti_Backend.Controllers.Api
         }
 
         // POST: api/Categories
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Category>> PostCategory(Category category)
+        public async Task<ActionResult<Category>> PostCategory(CategoryCreateDto dto)
         {
+            var category = new Category
+            {
+                Name = dto.Name,
+                IsActive = dto.IsActive,
+                CreatedAt = DateTime.Now
+            };
+
             _context.Categories.Add(category);
             await _context.SaveChangesAsync();
 
