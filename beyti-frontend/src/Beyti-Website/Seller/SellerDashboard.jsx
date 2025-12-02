@@ -1,5 +1,3 @@
-// src/Pages/Seller/StoreDetails.jsx
-
 import React, { useEffect, useMemo, useState } from "react";
 import PageHeader from "../../components/PageHeader";
 import SidebarProfile from "../../components/SidebarProfile";
@@ -10,6 +8,13 @@ import CRUDButton from "../../components/CRUDButton";
 import { Table, TableHeader, TableBody, TableRow } from "../../components/Table";
 
 import { getSellerOrders, getSellers } from "../../services/api";
+import Orders from "./Components/Orders"; 
+import Analytics from "./Components/Analytics";
+
+import * as Icon from "@phosphor-icons/react";
+
+
+
 
 // ---------- Helpers ----------
 const formatDate = (value) => {
@@ -248,15 +253,6 @@ const OrderDetailsModal = ({ order, onClose, onOrderUpdated }) => {
             </div>
             <div className="space-y-1">
               <p className="text-xs text-charcoal-400 uppercase tracking-wide">
-                Payment
-              </p>
-              <StatusChip variant={getPaymentVariant(localOrder.paymentStatus)}>
-                {localOrder.paymentStatus || "N/A"} •{" "}
-                {localOrder.paymentMethod || "Method N/A"}
-              </StatusChip>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-charcoal-400 uppercase tracking-wide">
                 Fulfillment
               </p>
               <span className="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-grey-200 text-charcoal-600">
@@ -363,7 +359,8 @@ const OrderDetailsModal = ({ order, onClose, onOrderUpdated }) => {
 };
 
 // ---------- Main Component ----------
-const StoreDetails = () => {
+const SellerDashboard = () => {
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [sellerId, setSellerId] = useState(null);
   const [sellerName, setSellerName] = useState("My Store");
 
@@ -600,6 +597,8 @@ useEffect(() => {
     );
   };
 
+  
+
   // -----------------------------------------
   // MAIN DASHBOARD LAYOUT
   // -----------------------------------------
@@ -625,85 +624,57 @@ useEffect(() => {
           </div>
 
           <NavigationButton
-            selected
+            selected={activeTab === "dashboard"}
+            onClick={() => setActiveTab("dashboard")}
             icon={
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                <Icon.House
+                size={20}
+                weight={activeTab === "dashboard" ? "fill" : "regular"}
                 />
-              </svg>
             }
-          >
+            >
             Dashboard
-          </NavigationButton>
+            </NavigationButton>
 
-          <NavigationButton
+            <NavigationButton
+            selected={activeTab === "orders"}
+            onClick={() => setActiveTab("orders")}
             icon={
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 7h18M3 12h18M3 17h18"
+                <Icon.Receipt
+                size={20}
+                weight={activeTab === "orders" ? "fill" : "regular"}
                 />
-              </svg>
             }
-          >
+            >
             Orders
-          </NavigationButton>
+            </NavigationButton>
 
-          <NavigationButton
+            <NavigationButton
+            selected={activeTab === "products"}
+            onClick={() => setActiveTab("products")}
             icon={
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0H4"
+                <Icon.Package
+                size={20}
+                weight={activeTab === "products" ? "fill" : "regular"}
                 />
-              </svg>
             }
-          >
+            >
             Products
-          </NavigationButton>
+            </NavigationButton>
 
-          <NavigationButton
+            <NavigationButton
+            selected={activeTab === "analytics"}
+            onClick={() => setActiveTab("analytics")}
             icon={
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 3v18h18"
+                <Icon.ChartBar
+                size={20}
+                weight={activeTab === "analytics" ? "fill" : "regular"}
                 />
-              </svg>
             }
-          >
+            >
             Analytics
-          </NavigationButton>
+            </NavigationButton>
+
         </div>
 
         <SidebarProfile userName={sellerName} userRole="Seller" />
@@ -751,6 +722,8 @@ useEffect(() => {
             {/* DASHBOARD CONTENT */}
             {sellerId && !loading && !error && (
               <>
+              {activeTab === "dashboard" ? (
+                <>
                 {/* TOP METRIC CARDS */}
                 <section className="space-y-4">
                   <h2 className="text-card-h2 text-charcoal-600">Overview</h2>
@@ -818,12 +791,15 @@ useEffect(() => {
                           className="hidden md:block w-56 px-3 py-2 rounded-lg border border-grey-stroke bg-cream-50 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400"
                         />
                         <button
-                          type="button"
-                          className="text-sm font-medium text-sage-600 hover:text-sage-700 underline"
-                          onClick={() => console.log("Go to Orders page")}
-                        >
-                          View all
-                        </button>
+                            type="button"
+                            className="text-sm font-medium text-sage-600 hover:text-sage-700 underline cursor-pointer"
+                            onClick={() => {
+                            setActiveTab("orders");
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                            >
+                            View all
+                            </button>
                       </div>
                     </div>
 
@@ -843,32 +819,61 @@ useEffect(() => {
                             "Action",
                           ]}
                         />
-                        <TableBody>
-                          {filteredRecentOrders.map((order) => (
+                       <TableBody>
+                        {filteredRecentOrders.map((order) => {
+                            // Check if order is a new request (within last 30 minutes)
+                            const status = order.status?.toLowerCase();
+                            const isRequest = ["placed", "pending"].includes(status);
+                            
+                            let isNew = false;
+                            if (isRequest) {
+                            const orderTime = new Date(order.createdAt);
+                            const now = new Date();
+                            const diffMinutes = (now - orderTime) / (1000 * 60);
+                            isNew = diffMinutes <= 100000;
+                            }
+                            
+                            return (
                             <TableRow
-                              key={order.id}
-                              data={[
-                                `#${order.id}`,
-                                order.customerName || "—",
+                                key={order.id}
+                                className={isNew ? "bg-danger-bg" : ""}
+                                data={[
+                                <div className="flex items-center gap-2" key={`id-${order.id}`}>
+                                    {isNew && (
+                                    <span className="flex h-2 w-2">
+                                        <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-danger-btn opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-danger-btn"></span>
+                                    </span>
+                                    )}
+                                    <span className={isNew ? "font-semibold text-danger-text" : ""}>
+                                    #{order.id}
+                                    </span>
+                                </div>,
+                                <span className={isNew ? "font-semibold" : ""}>
+                                    {order.customerName || "—"}
+                                </span>,
                                 <StatusChip
-                                  key={`status-${order.id}`}
-                                  variant={getStatusVariant(order.status)}
+                                    key={`status-${order.id}`}
+                                    variant={getStatusVariant(order.status)}
                                 >
-                                  {order.status || "Unknown"}
+                                    {order.status || "Unknown"}
                                 </StatusChip>,
-                                formatCurrency(order.totalAmount || 0),
+                                <span className={isNew ? "font-semibold" : ""}>
+                                    {formatCurrency(order.totalAmount || 0)}
+                                </span>,
                                 formatDate(order.createdAt),
-                              ]}
-                              actions={
+                                ]}
+                                actions={
                                 <CRUDButton
-                                  variant="neutral"
-                                  onClick={() => openOrderModal(order)}
+                                    variant={isNew ? "danger" : "neutral"}
+                                    onClick={() => openOrderModal(order)}
                                 >
-                                  View Details
+                                    {isNew ? "Respond Now" : "View Details"}
                                 </CRUDButton>
-                              }
+                                }
                             />
-                          ))}
+                            );
+                        })}
                         </TableBody>
                       </Table>
                     )}
@@ -952,8 +957,13 @@ useEffect(() => {
                       </div>
                       <button
                         type="button"
-                        className="text-sm font-medium text-sage-600 hover:text-sage-700 underline"
-                        onClick={() => console.log("Go to Analytics page")}
+                        className="text-sm font-medium text-sage-600 hover:text-sage-700 underline cursor-pointer"
+                            onClick={() => {
+                            setActiveTab("analytics");
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                            
+                            
                       >
                         View full analytics
                       </button>
@@ -1020,6 +1030,22 @@ useEffect(() => {
                   </div>
                 </section>
               </>
+                ) : activeTab === "orders" ? (
+                    <Orders
+                        sellerId={sellerId}
+                        sellerName={sellerName}
+                        onOpenOrderModal={openOrderModal}
+                        orders={orders}
+                        onOrderUpdate={handleOrderUpdated}
+                    />
+                    ) : activeTab === "analytics" ? (
+                    <Analytics
+                        sellerId={sellerId}
+                        sellerName={sellerName}
+                        orders={orders}
+                    />
+                    ) : null}
+            </>
             )}
           </div>
         </main>
@@ -1028,4 +1054,4 @@ useEffect(() => {
   );
 };
 
-export default StoreDetails;
+export default SellerDashboard;

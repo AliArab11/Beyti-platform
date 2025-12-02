@@ -9,7 +9,7 @@ import ServiceProviderRequests from './Pages/Admin/ServiceProviderRequests.jsx';
 import CustomerPage from "./Pages/Customer";
 import SellerPage from "./Pages/Seller";
 import StoresPage from "./Pages/Seller/Store";
-import StoreDetailsPage from "./Pages/Seller/StoreDetails";
+import SellerDashboardPage from "./Beyti-Website/Seller/SellerDashboard.jsx";
 import ProductsPage from "./Pages/Product/Products";
 import CategoryPage from "./Pages/Product/Categories";
 import DriverPage from "./Pages/Driver";
@@ -38,6 +38,7 @@ export default function App() {
     { id: 'membership', label: 'Membership' },
     { id: 'addplan', label: 'Add Plan' },
     { id: 'seller', label: 'Seller' },
+    { id: 'sellerDashboard', label: 'Seller Dashboard' },
     { id: 'store', label: 'Store' },
     { id: 'product', label: 'Product' },
     { id: 'category', label: 'Category' },
@@ -67,8 +68,8 @@ export default function App() {
         return <SellerPage />;
       case 'store':
         return <StoresPage />;
-      case 'storedetails':
-        return <StoreDetailsPage />;
+      case 'sellerDashboard':
+        return <SellerDashboardPage />;
       case 'product':
         return <ProductsPage />;
       case 'category':
