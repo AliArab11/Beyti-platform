@@ -184,6 +184,30 @@ export const deleteMembershipPlan = async (id) => {
   });
 };
 
+/**
+ * Toggle membership plan status (Active/Inactive)
+ *
+ * Usage example:
+ * ```javascript
+ * import { toggleMembershipPlanStatus } from './services/api';
+ *
+ * try {
+ *   const updatedPlan = await toggleMembershipPlanStatus(1);
+ *   console.log('Plan status toggled:', updatedPlan);
+ * } catch (error) {
+ *   console.error('Failed to toggle plan status:', error.message);
+ * }
+ * ```
+ *
+ * @param {number} id - The membership plan ID
+ * @returns {Promise<object>} - Updated membership plan object
+ */
+export const toggleMembershipPlanStatus = async (id) => {
+  return await fetchAPI(`/MembershipPlans/toggle/${id}`, {
+    method: 'PATCH',
+  });
+};
+
 // --- Admin APIs ---
 export const getAdmins = async () => {
   return await fetchAPI('/AdminProfiles');
@@ -471,7 +495,13 @@ export const createServiceProvider = async (data) => {
   });
 };
 
-  
+export const updateServiceProvider = async (id, data) => {
+  return await fetchAPI(`/ServiceProviders/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
 /**
  * Get sellers for dropdown (Store selector)
  * @returns {Promise<Array>} - Array [{ id, storeName }]
@@ -531,12 +561,6 @@ export const createProductVariant = async (data) => {
   });
 };
 
-export const updateServiceProvider = async (id, data) => {
-  return await fetchAPI(`/ServiceProviders/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(data),
-  });
-};
 /**
  * Update a product variant
  * @param {number} id - Variant ID

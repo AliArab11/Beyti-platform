@@ -88,11 +88,24 @@ This single class applies all typography properties at once instead of:
 
 ### 4. Component Layer
 
-**Files:** [`src/components/Button.jsx`](src/components/Button.jsx), etc.
+**Files:** All components in [`src/components/`](src/components/)
 
 React components that combine Tailwind utilities with component logic.
 
+**Available Components:**
+- **Button** - Flexible buttons with semantic variants
+- **CRUDButton** - Fixed-size buttons for CRUD operations (150px x 42px)
+- **NavigationButton** - Sidebar navigation with selected states (220px x 44px)
+- **StatusChip** - Pill-shaped status indicators
+- **AnalyticsCard** - Display metrics and analytics
+- **CardChecklist** - Checklist cards with completed/pending items
+- **FilterDropdown** - Dropdown filters for tables (140px x 42px)
+- **Table** - Complete table system with headers and rows
+- **PageHeader** - Top page header with search and user menu
+- **SidebarProfile** - User profile section for sidebar
+
 ```jsx
+// Example: Button Component
 const Button = ({ variant = 'primary' }) => {
   const variantStyles = {
     success: 'bg-success-btn text-white hover:bg-success-text',
@@ -383,6 +396,104 @@ function Input({ label, ...props }) {
 
 ---
 
+## Component Library Reference
+
+### Buttons
+
+#### Button (`Button.jsx`)
+Flexible button with multiple variants and sizes.
+- **Variants:** success, error, danger, primary, secondary, ghost
+- **Sizes:** small, medium, large
+- **Features:** Full width option, disabled state, focus states
+
+#### CRUDButton (`CRUDButton.jsx`)
+Fixed-size button for CRUD operations (150px x 42px).
+- **Variants:** success, error, danger, neutral, outline
+- **Use case:** Table actions, consistent spacing
+
+#### NavigationButton (`NavigationButton.jsx`)
+Sidebar navigation item (220px x 44px).
+- **Features:** Icon support, selected state, hover effects
+- **Background:** Designed for sage-500 sidebar
+
+### Status & Labels
+
+#### StatusChip (`StatusChip.jsx`)
+Pill-shaped status indicator (36px height).
+- **Variants:** brand, success, error, danger, neutral
+- **Use case:** User roles, account status, tags
+
+### Cards & Containers
+
+#### AnalyticsCard (`AnalyticsCard.jsx`)
+Card for displaying metrics and analytics.
+- **Features:** Single or multiple metrics, optional title
+- **Styling:** grey-200 background, soft-lift shadow
+
+#### CardChecklist (`CardChecklist.jsx`)
+Card with checklist items showing completed/pending states.
+- **Features:** Title, subheading, checkbox icons (Phosphor)
+- **Use case:** Task lists, onboarding flows
+
+### Data Display
+
+#### Table (`Table.jsx`)
+Complete table system with four components:
+- **Table:** Main container with title, filters, action button
+- **TableHeader:** Column headers with light-h3 typography
+- **TableBody:** Wrapper for table rows
+- **TableRow:** Data row with support for actions
+
+**Features:**
+- Integrated filter dropdowns
+- Action button slot
+- Cell content can be JSX (StatusChips, etc.)
+- Responsive scrolling
+
+### Forms & Controls
+
+#### FilterDropdown (`FilterDropdown.jsx`)
+Dropdown for filtering data (140px x 42px).
+- **Features:** Label, selected value, options list
+- **Variants:** Default (transparent), Active (cream-100)
+- **Icons:** Chevron down (Phosphor)
+
+### Layout Components
+
+#### PageHeader (`PageHeader.jsx`)
+Top page header (80px height).
+- **Features:**
+  - Page title (display-h1)
+  - Optional search bar with icon
+  - Notification bell with badge
+  - User dropdown menu
+- **Use case:** Top of every page
+
+#### SidebarProfile (`SidebarProfile.jsx`)
+User profile section for sidebar bottom.
+- **Features:**
+  - Avatar (circular, 40px)
+  - Name and role display
+  - Expandable menu
+  - Border separator
+- **Background:** Designed for sage-500 sidebar
+
+---
+
+## Component Dependencies
+
+All components use:
+- **Design tokens** from `design-tokens.css`
+- **Tailwind utilities** configured in `index.css`
+- **Phosphor Icons** (`@phosphor-icons/react`) for iconography
+
+Components that work together:
+- `Table` + `CRUDButton` + `StatusChip` + `FilterDropdown`
+- `PageHeader` + main content area
+- `NavigationButton` + `SidebarProfile` in sidebar layout
+
+---
+
 ## File Structure
 
 ```
@@ -391,11 +502,21 @@ beyti-frontend/
 │   ├── styles/
 │   │   └── design-tokens.css        # All design tokens (colors, typography, effects)
 │   ├── components/
-│   │   ├── Button.jsx               # Example component using design tokens
+│   │   ├── Button.jsx               # Flexible button component
+│   │   ├── CRUDButton.jsx           # Fixed-size CRUD buttons
+│   │   ├── NavigationButton.jsx     # Sidebar navigation
+│   │   ├── StatusChip.jsx           # Status indicators
+│   │   ├── AnalyticsCard.jsx        # Metrics display
+│   │   ├── CardChecklist.jsx        # Checklist cards
+│   │   ├── FilterDropdown.jsx       # Filter controls
+│   │   ├── Table.jsx                # Table system
+│   │   ├── PageHeader.jsx           # Page header
+│   │   ├── SidebarProfile.jsx       # Sidebar user profile
 │   │   └── DesignSystemDemo.jsx     # Interactive showcase
 │   └── index.css                     # Tailwind imports + theme extensions
-├── Design_System.md                  # Original design spec
-└── DESIGN_SYSTEM_ARCHITECTURE.md     # This file
+├── DESIGN_SYSTEM_SETUP.md            # Quick start guide (this file)
+├── DESIGN_SYSTEM_ARCHITECTURE.md     # Architecture documentation
+└── Design_System.md                  # Original design spec
 ```
 
 ---
@@ -418,6 +539,147 @@ import DesignSystemDemo from './components/DesignSystemDemo';
 
 ---
 
+## Component Usage Patterns
+
+### Complete Page Layout
+```jsx
+import PageHeader from './components/PageHeader';
+import SidebarProfile from './components/SidebarProfile';
+import NavigationButton from './components/NavigationButton';
+import { House, Users } from '@phosphor-icons/react';
+
+<div className="flex min-h-screen">
+  {/* Sidebar */}
+  <aside className="w-[260px] bg-sage-500 flex flex-col">
+    <div className="p-6">
+      <h1 className="text-display-h1 text-white">Beyti</h1>
+    </div>
+    <nav className="flex-1 px-5 space-y-2">
+      <NavigationButton icon={<House size={20} />} selected>
+        Dashboard
+      </NavigationButton>
+      <NavigationButton icon={<Users size={20} />}>
+        Users
+      </NavigationButton>
+    </nav>
+    <SidebarProfile userName="Ali" userRole="Admin" />
+  </aside>
+
+  {/* Main Content */}
+  <div className="flex-1 bg-cream-50">
+    <PageHeader title="Dashboard" userName="Ali" userRole="Admin" />
+    <main className="p-6">
+      {/* Page content */}
+    </main>
+  </div>
+</div>
+```
+
+### User Management Table
+```jsx
+import { Table, TableHeader, TableBody, TableRow } from './components/Table';
+import CRUDButton from './components/CRUDButton';
+import StatusChip from './components/StatusChip';
+
+<Table
+  title="Users"
+  filters={[{
+    label: 'Status:',
+    value: 'All',
+    options: ['All', 'Active', 'Suspended'],
+    onChange: setFilter
+  }]}
+  actionButton={<CRUDButton variant="success">Add User</CRUDButton>}
+>
+  <TableHeader columns={['Name', 'Email', 'Role', 'Status', 'Actions']} />
+  <TableBody>
+    <TableRow
+      data={[
+        'Ali Arab',
+        'ali@example.com',
+        <StatusChip variant="brand">Admin</StatusChip>,
+        <StatusChip variant="success">Active</StatusChip>
+      ]}
+      actions={
+        <>
+          <CRUDButton variant="neutral">View</CRUDButton>
+          <CRUDButton variant="error">Delete</CRUDButton>
+        </>
+      }
+    />
+  </TableBody>
+</Table>
+```
+
+### Dashboard Stats Grid
+```jsx
+import AnalyticsCard from './components/AnalyticsCard';
+
+<div className="grid grid-cols-3 gap-6">
+  <AnalyticsCard
+    metrics={[{ value: '1,234', label: 'Total Users' }]}
+  />
+  <AnalyticsCard
+    metrics={[{ value: '567', label: 'Active Sellers' }]}
+  />
+  <AnalyticsCard
+    metrics={[{ value: '$24,567', label: 'Revenue' }]}
+  />
+</div>
+```
+
+### Onboarding Checklist
+```jsx
+import CardChecklist from './components/CardChecklist';
+
+<CardChecklist
+  title="Getting Started"
+  subheading="Complete these steps"
+  items={[
+    { text: 'Create account', completed: true },
+    { text: 'Verify email', completed: true },
+    { text: 'Add business details', completed: false },
+    { text: 'Upload documents', completed: false }
+  ]}
+/>
+```
+
+### Alert Messages (Using Design Tokens)
+```jsx
+import Button from './components/Button';
+
+{/* Success Alert */}
+<div className="bg-success-bg border-l-4 border-success-btn p-4 rounded">
+  <p className="text-body-medium text-success-text">
+    Application approved successfully!
+  </p>
+  <Button variant="success" size="small" className="mt-2">
+    View Details
+  </Button>
+</div>
+
+{/* Error Alert */}
+<div className="bg-error-bg border-l-4 border-error-btn p-4 rounded">
+  <p className="text-body-medium text-error-text">
+    Failed to process request.
+  </p>
+  <Button variant="error" size="small" className="mt-2">
+    Retry
+  </Button>
+</div>
+```
+
+### Action Buttons Row
+```jsx
+import Button from './components/Button';
+
+<div className="flex gap-4">
+  <Button variant="success">Approve</Button>
+  <Button variant="error">Reject</Button>
+  <Button variant="secondary">View Details</Button>
+</div>
+```
+
 ## Quick Reference: Common Class Combinations
 
 ### Hero Section
@@ -428,27 +690,11 @@ import DesignSystemDemo from './components/DesignSystemDemo';
 </section>
 ```
 
-### Dashboard Stats Card
+### Dashboard Stats Card (Custom)
 ```jsx
 <div className="bg-grey-200 rounded-lg p-6 shadow-soft-lift">
   <h3 className="text-card-h2 text-charcoal-600 mb-2">Total Orders</h3>
   <p className="text-metric-h3 text-sage-700">1,234</p>
-</div>
-```
-
-### Action Row
-```jsx
-<div className="flex gap-4">
-  <Button variant="success">Approve</Button>
-  <Button variant="error">Reject</Button>
-  <Button variant="secondary">View Details</Button>
-</div>
-```
-
-### Success Message
-```jsx
-<div className="bg-success-bg border-l-4 border-success-btn p-4 rounded">
-  <p className="text-body-medium text-success-text">Operation completed!</p>
 </div>
 ```
 
@@ -463,5 +709,5 @@ For questions about the design system:
 
 ---
 
-**Last Updated:** 2025-11-30
-**Version:** 1.0.0
+**Last Updated:** 2025-12-01
+**Version:** 2.0.0 - Complete Component Library Documentation
