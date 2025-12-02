@@ -10,6 +10,9 @@ import { Table, TableHeader, TableBody, TableRow } from "../../components/Table"
 import { getSellerOrders, getSellers } from "../../services/api";
 import Orders from "./Components/Orders"; 
 import Analytics from "./Components/Analytics";
+import Products from "./Components/Products";
+import Reviews from "./Components/Reviews";
+
 
 import * as Icon from "@phosphor-icons/react";
 
@@ -675,6 +678,19 @@ useEffect(() => {
             Analytics
             </NavigationButton>
 
+            <NavigationButton
+                selected={activeTab === "reviews"}
+                onClick={() => setActiveTab("reviews")}
+                icon={
+                    <Icon.Star
+                    size={20}
+                    weight={activeTab === "reviews" ? "fill" : "regular"}
+                    />
+                }
+                >
+                Reviews
+                </NavigationButton>
+
         </div>
 
         <SidebarProfile userName={sellerName} userRole="Seller" />
@@ -1038,12 +1054,19 @@ useEffect(() => {
                         orders={orders}
                         onOrderUpdate={handleOrderUpdated}
                     />
+                    ) : activeTab === "products" ? (
+                    <Products
+                        sellerId={sellerId}
+                        sellerName={sellerName}
+                    />
                     ) : activeTab === "analytics" ? (
                     <Analytics
                         sellerId={sellerId}
                         sellerName={sellerName}
                         orders={orders}
                     />
+                    ) : activeTab === "reviews" ? (
+                    <Reviews sellerId={sellerId} sellerName={sellerName} />
                     ) : null}
             </>
             )}
