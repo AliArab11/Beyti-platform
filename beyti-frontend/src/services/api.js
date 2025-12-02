@@ -33,11 +33,25 @@ const fetchAPI = async (endpoint, options = {}) => {
 
     // Check if response is ok (status 200-299)
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        errorData.message ||
-        `API Error: ${response.status} ${response.statusText}`
-      );
+      // Try to parse error response
+      let errorMessage;
+      const contentType = response.headers.get('content-type');
+
+      if (contentType && contentType.includes('application/json')) {
+        // JSON error response
+        const errorData = await response.json().catch(() => ({}));
+        errorMessage = errorData.message || errorData.Message || errorData.title;
+      } else {
+        // Plain text error response (common for auth endpoints)
+        errorMessage = await response.text().catch(() => '');
+      }
+
+      // Fallback to generic error if no message found
+      if (!errorMessage) {
+        errorMessage = `Request failed with status ${response.status}`;
+      }
+
+      throw new Error(errorMessage);
     }
 
     // Handle 204 No Content responses
@@ -1410,6 +1424,47 @@ export const updateSellerOrderStatus = async (orderId, status) => {
   });
 };
 
+// --- Authentication APIs ---
+
+/**
+ * User login
+ *
+ * Usage example:
+ * ```javascript
+ * import { login } from './services/api';
+ *
+ * try {
+ *   const response = await login({
+ *     Email: "user@example.com",
+ *     Password: "password123"
+ *   });
+ *   console.log('Login successful:', response);
+ *   // Store token: localStorage.setItem('authToken', response.Token);
+ * } catch (error) {
+ *   console.error('Login failed:', error.message);
+ * }
+ * ```
+ *
+ * @param {object} credentials - Login credentials
+ *   Example: {
+ *     Email: "user@example.com",
+ *     Password: "password123"
+ *   }
+ * @returns {Promise<object>} - Login response
+ *   {
+ *     Token: "jwt_token_string",
+ *     UserId: number,
+ *     Role: "Customer" | "Seller" | "Admin" | "Driver" | "ServiceProvider"
+ *   }
+ * @throws {Error} - Throws error with message "Invalid credentials" on 401
+ */
+export const login = async (credentials) => {
+  return await fetchAPI('/Auth/login', {
+    method: 'POST',
+    body: JSON.stringify(credentials),
+  });
+};
+
 // --- Service Moderation APIs ---
 
 /**
@@ -1476,6 +1531,50 @@ export const suspendService = async (id, reason) => {
 export const deleteService = async (id) => {
   return await fetchAPI(`/ServiceModeration/Services/${id}`, {
     method: 'DELETE',
+  });
+};
+
+/**
+ * User registration
+ *
+ * Usage example:
+ * ```javascript
+ * import { register } from './services/api';
+ *
+ * const newUser = {
+ *   Email: "user@example.com",
+ *   Password: "password123",
+ *   FirstName: "John",
+ *   LastName: "Doe",
+ *   PhoneNumber: "+1234567890"
+ * };
+ *
+ * try {
+ *   const response = await register(newUser);
+ *   console.log('Registration successful:', response);
+ * } catch (error) {
+ *   console.error('Registration failed:', error.message);
+ * }
+ * ```
+ *
+ * @param {object} data - Registration data
+ *   Example: {
+ *     Email: "user@example.com",
+ *     Password: "password123",
+ *     FirstName: "John",
+ *     LastName: "Doe",
+ *     PhoneNumber: "+1234567890"
+ *   }
+ * @returns {Promise<object>} - Registration response
+ *   {
+ *     Message: "User registered successfully",
+ *     UserId: "identity_user_id"
+ *   }
+ */
+export const register = async (data) => {
+  return await fetchAPI('/Auth/register', {
+    method: 'POST',
+    body: JSON.stringify(data),
   });
 };
 

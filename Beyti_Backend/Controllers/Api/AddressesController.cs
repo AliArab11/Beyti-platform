@@ -1,11 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using BeytiDB.Data;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using BeytiDB.Data;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace Beyti_Backend.Controllers.Api
 {
@@ -25,7 +26,9 @@ namespace Beyti_Backend.Controllers.Api
             public string? Label { get; set; }
             public string Street { get; set; }
             public string City { get; set; }
+            [Column("Governorate")]
             public string? Region { get; set; }        // Changed from Governorate
+            [Column("Block")]
             public string? PostalCode { get; set; }    // Changed from Block
             public string Country { get; set; }
             public decimal? Latitude { get; set; }
