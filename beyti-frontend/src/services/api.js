@@ -241,6 +241,12 @@ export const updateAdmin = async (id, data) => {
   });
 };
 
+export const toggleAdminStatus = async (id) => {
+  return await fetchAPI(`/AdminProfiles/${id}/toggle`, {
+    method: 'PATCH',
+  });
+};
+
 // --- User Management (FR1) ---
 
 export const getUsers = async (role = null) => {
@@ -274,6 +280,10 @@ export const toggleUserStatus = async (id) => {
 
 // --- Service Provider Requests ---
 export const getServiceProviderRequests = async () => {
+  return await fetchAPI('/AdminDashboard/ServiceProviderRequests');
+};
+
+export const getAllServiceProviderRequests = async () => {
   return await fetchAPI('/AdminDashboard/ServiceProviderRequests');
 };
 
@@ -1241,6 +1251,103 @@ export const deleteDriver = async (id) => {
   });
 };
 
+
+// --- Service Provider Dashboard ---
+
+// Profile
+export const getProviderProfile = async (userProfileId) => {
+  return await fetchAPI(`/ServiceProviderDashboard/Profile/${userProfileId}`);
+};
+
+export const updateProviderProfile = async (userProfileId, data) => {
+  // Update user profile information via ServiceProviderDashboard endpoint
+  return await fetchAPI(`/ServiceProviderDashboard/UpdateProfile/${userProfileId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+export const updateProviderStatus = async (serviceProviderId, status) => {
+  // Update service provider status via ServiceProviderDashboard endpoint
+  return await fetchAPI(`/ServiceProviderDashboard/UpdateStatus/${serviceProviderId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ Status: status }),
+  });
+};
+
+export const updateProviderAddress = async (serviceProviderId, data) => {
+  // Update service provider address via ServiceProviderDashboard endpoint
+  return await fetchAPI(`/ServiceProviderDashboard/UpdateAddress/${serviceProviderId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+// Categories & Services
+export const getServiceCategories = async () => {
+  return await fetchAPI('/ServiceProviderDashboard/Categories');
+};
+
+export const getMyServices = async (serviceProviderId) => {
+  return await fetchAPI(`/ServiceProviderDashboard/MyServices/${serviceProviderId}`);
+};
+
+export const addService = async (data) => {
+  return await fetchAPI('/ServiceProviderDashboard/AddService', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export const updateService = async (serviceCatalogId, data) => {
+  return await fetchAPI(`/ServiceProviderDashboard/UpdateService/${serviceCatalogId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+export const toggleServiceStatus = async (serviceCatalogId) => {
+  return await fetchAPI(`/ServiceProviderDashboard/ToggleService/${serviceCatalogId}`, {
+    method: 'PUT',
+  });
+};
+
+// Time Slots / Schedule
+export const getProviderTimeSlots = async (serviceProviderId) => {
+  return await fetchAPI(`/ServiceProviderDashboard/TimeSlots/${serviceProviderId}`);
+};
+
+export const addTimeSlot = async (data) => {
+  return await fetchAPI('/ServiceProviderDashboard/AddTimeSlot', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export const deleteTimeSlot = async (timeSlotId) => {
+  return await fetchAPI(`/ServiceProviderDashboard/DeleteTimeSlot/${timeSlotId}`, {
+    method: 'DELETE',
+  });
+};
+
+// Bookings
+export const getProviderBookings = async (serviceProviderId, status = null) => {
+  const query = status ? `?status=${status}` : '';
+  return await fetchAPI(`/ServiceProviderDashboard/Bookings/${serviceProviderId}${query}`);
+};
+
+export const updateBookingStatus = async (bookingId, data) => {
+  return await fetchAPI(`/ServiceProviderDashboard/UpdateBookingStatus/${bookingId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+// Statistics
+export const getProviderStatistics = async (serviceProviderId) => {
+  return await fetchAPI(`/ServiceProviderDashboard/Statistics/${serviceProviderId}`);
+};
+
 // --- Delivery Ticket APIs ---
 
 /**
@@ -1358,6 +1465,75 @@ export const login = async (credentials) => {
   });
 };
 
+// --- Service Moderation APIs ---
+
+/**
+ * Get service moderation statistics
+ * @returns {Promise<object>} - Service statistics
+ */
+export const getServiceModerationStatistics = async () => {
+  return await fetchAPI('/ServiceModeration/Statistics');
+};
+
+/**
+ * Get services for moderation with optional filters
+ * @param {boolean|null} isActive - Filter by active status
+ * @param {string|null} search - Search term
+ * @returns {Promise<Array>} - Array of services
+ */
+export const getServicesForModeration = async (isActive = null, search = null) => {
+  let query = [];
+  if (isActive !== null) query.push(`isActive=${isActive}`);
+  if (search) query.push(`search=${encodeURIComponent(search)}`);
+
+  const queryString = query.length > 0 ? `?${query.join('&')}` : '';
+  return await fetchAPI(`/ServiceModeration/Services${queryString}`);
+};
+
+/**
+ * Get detailed service information
+ * @param {number} id - Service ID
+ * @returns {Promise<object>} - Service details
+ */
+export const getServiceDetails = async (id) => {
+  return await fetchAPI(`/ServiceModeration/Services/${id}`);
+};
+
+/**
+ * Approve a service
+ * @param {number} id - Service ID
+ * @returns {Promise<object>} - Response
+ */
+export const approveService = async (id) => {
+  return await fetchAPI(`/ServiceModeration/Services/${id}/approve`, {
+    method: 'PUT',
+  });
+};
+
+/**
+ * Suspend a service with reason
+ * @param {number} id - Service ID
+ * @param {string} reason - Suspension reason
+ * @returns {Promise<object>} - Response
+ */
+export const suspendService = async (id, reason) => {
+  return await fetchAPI(`/ServiceModeration/Services/${id}/suspend`, {
+    method: 'PUT',
+    body: JSON.stringify({ reason }),
+  });
+};
+
+/**
+ * Delete a service
+ * @param {number} id - Service ID
+ * @returns {Promise<object>} - Response
+ */
+export const deleteService = async (id) => {
+  return await fetchAPI(`/ServiceModeration/Services/${id}`, {
+    method: 'DELETE',
+  });
+};
+
 /**
  * User registration
  *
@@ -1400,4 +1576,21 @@ export const register = async (data) => {
     method: 'POST',
     body: JSON.stringify(data),
   });
+};
+
+// --- Service Review APIs ---
+
+/**
+ * Get all service reviews (optionally filtered by service provider)
+ * @param {number} [serviceProviderId] - Optional: Filter by service provider ID
+ * @returns {Promise<Array>} - Array of service review objects
+ */
+export const getServiceReviews = async (serviceProviderId = null) => {
+  let url = '/ServiceReviews';
+  if (serviceProviderId) {
+    // We'll need to filter client-side or add backend support
+    const allReviews = await fetchAPI(url);
+    return allReviews.filter(review => review.serviceProviderId === serviceProviderId);
+  }
+  return await fetchAPI(url);
 };

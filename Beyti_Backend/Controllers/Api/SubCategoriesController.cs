@@ -20,6 +20,14 @@ namespace Beyti_Backend.Controllers.Api
             public string Name { get; set; } = null!;
             public int CategoryId { get; set; }
         }
+
+        public class SubCategoryUpdateDto
+        {
+            public string Name { get; set; } = null!;
+            public int CategoryId { get; set; }
+            public bool IsActive { get; set; }
+        }
+
         public SubCategoriesController(BeytiContext context)
         {
             _context = context;
@@ -47,16 +55,23 @@ namespace Beyti_Backend.Controllers.Api
         }
 
         // PUT: api/SubCategories/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutSubCategory(int id, SubCategory subCategory)
+        public async Task<IActionResult> PutSubCategory(int id, SubCategoryUpdateDto dto)
         {
-            if (id != subCategory.Id)
+            var subCategory = await _context.SubCategories.FindAsync(id);
+            if (subCategory == null)
             {
-                return BadRequest();
+                return NotFound();
             }
 
-            _context.Entry(subCategory).State = EntityState.Modified;
+            if (!_context.Categories.Any(c => c.Id == dto.CategoryId))
+            {
+                return BadRequest("Invalid CategoryId");
+            }
+
+            subCategory.Name = dto.Name;
+            subCategory.CategoryId = dto.CategoryId;
+            subCategory.IsActive = dto.IsActive;
 
             try
             {

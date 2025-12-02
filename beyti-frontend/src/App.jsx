@@ -10,9 +10,11 @@ import CustomerPage from "./Pages/Customer";
 import SellerPage from "./Pages/Seller";
 import StoresPage from "./Pages/Seller/Store";
 import StoreDetailsPage from "./Pages/Seller/StoreDetails";
+import SellerDashboardPage from "./Beyti-Website/Seller/SellerDashboard.jsx";
 import ProductsPage from "./Pages/Product/Products";
 import CategoryPage from "./Pages/Product/Categories";
 import DriverPage from "./Pages/Driver";
+import ServiceProviderDashboard from './Beyti-Website/ServiceProvider/ServiceProviderDashboard';
 import DesignSystemDemo from './components/DesignSystemDemo';
 import DashboardTemplate from './Pages/DashboardTemplate';
 import AdminUserManagementNew from './Pages/Admin/AdminUserManagementNew';
@@ -22,6 +24,7 @@ import RoleSelect from './Beyti-Website/Registration/RoleSelect';
 import SellerOnboarding from './Beyti-Website/Registration/SellerOnboarding';
 import ProviderOnboarding from './Beyti-Website/Registration/ProviderOnboarding';
 import DriverOnboarding from './Beyti-Website/Registration/DriverOnboarding';
+import AdminView from './Beyti-Website/Admin/AdminView.jsx';
 
 // Placeholder components for pages that don't exist yet
 const PlaceholderPage = ({ pageName }) => (
@@ -41,6 +44,7 @@ export default function App() {
     { path: '/membership', label: 'Membership' },
     { path: '/addplan', label: 'Add Plan' },
     { path: '/seller', label: 'Seller' },
+    { path: '/seller-dashboard', label: 'Seller Dashboard' },
     { path: '/store', label: 'Store' },
     { path: '/product', label: 'Product' },
     { path: '/category', label: 'Category' },
@@ -48,14 +52,15 @@ export default function App() {
     { path: '/driver', label: 'Driver' },
     { path: '/admin', label: 'Admin' },
     { path: '/serviceprovider', label: 'Service Provider' },
+    { path: '/serviceprovider-dashboard', label: 'SP Dashboard' },
+    { path: '/admin-view', label: 'Admin Dashboard' },
     { path: '/notification', label: 'Notification' },
-    { path: '/admindashboard', label: 'Admin Dashboard'},
+    { path: '/admindashboard', label: 'Admin Dash (Old)'},
     { path: '/servicerequest', label: 'Service Request'},
     { path: '/design-demo', label: 'Design Demo'},
     { path: '/dashboard-template', label: 'Dashboard Template'},
     { path: '/user-management', label: 'User Management (New)'}
   ];
-
   return (
     <BrowserRouter>
       <div className="min-h-screen bg-gray-50">
@@ -142,6 +147,7 @@ export default function App() {
             <Route path="/membership" element={<MembershipPage />} />
             <Route path="/addplan" element={<AddPlanPage />} />
             <Route path="/seller" element={<SellerPage />} />
+            <Route path="/seller-dashboard" element={<SellerDashboardPage />} />
             <Route path="/store" element={<StoresPage />} />
             <Route path="/store/:id" element={<StoreDetailsPage />} />
             <Route path="/product" element={<ProductsPage />} />
@@ -150,6 +156,8 @@ export default function App() {
             <Route path="/driver" element={<DriverPage />} />
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/serviceprovider" element={<ServiceProviderPage />} />
+            <Route path="/serviceprovider-dashboard" element={<ServiceProviderDashboard />} />
+            <Route path="/admin-view" element={<AdminView />} />
             <Route path="/admindashboard" element={<AdminUsersPage />} />
             <Route path="/servicerequest" element={<ServiceProviderRequests />} />
             <Route path="/notification" element={<PlaceholderPage pageName="Notification" />} />
