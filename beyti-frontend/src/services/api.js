@@ -33,11 +33,25 @@ const fetchAPI = async (endpoint, options = {}) => {
 
     // Check if response is ok (status 200-299)
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        errorData.message ||
-        `API Error: ${response.status} ${response.statusText}`
-      );
+      // Try to parse error response
+      let errorMessage;
+      const contentType = response.headers.get('content-type');
+
+      if (contentType && contentType.includes('application/json')) {
+        // JSON error response
+        const errorData = await response.json().catch(() => ({}));
+        errorMessage = errorData.message || errorData.Message || errorData.title;
+      } else {
+        // Plain text error response (common for auth endpoints)
+        errorMessage = await response.text().catch(() => '');
+      }
+
+      // Fallback to generic error if no message found
+      if (!errorMessage) {
+        errorMessage = `Request failed with status ${response.status}`;
+      }
+
+      throw new Error(errorMessage);
     }
 
     // Handle 204 No Content responses
@@ -1334,6 +1348,72 @@ export const getProviderStatistics = async (serviceProviderId) => {
   return await fetchAPI(`/ServiceProviderDashboard/Statistics/${serviceProviderId}`);
 };
 
+// --- Universal User Profile APIs ---
+
+/**
+ * Get user profile for any user type
+ * Routes to appropriate endpoint based on user role
+ * @param {number} userId - User profile ID
+ * @returns {Promise<object>} - User profile data
+ */
+export const getUserProfile = async (userId) => {
+  // Using UserProfiles/Profile endpoint which works for all user types
+  // Returns role-specific data based on the user's RoleType
+  return await fetchAPI(`/UserProfiles/Profile/${userId}`);
+};
+
+/**
+ * Update user profile for any user type
+ * Routes to appropriate endpoint based on user role
+ * @param {number} userId - User profile ID
+ * @param {string} userRole - User role type (Admin, ServiceProvider, Seller, etc.)
+ * @param {object} updates - Profile updates object
+ * @returns {Promise<object>} - Updated profile data
+ */
+export const updateUserProfile = async (userId, userRole, updates) => {
+  // For now, use ServiceProviderDashboard endpoint for all profile updates
+  // This can be extended to route based on role if needed
+  const profileUpdates = {
+    DisplayName: updates.displayName,
+    Phone: updates.phone,
+  };
+
+  await fetchAPI(`/ServiceProviderDashboard/UpdateProfile/${userId}`, {
+    method: 'PUT',
+    body: JSON.stringify(profileUpdates),
+  });
+
+  // If address updates are provided and user has associated provider/seller/driver ID
+  if (updates.address && updates.entityId) {
+    const addressUpdates = {
+      Street: updates.address.street,
+      City: updates.address.city,
+      Region: updates.address.region,
+      PostalCode: updates.address.postalCode,
+      Country: updates.address.country,
+    };
+
+    // Route address update based on role
+    if (userRole === 'ServiceProvider') {
+      await fetchAPI(`/ServiceProviderDashboard/UpdateAddress/${updates.entityId}`, {
+        method: 'PUT',
+        body: JSON.stringify(addressUpdates),
+      });
+    }
+    // Add other role-specific address updates here if needed
+  }
+
+  // If status update is provided for service providers
+  if (updates.status && updates.entityId && userRole === 'ServiceProvider') {
+    await fetchAPI(`/ServiceProviderDashboard/UpdateStatus/${updates.entityId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ Status: updates.status }),
+    });
+  }
+
+  return { success: true };
+};
+
 // --- Delivery Ticket APIs ---
 
 /**
@@ -1410,6 +1490,47 @@ export const updateSellerOrderStatus = async (orderId, status) => {
   });
 };
 
+// --- Authentication APIs ---
+
+/**
+ * User login
+ *
+ * Usage example:
+ * ```javascript
+ * import { login } from './services/api';
+ *
+ * try {
+ *   const response = await login({
+ *     Email: "user@example.com",
+ *     Password: "password123"
+ *   });
+ *   console.log('Login successful:', response);
+ *   // Store token: localStorage.setItem('authToken', response.Token);
+ * } catch (error) {
+ *   console.error('Login failed:', error.message);
+ * }
+ * ```
+ *
+ * @param {object} credentials - Login credentials
+ *   Example: {
+ *     Email: "user@example.com",
+ *     Password: "password123"
+ *   }
+ * @returns {Promise<object>} - Login response
+ *   {
+ *     Token: "jwt_token_string",
+ *     UserId: number,
+ *     Role: "Customer" | "Seller" | "Admin" | "Driver" | "ServiceProvider"
+ *   }
+ * @throws {Error} - Throws error with message "Invalid credentials" on 401
+ */
+export const login = async (credentials) => {
+  return await fetchAPI('/Auth/login', {
+    method: 'POST',
+    body: JSON.stringify(credentials),
+  });
+};
+
 // --- Service Moderation APIs ---
 
 /**
@@ -1479,6 +1600,50 @@ export const deleteService = async (id) => {
   });
 };
 
+/**
+ * User registration
+ *
+ * Usage example:
+ * ```javascript
+ * import { register } from './services/api';
+ *
+ * const newUser = {
+ *   Email: "user@example.com",
+ *   Password: "password123",
+ *   FirstName: "John",
+ *   LastName: "Doe",
+ *   PhoneNumber: "+1234567890"
+ * };
+ *
+ * try {
+ *   const response = await register(newUser);
+ *   console.log('Registration successful:', response);
+ * } catch (error) {
+ *   console.error('Registration failed:', error.message);
+ * }
+ * ```
+ *
+ * @param {object} data - Registration data
+ *   Example: {
+ *     Email: "user@example.com",
+ *     Password: "password123",
+ *     FirstName: "John",
+ *     LastName: "Doe",
+ *     PhoneNumber: "+1234567890"
+ *   }
+ * @returns {Promise<object>} - Registration response
+ *   {
+ *     Message: "User registered successfully",
+ *     UserId: "identity_user_id"
+ *   }
+ */
+export const register = async (data) => {
+  return await fetchAPI('/Auth/register', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
 // --- Service Review APIs ---
 
 /**
@@ -1494,4 +1659,35 @@ export const getServiceReviews = async (serviceProviderId = null) => {
     return allReviews.filter(review => review.serviceProviderId === serviceProviderId);
   }
   return await fetchAPI(url);
+};
+
+// Fetch all notifications for user
+export const getUserNotifications = async (userId) => {
+  return await fetchAPI(`/Notifications/user/${userId}`);
+};
+
+// Fetch unread count
+export const getUnreadCount = async (userId) => {
+  return await fetchAPI(`/Notifications/user/${userId}/unread/count`);
+};
+
+// Mark all notifications as read
+export const markAllNotificationsRead = async (userId) => {
+  return await fetchAPI(`/Notifications/user/${userId}/read-all`, {
+    method: 'PUT',
+  });
+};
+
+// Mark single notification as read
+export const markNotificationRead = async (id) => {
+  return await fetchAPI(`/Notifications/${id}/read`, {
+    method: 'PUT',
+  });
+};
+
+// Delete notification
+export const deleteNotification = async (id) => {
+  return await fetchAPI(`/Notifications/${id}`, {
+    method: 'DELETE',
+  });
 };

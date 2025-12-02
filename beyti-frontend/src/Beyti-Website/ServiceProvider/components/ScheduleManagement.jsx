@@ -87,11 +87,11 @@ export default function ScheduleManagement({ serviceProviderId }) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white rounded-lg shadow-soft-lift p-6">
+      <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none p-6 transition-colors">
         <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-card-h2 text-charcoal-600">Weekly Schedule</h2>
-            <p className="text-body-regular text-charcoal-400 mt-1">
+            <h2 className="text-card-h2 text-charcoal-600 dark:text-white">Weekly Schedule</h2>
+            <p className="text-body-regular text-charcoal-400 dark:text-gray-400 mt-1">
               Set your availability for customers to book appointments
             </p>
           </div>
@@ -106,11 +106,11 @@ export default function ScheduleManagement({ serviceProviderId }) {
 
       {/* Form */}
       {showForm && (
-        <div className="bg-white rounded-lg shadow-soft-lift p-6">
-          <h3 className="text-card-h2 text-charcoal-600 mb-6">Add Time Slot</h3>
+        <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none p-6 transition-colors">
+          <h3 className="text-card-h2 text-charcoal-600 dark:text-white mb-6">Add Time Slot</h3>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-body-medium text-charcoal-600 mb-2">Day of Week *</label>
+              <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">Day of Week *</label>
               <select
                 value={formData.dayOfWeek}
                 onChange={(e) => setFormData({ ...formData, dayOfWeek: e.target.value })}
@@ -128,7 +128,7 @@ export default function ScheduleManagement({ serviceProviderId }) {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-body-medium text-charcoal-600 mb-2">Start Time *</label>
+                <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">Start Time *</label>
                 <input
                   type="time"
                   value={formData.startTime}
@@ -139,7 +139,7 @@ export default function ScheduleManagement({ serviceProviderId }) {
               </div>
 
               <div>
-                <label className="block text-body-medium text-charcoal-600 mb-2">End Time *</label>
+                <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">End Time *</label>
                 <input
                   type="time"
                   value={formData.endTime}
@@ -164,15 +164,15 @@ export default function ScheduleManagement({ serviceProviderId }) {
 
       {/* Weekly Schedule Display */}
       {timeSlots.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-soft-lift p-12 text-center">
+        <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none p-12 text-center transition-colors">
           <div className="text-6xl mb-4">📅</div>
-          <p className="text-body-regular text-charcoal-400">No schedule set yet</p>
-          <p className="text-label-medium text-charcoal-300 mt-2">Add time slots to let customers book appointments</p>
+          <p className="text-body-regular text-charcoal-400 dark:text-gray-400">No schedule set yet</p>
+          <p className="text-label-medium text-charcoal-300 dark:text-gray-500 mt-2">Add time slots to let customers book appointments</p>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow-soft-lift overflow-hidden">
-          <div className="p-6 border-b border-grey-stroke">
-            <h3 className="text-card-h2 text-charcoal-600">Your Availability</h3>
+        <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none overflow-hidden transition-colors">
+          <div className="p-6 border-b border-grey-stroke dark:border-charcoal-500">
+            <h3 className="text-card-h2 text-charcoal-600 dark:text-white">Your Availability</h3>
           </div>
 
           <div className="divide-y divide-grey-stroke">
@@ -180,10 +180,10 @@ export default function ScheduleManagement({ serviceProviderId }) {
               <div key={day.id} className="p-6">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <h4 className="text-card-h3 text-charcoal-600 mb-3">{day.name}</h4>
+                    <h4 className="text-card-h3 text-charcoal-600 dark:text-white mb-3">{day.name}</h4>
 
                     {day.slots.length === 0 ? (
-                      <p className="text-body-regular text-charcoal-300 italic">No availability set</p>
+                      <p className="text-body-regular text-charcoal-300 dark:text-gray-500 italic">No availability set</p>
                     ) : (
                       <div className="space-y-2">
                         {day.slots.map((slot) => (
@@ -195,7 +195,7 @@ export default function ScheduleManagement({ serviceProviderId }) {
                               <StatusChip variant={slot.isActive ? 'success' : 'error'}>
                                 {slot.isActive ? 'Active' : 'Inactive'}
                               </StatusChip>
-                              <span className="text-body-regular text-charcoal-600 font-medium">
+                              <span className="text-body-regular text-charcoal-600 dark:text-white font-medium">
                                 {slot.startTime} - {slot.endTime}
                               </span>
                             </div>

@@ -107,11 +107,11 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
   return (
     <div className="space-y-6">
       {/* Header with View Toggle and Filters */}
-      <div className="bg-white rounded-lg shadow-soft-lift p-6">
+      <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none p-6 transition-colors">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
           <div>
-            <h2 className="text-card-h2 text-charcoal-600">Service Bookings</h2>
-            <p className="text-body-regular text-charcoal-400 mt-1">
+            <h2 className="text-card-h2 text-charcoal-600 dark:text-white">Service Bookings</h2>
+            <p className="text-body-regular text-charcoal-400 dark:text-gray-400 mt-1">
               {viewMode === 'upcoming'
                 ? `${upcomingBookings.length} upcoming bookings`
                 : `${displayedBookings.length} bookings`}
@@ -128,8 +128,8 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
                 }}
                 className={`px-4 py-2 rounded-md text-label-medium font-medium transition-colors ${
                   viewMode === 'upcoming'
-                    ? 'bg-white text-sage-600 shadow-sm'
-                    : 'text-charcoal-400 hover:text-charcoal-600'
+                    ? 'bg-grey-200 dark:bg-[#2A2A2A] text-sage-600 shadow-sm'
+                    : 'text-charcoal-400 dark:text-gray-400 hover:text-charcoal-600 dark:hover:text-white'
                 }`}
               >
                 Upcoming
@@ -138,8 +138,8 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
                 onClick={() => setViewMode('all')}
                 className={`px-4 py-2 rounded-md text-label-medium font-medium transition-colors ${
                   viewMode === 'all'
-                    ? 'bg-white text-sage-600 shadow-sm'
-                    : 'text-charcoal-400 hover:text-charcoal-600'
+                    ? 'bg-grey-200 dark:bg-[#2A2A2A] text-sage-600 shadow-sm'
+                    : 'text-charcoal-400 dark:text-gray-400 hover:text-charcoal-600 dark:hover:text-white'
                 }`}
               >
                 All Bookings
@@ -149,7 +149,7 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
             {/* Status Filter */}
             {viewMode === 'all' && (
               <div className="flex items-center gap-2">
-                <label className="text-body-medium text-charcoal-600">Filter:</label>
+                <label className="text-body-medium text-charcoal-600 dark:text-white">Filter:</label>
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
@@ -176,19 +176,19 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
               <div className="text-metric-h3 text-yellow-500">
                 {upcomingBookings.filter(b => b.status === 'PendingQuote').length}
               </div>
-              <div className="text-body-regular text-charcoal-400 mt-1">Needs Quote</div>
+              <div className="text-body-regular text-charcoal-400 dark:text-gray-400 mt-1">Needs Quote</div>
             </div>
             <div className="text-center">
               <div className="text-metric-h3 text-success-btn">
                 {upcomingBookings.filter(b => b.status === 'Confirmed').length}
               </div>
-              <div className="text-body-regular text-charcoal-400 mt-1">Confirmed</div>
+              <div className="text-body-regular text-charcoal-400 dark:text-gray-400 mt-1">Confirmed</div>
             </div>
             <div className="text-center">
               <div className="text-metric-h3 text-sage-600">
                 {upcomingBookings.filter(b => b.status === 'InProgress').length}
               </div>
-              <div className="text-body-regular text-charcoal-400 mt-1">In Progress</div>
+              <div className="text-body-regular text-charcoal-400 dark:text-gray-400 mt-1">In Progress</div>
             </div>
           </div>
         )}
@@ -197,37 +197,37 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
       {/* Bookings List */}
       <div className="space-y-4">
         {displayedBookings.map((booking) => (
-          <div key={booking.id} className="bg-white rounded-lg shadow-soft-lift overflow-hidden hover:shadow-lg transition-shadow">
+          <div key={booking.id} className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none overflow-hidden hover:shadow-lg transition-colors">
             <div className="p-6">
               {/* Header */}
               <div className="flex justify-between items-start mb-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-card-h3 text-charcoal-600">{booking.serviceName}</h3>
+                    <h3 className="text-card-h3 text-charcoal-600 dark:text-white">{booking.serviceName}</h3>
                     <StatusChip variant={getStatusVariant(booking.status)}>
                       {booking.status}
                     </StatusChip>
                   </div>
-                  <p className="text-body-regular text-charcoal-400">Category: {booking.category}</p>
+                  <p className="text-body-regular text-charcoal-400 dark:text-gray-400">Category: {booking.category}</p>
                 </div>
               </div>
 
               {/* Customer Info */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 p-4 bg-cream-50 rounded-lg">
                 <div>
-                  <p className="text-body-regular text-charcoal-400">
-                    <span className="font-semibold text-charcoal-600">Customer:</span> {booking.customerName}
+                  <p className="text-body-regular text-charcoal-400 dark:text-gray-400">
+                    <span className="font-semibold text-charcoal-600 dark:text-white">Customer:</span> {booking.customerName}
                   </p>
-                  <p className="text-body-regular text-charcoal-400">
-                    <span className="font-semibold text-charcoal-600">Phone:</span> {booking.customerPhone}
+                  <p className="text-body-regular text-charcoal-400 dark:text-gray-400">
+                    <span className="font-semibold text-charcoal-600 dark:text-white">Phone:</span> {booking.customerPhone}
                   </p>
                 </div>
                 <div>
-                  <p className="text-body-regular text-charcoal-400">
-                    <span className="font-semibold text-charcoal-600">Service Type:</span> {booking.serviceType}
+                  <p className="text-body-regular text-charcoal-400 dark:text-gray-400">
+                    <span className="font-semibold text-charcoal-600 dark:text-white">Service Type:</span> {booking.serviceType}
                   </p>
-                  <p className="text-body-regular text-charcoal-400">
-                    <span className="font-semibold text-charcoal-600">Date:</span>{' '}
+                  <p className="text-body-regular text-charcoal-400 dark:text-gray-400">
+                    <span className="font-semibold text-charcoal-600 dark:text-white">Date:</span>{' '}
                     {new Date(booking.bookingDateTime).toLocaleString()}
                   </p>
                 </div>
@@ -236,7 +236,7 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
               {/* Address */}
               <div className="mb-4 p-4 bg-sage-100 rounded-lg">
                 <p className="text-body-medium font-semibold text-sage-700 mb-1">Service Address:</p>
-                <p className="text-body-regular text-charcoal-600">
+                <p className="text-body-regular text-charcoal-600 dark:text-white">
                   {booking.address.street}, {booking.address.city}
                 </p>
                 {booking.address.latitude && booking.address.longitude && (
@@ -256,15 +256,15 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
                 <div className="mb-4 p-4 bg-success-bg rounded-lg">
                   <div className="grid grid-cols-3 gap-4 text-center">
                     <div>
-                      <p className="text-body-regular text-charcoal-400">Quoted Price</p>
-                      <p className="text-card-h3 text-charcoal-600">{booking.quotedPrice} BHD</p>
+                      <p className="text-body-regular text-charcoal-400 dark:text-gray-400">Quoted Price</p>
+                      <p className="text-card-h3 text-charcoal-600 dark:text-white">{booking.quotedPrice} BHD</p>
                     </div>
                     <div>
-                      <p className="text-body-regular text-charcoal-400">Deposit (50%)</p>
+                      <p className="text-body-regular text-charcoal-400 dark:text-gray-400">Deposit (50%)</p>
                       <p className="text-card-h3 text-success-btn">{booking.depositAmount} BHD</p>
                     </div>
                     <div>
-                      <p className="text-body-regular text-charcoal-400">Final Payment</p>
+                      <p className="text-body-regular text-charcoal-400 dark:text-gray-400">Final Payment</p>
                       <p className="text-card-h3 text-sage-600">{booking.finalAmount} BHD</p>
                     </div>
                   </div>
@@ -275,7 +275,7 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
               {booking.notes && (
                 <div className="mb-4 p-3 bg-warning-bg border border-warning-btn rounded-lg">
                   <p className="text-body-medium font-semibold text-warning-text">Customer Notes:</p>
-                  <p className="text-body-regular text-charcoal-600 mt-1">{booking.notes}</p>
+                  <p className="text-body-regular text-charcoal-600 dark:text-white mt-1">{booking.notes}</p>
                 </div>
               )}
 
@@ -358,18 +358,18 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
 
       {/* Empty State */}
       {displayedBookings.length === 0 && (
-        <div className="bg-white rounded-lg shadow-soft-lift p-12 text-center">
+        <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none p-12 text-center transition-colors">
           <div className="text-6xl mb-4">
             {viewMode === 'upcoming' ? '📌' : '📋'}
           </div>
-          <p className="text-body-regular text-charcoal-400 font-medium">
+          <p className="text-body-regular text-charcoal-400 dark:text-gray-400 font-medium">
             {viewMode === 'upcoming'
               ? 'No upcoming bookings'
               : filterStatus
                 ? `No ${filterStatus} bookings found`
                 : 'No bookings found'}
           </p>
-          <p className="text-label-medium text-charcoal-300 mt-2">
+          <p className="text-label-medium text-charcoal-300 dark:text-gray-500 mt-2">
             {viewMode === 'upcoming'
               ? 'Pending and active bookings will appear here'
               : filterStatus
@@ -382,30 +382,30 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
       {/* Quote Modal */}
       {showQuoteModal && selectedBooking && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="p-6 border-b border-grey-stroke">
-              <h3 className="text-card-h2 text-charcoal-600">Send Quote</h3>
-              <p className="text-body-regular text-charcoal-400 mt-1">
+          <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-xl max-w-md w-full transition-colors">
+            <div className="p-6 border-b border-grey-stroke dark:border-charcoal-500">
+              <h3 className="text-card-h2 text-charcoal-600 dark:text-white">Send Quote</h3>
+              <p className="text-body-regular text-charcoal-400 dark:text-gray-400 mt-1">
                 for {selectedBooking.serviceName}
               </p>
             </div>
 
             <div className="p-6">
               <div className="mb-4 p-4 bg-cream-50 rounded-lg">
-                <p className="text-body-regular text-charcoal-400 mb-2">
-                  <span className="font-semibold text-charcoal-600">Customer:</span> {selectedBooking.customerName}
+                <p className="text-body-regular text-charcoal-400 dark:text-gray-400 mb-2">
+                  <span className="font-semibold text-charcoal-600 dark:text-white">Customer:</span> {selectedBooking.customerName}
                 </p>
-                <p className="text-body-regular text-charcoal-400">
-                  <span className="font-semibold text-charcoal-600">Service:</span> {selectedBooking.serviceName}
+                <p className="text-body-regular text-charcoal-400 dark:text-gray-400">
+                  <span className="font-semibold text-charcoal-600 dark:text-white">Service:</span> {selectedBooking.serviceName}
                 </p>
-                <p className="text-body-regular text-charcoal-400">
-                  <span className="font-semibold text-charcoal-600">Date:</span>{' '}
+                <p className="text-body-regular text-charcoal-400 dark:text-gray-400">
+                  <span className="font-semibold text-charcoal-600 dark:text-white">Date:</span>{' '}
                   {new Date(selectedBooking.bookingDateTime).toLocaleString()}
                 </p>
               </div>
 
               <div className="mb-6">
-                <label className="block text-body-medium text-charcoal-600 mb-2">
+                <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">
                   Quote Price (BHD) *
                 </label>
                 <input
@@ -420,13 +420,13 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
                 />
                 {quotePrice && parseFloat(quotePrice) > 0 && (
                   <div className="mt-3 p-4 bg-sage-100 rounded-lg border border-sage-300">
-                    <p className="text-body-regular text-charcoal-600 mb-1">
+                    <p className="text-body-regular text-charcoal-600 dark:text-white mb-1">
                       <span className="font-semibold">Deposit (50%):</span>{' '}
                       <span className="text-sage-600 font-bold">
                         {(parseFloat(quotePrice) * 0.5).toFixed(2)} BHD
                       </span>
                     </p>
-                    <p className="text-body-regular text-charcoal-600">
+                    <p className="text-body-regular text-charcoal-600 dark:text-white">
                       <span className="font-semibold">Final Payment (50%):</span>{' '}
                       <span className="text-success-btn font-bold">
                         {(parseFloat(quotePrice) * 0.5).toFixed(2)} BHD

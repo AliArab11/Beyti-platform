@@ -110,12 +110,12 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
         {[1, 2, 3, 4, 5].map((star) => (
           <span
             key={star}
-            className={`text-lg ${star <= rating ? 'text-yellow-500' : 'text-charcoal-300'}`}
+            className={`text-lg ${star <= rating ? 'text-yellow-500' : 'text-charcoal-300 dark:text-gray-600'}`}
           >
             ★
           </span>
         ))}
-        <span className="text-body-regular text-charcoal-600 ml-2">
+        <span className="text-body-regular text-charcoal-600 dark:text-white ml-2">
           {rating.toFixed(1)}/5.0
         </span>
       </div>
@@ -132,8 +132,8 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
 
   if (!stats) {
     return (
-      <div className="bg-white rounded-lg shadow-soft-lift p-12 text-center">
-        <p className="text-body-regular text-charcoal-400">Unable to load statistics</p>
+      <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none p-12 text-center border border-transparent dark:border-charcoal-500 transition-colors">
+        <p className="text-body-regular text-charcoal-400 dark:text-gray-400">Unable to load statistics</p>
       </div>
     );
   }
@@ -246,9 +246,9 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
       </div>
 
       {/* Recent Reviews */}
-      <div className="bg-white rounded-lg shadow-soft-lift p-6">
+      <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none p-6 border border-transparent dark:border-charcoal-500 transition-colors">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-card-h2 text-charcoal-600">Recent Reviews</h2>
+          <h2 className="text-card-h2 text-charcoal-600 dark:text-white">Recent Reviews</h2>
           {stats.currentRating > 0 && (
             <div className="flex items-center gap-2">
               {renderStarRating(stats.currentRating)}
@@ -262,9 +262,9 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
           </div>
         ) : recentReviews.length === 0 ? (
           <div className="text-center py-8">
-            <span className="text-5xl text-charcoal-300 mb-3 block">★</span>
-            <p className="text-body-regular text-charcoal-400">No reviews yet</p>
-            <p className="text-label-medium text-charcoal-300 mt-1">
+            <span className="text-5xl text-charcoal-300 dark:text-gray-600 mb-3 block">★</span>
+            <p className="text-body-regular text-charcoal-400 dark:text-gray-400">No reviews yet</p>
+            <p className="text-label-medium text-charcoal-300 dark:text-gray-500 mt-1">
               Complete services to receive customer reviews
             </p>
           </div>
@@ -273,11 +273,11 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
             {recentReviews.map((review, index) => (
               <div
                 key={review.id || index}
-                className="pb-4 border-b border-grey-stroke last:border-0 last:pb-0"
+                className="pb-4 border-b border-grey-stroke dark:border-charcoal-500 last:border-0 last:pb-0"
               >
                 <div className="flex items-start justify-between mb-2">
                   <div>
-                    <p className="text-body-medium text-charcoal-600 font-semibold">
+                    <p className="text-body-medium text-charcoal-600 dark:text-white font-semibold">
                       {review.customer?.fullName || 'Customer'}
                     </p>
                     <div className="flex items-center gap-0.5 mt-1">
@@ -287,7 +287,7 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
                           className={`text-sm ${
                             star <= (review.overallRating || 0)
                               ? 'text-yellow-500'
-                              : 'text-charcoal-300'
+                              : 'text-charcoal-300 dark:text-gray-600'
                           }`}
                         >
                           ★
@@ -295,12 +295,12 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
                       ))}
                     </div>
                   </div>
-                  <span className="text-label-medium text-charcoal-300">
+                  <span className="text-label-medium text-charcoal-300 dark:text-gray-500">
                     {new Date(review.createdAt).toLocaleDateString()}
                   </span>
                 </div>
                 {review.comment && (
-                  <p className="text-body-regular text-charcoal-400 mt-2">
+                  <p className="text-body-regular text-charcoal-400 dark:text-gray-400 mt-2">
                     {review.comment}
                   </p>
                 )}

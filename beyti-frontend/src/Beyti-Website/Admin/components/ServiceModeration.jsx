@@ -255,10 +255,10 @@ const ServiceModeration = ({ onNavigate }) => {
             </div>
 
             {/* Services Table */}
-            <div className="bg-white rounded-lg shadow-soft-lift">
-              <div className="p-6 border-b border-grey-stroke">
+            <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none transition-colors">
+              <div className="p-6 border-b border-grey-stroke dark:border-charcoal-500">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                  <h2 className="text-card-h2 text-charcoal-600">Services Management</h2>
+                  <h2 className="text-card-h2 text-charcoal-600 dark:text-white">Services Management</h2>
                   <div className="flex gap-2">
                     <CRUDButton
                       variant={filterStatus === 'all' ? 'success' : 'neutral'}
@@ -374,13 +374,13 @@ const ServiceModeration = ({ onNavigate }) => {
       {/* Service Details Modal */}
       {showDetailsModal && selectedService && (
         <div className="fixed inset-0 bg-charcoal-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-soft-lift max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift max-w-3xl w-full max-h-[90vh] overflow-y-auto transition-colors">
             {/* Modal Header */}
-            <div className="p-6 border-b border-grey-stroke">
+            <div className="p-6 border-b border-grey-stroke dark:border-charcoal-500">
               <div className="flex justify-between items-start">
                 <div>
-                  <h3 className="text-display-h2 text-charcoal-600">{selectedService.name}</h3>
-                  <p className="text-body-regular text-charcoal-400 mt-1">
+                  <h3 className="text-display-h2 text-charcoal-600 dark:text-white">{selectedService.name}</h3>
+                  <p className="text-body-regular text-charcoal-400 dark:text-gray-400 mt-1">
                     Service ID: {selectedService.id}
                   </p>
                   <div className="mt-3">
@@ -400,7 +400,7 @@ const ServiceModeration = ({ onNavigate }) => {
 
             {/* Modal Body */}
             <div className="p-6">
-              <h4 className="text-card-h2 text-charcoal-600 mb-4">Service Details</h4>
+              <h4 className="text-card-h2 text-charcoal-600 dark:text-white mb-4">Service Details</h4>
 
               <div className="space-y-4">
                 {/* Description */}
@@ -519,13 +519,13 @@ const ServiceModeration = ({ onNavigate }) => {
       {/* Suspend Modal */}
       {showSuspendModal && serviceToSuspend && (
         <div className="fixed inset-0 bg-charcoal-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-soft-lift max-w-md w-full">
+          <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift max-w-md w-full transition-colors">
             {/* Modal Header */}
-            <div className="p-6 border-b border-grey-stroke">
+            <div className="p-6 border-b border-grey-stroke dark:border-charcoal-500">
               <div className="flex justify-between items-start">
                 <div>
-                  <h3 className="text-display-h2 text-charcoal-600">Suspend Service</h3>
-                  <p className="text-body-regular text-charcoal-400 mt-1">
+                  <h3 className="text-display-h2 text-charcoal-600 dark:text-white">Suspend Service</h3>
+                  <p className="text-body-regular text-charcoal-400 dark:text-gray-400 mt-1">
                     {serviceToSuspend.name}
                   </p>
                 </div>
@@ -544,7 +544,7 @@ const ServiceModeration = ({ onNavigate }) => {
 
             {/* Modal Body */}
             <div className="p-6">
-              <label className="block text-body-regular text-charcoal-600 font-semibold mb-2">
+              <label className="block text-body-regular text-charcoal-600 dark:text-white font-semibold mb-2">
                 Reason for Suspension *
               </label>
               <textarea
@@ -554,7 +554,7 @@ const ServiceModeration = ({ onNavigate }) => {
                 className="w-full border border-grey-stroke rounded-lg px-4 py-2 focus:ring-2 focus:ring-sage-500 focus:border-sage-500 text-body-regular bg-white min-h-[120px]"
                 required
               />
-              <p className="text-label-medium text-charcoal-400 mt-2">
+              <p className="text-label-medium text-charcoal-400 dark:text-gray-500 mt-2">
                 This reason will be recorded and the service will be marked as inactive.
               </p>
             </div>
