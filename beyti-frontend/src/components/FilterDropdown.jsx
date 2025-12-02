@@ -41,8 +41,8 @@ const FilterDropdown = ({
   // Variant styles based on filled state
   const variantStyles =
     selectedValue && selectedValue !== 'All'
-      ? 'bg-cream-100 border-charcoal-400'
-      : 'bg-transparent border-charcoal-400';
+      ? 'bg-cream-100 border-charcoal-400 dark:bg-charcoal-400 dark:border-charcoal-500'
+      : 'bg-transparent border-charcoal-400 dark:border-charcoal-500';
 
   // Base styles
   const baseStyles = `
@@ -60,6 +60,7 @@ const FilterDropdown = ({
     transition-all
     duration-200
     hover:bg-cream-50
+    dark:hover:bg-charcoal-400
   `.trim().replace(/\s+/g, ' ');
 
   const combinedStyles = `
@@ -76,10 +77,10 @@ const FilterDropdown = ({
         {...props}
       >
         <div className="flex items-center gap-1 text-body-regular">
-          <span className="text-charcoal-400">{label}</span>
-          <span className="text-charcoal-600 font-medium">{selectedValue}</span>
+          <span className="text-charcoal-400 dark:text-gray-400">{label}</span>
+          <span className="text-charcoal-600 dark:text-white font-medium">{selectedValue}</span>
         </div>
-        <CaretDown size={16} className="text-charcoal-400 flex-shrink-0" />
+        <CaretDown size={16} className="text-charcoal-400 dark:text-gray-400 flex-shrink-0" />
       </div>
 
       {/* Dropdown Menu */}
@@ -92,15 +93,15 @@ const FilterDropdown = ({
           />
 
           {/* Options */}
-          <div className="absolute top-full left-0 mt-1 w-full bg-grey-200 border border-grey-stroke rounded-md shadow-soft-lift z-20 overflow-hidden">
+          <div className="absolute top-full left-0 mt-1 w-full bg-grey-200 dark:bg-[#2A2A2A] border border-grey-stroke dark:border-charcoal-500 rounded-md shadow-soft-lift dark:shadow-none z-20 overflow-hidden">
             {options.map((option, index) => (
               <div
                 key={index}
                 className={`
                   px-3 py-2 text-body-regular cursor-pointer transition-colors
                   ${selectedValue === option
-                    ? 'bg-cream-100 text-charcoal-600 font-medium'
-                    : 'text-charcoal-600 hover:bg-cream-50'
+                    ? 'bg-cream-100 dark:bg-charcoal-400 text-charcoal-600 dark:text-white font-medium'
+                    : 'text-charcoal-600 dark:text-gray-200 hover:bg-cream-50 dark:hover:bg-charcoal-500'
                   }
                 `}
                 onClick={() => handleSelect(option)}

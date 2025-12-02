@@ -6,6 +6,10 @@
  */
 
 @import "tailwindcss";
+
+/* Configure dark mode to use class-based strategy */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @import "./styles/design-tokens.css";
 
 /**
@@ -19,18 +23,22 @@
  */
 
 @theme {
+
   /* ====================================
      COLOR UTILITIES - Brand Colors
      ==================================== */
   --color-sage-100: var(--sage-100);
   --color-sage-500: var(--sage-500);
   --color-sage-700: var(--sage-700);
+  --color-sage-900: var(--sage-900);
 
   /* ====================================
      COLOR UTILITIES - Neutrals
      ==================================== */
   --color-charcoal-600: var(--charcoal-600);
+  --color-charcoal-500: var(--charcoal-500);
   --color-charcoal-400: var(--charcoal-400);
+  --color-charcoal-300: var(--charcoal-300);
   --color-cream-200: var(--cream-200);
   --color-cream-100: var(--cream-100);
   --color-cream-50: var(--cream-50);
@@ -144,6 +152,27 @@
     line-height: var(--label-medium-line-height);
     text-transform: var(--label-medium-transform);
     letter-spacing: var(--label-medium-spacing);
+  }
+
+  .text-label-small {
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.4;
+  }
+
+  .text-body-large {
+    font-family: var(--font-body);
+    font-size: 18px;
+    font-weight: 500;
+    line-height: 1.5;
+  }
+
+  .text-body-small {
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.5;
   }
 }
 

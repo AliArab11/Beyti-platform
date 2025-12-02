@@ -41,6 +41,163 @@ namespace Beyti_Backend.Controllers.Api
             return userProfile;
         }
 
+        // GET: api/UserProfiles/Profile/5
+        // Returns complete profile data for any user type
+        [HttpGet("Profile/{userProfileId}")]
+        public async Task<IActionResult> GetCompleteProfile(int userProfileId)
+        {
+            try
+            {
+                var userProfile = await _context.UserProfiles.FindAsync(userProfileId);
+
+                if (userProfile == null)
+                    return NotFound("User profile not found");
+
+                // Base profile data
+                var response = new Dictionary<string, object>
+                {
+                    { "UserProfileId", userProfile.Id },
+                    { "DisplayName", userProfile.DisplayName },
+                    { "RoleType", userProfile.RoleType },
+                    { "Status", userProfile.Status },
+                    { "CreatedAt", userProfile.CreatedAt },
+                    { "UpdatedAt", userProfile.UpdatedAt }
+                };
+
+                // Fetch role-specific data based on RoleType
+                switch (userProfile.RoleType)
+                {
+                    case "Admin":
+                        var admin = await _context.AdminProfiles
+                            .FirstOrDefaultAsync(a => a.UserProfileId == userProfileId);
+                        if (admin != null)
+                        {
+                            response.Add("AdminId", admin.Id);
+                            response.Add("Title", admin.Title);
+                            response.Add("Permissions", admin.Permissions);
+                        }
+                        break;
+
+                    case "ServiceProvider":
+                        var provider = await _context.ServiceProviders
+                            .Include(sp => sp.ServiceProviderAddresses)
+                                .ThenInclude(spa => spa.Address)
+                            .FirstOrDefaultAsync(sp => sp.UserProfileId == userProfileId);
+
+                        if (provider != null)
+                        {
+                            Console.WriteLine($"[GetCompleteProfile] ServiceProvider {provider.Id} has Status: '{provider.Status}'");
+                            response.Add("ServiceProviderId", provider.Id);
+                            response.Add("BusinessName", provider.BusinessName);
+                            response.Add("Phone", provider.Phone);
+                            // Override UserProfile.Status with ServiceProvider.Status for service providers
+                            // ServiceProvider.Status is user-controlled (Available/Busy/Unavailable)
+                            // UserProfile.Status is admin-controlled (Active/Inactive)
+                            response["Status"] = provider.Status;
+                            Console.WriteLine($"[GetCompleteProfile] Returning Status: '{response["Status"]}'");
+
+                            var primaryAddress = provider.ServiceProviderAddresses
+                                .Select(spa => spa.Address)
+                                .FirstOrDefault();
+
+                            if (primaryAddress != null)
+                            {
+                                response.Add("Street", primaryAddress.Street);
+                                response.Add("City", primaryAddress.City);
+                                response.Add("Region", primaryAddress.Region);
+                                response.Add("PostalCode", primaryAddress.PostalCode);
+                                response.Add("Country", primaryAddress.Country);
+
+                                // Build formatted address
+                                var addressParts = new List<string>();
+                                if (!string.IsNullOrEmpty(primaryAddress.Street)) addressParts.Add(primaryAddress.Street);
+                                if (!string.IsNullOrEmpty(primaryAddress.City)) addressParts.Add(primaryAddress.City);
+                                if (!string.IsNullOrEmpty(primaryAddress.Region)) addressParts.Add(primaryAddress.Region);
+                                if (!string.IsNullOrEmpty(primaryAddress.PostalCode)) addressParts.Add(primaryAddress.PostalCode);
+                                if (!string.IsNullOrEmpty(primaryAddress.Country)) addressParts.Add(primaryAddress.Country);
+
+                                if (addressParts.Count > 0)
+                                {
+                                    response.Add("Address", string.Join(", ", addressParts));
+                                }
+                            }
+                        }
+                        break;
+
+                    case "Seller":
+                        var seller = await _context.Sellers
+                            .Include(s => s.SellerAddresses)
+                                .ThenInclude(sa => sa.Address)
+                            .FirstOrDefaultAsync(s => s.UserProfileId == userProfileId);
+
+                        if (seller != null)
+                        {
+                            response.Add("SellerId", seller.Id);
+                            response.Add("StoreName", seller.StoreName);
+                            response.Add("Phone", seller.Phone);
+
+                            var primaryAddress = seller.SellerAddresses
+                                .Select(sa => sa.Address)
+                                .FirstOrDefault();
+
+                            if (primaryAddress != null)
+                            {
+                                response.Add("Street", primaryAddress.Street);
+                                response.Add("City", primaryAddress.City);
+                                response.Add("Region", primaryAddress.Region);
+                                response.Add("PostalCode", primaryAddress.PostalCode);
+                                response.Add("Country", primaryAddress.Country);
+                            }
+                        }
+                        break;
+
+                    case "Customer":
+                        var customer = await _context.Customers
+                            .Include(c => c.CustomerAddresses)
+                                .ThenInclude(ca => ca.Address)
+                            .FirstOrDefaultAsync(c => c.UserProfileId == userProfileId);
+
+                        if (customer != null)
+                        {
+                            response.Add("CustomerId", customer.Id);
+                            response.Add("Phone", customer.Phone);
+
+                            var primaryAddress = customer.CustomerAddresses
+                                .Select(ca => ca.Address)
+                                .FirstOrDefault();
+
+                            if (primaryAddress != null)
+                            {
+                                response.Add("Street", primaryAddress.Street);
+                                response.Add("City", primaryAddress.City);
+                                response.Add("Region", primaryAddress.Region);
+                                response.Add("PostalCode", primaryAddress.PostalCode);
+                                response.Add("Country", primaryAddress.Country);
+                            }
+                        }
+                        break;
+
+                    case "Driver":
+                        var driver = await _context.Drivers
+                            .FirstOrDefaultAsync(d => d.UserProfileId == userProfileId);
+
+                        if (driver != null)
+                        {
+                            response.Add("DriverId", driver.Id);
+                            response.Add("Phone", driver.Phone);
+                            response.Add("DriverStatus", driver.Status);
+                        }
+                        break;
+                }
+
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
+
         // PUT: api/UserProfiles/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]

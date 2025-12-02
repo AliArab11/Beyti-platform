@@ -26,8 +26,8 @@ const NavigationButton = ({
 }) => {
   // Variant styles based on selected state
   const variantStyles = selected
-    ? 'bg-sage-700 text-cream-200'
-    : 'text-cream-200 hover:bg-sage-700/50';
+    ? 'bg-sage-700 dark:bg-charcoal-400 text-cream-200 dark:text-cream-50'
+    : 'text-cream-200 dark:text-cream-50 hover:bg-sage-700/50 dark:hover:bg-charcoal-400';
 
   // Base styles - fixed width 220px, height 44px
   const baseStyles = `

@@ -161,12 +161,12 @@ export default function ServicesManagement({ serviceProviderId }) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white rounded-lg shadow-soft-lift p-6">
+      <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none p-6 transition-colors">
         <div className="flex flex-col gap-4">
           <div className="flex justify-between items-center">
             <div>
-              <h2 className="text-card-h2 text-charcoal-600">My Services</h2>
-              <p className="text-body-regular text-charcoal-400 mt-1">
+              <h2 className="text-card-h2 text-charcoal-600 dark:text-white">My Services</h2>
+              <p className="text-body-regular text-charcoal-400 dark:text-gray-400 mt-1">
                 {filteredServices.length} {filteredServices.length === 1 ? 'service' : 'services'}
                 {searchTerm && ` (filtered from ${services.length})`}
               </p>
@@ -198,13 +198,13 @@ export default function ServicesManagement({ serviceProviderId }) {
 
       {/* Form */}
       {showForm && (
-        <div className="bg-white rounded-lg shadow-soft-lift p-6">
-          <h3 className="text-card-h2 text-charcoal-600 mb-6">
+        <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none p-6 transition-colors">
+          <h3 className="text-card-h2 text-charcoal-600 dark:text-white mb-6">
             {editingService ? 'Edit Service' : 'Add New Service'}
           </h3>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-body-medium text-charcoal-600 mb-2">Service Name *</label>
+              <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">Service Name *</label>
               <input
                 type="text"
                 value={formData.name}
@@ -215,7 +215,7 @@ export default function ServicesManagement({ serviceProviderId }) {
             </div>
 
             <div>
-              <label className="block text-body-medium text-charcoal-600 mb-2">Category *</label>
+              <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">Category *</label>
               <select
                 value={formData.subCategoryId}
                 onChange={(e) => setFormData({ ...formData, subCategoryId: e.target.value })}
@@ -236,7 +236,7 @@ export default function ServicesManagement({ serviceProviderId }) {
             </div>
 
             <div>
-              <label className="block text-body-medium text-charcoal-600 mb-2">Description</label>
+              <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">Description</label>
               <textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -247,7 +247,7 @@ export default function ServicesManagement({ serviceProviderId }) {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-body-medium text-charcoal-600 mb-2">Min Price (BHD)</label>
+                <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">Min Price (BHD)</label>
                 <input
                   type="number"
                   step="0.01"
@@ -258,7 +258,7 @@ export default function ServicesManagement({ serviceProviderId }) {
               </div>
 
               <div>
-                <label className="block text-body-medium text-charcoal-600 mb-2">Max Price (BHD)</label>
+                <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">Max Price (BHD)</label>
                 <input
                   type="number"
                   step="0.01"
@@ -269,7 +269,7 @@ export default function ServicesManagement({ serviceProviderId }) {
               </div>
 
               <div>
-                <label className="block text-body-medium text-charcoal-600 mb-2">Duration (minutes)</label>
+                <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">Duration (minutes)</label>
                 <input
                   type="number"
                   value={formData.estimatedDuration}

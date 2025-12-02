@@ -33,11 +33,11 @@ export const Table = ({
   ...props
 }) => {
   return (
-    <div className={`bg-grey-200 shadow-soft-lift rounded-lg ${className}`} {...props}>
+    <div className={`bg-grey-200 dark:bg-[#2A2A2A] shadow-soft-lift dark:shadow-none rounded-lg border border-transparent dark:border-charcoal-500 transition-colors ${className}`} {...props}>
       {/* Header with title, filters, and action */}
       {(title || filters.length > 0 || actionButton) && (
-        <div className="flex items-center justify-between p-6 border-b border-grey-stroke">
-          <h2 className="text-display-h2 text-charcoal-600">{title}</h2>
+        <div className="flex items-center justify-between p-6 border-b border-grey-stroke dark:border-charcoal-500">
+          <h2 className="text-display-h2 text-charcoal-600 dark:text-white">{title}</h2>
 
           <div className="flex items-center gap-3">
             {/* Filters */}
@@ -80,12 +80,12 @@ export const Table = ({
  */
 export const TableHeader = ({ columns, className = '', ...props }) => {
   return (
-    <thead className={`bg-cream-100 border-b border-grey-stroke ${className}`} {...props}>
+    <thead className={`bg-cream-100 dark:bg-charcoal-500 border-b border-grey-stroke dark:border-charcoal-500 ${className}`} {...props}>
       <tr>
         {columns.map((column, index) => (
           <th
             key={index}
-            className="px-6 py-3 text-left text-light-h3 text-charcoal-600 font-light"
+            className="px-6 py-3 text-left text-light-h3 text-charcoal-600 dark:text-gray-200 font-light"
           >
             {column}
           </th>
@@ -107,9 +107,9 @@ export const TableHeader = ({ columns, className = '', ...props }) => {
  */
 export const TableRow = ({ data, actions, className = '', ...props }) => {
   return (
-    <tr className={`bg-grey-200 border-b border-grey-stroke ${className}`} {...props}>
+    <tr className={`bg-grey-200 dark:bg-[#2A2A2A] border-b border-grey-stroke dark:border-charcoal-500 hover:bg-cream-50 dark:hover:bg-charcoal-500 transition-colors ${className}`} {...props}>
       {data.map((cell, index) => (
-        <td key={index} className="px-6 py-4 text-body-regular text-charcoal-600">
+        <td key={index} className="px-6 py-4 text-body-regular text-charcoal-600 dark:text-gray-200">
           {cell}
         </td>
       ))}
