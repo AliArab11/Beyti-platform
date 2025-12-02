@@ -1,0 +1,166 @@
+/**
+ * Beyti Design System - Design Tokens
+ *
+ * This file defines all design tokens as CSS custom properties.
+ * These tokens map directly to the Design_System.md specification.
+ *
+ * Architecture:
+ * - Primitive tokens: Base color values defined with hex codes
+ * - Semantic tokens: Purpose-driven tokens that reference primitive values
+ * - Typography tokens: Font families, sizes, weights, and line heights
+ * - Effect tokens: Shadows, borders, and other visual effects
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Merriweather:wght@300;400;700;900&family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  /* ====================================
+     BRAND COLORS - Sage Palette
+     ==================================== */
+  --sage-100: #EEF0EF;
+  --sage-500: #556B5C;
+  --sage-700: #3C5243;
+
+  /* ====================================
+     NEUTRAL COLORS
+     ==================================== */
+  --charcoal-600: #353535;
+  --charcoal-400: #8B8A88;
+  --cream-200: #F8F4E9;
+  --cream-100: #F6F2EB;
+  --cream-50: #F8F5F1;
+  --grey-200: #FEFDFB;
+  --grey-stroke: #D2D2D2;
+
+  /* ====================================
+     STATUS COLORS - Success
+     ==================================== */
+  --success-btn: #5D755D;
+  --success-bg: #D7E6D7;
+  --success-text: #3C5243;
+
+  /* ====================================
+     STATUS COLORS - Error
+     ==================================== */
+  --error-btn: #A45B58;
+  --error-bg: #FFCACA;
+  --error-text: #792E2B;
+
+  /* ====================================
+     STATUS COLORS - Warning/Danger
+     ==================================== */
+  --danger-btn: #F8CC8E;
+  --danger-bg: #FFE6B1;
+  --danger-text: #714C18;
+
+  /* ====================================
+     TYPOGRAPHY - Font Families
+     ==================================== */
+  --font-display: 'Merriweather', serif;
+  --font-body: 'Inter', sans-serif;
+
+  /* ====================================
+     TYPOGRAPHY - Font Sizes & Styles
+     Display Headers (Merriweather)
+     ==================================== */
+  --display-h1-size: 32px;
+  --display-h1-family: var(--font-display);
+  --display-h1-weight: 700;
+  --display-h1-line-height: 1.25;
+
+  --display-h2-size: 24px;
+  --display-h2-family: var(--font-display);
+  --display-h2-weight: 700;
+  --display-h2-line-height: 1.3;
+
+  /* ====================================
+     TYPOGRAPHY - Metric Headers
+     ==================================== */
+  --metric-h3-size: 36px;
+  --metric-h3-family: var(--font-display);
+  --metric-h3-weight: 900;
+  --metric-h3-line-height: 1.2;
+
+  /* ====================================
+     TYPOGRAPHY - Card Headers
+     ==================================== */
+  --card-h2-size: 20px;
+  --card-h2-family: var(--font-display);
+  --card-h2-weight: 700;
+  --card-h2-line-height: 1.4;
+
+  /* ====================================
+     TYPOGRAPHY - Light Headers
+     ==================================== */
+  --light-h3-size: 18px;
+  --light-h3-family: var(--font-display);
+  --light-h3-weight: 300;
+  --light-h3-line-height: 1.5;
+
+  /* ====================================
+     TYPOGRAPHY - Body Text (Inter)
+     ==================================== */
+  --body-medium-size: 18px;
+  --body-medium-family: var(--font-body);
+  --body-medium-weight: 500;
+  --body-medium-line-height: 1.6;
+
+  --body-regular-size: 16px;
+  --body-regular-family: var(--font-body);
+  --body-regular-weight: 400;
+  --body-regular-line-height: 1.5;
+
+  /* ====================================
+     TYPOGRAPHY - Button Text
+     ==================================== */
+  --button-text-size: 14px;
+  --button-text-family: var(--font-body);
+  --button-text-weight: 600;
+  --button-text-line-height: 1.4;
+  --button-text-transform: uppercase;
+  --button-text-spacing: 0.5px;
+
+  /* ====================================
+     TYPOGRAPHY - Labels
+     ==================================== */
+  --label-medium-size: 12px;
+  --label-medium-family: var(--font-body);
+  --label-medium-weight: 500;
+  --label-medium-line-height: 1.4;
+  --label-medium-transform: uppercase;
+  --label-medium-spacing: 0.5px;
+
+  /* ====================================
+     EFFECTS - Shadows
+     ==================================== */
+  --soft-lift: 0px 4px 10px rgba(53, 53, 53, 0.1);
+
+  /* ====================================
+     EFFECTS - Border Radius
+     ==================================== */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* ====================================
+     SPACING - Based on 8px grid
+     ==================================== */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ====================================
+     TRANSITIONS
+     ==================================== */
+  --transition-fast: 150ms ease-in-out;
+  --transition-base: 250ms ease-in-out;
+  --transition-slow: 350ms ease-in-out;
+}

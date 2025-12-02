@@ -1,0 +1,168 @@
+/**
+ * Beyti Platform - Main Stylesheet
+ *
+ * This file imports Tailwind CSS and our design system tokens,
+ * then extends Tailwind with custom utilities based on our design tokens.
+ */
+
+@import "tailwindcss";
+@import "./styles/design-tokens.css";
+
+/**
+ * Tailwind v4 Theme Extensions
+ *
+ * We extend Tailwind's @theme to add our design system as utilities.
+ * This allows us to use classes like:
+ * - bg-sage-500, text-charcoal-600
+ * - text-display-h1, text-body-medium
+ * - shadow-soft-lift
+ */
+
+@theme {
+  /* ====================================
+     COLOR UTILITIES - Brand Colors
+     ==================================== */
+  --color-sage-100: var(--sage-100);
+  --color-sage-500: var(--sage-500);
+  --color-sage-700: var(--sage-700);
+
+  /* ====================================
+     COLOR UTILITIES - Neutrals
+     ==================================== */
+  --color-charcoal-600: var(--charcoal-600);
+  --color-charcoal-400: var(--charcoal-400);
+  --color-cream-200: var(--cream-200);
+  --color-cream-100: var(--cream-100);
+  --color-cream-50: var(--cream-50);
+  --color-grey-200: var(--grey-200);
+  --color-grey-stroke: var(--grey-stroke);
+
+  /* ====================================
+     COLOR UTILITIES - Status Colors
+     ==================================== */
+  --color-success-btn: var(--success-btn);
+  --color-success-bg: var(--success-bg);
+  --color-success-text: var(--success-text);
+  --color-error-btn: var(--error-btn);
+  --color-error-bg: var(--error-bg);
+  --color-error-text: var(--error-text);
+  --color-danger-btn: var(--danger-btn);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-text: var(--danger-text);
+
+  /* ====================================
+     SHADOW UTILITIES
+     ==================================== */
+  --shadow-soft-lift: var(--soft-lift);
+
+  /* ====================================
+     BORDER RADIUS UTILITIES
+     ==================================== */
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+}
+
+/**
+ * Custom Typography Utilities
+ *
+ * These classes apply complete typography styles (family, size, weight, line-height)
+ * Use them as: class="text-display-h1" or class="text-body-medium"
+ */
+
+@layer utilities {
+  /* Display Headers (Merriweather) */
+  .text-display-h1 {
+    font-family: var(--display-h1-family);
+    font-size: var(--display-h1-size);
+    font-weight: var(--display-h1-weight);
+    line-height: var(--display-h1-line-height);
+  }
+
+  .text-display-h2 {
+    font-family: var(--display-h2-family);
+    font-size: var(--display-h2-size);
+    font-weight: var(--display-h2-weight);
+    line-height: var(--display-h2-line-height);
+  }
+
+  /* Metric Headers */
+  .text-metric-h3 {
+    font-family: var(--metric-h3-family);
+    font-size: var(--metric-h3-size);
+    font-weight: var(--metric-h3-weight);
+    line-height: var(--metric-h3-line-height);
+  }
+
+  /* Card Headers */
+  .text-card-h2 {
+    font-family: var(--card-h2-family);
+    font-size: var(--card-h2-size);
+    font-weight: var(--card-h2-weight);
+    line-height: var(--card-h2-line-height);
+  }
+
+  /* Light Headers */
+  .text-light-h3 {
+    font-family: var(--light-h3-family);
+    font-size: var(--light-h3-size);
+    font-weight: var(--light-h3-weight);
+    line-height: var(--light-h3-line-height);
+  }
+
+  /* Body Text (Inter) */
+  .text-body-medium {
+    font-family: var(--body-medium-family);
+    font-size: var(--body-medium-size);
+    font-weight: var(--body-medium-weight);
+    line-height: var(--body-medium-line-height);
+  }
+
+  .text-body-regular {
+    font-family: var(--body-regular-family);
+    font-size: var(--body-regular-size);
+    font-weight: var(--body-regular-weight);
+    line-height: var(--body-regular-line-height);
+  }
+
+  /* Button Text */
+  .text-button {
+    font-family: var(--button-text-family);
+    font-size: var(--button-text-size);
+    font-weight: var(--button-text-weight);
+    line-height: var(--button-text-line-height);
+    text-transform: var(--button-text-transform);
+    letter-spacing: var(--button-text-spacing);
+  }
+
+  /* Label Text */
+  .text-label-medium {
+    font-family: var(--label-medium-family);
+    font-size: var(--label-medium-size);
+    font-weight: var(--label-medium-weight);
+    line-height: var(--label-medium-line-height);
+    text-transform: var(--label-medium-transform);
+    letter-spacing: var(--label-medium-spacing);
+  }
+}
+
+/**
+ * Base Styles
+ */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  color: var(--charcoal-600);
+  background-color: var(--cream-50);
+}

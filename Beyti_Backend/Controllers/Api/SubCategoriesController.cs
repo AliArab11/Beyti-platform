@@ -1,0 +1,140 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using BeytiDB.Data;
+
+namespace Beyti_Backend.Controllers.Api
+{
+    [Route("api/[controller]")]
+    [ApiController]
+    public class SubCategoriesController : ControllerBase
+    {
+        private readonly BeytiContext _context;
+
+        public class SubCategoryCreateDto
+        {
+            public string Name { get; set; } = null!;
+            public int CategoryId { get; set; }
+        }
+
+        public class SubCategoryUpdateDto
+        {
+            public string Name { get; set; } = null!;
+            public int CategoryId { get; set; }
+            public bool IsActive { get; set; }
+        }
+
+        public SubCategoriesController(BeytiContext context)
+        {
+            _context = context;
+        }
+
+        // GET: api/SubCategories
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<SubCategory>>> GetSubCategories()
+        {
+            return await _context.SubCategories.ToListAsync();
+        }
+
+        // GET: api/SubCategories/5
+        [HttpGet("{id}")]
+        public async Task<ActionResult<SubCategory>> GetSubCategory(int id)
+        {
+            var subCategory = await _context.SubCategories.FindAsync(id);
+
+            if (subCategory == null)
+            {
+                return NotFound();
+            }
+
+            return subCategory;
+        }
+
+        // PUT: api/SubCategories/5
+        [HttpPut("{id}")]
+        public async Task<IActionResult> PutSubCategory(int id, SubCategoryUpdateDto dto)
+        {
+            var subCategory = await _context.SubCategories.FindAsync(id);
+            if (subCategory == null)
+            {
+                return NotFound();
+            }
+
+            if (!_context.Categories.Any(c => c.Id == dto.CategoryId))
+            {
+                return BadRequest("Invalid CategoryId");
+            }
+
+            subCategory.Name = dto.Name;
+            subCategory.CategoryId = dto.CategoryId;
+            subCategory.IsActive = dto.IsActive;
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!SubCategoryExists(id))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
+
+            return NoContent();
+        }
+
+        // POST: api/SubCategories
+        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
+        [HttpPost]
+        public async Task<ActionResult<SubCategory>> PostSubCategory(SubCategoryCreateDto dto)
+        {
+            if (!_context.Categories.Any(c => c.Id == dto.CategoryId))
+                return BadRequest("Invalid CategoryId");
+
+            var subCategory = new SubCategory
+            {
+                Name = dto.Name,
+                CategoryId = dto.CategoryId,
+                IsActive = true,
+                CreatedAt = DateTime.Now
+            };
+
+            _context.SubCategories.Add(subCategory);
+            await _context.SaveChangesAsync();
+
+            return CreatedAtAction("GetSubCategory", new { id = subCategory.Id }, subCategory);
+        }
+
+
+
+        // DELETE: api/SubCategories/5
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteSubCategory(int id)
+        {
+            var subCategory = await _context.SubCategories.FindAsync(id);
+            if (subCategory == null)
+            {
+                return NotFound();
+            }
+
+            _context.SubCategories.Remove(subCategory);
+            await _context.SaveChangesAsync();
+
+            return NoContent();
+        }
+
+        private bool SubCategoryExists(int id)
+        {
+            return _context.SubCategories.Any(e => e.Id == id);
+        }
+    }
+}
