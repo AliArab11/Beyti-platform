@@ -16,6 +16,7 @@ import SellerDashboardPage from "./Beyti-Website/Seller/SellerDashboard.jsx";
 import ProductsPage from "./Pages/Product/Products";
 import CategoryPage from "./Pages/Product/Categories";
 import DriverPage from "./Pages/Driver";
+import DriverDashboardPage from "./Beyti-Website/Driver/DriverDashboard.jsx";
 import ServiceProviderDashboard from './Beyti-Website/ServiceProvider/ServiceProviderDashboard';
 import DesignSystemDemo from './components/DesignSystemDemo';
 import DashboardTemplate from './Pages/DashboardTemplate';
@@ -52,6 +53,7 @@ export default function App() {
     { path: '/category', label: 'Category' },
     { path: '/customer', label: 'Customer' },
     { path: '/driver', label: 'Driver' },
+    { path: '/driver-dashboard', label: 'Driver Dashboard' },
     { path: '/admin', label: 'Admin' },
     { path: '/serviceprovider', label: 'Service Provider' },
     { path: '/serviceprovider-dashboard', label: 'SP Dashboard' },
@@ -157,6 +159,7 @@ export default function App() {
             <Route path="/category" element={<CategoryPage />} />
             <Route path="/customer" element={<CustomerPage />} />
             <Route path="/driver" element={<DriverPage />} />
+            <Route path="/driver-dashboard" element={<DriverDashboardPage />} />
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/serviceprovider" element={<ServiceProviderPage />} />
             <Route path="/serviceprovider-dashboard" element={<ServiceProviderDashboard />} />
