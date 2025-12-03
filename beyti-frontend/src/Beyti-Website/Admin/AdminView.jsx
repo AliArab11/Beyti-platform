@@ -36,6 +36,7 @@ import RequestApprovals from './components/RequestApprovals';
 import CategoryModeration from './components/CategoryModeration';
 import ProductModeration from './components/ProductModeration';
 import ServiceModeration from './components/ServiceModeration';
+import NotificationsPage from '../ServiceProvider/components/NotificationsPage';
 import AdminSidebar from './components/AdminSidebar';
 
 const AdminView = () => {
@@ -234,6 +235,7 @@ const AdminView = () => {
       '/admin/product-moderation': 'product-moderation',
       '/admin/service-moderation': 'service-moderation',
       '/admin/category-moderation': 'category-moderation',
+      '/admin/notifications': 'notifications',
     };
 
     const view = viewMap[path] || 'dashboard';
@@ -265,6 +267,32 @@ const AdminView = () => {
     return <CategoryModeration onNavigate={handleNavigate} />;
   }
 
+  if (currentView === 'notifications') {
+    return (
+      <div className="flex min-h-screen bg-cream-50">
+        <AdminSidebar currentPage="notifications" onNavigate={handleNavigate} />
+        <div className="flex-1 ml-[250px] flex flex-col">
+          <PageHeader
+            title="Notifications"
+            withSearch={true}
+            searchPlaceholder="Search notifications by title, content, or type..."
+            userName={displayName}
+            userRole="Super Admin"
+            userProfile={userProfile}
+            entityId={null}
+            userId={userProfileId}
+            onProfileUpdate={handleProfileUpdate}
+          />
+          <main className="flex-1 p-8 overflow-y-auto">
+            <div className="max-w-7xl mx-auto">
+              <NotificationsPage userId={userProfileId} />
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen bg-cream-50">
       {/* Sidebar */}
@@ -280,6 +308,7 @@ const AdminView = () => {
           userRole="Super Admin"
           userProfile={userProfile}
           entityId={null} // Admins don't have entity IDs
+          userId={userProfileId}
           onProfileUpdate={handleProfileUpdate}
         />
 

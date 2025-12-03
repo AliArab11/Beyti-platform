@@ -78,7 +78,7 @@ export const Table = ({
  * - Height: ~48px - 56px
  * - Padding: px-6
  */
-export const TableHeader = ({ columns, className = '', ...props }) => {
+export const TableHeader = ({ columns = [], className = '', ...props }) => {
   return (
     <thead className={`bg-cream-100 dark:bg-charcoal-500 border-b border-grey-stroke dark:border-charcoal-500 ${className}`} {...props}>
       <tr>
@@ -105,7 +105,7 @@ export const TableHeader = ({ columns, className = '', ...props }) => {
  * - Height: ~72px (accommodating 42px buttons + padding)
  * - Padding: Vertical py-4, Horizontal px-6
  */
-export const TableRow = ({ data, actions, className = '', ...props }) => {
+export const TableRow = ({ data = [], actions, className = '', ...props }) => {
   return (
     <tr className={`bg-grey-200 dark:bg-[#2A2A2A] border-b border-grey-stroke dark:border-charcoal-500 hover:bg-cream-50 dark:hover:bg-charcoal-500 transition-colors ${className}`} {...props}>
       {data.map((cell, index) => (
