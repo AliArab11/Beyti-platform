@@ -1654,11 +1654,42 @@ export const register = async (data) => {
 export const getServiceReviews = async (serviceProviderId = null) => {
   let url = '/ServiceReviews';
   if (serviceProviderId) {
-    // We'll need to filter client-side or add backend support
-    const allReviews = await fetchAPI(url);
-    return allReviews.filter(review => review.serviceProviderId === serviceProviderId);
+    url = `/ServiceReviews/provider/${serviceProviderId}`;
   }
   return await fetchAPI(url);
+};
+
+/**
+ * Get service reviews grouped by service for a service provider
+ * @param {number} serviceProviderId - Service provider ID
+ * @returns {Promise<Array>} - Array of service review objects
+ */
+export const getProviderServiceReviews = async (serviceProviderId) => {
+  return await fetchAPI(`/ServiceReviews/provider/${serviceProviderId}`);
+};
+
+/**
+ * Respond to a service review
+ * @param {number} reviewId - Review ID
+ * @param {string} response - Provider's response text
+ * @returns {Promise<null>} - Returns null on success
+ */
+export const respondToServiceReview = async (reviewId, response) => {
+  return await fetchAPI(`/ServiceReviews/${reviewId}/respond`, {
+    method: 'PUT',
+    body: JSON.stringify({ ProviderResponse: response }),
+  });
+};
+
+/**
+ * Toggle visibility of a service review (hide/unhide)
+ * @param {number} reviewId - Review ID
+ * @returns {Promise<null>} - Returns null on success
+ */
+export const toggleServiceReviewVisibility = async (reviewId) => {
+  return await fetchAPI(`/ServiceReviews/${reviewId}/toggle-visibility`, {
+    method: 'PUT',
+  });
 };
 
 // Fetch all notifications for user

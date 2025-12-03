@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using BeytiDB.Data;
 using System.Text.Json;
+using Beyti_Backend.Services;
 
 namespace Beyti_Backend.Controllers.Api
 {
@@ -10,17 +11,19 @@ namespace Beyti_Backend.Controllers.Api
     public class AdminDashboardController : ControllerBase
     {
         private readonly BeytiContext _context;
+        private readonly INotificationService _notificationService;
 
-        public AdminDashboardController(BeytiContext context)
+        public AdminDashboardController(BeytiContext context, INotificationService notificationService)
         {
             _context = context;
+            _notificationService = notificationService;
         }
 
         [HttpGet("Users")]
         public async Task<IActionResult> GetUsers([FromQuery] string? role = null)
         {
             var query = _context.UserProfiles.AsQueryable();
-
+            
             // Apply role filter if provided and not "All"
             if (!string.IsNullOrEmpty(role) && role != "All")
             {
@@ -118,15 +121,46 @@ namespace Beyti_Backend.Controllers.Api
             else
             {
                 // Normal update (no role change)
+                bool statusChanged = false;
+                string oldStatus = user.Status;
+
                 if (!string.IsNullOrEmpty(newDisplayName))
                     user.DisplayName = newDisplayName;
 
-                if (!string.IsNullOrEmpty(newStatus))
+                if (!string.IsNullOrEmpty(newStatus) && newStatus != user.Status)
+                {
                     user.Status = newStatus;
+                    statusChanged = true;
+                }
 
                 user.UpdatedAt = DateTime.UtcNow;
 
                 await _context.SaveChangesAsync();
+
+                // Send notification if status changed
+                if (statusChanged && newStatus != null)
+                {
+                    string notificationTitle = "Account Status Updated";
+                    string notificationBody = $"Your account status has been changed from {oldStatus} to {newStatus} by an administrator.";
+                    string notificationType = newStatus.ToLower() switch
+                    {
+                        "active" => "status_activated",
+                        "inactive" => "status_deactivated",
+                        "suspended" => "status_suspended",
+                        _ => "status_changed"
+                    };
+
+                    await _notificationService.SendNotificationAsync(
+                        recipientUserId: user.Id,
+                        senderUserId: null,
+                        type: notificationType,
+                        title: notificationTitle,
+                        body: notificationBody,
+                        relatedEntityType: "UserProfile",
+                        relatedEntityId: user.Id
+                    );
+                }
+
                 return Ok(user);
             }
         }
@@ -195,10 +229,27 @@ namespace Beyti_Backend.Controllers.Api
             var user = await _context.UserProfiles.FindAsync(id);
             if (user == null) return NotFound();
 
+            string oldStatus = user.Status;
             user.Status = user.Status == "Active" ? "Inactive" : "Active";
             user.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
+
+            // Send notification about status toggle
+            string notificationTitle = user.Status == "Active" ? "Account Activated" : "Account Deactivated";
+            string notificationBody = $"Your account has been {(user.Status == "Active" ? "activated" : "deactivated")} by an administrator.";
+            string notificationType = user.Status == "Active" ? "status_activated" : "status_deactivated";
+
+            await _notificationService.SendNotificationAsync(
+                recipientUserId: user.Id,
+                senderUserId: null,
+                type: notificationType,
+                title: notificationTitle,
+                body: notificationBody,
+                relatedEntityType: "UserProfile",
+                relatedEntityId: user.Id
+            );
+
             return Ok(user);
         }
 
@@ -255,6 +306,17 @@ namespace Beyti_Backend.Controllers.Api
 
                 await _context.SaveChangesAsync();
 
+                // Send notification to the service provider
+                await _notificationService.SendNotificationAsync(
+                    recipientUserId: request.ServiceProvider.UserProfileId,
+                    senderUserId: null,
+                    type: "application_approved",
+                    title: "Application Approved",
+                    body: "Congratulations! Your service provider application has been approved. You can now start accepting service requests.",
+                    relatedEntityType: "ProviderApplication",
+                    relatedEntityId: request.Id
+                );
+
                 return Ok(new
                 {
                     message = "Request approved successfully",
@@ -294,6 +356,17 @@ namespace Beyti_Backend.Controllers.Api
                 request.ServiceProvider.UserProfile.UpdatedAt = DateTime.UtcNow;
 
                 await _context.SaveChangesAsync();
+
+                // Send notification to the service provider
+                await _notificationService.SendNotificationAsync(
+                    recipientUserId: request.ServiceProvider.UserProfileId,
+                    senderUserId: null,
+                    type: "application_rejected",
+                    title: "Application Rejected",
+                    body: "Your service provider application has been reviewed and unfortunately was not approved at this time. Please contact support for more information.",
+                    relatedEntityType: "ProviderApplication",
+                    relatedEntityId: request.Id
+                );
 
                 return Ok(new
                 {
@@ -743,6 +816,17 @@ namespace Beyti_Backend.Controllers.Api
 
                 await _context.SaveChangesAsync();
 
+                // Send notification to the suspended user
+                await _notificationService.SendNotificationAsync(
+                    recipientUserId: userId,
+                    senderUserId: null,
+                    type: "account_suspended",
+                    title: "Account Suspended",
+                    body: reason ?? "Your account has been suspended by an administrator. Please contact support for more information.",
+                    relatedEntityType: "UserProfile",
+                    relatedEntityId: userId
+                );
+
                 return Ok(new
                 {
                     message = "User suspended successfully",
@@ -796,6 +880,17 @@ namespace Beyti_Backend.Controllers.Api
                 }
 
                 await _context.SaveChangesAsync();
+
+                // Send notification to the reactivated user
+                await _notificationService.SendNotificationAsync(
+                    recipientUserId: userId,
+                    senderUserId: null,
+                    type: "account_reactivated",
+                    title: "Account Reactivated",
+                    body: "Your account has been reactivated by an administrator. You can now access all features.",
+                    relatedEntityType: "UserProfile",
+                    relatedEntityId: userId
+                );
 
                 return Ok(new
                 {

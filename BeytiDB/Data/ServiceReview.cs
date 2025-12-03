@@ -36,6 +36,8 @@ public partial class ServiceReview
     [Precision(3)]
     public DateTime? RespondedAt { get; set; }
 
+    public bool IsHidden { get; set; }
+
     [Precision(3)]
     public DateTime CreatedAt { get; set; }
 

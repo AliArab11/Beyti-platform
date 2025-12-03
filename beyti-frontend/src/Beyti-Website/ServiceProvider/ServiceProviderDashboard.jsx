@@ -3,6 +3,8 @@ import ProviderOverview from './components/ProviderOverview';
 import ServicesManagement from './components/ServicesManagement';
 import ScheduleManagement from './components/ScheduleManagement';
 import BookingsManagement from './components/BookingsManagement';
+import ReviewsManagement from './components/ReviewsManagement';
+import NotificationsPage from './components/NotificationsPage';
 import ProfilePage from '../../components/ProfilePage';
 import ServiceProviderSidebar from './components/ServiceProviderSidebar';
 import PageHeader from '../../components/PageHeader';
@@ -15,6 +17,7 @@ export default function ServiceProviderDashboard() {
   const [userProfile, setUserProfile] = useState(null);
   const [providerStatus, setProviderStatus] = useState('Available');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [reviewSearchQuery, setReviewSearchQuery] = useState('');
 
   // Hardcoded login credentials - TODO: Replace with actual authentication/context
   const userProfileId = 1031; // Logged-in service provider's UserProfile ID
@@ -120,6 +123,10 @@ export default function ServiceProviderDashboard() {
         return 'Booking Requests';
       case 'schedule':
         return 'Availability';
+      case 'reviews':
+        return 'Reviews';
+      case 'notifications':
+        return 'Notifications';
       case 'profile':
         return 'My Profile';
       default:
@@ -142,11 +149,19 @@ export default function ServiceProviderDashboard() {
         {/* Header */}
         <PageHeader
           title={getPageTitle()}
+          withSearch={activeTab === 'reviews' || activeTab === 'notifications'}
+          searchPlaceholder={
+            activeTab === 'notifications'
+              ? 'Search notifications by title, content, or type...'
+              : 'Search by customer, service, or comment...'
+          }
+          onSearch={setReviewSearchQuery}
           notificationCount={0}
           userName={displayName}
           userRole="Service Provider"
           userProfile={userProfile}
           entityId={serviceProviderId}
+          userId={userProfileId}
           onProfileClick={() => setActiveTab('profile')}
           onProfileUpdate={handleProfileUpdate}
         />
@@ -203,6 +218,15 @@ export default function ServiceProviderDashboard() {
                 serviceProviderId={serviceProviderId}
                 initialFilter={bookingFilter}
               />
+            )}
+            {activeTab === 'reviews' && (
+              <ReviewsManagement
+                serviceProviderId={serviceProviderId}
+                searchQuery={reviewSearchQuery}
+              />
+            )}
+            {activeTab === 'notifications' && (
+              <NotificationsPage userId={userProfileId} />
             )}
             {activeTab === 'profile' && (
               <ProfilePage

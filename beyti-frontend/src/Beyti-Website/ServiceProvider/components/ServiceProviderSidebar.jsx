@@ -12,7 +12,9 @@ import {
   CalendarCheck,
   CalendarBlank,
   User,
-  CaretDown
+  CaretDown,
+  Star,
+  Bell
 } from '@phosphor-icons/react';
 import NavigationButton from '../../../components/NavigationButton';
 
@@ -55,6 +57,22 @@ const ServiceProviderSidebar = ({ currentPage, onNavigate, userName = "Service P
           onClick={() => onNavigate('schedule')}
         >
           Availability
+        </NavigationButton>
+
+        <NavigationButton
+          selected={currentPage === 'reviews'}
+          icon={<Star size={20} weight={currentPage === 'reviews' ? 'fill' : 'regular'} />}
+          onClick={() => onNavigate('reviews')}
+        >
+          Reviews
+        </NavigationButton>
+
+        <NavigationButton
+          selected={currentPage === 'notifications'}
+          icon={<Bell size={20} weight={currentPage === 'notifications' ? 'fill' : 'regular'} />}
+          onClick={() => onNavigate('notifications')}
+        >
+          Notifications
         </NavigationButton>
       </nav>
 
