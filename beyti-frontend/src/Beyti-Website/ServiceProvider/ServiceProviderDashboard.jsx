@@ -16,55 +16,79 @@ export default function ServiceProviderDashboard() {
   const [providerStatus, setProviderStatus] = useState('Available');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
-  // Hardcoded login credentials - TODO: Replace with actual authentication/context
-  const userProfileId = 1031; // Logged-in service provider's UserProfile ID
-  const serviceProviderId = 6; // Logged-in service provider's ID in ServiceProvider table
+  
+// 1. Get the logged-in user's Profile ID from the browser storage
+const userProfileId = localStorage.getItem('userId'); 
+
+// 2. Create state to hold the Provider ID (we will get this from the API)
+const [serviceProviderId, setServiceProviderId] = useState(null);
 
   // Fetch user profile details
   const fetchUserProfile = async () => {
     try {
-      const profile = await getUserProfile(userProfileId);
-      console.log('[fetchUserProfile] Received profile:', profile);
+      // 1. Check if we have a valid User ID to query
+      if (!userProfileId) {
+        console.warn('[fetchUserProfile] No userProfileId available, skipping fetch.');
+        return;
+      }
+
+      // 2. CRITICAL CHANGE: Use getProviderProfile instead of getUserProfile
+      // This hits the new endpoint: GET /api/ServiceProviderDashboard/Profile/{id}
+      const profile = await getProviderProfile(userProfileId);
+      
+      console.log('[fetchUserProfile] Received provider profile:', profile);
+
       if (profile) {
-        // API returns PascalCase, convert to camelCase for frontend use
+        // 3. Map the Backend (PascalCase) data to Frontend (camelCase)
         const normalizedProfile = {
+          id: profile.Id, // CRITICAL: This is the actual ServiceProviderId (e.g., 6)
           userProfileId: profile.UserProfileId,
           displayName: profile.DisplayName,
           roleType: profile.RoleType,
-          status: profile.Status, // This is ServiceProvider.Status from the API
+          status: profile.Status, 
           phone: profile.Phone,
           businessName: profile.BusinessName,
+          // Address fields from the new controller
           street: profile.Street,
           city: profile.City,
           region: profile.Region,
           postalCode: profile.PostalCode,
           country: profile.Country,
-          address: profile.Address,
+          address: profile.Address, // Formatted string
           createdAt: profile.CreatedAt,
           updatedAt: profile.UpdatedAt,
         };
 
-        console.log('[fetchUserProfile] Normalized profile status:', normalizedProfile.status);
+        console.log('[fetchUserProfile] Normalized profile:', normalizedProfile);
+        
+        // 4. Update all necessary states
         setUserProfile(normalizedProfile);
+        
+        // CRITICAL: Save the ServiceProviderId to state so other widgets can use it
+        // (Make sure you have [serviceProviderId, setServiceProviderId] = useState(null) defined above)
+        setServiceProviderId(normalizedProfile.id); 
+
         if (normalizedProfile.displayName) {
           setDisplayName(normalizedProfile.displayName);
         }
-        // Set provider status from profile - this comes from ServiceProvider.Status
-        // The UserProfilesController returns ServiceProvider.Status for service providers
+
+        // Set provider status (Available/Busy/Unavailable)
         if (normalizedProfile.status) {
-          console.log('[fetchUserProfile] Setting providerStatus to:', normalizedProfile.status);
           setProviderStatus(normalizedProfile.status);
         }
       }
     } catch (error) {
-      console.error('Error fetching user profile:', error);
+      console.error('Error fetching service provider profile:', error);
     }
   };
 
   // Handle profile update
   const handleProfileUpdate = async (updates) => {
     try {
-      await updateUserProfile(userProfileId, 'ServiceProvider', updates);
+      // Use the provider-specific update function
+      // This hits: PUT /api/ServiceProviderDashboard/UpdateProfile/{id}
+      await updateProviderProfile(userProfileId, updates);
+      
       // Refresh the profile after update
       await fetchUserProfile();
     } catch (error) {
@@ -74,7 +98,9 @@ export default function ServiceProviderDashboard() {
   };
 
   useEffect(() => {
-    fetchUserProfile();
+    if (userProfileId) {
+        fetchUserProfile();
+    }
   }, [userProfileId]);
 
   // Handle status change

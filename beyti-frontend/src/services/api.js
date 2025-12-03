@@ -394,6 +394,28 @@ export const getSeller = async (id) => {
 };
 
 /**
+ * Get seller profile by UserProfileId
+ * WORKAROUND: Backend doesn't have a dedicated endpoint for this
+ * This fetches all sellers and finds the one with matching UserProfileId
+ * @param {number} userProfileId - User Profile ID
+ * @returns {Promise<object|null>} - Seller object or null if not found
+ */
+export const getSellerByUserProfileId = async (userProfileId) => {
+  try {
+    // Fetch seller directly using a potential backend endpoint pattern
+    // Similar to ServiceProviderDashboard/Profile/{userProfileId}
+    const response = await fetchAPI(`/Sellers/Profile/${userProfileId}`);
+    return response;
+  } catch (error) {
+    // If endpoint doesn't exist (404), return null
+    if (error.message.includes('404') || error.message.includes('not found')) {
+      return null;
+    }
+    throw error;
+  }
+};
+
+/**
  * Create a new seller
  * @param {object} data - Seller data (PascalCase: UserProfileId, StoreName, Phone)
  * @returns {Promise<object>} - Created seller object
@@ -1213,6 +1235,27 @@ export const getDrivers = async () => {
  */
 export const getDriver = async (id) => {
   return await fetchAPI(`/Drivers/${id}`);
+};
+
+/**
+ * Get driver profile by UserProfileId
+ * WORKAROUND: Backend doesn't have a dedicated endpoint for this
+ * @param {number} userProfileId - User Profile ID
+ * @returns {Promise<object|null>} - Driver object or null if not found
+ */
+export const getDriverByUserProfileId = async (userProfileId) => {
+  try {
+    // Fetch driver directly using a potential backend endpoint pattern
+    // Similar to ServiceProviderDashboard/Profile/{userProfileId}
+    const response = await fetchAPI(`/Drivers/Profile/${userProfileId}`);
+    return response;
+  } catch (error) {
+    // If endpoint doesn't exist (404), return null
+    if (error.message.includes('404') || error.message.includes('not found')) {
+      return null;
+    }
+    throw error;
+  }
 };
 
 /**

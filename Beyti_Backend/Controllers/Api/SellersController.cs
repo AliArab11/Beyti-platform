@@ -55,6 +55,56 @@ namespace Beyti_Backend.Controllers.Api
                 .ToListAsync();
         }
 
+        // GET: api/Sellers/Profile/{userProfileId} - Get seller by UserProfileId
+        [HttpGet("Profile/{userProfileId}")]
+        public async Task<ActionResult<object>> GetSellerByUserProfileId(int userProfileId)
+        {
+            try
+            {
+                var seller = await _context.Sellers
+                    .Include(s => s.UserProfile)
+                    .Include(s => s.SellerAddresses)
+                        .ThenInclude(sa => sa.Address)
+                    .FirstOrDefaultAsync(s => s.UserProfileId == userProfileId);
+
+                if (seller == null)
+                    return NotFound("Seller not found");
+
+                // Get primary address if available
+                var primaryAddress = seller.SellerAddresses
+                    .Select(sa => sa.Address)
+                    .FirstOrDefault();
+
+                return Ok(new
+                {
+                    SellerId = seller.Id,
+                    Id = seller.Id, // For compatibility
+                    UserProfileId = seller.UserProfileId,
+                    StoreName = seller.UserProfile.DisplayName,
+                    Phone = seller.Phone,
+                    CreatedAt = seller.CreatedAt,
+                    DisplayName = seller.UserProfile.DisplayName,
+                    RoleType = seller.UserProfile.RoleType,
+                    Address = primaryAddress != null ? new
+                    {
+                        Street = primaryAddress.Street,
+                        City = primaryAddress.City,
+                        Region = primaryAddress.Region,
+                        PostalCode = primaryAddress.PostalCode,
+                        Country = primaryAddress.Country
+                    } : null
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Error fetching seller profile",
+                    error = ex.Message
+                });
+            }
+        }
+
         // GET: api/Sellers/{id}/products - THIS MUST COME BEFORE GetSeller
         [HttpGet("{id}/products")]
         public async Task<ActionResult<object>> GetSellerWithProducts(int id)

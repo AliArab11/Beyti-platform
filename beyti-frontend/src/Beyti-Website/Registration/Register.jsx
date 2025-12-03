@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
@@ -6,6 +6,7 @@ import PasswordInput from '../../components/PasswordInput';
 import Checkbox from '../../components/Checkbox';
 import { register, login } from '../../services/api';
 import { validateEmail, validatePassword, passwordsMatch } from '../../utils/validation';
+import { isLoggedIn } from '../../utils/auth';
 
 /**
  * Universal Registration Page
@@ -28,6 +29,14 @@ export default function Register() {
   });
 
   const [errors, setErrors] = useState({});
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (isLoggedIn()) {
+      console.log('[Register] User already logged in, redirecting to dashboard');
+      navigate('/dashboard');
+    }
+  }, [navigate]);
   const [isLoading, setIsLoading] = useState(false);
 
   // Password strength validation
