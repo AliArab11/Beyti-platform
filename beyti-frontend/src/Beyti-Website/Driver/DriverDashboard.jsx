@@ -1,6 +1,22 @@
 import React, { useState, useEffect, useMemo } from "react";
 import * as Icon from "@phosphor-icons/react";
 
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+import L from 'leaflet'
+// Ensure Leaflet CSS is loaded
+if (typeof window !== 'undefined') {
+  import('leaflet/dist/leaflet.css');
+}
+
+// Fix Leaflet marker icons
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
 // ---------------------------------------------------------------------
 // API helpers
 // ---------------------------------------------------------------------
@@ -143,15 +159,15 @@ const PageHeader = ({ title, notificationCount, userName, userRole }) => (
   </div>
 );
 
-const AnalyticsCard = ({ title, metrics }) => (
-  <div className="bg-grey-200 rounded-lg p-6 shadow-soft-lift border border-grey-stroke">
-    {title && <h3 className="text-card-h2 text-charcoal-600 mb-4">{title}</h3>}
-    <div className="flex gap-6">
+const AnalyticsCard = ({ title, metrics, compact }) => (
+  <div className={`bg-grey-200 rounded-lg shadow-soft-lift border border-grey-stroke ${compact ? 'p-4' : 'p-6'}`}>
+    {title && <h3 className={`text-charcoal-600 font-semibold ${compact ? 'text-sm mb-2' : 'text-card-h2 mb-4'}`}>{title}</h3>}
+    <div className={`flex ${compact ? 'gap-3' : 'gap-6'}`}>
       {metrics.map((metric, idx) => (
         <div key={idx} className="flex-1">
-          <p className="text-metric-h3 text-sage-700">{metric.value}</p>
+          <p className={`text-sage-700 font-bold ${compact ? 'text-xl' : 'text-metric-h3'}`}>{metric.value}</p>
           {metric.label && (
-            <p className="text-body-regular text-charcoal-400 mt-1">
+            <p className={`text-charcoal-400 ${compact ? 'text-xs mt-0.5' : 'text-body-regular mt-1'}`}>
               {metric.label}
             </p>
           )}
@@ -229,6 +245,16 @@ const DriverDashboard = () => {
   const [selectedJob, setSelectedJob] = useState(null);
   const [jobModalOpen, setJobModalOpen] = useState(false);
 
+  // Online/Offline state
+const [isOnline, setIsOnline] = useState(true);
+
+// Map modal state
+const [viewMapModal, setViewMapModal] = useState({ 
+  show: false, 
+  pickup: null, 
+  delivery: null 
+});
+
   // Disable body scroll when modal(s) are open
   useEffect(() => {
     if (selectModalOpen || jobModalOpen) {
@@ -283,6 +309,13 @@ const DriverDashboard = () => {
 
   const handleAcceptJob = async (job) => {
     if (!driverId) return;
+    
+    // Check if there's already an active delivery
+    if (metrics.activeDelivery) {
+        alert('⚠️ You already have an active delivery in progress. Please complete it before accepting another job.');
+        return;
+    }
+    
     try {
       await acceptDeliveryTicket(job.id, driverId);
       const updated = { ...job, status: "Accepted", driverId };
@@ -291,7 +324,7 @@ const DriverDashboard = () => {
       console.error(err);
       alert(err.message || "Failed to accept job");
     }
-  };
+};
 
   // Fetch tickets (all) - filtered by driver in frontend
   const fetchTickets = async () => {
@@ -312,59 +345,243 @@ const DriverDashboard = () => {
     // DO NOT ADD ANYTHING ELSE
   }, [driverId]);
 
-  // Derived metrics & slices
-  const { metrics, availableJobs, currentJobs, historyJobs } = useMemo(() => {
-    if (!tickets || tickets.length === 0) {
-      return {
-        metrics: {
-          available: 0,
-          current: 0,
-          completed: 0,
-          earnings: 0,
-        },
-        availableJobs: [],
-        currentJobs: [],
-        historyJobs: [],
-      };
-    }
-
-    const availableJobs = tickets.filter(
-      (t) => t.status === "Available" && !t.driverId
-    );
-
-    const currentJobs = tickets.filter(
-      (t) =>
-        t.driverId === driverId &&
-        (t.status === "Accepted" || t.status === "Picked Up")
-    );
-
-    const historyJobs = tickets.filter(
-      (t) => t.driverId === driverId && t.status === "Delivered"
-    );
-
-    const completed = historyJobs.length;
-    const earnings = historyJobs.reduce(
-      (sum, t) => sum + (t.order?.deliveryFee || 0),
-      0
-    );
-
+const { metrics, availableJobs, currentJobs, historyJobs } = useMemo(() => {
+if (!tickets || tickets.length === 0) {
     return {
       metrics: {
-        available: availableJobs.length,
-        current: currentJobs.length,
-        completed,
-        earnings,
+        available: 0,
+        current: 0,
+        completed: 0,
+        earnings: 0,
+        earningsToday: 0,
+        deliveriesToday: 0,
+        acceptanceRate: 0,
+        activeDelivery: null,
+        weeklyDeliveries: 0,
+        weeklyEarnings: 0,
+        avgDeliveryValue: 0,
       },
-      availableJobs,
-      currentJobs,
-      historyJobs,
+      availableJobs: [],
+      currentJobs: [],
+      historyJobs: [],
     };
-  }, [tickets, driverId]);
+  }
 
-  // -------------------------------------------------------------------
-  // Delivery Details Modal (kept for full-screen "Manage")
-  // -------------------------------------------------------------------
-  const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
+  const availableJobs = tickets.filter(
+    (t) => t.status === "Available" && !t.driverId
+  );
+
+  const currentJobs = tickets.filter(
+    (t) =>
+      t.driverId === driverId &&
+      (t.status === "Accepted" || t.status === "Picked Up")
+  );
+
+  const historyJobs = tickets.filter(
+    (t) => t.driverId === driverId && t.status === "Delivered"
+  );
+
+  const completed = historyJobs.length;
+  const earnings = historyJobs.reduce(
+    (sum, t) => sum + (t.order?.deliveryFee || 0),
+    0
+  );
+
+  // Calculate daily metrics
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const deliveriesToday = historyJobs.filter(t => {
+    const deliveryDate = new Date(t.updatedAt);
+    deliveryDate.setHours(0, 0, 0, 0);
+    return deliveryDate.getTime() === today.getTime();
+  }).length;
+
+  const earningsToday = historyJobs
+    .filter(t => {
+      const deliveryDate = new Date(t.updatedAt);
+      deliveryDate.setHours(0, 0, 0, 0);
+      return deliveryDate.getTime() === today.getTime();
+    })
+    .reduce((sum, t) => sum + (t.order?.deliveryFee || 0), 0);
+
+  // Calculate acceptance rate (accepted / total available shown to driver)
+  const totalOffered = tickets.filter(t => 
+    t.status === "Available" || (t.driverId === driverId)
+  ).length;
+  const totalAccepted = tickets.filter(t => t.driverId === driverId).length;
+  const acceptanceRate = totalOffered > 0 
+    ? Math.round((totalAccepted / totalOffered) * 100) 
+    : 0;
+
+  // Find active delivery (most recent Accepted or Picked Up)
+  const activeDelivery = currentJobs.length > 0 
+    ? currentJobs.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))[0]
+    : null;
+
+  // Weekly performance summary
+  const last7DaysJobs = historyJobs.filter(job => {
+    const jobDate = new Date(job.updatedAt);
+    const daysDiff = (today - jobDate) / (1000 * 60 * 60 * 24);
+    return daysDiff <= 7;
+  });
+  
+  const weeklyDeliveries = last7DaysJobs.length;
+  const weeklyEarnings = last7DaysJobs.reduce((sum, job) => sum + (job.order?.deliveryFee || 0), 0);
+  const avgDeliveryValue = weeklyDeliveries > 0 ? weeklyEarnings / weeklyDeliveries : 0;
+
+return {
+    metrics: {
+      available: availableJobs.length,
+      current: currentJobs.length,
+      completed,
+      earnings,
+      earningsToday,
+      deliveriesToday,
+      acceptanceRate,
+      activeDelivery,
+      weeklyDeliveries,
+      weeklyEarnings,
+      avgDeliveryValue,
+    },
+    availableJobs,
+    currentJobs,
+    historyJobs,
+  };
+}, [tickets, driverId]);
+
+
+// -------------------------------------------------------------------
+// Map Modal Component
+// -------------------------------------------------------------------
+const ViewMapModal = ({ pickup, delivery, onClose }) => {
+  const mapRef = React.useRef(null);
+
+  if (!pickup?.latitude || !delivery?.latitude) return null;
+
+  const handleResetView = () => {
+    if (mapRef.current) {
+      const map = mapRef.current;
+      map.setView([
+        (pickup.latitude + delivery.latitude) / 2,
+        (pickup.longitude + delivery.longitude) / 2
+      ], 13);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+      <div className="bg-cream-50 rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col border border-grey-stroke">
+        {/* Header */}
+        <div className="p-6 border-b border-grey-stroke flex justify-between items-center bg-grey-200">
+          <div>
+            <h3 className="text-xl font-bold text-charcoal-700 flex items-center gap-2">
+              <Icon.MapTrifold size={24} weight="fill" className="text-sage-600" />
+              Delivery Route
+            </h3>
+            <p className="text-sm text-charcoal-400 mt-1">Pickup to delivery location</p>
+          </div>
+          <button 
+            onClick={onClose} 
+            className="text-charcoal-400 hover:text-charcoal-600 text-2xl leading-none"
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Map Container */}
+        <div className="flex-1 p-6 bg-white" style={{ minHeight: '600px' }}>
+         <div className="rounded-lg overflow-hidden border-2 border-grey-stroke shadow-lg" style={{ height: '550px', width: '100%' }}>
+            <MapContainer
+                center={[
+                    (pickup.latitude + delivery.latitude) / 2,
+                    (pickup.longitude + delivery.longitude) / 2
+                ]}
+                zoom={13}
+                scrollWheelZoom={true}
+                dragging={true}
+                doubleClickZoom={true}
+                zoomControl={true}
+                style={{ height: '500px', width: '100%', minHeight: '500px' }}
+                ref={mapRef}
+                >
+              <TileLayer 
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              />
+              
+              {/* Pickup Marker */}
+              <Marker position={[pickup.latitude, pickup.longitude]}>
+                <Popup>
+                  <div className="p-2">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Icon.Package size={20} className="text-sage-600" />
+                      <strong className="text-sage-700">Pickup Location</strong>
+                    </div>
+                    {pickup.street && <p className="text-sm mb-1"><strong>Street:</strong> {pickup.street}</p>}
+                    {pickup.city && <p className="text-sm mb-1"><strong>City:</strong> {pickup.city}</p>}
+                    {pickup.building && <p className="text-sm"><strong>Building:</strong> {pickup.building}</p>}
+                  </div>
+                </Popup>
+              </Marker>
+              
+              {/* Delivery Marker */}
+              <Marker position={[delivery.latitude, delivery.longitude]}>
+                <Popup>
+                  <div className="p-2">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Icon.MapPin size={20} className="text-danger-btn" />
+                      <strong className="text-danger-text">Delivery Location</strong>
+                    </div>
+                    {delivery.street && <p className="text-sm mb-1"><strong>Street:</strong> {delivery.street}</p>}
+                    {delivery.city && <p className="text-sm mb-1"><strong>City:</strong> {delivery.city}</p>}
+                    {delivery.building && <p className="text-sm"><strong>Building:</strong> {delivery.building}</p>}
+                  </div>
+                </Popup>
+              </Marker>
+            </MapContainer>
+          </div>
+        </div>
+
+        {/* Legend */}
+        <div className="px-6 py-3 bg-grey-100 border-t border-grey-stroke">
+          <div className="flex items-center justify-center gap-8 text-sm">
+            <div className="flex items-center gap-2">
+              <Icon.Package size={20} className="text-sage-600" />
+              <span className="text-charcoal-600 font-medium">Pickup Location</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Icon.MapPin size={20} className="text-danger-btn" />
+              <span className="text-charcoal-600 font-medium">Delivery Location</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-6 border-t border-grey-stroke bg-grey-200 flex gap-3">
+          <button
+            onClick={handleResetView}
+            className="flex-1 bg-sage-500 hover:bg-sage-600 text-cream-50 py-2.5 rounded-lg font-semibold"
+          >
+            Reset View
+          </button>
+          <button
+            onClick={onClose}
+            className="flex-1 bg-grey-300 hover:bg-grey-400 text-charcoal-700 py-2.5 rounded-lg font-semibold"
+          >
+            Close Map
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+// -------------------------------------------------------------------
+// Delivery Details Modal (kept for full-screen "Manage")
+// -------------------------------------------------------------------
+const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
     const [actionLoading, setActionLoading] = useState(false);
     const [actionError, setActionError] = useState(null);
     const [localJob, setLocalJob] = useState(job);
@@ -382,19 +599,26 @@ const DriverDashboard = () => {
       if (onJobUpdated) onJobUpdated(updated);
     };
 
-    const handleAcceptModal = async () => {
-      if (!driverId) return;
-      setActionLoading(true);
-      setActionError(null);
-      try {
-        await acceptDeliveryTicket(localJob.id, driverId);
-        applyUpdate("Accepted");
-      } catch (err) {
-        setActionError(err.message || "Failed to accept delivery");
-      } finally {
-        setActionLoading(false);
-      }
-    };
+   const handleAcceptModal = async () => {
+    if (!driverId) return;
+    
+    // Check if there's already an active delivery
+    if (metrics.activeDelivery) {
+        setActionError('⚠️ You already have an active delivery. Complete it before accepting another.');
+        return;
+    }
+    
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      await acceptDeliveryTicket(localJob.id, driverId);
+      applyUpdate("Accepted");
+    } catch (err) {
+      setActionError(err.message || "Failed to accept delivery");
+    } finally {
+      setActionLoading(false);
+    }
+};
 
     const handleUpdateStatus = async (newStatus) => {
       setActionLoading(true);
@@ -423,16 +647,17 @@ const DriverDashboard = () => {
       }
 
       if (isAvailable) {
-        return (
-          <div className="flex flex-col md:flex-row gap-3">
-            <button
-              type="button"
-              disabled={actionLoading}
-              onClick={handleAcceptModal}
-              className="flex-1 bg-success-btn hover:bg-success-text disabled:bg-success-btn/60 text-white py-2.5 rounded-lg font-semibold"
-            >
-              {actionLoading ? "Accepting..." : "✓ Accept Job"}
-            </button>
+            const hasActiveDelivery = !!metrics.activeDelivery;
+            return (
+                <div className="flex flex-col md:flex-row gap-3">
+                <button
+                    type="button"
+                    disabled={actionLoading || !isOnline || hasActiveDelivery}
+                    onClick={handleAcceptModal}
+                    className="flex-1 bg-success-btn hover:bg-success-text disabled:bg-success-btn/60 text-white py-2.5 rounded-lg font-semibold"
+                >
+                    {hasActiveDelivery ? "🚫 Complete Active Delivery First" : (!isOnline ? "⚠️ You're Offline" : actionLoading ? "Accepting..." : "✓ Accept Job")}
+                </button>
             <button
               type="button"
               disabled={actionLoading}
@@ -549,113 +774,189 @@ const DriverDashboard = () => {
               </div>
             </div>
 
-            {/* Customer & Order info */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-grey-100 rounded-xl p-4 border border-grey-stroke">
-              <div>
-                <p className="text-xs text-charcoal-400 mb-1 uppercase tracking-wide">
-                  Customer
-                </p>
-                <p className="text-sm font-semibold text-charcoal-700">
-                  {localJob.order?.customerName || "N/A"}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-charcoal-400 mb-1 uppercase tracking-wide">
-                  Restaurant
-                </p>
-                <p className="text-sm font-semibold text-charcoal-700">
-                  {localJob.order?.sellerName || "N/A"}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-charcoal-400 mb-1 uppercase tracking-wide">
-                  Order Total
-                </p>
-                <p className="text-lg font-semibold text-charcoal-800">
-                  BHD {(localJob.order?.totalAmount || 0).toFixed(3)}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-charcoal-400 mb-1 uppercase tracking-wide">
-                  Payment Method
-                </p>
-                <p className="text-sm font-semibold text-charcoal-700">
-                  {localJob.order?.paymentMethod || "N/A"}
-                </p>
-              </div>
-            </div>
-
-            {/* Addresses */}
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-charcoal-700">
-                Route Information
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-cream-50 border border-grey-stroke rounded-lg p-4">
-                  <div className="flex items-start gap-2 mb-2">
-                    <Icon.Package
-                      size={20}
-                      className="text-sage-600 mt-0.5"
-                    />
-                    <div className="flex-1">
-                      <p className="text-xs text-charcoal-400 uppercase tracking-wide mb-1">
-                        PICKUP LOCATION
-                      </p>
-                      <p className="text-sm font-semibold text-charcoal-700">
-                        {localJob.pickupAddress?.street || "N/A"}
-                      </p>
-                      <p className="text-xs text-charcoal-500">
-                        {localJob.pickupAddress?.city || "N/A"},{" "}
-                        {localJob.pickupAddress?.state || ""}
-                      </p>
-                      {localJob.pickupAddress?.building && (
-                        <p className="text-xs text-charcoal-500">
-                          Building: {localJob.pickupAddress.building}
+                {/* Contact Information */}
+                <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-charcoal-700 flex items-center gap-2">
+                    <Icon.Users size={18} className="text-sage-600" />
+                    Contact Information
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-grey-100 rounded-lg p-4 border border-grey-stroke">
+                    <div className="flex items-start gap-3">
+                        <Icon.User size={20} className="text-sage-600 mt-0.5" />
+                        <div className="flex-1">
+                        <p className="text-xs text-charcoal-400 mb-1 uppercase tracking-wide">
+                            Customer
                         </p>
-                      )}
+                        <p className="text-sm font-semibold text-charcoal-700 mb-2">
+                            {localJob.order?.customerName || "N/A"}
+                        </p>
+                        <a 
+                            href={`tel:${localJob.order?.customerPhone}`}
+                            className="text-xs text-sage-600 hover:text-sage-700 flex items-center gap-1 font-medium"
+                        >
+                            <Icon.Phone size={14} weight="fill" />
+                            {localJob.order?.customerPhone || "No phone"}
+                        </a>
+                        </div>
                     </div>
-                  </div>
+                    </div>
+                    
+                    <div className="bg-grey-100 rounded-lg p-4 border border-grey-stroke">
+                    <div className="flex items-start gap-3">
+                        <Icon.Storefront size={20} className="text-sage-600 mt-0.5" />
+                        <div className="flex-1">
+                        <p className="text-xs text-charcoal-400 mb-1 uppercase tracking-wide">
+                            Restaurant
+                        </p>
+                        <p className="text-sm font-semibold text-charcoal-700 mb-2">
+                            {localJob.order?.sellerName || "N/A"}
+                        </p>
+                        <a 
+                            href={`tel:${localJob.order?.sellerPhone}`}
+                            className="text-xs text-sage-600 hover:text-sage-700 flex items-center gap-1 font-medium"
+                        >
+                            <Icon.Phone size={14} weight="fill" />
+                            {localJob.order?.sellerPhone || "No phone"}
+                        </a>
+                        </div>
+                    </div>
+                    </div>
+                </div>
                 </div>
 
-                <div className="bg-cream-50 border border-grey-stroke rounded-lg p-4">
-                  <div className="flex items-start gap-2 mb-2">
-                    <Icon.MapPin
-                      size={20}
-                      className="text-danger-btn mt-0.5"
-                    />
-                    <div className="flex-1">
-                      <p className="text-xs text-charcoal-400 uppercase tracking-wide mb-1">
-                        DELIVERY LOCATION
-                      </p>
-                      <p className="text-sm font-semibold text-charcoal-700">
-                        {localJob.deliveryAddress?.street || "N/A"}
-                      </p>
-                      <p className="text-xs text-charcoal-500">
-                        {localJob.deliveryAddress?.city || "N/A"},{" "}
-                        {localJob.deliveryAddress?.state || ""}
-                      </p>
-                      {localJob.deliveryAddress?.building && (
-                        <p className="text-xs text-charcoal-500">
-                          Building: {localJob.deliveryAddress.building}
-                        </p>
-                      )}
+                {/* Payment & Pricing */}
+                <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-charcoal-700 flex items-center gap-2">
+                    <Icon.CurrencyDollar size={18} className="text-sage-600" />
+                    Payment Details
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-cream-50 rounded-lg p-4 border border-grey-stroke">
+                    <p className="text-xs text-charcoal-400 mb-1 uppercase tracking-wide">
+                        Payment Method
+                    </p>
+                    <p className="text-sm font-semibold text-charcoal-700">
+                        {localJob.order?.paymentMethod || "N/A"}
+                    </p>
                     </div>
-                  </div>
+                    
+                    <div className="bg-cream-50 rounded-lg p-4 border border-grey-stroke">
+                    <p className="text-xs text-charcoal-400 mb-1 uppercase tracking-wide">
+                        Items Subtotal
+                    </p>
+                    <p className="text-base font-bold text-charcoal-700">
+                        BHD {((localJob.order?.totalAmount || 0) - (localJob.order?.deliveryFee || 0)).toFixed(3)}
+                    </p>
+                    </div>
+                    
+                    <div className="bg-sage-100 rounded-lg p-4 border border-sage-500">
+                    <p className="text-xs text-sage-700 mb-1 uppercase tracking-wide font-semibold">
+                        Your Earnings
+                    </p>
+                    <p className="text-lg font-bold text-sage-700">
+                        BHD {(localJob.order?.deliveryFee || 0).toFixed(3)}
+                    </p>
+                    <p className="text-xs text-charcoal-500 mt-1">
+                        Total: BHD {(localJob.order?.totalAmount || 0).toFixed(3)}
+                    </p>
+                    </div>
                 </div>
-              </div>
-            </div>
+                </div>
 
-            {/* Special instructions */}
-            {localJob.order?.specialInstructions && (
-              <div className="bg-cream-50 border border-grey-stroke rounded-lg p-4">
-                <p className="text-xs text-charcoal-400 uppercase tracking-wide mb-2">
-                  SPECIAL INSTRUCTIONS
-                </p>
-                <p className="text-sm text-charcoal-700">
-                  {localJob.order.specialInstructions}
-                </p>
-              </div>
-            )}
+            {/* Route Information */}
+                <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-charcoal-700 flex items-center gap-2">
+                    <Icon.MapTrifold size={18} className="text-sage-600" />
+                    Route Information
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-gradient-to-br from-sage-50 to-cream-50 border-2 border-sage-300 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-full bg-sage-500 flex items-center justify-center flex-shrink-0">
+                        <Icon.Package size={20} weight="fill" className="text-white" />
+                        </div>
+                        <div className="flex-1">
+                        <p className="text-xs text-sage-700 uppercase tracking-wide mb-2 font-semibold">
+                            📦 PICKUP LOCATION
+                        </p>
+                        <p className="text-sm font-bold text-charcoal-700 mb-1">
+                            {localJob.pickupAddress?.street || "N/A"}
+                        </p>
+                        <p className="text-xs text-charcoal-600 mb-1">
+                            {localJob.pickupAddress?.city || "N/A"}
+                            {localJob.pickupAddress?.state && `, ${localJob.pickupAddress.state}`}
+                        </p>
+                        {localJob.pickupAddress?.building && (
+                            <p className="text-xs text-charcoal-500 bg-white/60 rounded px-2 py-1 inline-block mt-1">
+                            🏢 {localJob.pickupAddress.building}
+                            </p>
+                        )}
+                        </div>
+                    </div>
+                    </div>
+
+                    <div className="bg-gradient-to-br from-danger-bg to-cream-50 border-2 border-danger-btn/30 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-full bg-danger-btn flex items-center justify-center flex-shrink-0">
+                        <Icon.MapPin size={20} weight="fill" className="text-white" />
+                        </div>
+                        <div className="flex-1">
+                        <p className="text-xs text-danger-text uppercase tracking-wide mb-2 font-semibold">
+                            📍 DELIVERY LOCATION
+                        </p>
+                        <p className="text-sm font-bold text-charcoal-700 mb-1">
+                            {localJob.deliveryAddress?.street || "N/A"}
+                        </p>
+                        <p className="text-xs text-charcoal-600 mb-1">
+                            {localJob.deliveryAddress?.city || "N/A"}
+                            {localJob.deliveryAddress?.state && `, ${localJob.deliveryAddress.state}`}
+                        </p>
+                        {localJob.deliveryAddress?.building && (
+                            <p className="text-xs text-charcoal-500 bg-white/60 rounded px-2 py-1 inline-block mt-1">
+                            🏢 {localJob.deliveryAddress.building}
+                            </p>
+                        )}
+                        </div>
+                    </div>
+                    </div>
+                </div>
+                </div>
+
+            {/* Special Instructions */}
+                {localJob.order?.specialInstructions && (
+                <div className="bg-amber-50 border-l-4 border-amber-500 rounded-lg p-4">
+                    <div className="flex items-start gap-2">
+                    <Icon.Note size={20} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                        <p className="text-xs text-amber-700 uppercase tracking-wide mb-2 font-semibold">
+                        📝 SPECIAL INSTRUCTIONS
+                        </p>
+                        <p className="text-sm text-charcoal-700 leading-relaxed">
+                        {localJob.order.specialInstructions}
+                        </p>
+                    </div>
+                    </div>
+                </div>
+                )}
+
+            {/* View Route Map Button */}
+                {localJob.pickupAddress?.latitude && localJob.deliveryAddress?.latitude && (
+                <button
+                    type="button"
+                    onClick={() => {
+                    setViewMapModal({
+                        show: true,
+                        pickup: localJob.pickupAddress,
+                        delivery: localJob.deliveryAddress
+                    });
+                    }}
+                    className="w-full bg-sage-500 hover:bg-sage-600 text-cream-50 py-3 rounded-lg font-semibold flex items-center justify-center gap-2"
+                >
+                    <Icon.MapTrifold size={20} weight="fill" />
+                    <span>🗺️ View Route on Map</span>
+                </button>
+                )}
 
             {/* Error message */}
             {actionError && (
@@ -775,9 +1076,10 @@ const DriverDashboard = () => {
               const newJob = isNewJob(job);
 
               const mainRowClass = [
-                "border-b border-grey-stroke",
-                newJob ? "bg-danger-bg/30" : "bg-cream-50 hover:bg-grey-100",
-              ].join(" ");
+                "border-b-2 border-grey-stroke transition-all",
+                newJob ? "bg-danger-bg/30 hover:bg-danger-bg/40" : "bg-cream-50 hover:bg-grey-100",
+                isExpanded ? "border-b-0" : ""
+                ].join(" ");
 
               return (
                 <React.Fragment key={job.id}>
@@ -823,10 +1125,13 @@ const DriverDashboard = () => {
                       {job.order?.sellerName || "—"}
                     </td>
 
-                    {/* total */}
+                    {/* subtotal (items total only) */}
                     <td className="px-2 py-3 align-top text-right text-charcoal-800 font-semibold">
-                      BHD {(job.order?.totalAmount || 0).toFixed(3)}
+                    BHD {(
+                        (job.order?.totalAmount || 0) - (job.order?.deliveryFee || 0)
+                    ).toFixed(3)}
                     </td>
+
 
                     {/* fee */}
                     <td className="px-2 py-3 align-top text-right text-charcoal-600">
@@ -842,152 +1147,205 @@ const DriverDashboard = () => {
 
                     {/* actions */}
                     <td className="px-4 py-3 align-top">
-                      <div className="flex flex-wrap gap-2 justify-end">
-                       {/* Manage button (outline, proper size) */}
-                            <CRUDButton 
-                            variant="outline" 
-                            onClick={() => openJobModal(job)}
-                            >
-                            Manage
-                            </CRUDButton>
+                    <div className="flex flex-wrap gap-2 justify-end">
+                        {/* Manage button */}
+                        <CRUDButton 
+                        variant="outline" 
+                        onClick={() => openJobModal(job)}
+                        >
+                        Manage
+                        </CRUDButton>
 
-                        {/* For available jobs: Accept + Decline */}
-                        {(job.status === "Available" || job.status === "available") && (
-                          <>
-                            <CRUDButton
-                              variant="success"
-                              onClick={() => handleAcceptJob(job)}
-                            >
-                              Accept
-                            </CRUDButton>
-                            <CRUDButton
-                              variant="error"
-                              onClick={() => handleDeclineJob(job.id)}
-                            >
-                              Decline
-                            </CRUDButton>
-                          </>
-                        )}
-                      </div>
+                        {/* For available jobs: Accept + Decline (disabled if offline or active delivery) */}
+                            {(job.status === "Available" || job.status === "available") && (
+                            <>
+                                <CRUDButton
+                                variant="success"
+                                onClick={() => handleAcceptJob(job)}
+                                disabled={!isOnline || !!metrics.activeDelivery}
+                                title={metrics.activeDelivery ? 'Complete your active delivery first' : (!isOnline ? 'You are offline' : 'Accept this delivery')}
+                                >
+                                {metrics.activeDelivery ? '🚫 Busy' : 'Accept'}
+                                </CRUDButton>
+                                <CRUDButton
+                                variant="error"
+                                onClick={() => handleDeclineJob(job.id)}
+                                disabled={!isOnline}
+                                >
+                                Decline
+                                </CRUDButton>
+                            </>
+                            )}
+                    </div>
                     </td>
                   </tr>
 
-                  {/* Expanded row with A-style boxed details */}
-                  {isExpanded && (
-                    <tr className="bg-cream-50">
-                      <td colSpan={8} className="px-6 pb-4 pt-0">
-                        <div className="border-t border-grey-stroke mt-1 pt-4 space-y-4">
-                          {/* Top summary grid */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div className="bg-grey-100 rounded-lg p-3 border border-grey-stroke">
-                              <p className="text-xs text-charcoal-400 mb-1 uppercase tracking-wide">
-                                Customer
-                              </p>
-                              <p className="text-sm font-semibold text-charcoal-700">
-                                {job.order?.customerName || "N/A"}
-                              </p>
+                 {/* Expanded row with A-style boxed details */}
+                    {isExpanded && (
+                    <tr className="bg-grey-50">
+                        <td colSpan={8} className="px-0 pb-0 pt-0">
+                        <div className="bg-gradient-to-b from-grey-50 to-cream-50 border-l-4 border-sage-500 mx-4 mb-4 mt-2 rounded-lg shadow-md p-6 space-y-5">
+                            
+                            {/* Section Title */}
+                            <div className="flex items-center justify-between pb-3 border-b-2 border-sage-300">
+                            <h4 className="text-base font-bold text-charcoal-700 flex items-center gap-2">
+                                <Icon.Package size={20} weight="fill" className="text-sage-600" />
+                                Order Details - #{job.orderId}
+                            </h4>
+                            <button
+                                onClick={() => toggleRow(job.id)}
+                                className="text-charcoal-400 hover:text-charcoal-600 flex items-center gap-1 text-sm font-medium"
+                            >
+                                <span>Collapse</span>
+                                <Icon.CaretUp size={16} />
+                            </button>
                             </div>
-                            <div className="bg-grey-100 rounded-lg p-3 border border-grey-stroke">
-                              <p className="text-xs text-charcoal-400 mb-1 uppercase tracking-wide">
-                                Restaurant
-                              </p>
-                              <p className="text-sm font-semibold text-charcoal-700">
-                                {job.order?.sellerName || "N/A"}
-                              </p>
+
+                            {/* Contact Information Row */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="bg-grey-100 rounded-lg p-4 border border-grey-stroke">
+                                <div className="flex items-start gap-3">
+                                <Icon.User size={20} className="text-sage-600 mt-0.5" />
+                                <div className="flex-1">
+                                    <p className="text-xs text-charcoal-400 mb-1 uppercase tracking-wide">
+                                    Customer
+                                    </p>
+                                    <p className="text-sm font-semibold text-charcoal-700 mb-1">
+                                    {job.order?.customerName || "N/A"}
+                                    </p>
+                                    <p className="text-xs text-charcoal-500 flex items-center gap-1">
+                                    <Icon.Phone size={14} weight="fill" />
+                                    {job.order?.customerPhone || "No phone"}
+                                    </p>
+                                </div>
+                                </div>
                             </div>
-                            <div className="bg-grey-100 rounded-lg p-3 border border-grey-stroke">
-                              <p className="text-xs text-charcoal-400 mb-1 uppercase tracking-wide">
-                                Payment
-                              </p>
-                              <p className="text-sm font-semibold text-charcoal-700">
+                            
+                            <div className="bg-grey-100 rounded-lg p-4 border border-grey-stroke">
+                                <div className="flex items-start gap-3">
+                                <Icon.Storefront size={20} className="text-sage-600 mt-0.5" />
+                                <div className="flex-1">
+                                    <p className="text-xs text-charcoal-400 mb-1 uppercase tracking-wide">
+                                    Restaurant
+                                    </p>
+                                    <p className="text-sm font-semibold text-charcoal-700 mb-1">
+                                    {job.order?.sellerName || "N/A"}
+                                    </p>
+                                    <p className="text-xs text-charcoal-500 flex items-center gap-1">
+                                    <Icon.Phone size={14} weight="fill" />
+                                    {job.order?.sellerPhone || "No phone"}
+                                    </p>
+                                </div>
+                                </div>
+                            </div>
+                            </div>
+
+                            {/* Payment & Pricing Row */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="bg-cream-50 rounded-lg p-4 border border-grey-stroke">
+                                <p className="text-xs text-charcoal-400 mb-1 uppercase tracking-wide">
+                                Payment Method
+                                </p>
+                                <p className="text-sm font-semibold text-charcoal-700">
                                 {job.order?.paymentMethod || "N/A"}
-                              </p>
+                                </p>
                             </div>
-                            <div className="bg-grey-100 rounded-lg p-3 border border-grey-stroke">
-                              <p className="text-xs text-charcoal-400 mb-1 uppercase tracking-wide">
-                                Total + Fee
-                              </p>
-                              <p className="text-sm font-semibold text-charcoal-700">
-                                Total: BHD{" "}
-                                {(job.order?.totalAmount || 0).toFixed(3)}
-                              </p>
-                              <p className="text-xs text-charcoal-500">
-                                Fee: BHD{" "}
-                                {(job.order?.deliveryFee || 0).toFixed(3)}
-                              </p>
+                            
+                            <div className="bg-cream-50 rounded-lg p-4 border border-grey-stroke">
+                                <p className="text-xs text-charcoal-400 mb-1 uppercase tracking-wide">
+                                Items Subtotal
+                                </p>
+                                <p className="text-base font-bold text-charcoal-700">
+                                BHD {((job.order?.totalAmount || 0) - (job.order?.deliveryFee || 0)).toFixed(3)}
+                                </p>
                             </div>
-                          </div>
+                            
+                            <div className="bg-sage-100 rounded-lg p-4 border border-sage-500">
+                                <p className="text-xs text-sage-700 mb-1 uppercase tracking-wide font-semibold">
+                                Your Earnings
+                                </p>
+                                <p className="text-base font-bold text-sage-700">
+                                BHD {(job.order?.deliveryFee || 0).toFixed(3)}
+                                </p>
+                                <p className="text-xs text-charcoal-500 mt-1">
+                                Total: BHD {(job.order?.totalAmount || 0).toFixed(3)}
+                                </p>
+                            </div>
+                            </div>
 
-                          {/* Route cards */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="bg-cream-50 border border-grey-stroke rounded-lg p-4">
-                              <div className="flex items-start gap-2">
-                                <Icon.Package
-                                  size={20}
-                                  className="text-sage-600 mt-0.5"
-                                />
-                                <div>
-                                  <p className="text-xs text-charcoal-400 uppercase tracking-wide mb-1">
-                                    PICKUP LOCATION
-                                  </p>
-                                  <p className="text-sm font-semibold text-charcoal-700">
+                            {/* Route Information */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="bg-gradient-to-br from-sage-50 to-cream-50 border-2 border-sage-300 rounded-lg p-4">
+                                <div className="flex items-start gap-3">
+                                <div className="w-10 h-10 rounded-full bg-sage-500 flex items-center justify-center flex-shrink-0">
+                                    <Icon.Package size={20} weight="fill" className="text-white" />
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-xs text-sage-700 uppercase tracking-wide mb-2 font-semibold">
+                                    📦 PICKUP LOCATION
+                                    </p>
+                                    <p className="text-sm font-bold text-charcoal-700 mb-1">
                                     {job.pickupAddress?.street || "N/A"}
-                                  </p>
-                                  <p className="text-xs text-charcoal-500">
-                                    {job.pickupAddress?.city || "N/A"},{" "}
-                                    {job.pickupAddress?.state || ""}
-                                  </p>
-                                  {job.pickupAddress?.building && (
-                                    <p className="text-xs text-charcoal-500">
-                                      Building: {job.pickupAddress.building}
                                     </p>
-                                  )}
+                                    <p className="text-xs text-charcoal-600 mb-1">
+                                    {job.pickupAddress?.city || "N/A"}
+                                    {job.pickupAddress?.state && `, ${job.pickupAddress.state}`}
+                                    </p>
+                                    {job.pickupAddress?.building && (
+                                    <p className="text-xs text-charcoal-500 bg-white/60 rounded px-2 py-1 inline-block">
+                                        🏢 Building: {job.pickupAddress.building}
+                                    </p>
+                                    )}
                                 </div>
-                              </div>
+                                </div>
                             </div>
 
-                            <div className="bg-cream-50 border border-grey-stroke rounded-lg p-4">
-                              <div className="flex items-start gap-2">
-                                <Icon.MapPin
-                                  size={20}
-                                  className="text-danger-btn mt-0.5"
-                                />
-                                <div>
-                                  <p className="text-xs text-charcoal-400 uppercase tracking-wide mb-1">
-                                    DELIVERY LOCATION
-                                  </p>
-                                  <p className="text-sm font-semibold text-charcoal-700">
+                            <div className="bg-gradient-to-br from-danger-bg to-cream-50 border-2 border-danger-btn/30 rounded-lg p-4">
+                                <div className="flex items-start gap-3">
+                                <div className="w-10 h-10 rounded-full bg-danger-btn flex items-center justify-center flex-shrink-0">
+                                    <Icon.MapPin size={20} weight="fill" className="text-white" />
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-xs text-danger-text uppercase tracking-wide mb-2 font-semibold">
+                                    📍 DELIVERY LOCATION
+                                    </p>
+                                    <p className="text-sm font-bold text-charcoal-700 mb-1">
                                     {job.deliveryAddress?.street || "N/A"}
-                                  </p>
-                                  <p className="text-xs text-charcoal-500">
-                                    {job.deliveryAddress?.city || "N/A"},{" "}
-                                    {job.deliveryAddress?.state || ""}
-                                  </p>
-                                  {job.deliveryAddress?.building && (
-                                    <p className="text-xs text-charcoal-500">
-                                      Building: {job.deliveryAddress.building}
                                     </p>
-                                  )}
+                                    <p className="text-xs text-charcoal-600 mb-1">
+                                    {job.deliveryAddress?.city || "N/A"}
+                                    {job.deliveryAddress?.state && `, ${job.deliveryAddress.state}`}
+                                    </p>
+                                    {job.deliveryAddress?.building && (
+                                    <p className="text-xs text-charcoal-500 bg-white/60 rounded px-2 py-1 inline-block">
+                                        🏢 Building: {job.deliveryAddress.building}
+                                    </p>
+                                    )}
                                 </div>
-                              </div>
+                                </div>
                             </div>
-                          </div>
+                            </div>
 
-                          {/* Special instructions */}
-                          {job.order?.specialInstructions && (
-                            <div className="bg-cream-50 border border-grey-stroke rounded-lg p-4">
-                              <p className="text-xs text-charcoal-400 uppercase tracking-wide mb-2">
-                                SPECIAL INSTRUCTIONS
-                              </p>
-                              <p className="text-sm text-charcoal-700">
-                                {job.order.specialInstructions}
-                              </p>
+                            {/* Special Instructions */}
+                            {job.order?.specialInstructions && (
+                            <div className="bg-amber-50 border-l-4 border-amber-500 rounded-lg p-4">
+                                <div className="flex items-start gap-2">
+                                <Icon.Note size={20} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                                <div className="flex-1">
+                                    <p className="text-xs text-amber-700 uppercase tracking-wide mb-2 font-semibold">
+                                    📝 SPECIAL INSTRUCTIONS
+                                    </p>
+                                    <p className="text-sm text-charcoal-700 leading-relaxed">
+                                    {job.order.specialInstructions}
+                                    </p>
+                                </div>
+                                </div>
                             </div>
-                          )}
+                            )}
                         </div>
-                      </td>
+                        </td>
                     </tr>
-                  )}
+                    )}
                 </React.Fragment>
               );
             })}
@@ -1003,6 +1361,15 @@ const DriverDashboard = () => {
   return (
     <div className="min-h-screen bg-cream-50 flex">
       <DriverSelectModal />
+
+          {/* Map Modal */}
+            {viewMapModal.show && (
+            <ViewMapModal
+                pickup={viewMapModal.pickup}
+                delivery={viewMapModal.delivery}
+                onClose={() => setViewMapModal({ show: false, pickup: null, delivery: null })}
+            />
+            )}
 
       {jobModalOpen && selectedJob && (
         <DeliveryDetailsModal
@@ -1082,14 +1449,44 @@ const DriverDashboard = () => {
       {/* Main content */}
       <div className="flex-1 flex flex-col">
         <PageHeader
-          title="Driver Dashboard"
-          notificationCount={metrics.available}
-          userName={driverName}
-          userRole="Driver"
+        title="Driver Dashboard"
+        notificationCount={isOnline ? metrics.available : 0}
+        userName={driverName}
+        userRole="Driver"
         />
 
         <main className="flex-1 p-6 lg:p-8">
-          <div className="max-w-7xl mx-auto space-y-8">
+        <div className="max-w-7xl mx-auto space-y-6">
+            {/* Online/Offline Toggle - Compact */}
+                {driverId && (
+                <div className="flex justify-end mb-0">
+                    <div className="bg-grey-200 border border-grey-stroke rounded-lg px-4 py-2 shadow-soft-lift inline-flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                        <span className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-success-btn' : 'bg-grey-400'} ${isOnline ? 'animate-pulse' : ''}`}></span>
+                        <span className={`text-sm font-semibold ${isOnline ? 'text-success-text' : 'text-charcoal-400'}`}>
+                        {isOnline ? 'Online' : 'Offline'}
+                        </span>
+                    </div>
+                    <button
+                        onClick={() => {
+                            if (isOnline && metrics.activeDelivery) {
+                                alert('⚠️ You cannot go offline while you have an active delivery. Please complete or cancel your current delivery first.');
+                                return;
+                            }
+                            setIsOnline(!isOnline);
+                        }}
+                        disabled={isOnline && metrics.activeDelivery}
+                        className={`px-4 py-1.5 rounded-lg font-semibold text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                        isOnline 
+                            ? 'bg-error-btn hover:bg-error-text text-white' 
+                            : 'bg-success-btn hover:bg-success-text text-white'
+                        }`}
+                    >
+                        {isOnline ? (metrics.activeDelivery ? '🚫 Active Delivery' : 'Go Offline') : 'Go Online'}
+                    </button>
+                    </div>
+                </div>
+                )}
             {!driverId && (
               <div className="bg-cream-50 border border-grey-stroke rounded-xl p-6 text-center">
                 <p className="text-body-medium text-charcoal-500">
@@ -1117,148 +1514,525 @@ const DriverDashboard = () => {
                 {activeTab === "dashboard" && (
                   <>
                     {/* OVERVIEW CARDS */}
-                    <section className="space-y-4">
-                      <h2 className="text-card-h2 text-charcoal-600">
-                        Overview
-                      </h2>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <AnalyticsCard
-                          title="Available Jobs"
-                          metrics={[
-                            {
-                              value: metrics.available,
-                              label: "Unassigned deliveries",
-                            },
-                          ]}
-                        />
-                        <AnalyticsCard
-                          title="Active Deliveries"
-                          metrics={[
-                            {
-                              value: metrics.current,
-                              label: "Accepted / Picked up",
-                            },
-                          ]}
-                        />
-                        <AnalyticsCard
-                          title="Completed Deliveries"
-                          metrics={[
-                            {
-                              value: metrics.completed,
-                              label: "All time",
-                            },
-                          ]}
-                        />
-                        <AnalyticsCard
-                          title="Total Earnings"
-                          metrics={[
-                            {
-                              value: `BHD ${metrics.earnings.toFixed(3)}`,
-                              label: "All time",
-                            },
-                          ]}
-                        />
-                      </div>
-                    </section>
+                        <section className="space-y-4">
+                        <h2 className="text-card-h2 text-charcoal-600">Overview</h2>
+                        
+                        {/* Top Row: 4 Main Metric Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            {/* Available Jobs */}
+                            <AnalyticsCard
+                            title="Available Jobs"
+                            metrics={[
+                                {
+                                value: isOnline ? metrics.available : "—",
+                                label: isOnline ? "Unassigned deliveries" : "You are offline",
+                                },
+                            ]}
+                            />
+                            
+                            {/* Active Deliveries */}
+                            <AnalyticsCard
+                            title="Active Deliveries"
+                            metrics={[
+                                {
+                                value: metrics.current,
+                                label: "Accepted / Picked up",
+                                },
+                            ]}
+                            />
+                            
+                            {/* Earnings Today */}
+                            <AnalyticsCard
+                            title="Earnings Today"
+                            metrics={[
+                                {
+                                value: `BHD ${metrics.earningsToday.toFixed(3)}`,
+                                label: `${metrics.deliveriesToday} ${metrics.deliveriesToday === 1 ? 'delivery' : 'deliveries'}`,
+                                },
+                            ]}
+                            />
+                            
+                            {/* Acceptance Rate */}
+                            <AnalyticsCard
+                            title="Acceptance Rate"
+                            metrics={[
+                                {
+                                value: `${metrics.acceptanceRate}%`,
+                                label: `${metrics.completed} completed`,
+                                },
+                            ]}
+                            />
+                        </div>
 
-                    {/* DELIVERIES SECTION WITH INLINE TABS */}
-                    <section className="bg-grey-200 rounded-lg p-6 shadow-soft-lift border border-grey-stroke space-y-4">
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                        <div>
-                          <h2 className="text-card-h2 text-charcoal-600">
-                            Deliveries
-                          </h2>
-                          <p className="text-body-regular text-charcoal-400">
-                            Manage your current requests, ongoing tasks, and
-                            history from here.
+                        {/* Second Row: Active Delivery/Deliveries Table + Stats */}
+                        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                        {/* Left Section: Active Delivery OR Deliveries Table (3 columns) */}
+                        <div className="lg:col-span-3">
+                            {metrics.activeDelivery ? (
+                            /* When there IS an active delivery */
+                            <div className="bg-gradient-to-br from-danger-bg to-danger-bg/50 border-2 border-danger-btn rounded-lg p-6 shadow-soft-lift h-full">
+                                <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-2">
+                                    <span className="relative flex h-3 w-3">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-danger-btn opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-3 w-3 bg-danger-btn"></span>
+                                    </span>
+                                    <h3 className="text-card-h2 text-danger-text font-bold">Active Delivery in Progress</h3>
+                                    </div>
+                                    <p className="text-body-medium text-charcoal-600 mb-4">
+                                    Order #{metrics.activeDelivery.orderId} • {metrics.activeDelivery.status}
+                                    </p>
+                                    <div className="grid grid-cols-2 gap-4 mb-4">
+                                    <div className="bg-white/60 rounded-lg p-3">
+                                        <p className="text-xs text-charcoal-400 uppercase mb-1">Customer</p>
+                                        <p className="text-sm font-semibold text-charcoal-700">
+                                        {metrics.activeDelivery.order?.customerName || "N/A"}
+                                        </p>
+                                    </div>
+                                    <div className="bg-white/60 rounded-lg p-3">
+                                        <p className="text-xs text-charcoal-400 uppercase mb-1">Restaurant</p>
+                                        <p className="text-sm font-semibold text-charcoal-700">
+                                        {metrics.activeDelivery.order?.sellerName || "N/A"}
+                                        </p>
+                                    </div>
+                                    <div className="bg-white/60 rounded-lg p-3">
+                                        <p className="text-xs text-charcoal-400 uppercase mb-1">Your Earnings</p>
+                                        <p className="text-lg font-bold text-sage-700">
+                                        BHD {(metrics.activeDelivery.order?.deliveryFee || 0).toFixed(3)}
+                                        </p>
+                                    </div>
+                                    <div className="bg-white/60 rounded-lg p-3">
+                                        <p className="text-xs text-charcoal-400 uppercase mb-1">Total Order</p>
+                                        <p className="text-lg font-bold text-charcoal-700">
+                                        BHD {(metrics.activeDelivery.order?.totalAmount || 0).toFixed(3)}
+                                        </p>
+                                    </div>
+                                    </div>
+                                    <CRUDButton
+                                    variant="outline"
+                                    onClick={() => openJobModal(metrics.activeDelivery)}
+                                    >
+                                    Manage Delivery →
+                                    </CRUDButton>
+                                </div>
+                                </div>
+                            </div>
+                            ) : (
+                            /* When there's NO active delivery - show deliveries table */
+                            <div className="bg-grey-200 rounded-lg p-6 shadow-soft-lift border border-grey-stroke space-y-4">
+                               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                                <div>
+                                    <h2 className="text-card-h2 text-charcoal-600">
+                                    Deliveries
+                                    </h2>
+                                    <p className="text-body-regular text-charcoal-400">
+                                    Manage your current requests, ongoing tasks, and history from here.
+                                    </p>
+                                </div>
+                                <div className="flex gap-3">
+                                    <button
+                                    type="button"
+                                    className="px-4 py-2 bg-sage-500 hover:bg-sage-600 text-white rounded-lg font-semibold text-sm flex items-center gap-2 cursor-pointer"
+                                    onClick={() => fetchTickets()}
+                                    >
+                                    <Icon.ArrowsClockwise size={16} weight="bold" />
+                                    Refresh
+                                    </button>
+                                    <button
+                                    type="button"
+                                    className="text-sm font-medium text-sage-600 hover:text-sage-700 underline cursor-pointer"
+                                    onClick={() => {
+                                        setActiveTab("current");
+                                        window.scrollTo({ top: 0, behavior: "smooth" });
+                                    }}
+                                    >
+                                    Go to full view
+                                    </button>
+                                </div>
+                                </div>
+
+                                {/* Inline Tabs */}
+                                <div className="border-b border-grey-stroke flex gap-4">
+                                <button
+                                    className={`px-4 py-2 text-sm font-medium ${
+                                    dashTab === "requests"
+                                        ? "text-sage-700 border-b-2 border-sage-600"
+                                        : "text-charcoal-400"
+                                    }`}
+                                    onClick={() => setDashTab("requests")}
+                                >
+                                    Current Requests
+                                </button>
+                                <button
+                                    className={`px-4 py-2 text-sm font-medium ${
+                                    dashTab === "ongoing"
+                                        ? "text-sage-700 border-b-2 border-sage-600"
+                                        : "text-charcoal-400"
+                                    }`}
+                                    onClick={() => setDashTab("ongoing")}
+                                >
+                                    Ongoing
+                                </button>
+                                <button
+                                    className={`px-4 py-2 text-sm font-medium ${
+                                    dashTab === "history"
+                                        ? "text-sage-700 border-b-2 border-sage-600"
+                                        : "text-charcoal-400"
+                                    }`}
+                                    onClick={() => setDashTab("history")}
+                                >
+                                    History
+                                </button>
+                                </div>
+
+                                {/* Tab Content - TABLES */}
+                                <div className="mt-4 space-y-3">
+                                {dashTab === "requests" && (
+                                    <>
+                                        {!isOnline ? (
+                                        <div className="bg-error-bg border-l-4 border-error-btn p-4 rounded-lg">
+                                            <p className="text-body-medium text-error-text font-semibold">
+                                            ⚠️ You are currently offline. Go online to view and accept delivery requests.
+                                            </p>
+                                        </div>
+                                        ) : availableJobs.length === 0 ? (
+                                        <p className="text-body-regular text-charcoal-400">
+                                            No available jobs at the moment.
+                                        </p>
+                                        ) : (
+                                        <JobTable jobs={availableJobs.slice(0, 5)} />
+                                        )}
+                                    </>
+                                    )}
+
+                                {dashTab === "ongoing" && (
+                                    <>
+                                    {currentJobs.length === 0 ? (
+                                        <p className="text-body-regular text-charcoal-400">
+                                        No active deliveries.
+                                        </p>
+                                    ) : (
+                                        <JobTable jobs={currentJobs.slice(0, 5)} />
+                                    )}
+                                    </>
+                                )}
+
+                                {dashTab === "history" && (
+                                    <>
+                                    {historyJobs.length === 0 ? (
+                                        <p className="text-body-regular text-charcoal-400">
+                                        No delivery history yet.
+                                        </p>
+                                    ) : (
+                                        <JobTable jobs={historyJobs.slice(0, 5)} />
+                                    )}
+                                    </>
+                                )}
+                                </div>
+                            </div>
+                            )}
+                        </div>
+
+                        {/* Right Section: Stats - ALWAYS VISIBLE (1 column) */}
+                            <div className="space-y-4 flex flex-col h-full">
+                            <AnalyticsCard
+                                title="Total Completed"
+                                compact={false}
+                                metrics={[
+                                {
+                                    value: metrics.completed,
+                                    label: "All time deliveries",
+                                },
+                                ]}
+                            />
+                            <AnalyticsCard
+                                title="Total Earnings"
+                                compact={false}
+                                metrics={[
+                                {
+                                    value: `BHD ${metrics.earnings.toFixed(3)}`,
+                                    label: "Lifetime earnings",
+                                },
+                                ]}
+                            />
+                            </div>
+                        </div>
+
+                        {/* Third Row: Deliveries Table - ONLY shows when there IS an active delivery */}
+                        {metrics.activeDelivery && (
+                        <div className="bg-grey-200 rounded-lg p-6 shadow-soft-lift border border-grey-stroke space-y-4">
+                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                                <div>
+                                    <h2 className="text-card-h2 text-charcoal-600">
+                                    Deliveries
+                                    </h2>
+                                    <p className="text-body-regular text-charcoal-400">
+                                    Manage your current requests, ongoing tasks, and history from here.
+                                    </p>
+                                </div>
+                                <div className="flex gap-3">
+                                    <button
+                                    type="button"
+                                    className="px-4 py-2 bg-sage-500 hover:bg-sage-600 text-white rounded-lg font-semibold text-sm flex items-center gap-2 cursor-pointer"
+                                    onClick={() => fetchTickets()}
+                                    >
+                                    <Icon.ArrowsClockwise size={16} weight="bold" />
+                                    Refresh
+                                    </button>
+                                    <button
+                                    type="button"
+                                    className="text-sm font-medium text-sage-600 hover:text-sage-700 underline cursor-pointer"
+                                    onClick={() => {
+                                        setActiveTab("current");
+                                        window.scrollTo({ top: 0, behavior: "smooth" });
+                                    }}
+                                    >
+                                    Go to full view
+                                    </button>
+                                </div>
+                                </div>
+
+                            {/* Inline Tabs */}
+                            <div className="border-b border-grey-stroke flex gap-4">
+                            <button
+                                className={`px-4 py-2 text-sm font-medium ${
+                                dashTab === "requests"
+                                    ? "text-sage-700 border-b-2 border-sage-600"
+                                    : "text-charcoal-400"
+                                }`}
+                                onClick={() => setDashTab("requests")}
+                            >
+                                Current Requests
+                            </button>
+                            <button
+                                className={`px-4 py-2 text-sm font-medium ${
+                                dashTab === "ongoing"
+                                    ? "text-sage-700 border-b-2 border-sage-600"
+                                    : "text-charcoal-400"
+                                }`}
+                                onClick={() => setDashTab("ongoing")}
+                            >
+                                Ongoing
+                            </button>
+                            <button
+                                className={`px-4 py-2 text-sm font-medium ${
+                                dashTab === "history"
+                                    ? "text-sage-700 border-b-2 border-sage-600"
+                                    : "text-charcoal-400"
+                                }`}
+                                onClick={() => setDashTab("history")}
+                            >
+                                History
+                            </button>
+                            </div>
+
+                            {/* Tab Content - TABLES */}
+                            <div className="mt-4 space-y-3">
+                            {dashTab === "requests" && (
+                                <>
+                                {availableJobs.length === 0 ? (
+                                    <p className="text-body-regular text-charcoal-400">
+                                    No available jobs at the moment.
+                                    </p>
+                                ) : (
+                                    <JobTable jobs={availableJobs.slice(0, 5)} />
+                                )}
+                                </>
+                            )}
+
+                            {dashTab === "ongoing" && (
+                                <>
+                                {currentJobs.length === 0 ? (
+                                    <p className="text-body-regular text-charcoal-400">
+                                    No active deliveries.
+                                    </p>
+                                ) : (
+                                    <JobTable jobs={currentJobs.slice(0, 5)} />
+                                )}
+                                </>
+                            )}
+
+                            {dashTab === "history" && (
+                                <>
+                                {historyJobs.length === 0 ? (
+                                    <p className="text-body-regular text-charcoal-400">
+                                    No delivery history yet.
+                                    </p>
+                                ) : (
+                                    <JobTable jobs={historyJobs.slice(0, 5)} />
+                                )}
+                                </>
+                            )}
+                            </div>
+                        </div>
+                        )}
+                        </section>
+
+                    
+                  </>
+                )}
+
+                {/* ANALYTICS SECTION - Shows on Dashboard only */}
+                {activeTab === "dashboard" && driverId && (
+                  <section className="space-y-4 mt-8">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h2 className="text-card-h2 text-charcoal-600">Weekly Performance</h2>
+                        <p className="text-body-regular text-charcoal-400">Your last 7 days overview</p>
+                      </div>
+                    </div>
+
+                    {/* Weekly Stats Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {/* Weekly Deliveries */}
+                      <div className="bg-gradient-to-br from-sage-50 to-cream-50 rounded-lg shadow-soft-lift border-2 border-sage-300 p-6">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="w-12 h-12 rounded-full bg-sage-500 flex items-center justify-center">
+                            <Icon.Package size={24} weight="fill" className="text-white" />
+                          </div>
+                          <span className="text-xs font-semibold text-sage-700 bg-sage-100 px-2 py-1 rounded-full">
+                            Last 7 Days
+                          </span>
+                        </div>
+                        <h3 className="text-3xl font-bold text-sage-700 mb-1">
+                          {metrics.weeklyDeliveries}
+                        </h3>
+                        <p className="text-sm text-charcoal-500 mb-3">Deliveries Completed</p>
+                        <div className="pt-3 border-t border-sage-200">
+                          <p className="text-xs text-charcoal-400">
+                            {metrics.weeklyDeliveries > metrics.deliveriesToday 
+                              ? `${metrics.weeklyDeliveries - metrics.deliveriesToday} from previous days`
+                              : 'All completed today'}
                           </p>
                         </div>
-                        <button
-                          type="button"
-                          className="text-sm font-medium text-sage-600 hover:text-sage-700 underline cursor-pointer"
-                          onClick={() => {
-                            setActiveTab("current");
-                            window.scrollTo({ top: 0, behavior: "smooth" });
-                          }}
-                        >
-                          Go to full view
-                        </button>
                       </div>
 
-                      {/* Inline Tabs */}
-                      <div className="border-b border-grey-stroke flex gap-4">
-                        <button
-                          className={`px-4 py-2 text-sm font-medium ${
-                            dashTab === "requests"
-                              ? "text-sage-700 border-b-2 border-sage-600"
-                              : "text-charcoal-400"
-                          }`}
-                          onClick={() => setDashTab("requests")}
-                        >
-                          Current Requests
-                        </button>
-                        <button
-                          className={`px-4 py-2 text-sm font-medium ${
-                            dashTab === "ongoing"
-                              ? "text-sage-700 border-b-2 border-sage-600"
-                              : "text-charcoal-400"
-                          }`}
-                          onClick={() => setDashTab("ongoing")}
-                        >
-                          Ongoing
-                        </button>
-                        <button
-                          className={`px-4 py-2 text-sm font-medium ${
-                            dashTab === "history"
-                              ? "text-sage-700 border-b-2 border-sage-600"
-                              : "text-charcoal-400"
-                          }`}
-                          onClick={() => setDashTab("history")}
-                        >
-                          History
-                        </button>
+                      {/* Weekly Earnings */}
+                      <div className="bg-gradient-to-br from-success-bg to-cream-50 rounded-lg shadow-soft-lift border-2 border-success-btn/30 p-6">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="w-12 h-12 rounded-full bg-success-btn flex items-center justify-center">
+                            <Icon.CurrencyDollar size={24} weight="fill" className="text-white" />
+                          </div>
+                          <span className="text-xs font-semibold text-success-text bg-success-bg px-2 py-1 rounded-full">
+                            Last 7 Days
+                          </span>
+                        </div>
+                        <h3 className="text-3xl font-bold text-success-text mb-1">
+                          BHD {metrics.weeklyEarnings.toFixed(3)}
+                        </h3>
+                        <p className="text-sm text-charcoal-500 mb-3">Total Earnings</p>
+                        <div className="pt-3 border-t border-success-btn/20">
+                          <p className="text-xs text-charcoal-400">
+                            BHD {metrics.earningsToday.toFixed(3)} earned today
+                          </p>
+                        </div>
                       </div>
 
-                      {/* Tab Content - TABLES */}
-                      <div className="mt-4 space-y-3">
-                        {dashTab === "requests" && (
-                          <>
-                            {availableJobs.length === 0 ? (
-                              <p className="text-body-regular text-charcoal-400">
-                                No available jobs at the moment.
-                              </p>
-                            ) : (
-                              <JobTable jobs={availableJobs.slice(0, 5)} />
-                            )}
-                          </>
-                        )}
-
-                        {dashTab === "ongoing" && (
-                          <>
-                            {currentJobs.length === 0 ? (
-                              <p className="text-body-regular text-charcoal-400">
-                                No active deliveries.
-                              </p>
-                            ) : (
-                              <JobTable jobs={currentJobs.slice(0, 5)} />
-                            )}
-                          </>
-                        )}
-
-                        {dashTab === "history" && (
-                          <>
-                            {historyJobs.length === 0 ? (
-                              <p className="text-body-regular text-charcoal-400">
-                                No delivery history yet.
-                              </p>
-                            ) : (
-                              <JobTable jobs={historyJobs.slice(0, 5)} />
-                            )}
-                          </>
-                        )}
+                      {/* Average per Delivery */}
+                      <div className="bg-gradient-to-br from-grey-100 to-cream-50 rounded-lg shadow-soft-lift border-2 border-grey-stroke p-6">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="w-12 h-12 rounded-full bg-charcoal-600 flex items-center justify-center">
+                            <Icon.ChartLine size={24} weight="fill" className="text-white" />
+                          </div>
+                          <span className="text-xs font-semibold text-charcoal-600 bg-grey-200 px-2 py-1 rounded-full">
+                            Average
+                          </span>
+                        </div>
+                        <h3 className="text-3xl font-bold text-charcoal-700 mb-1">
+                          BHD {metrics.avgDeliveryValue.toFixed(3)}
+                        </h3>
+                        <p className="text-sm text-charcoal-500 mb-3">Per Delivery (Weekly)</p>
+                        <div className="pt-3 border-t border-grey-stroke">
+                          <p className="text-xs text-charcoal-400">
+                            {metrics.completed > 0 
+                              ? `Lifetime avg: BHD ${(metrics.earnings / metrics.completed).toFixed(3)}`
+                              : 'No lifetime data yet'}
+                          </p>
+                        </div>
                       </div>
-                    </section>
-                  </>
+                    </div>
+
+                    {/* Performance Breakdown */}
+                    <div className="bg-grey-200 rounded-lg shadow-soft-lift border border-grey-stroke p-6">
+                      <h3 className="text-lg font-semibold text-charcoal-700 mb-4 flex items-center gap-2">
+                        <Icon.ChartBar size={20} className="text-sage-600" />
+                        Performance Breakdown
+                      </h3>
+                      
+                      <div className="space-y-4">
+                        {/* Deliveries Progress Bar */}
+                        <div>
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm font-medium text-charcoal-600">Weekly vs Lifetime</span>
+                            <span className="text-sm font-semibold text-sage-700">
+                              {metrics.weeklyDeliveries} / {metrics.completed} deliveries
+                            </span>
+                          </div>
+                          <div className="w-full bg-grey-300 rounded-full h-3 overflow-hidden">
+                            <div 
+                              className="bg-sage-500 h-full rounded-full transition-all duration-500"
+                              style={{ 
+                                width: `${metrics.completed > 0 ? (metrics.weeklyDeliveries / metrics.completed) * 100 : 0}%` 
+                              }}
+                            ></div>
+                          </div>
+                          <p className="text-xs text-charcoal-400 mt-1">
+                            {metrics.completed > 0 
+                              ? `${((metrics.weeklyDeliveries / metrics.completed) * 100).toFixed(1)}% of lifetime deliveries`
+                              : 'Start delivering to see progress'}
+                          </p>
+                        </div>
+
+                        {/* Earnings Progress Bar */}
+                        <div>
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm font-medium text-charcoal-600">Weekly vs Lifetime Earnings</span>
+                            <span className="text-sm font-semibold text-success-text">
+                              BHD {metrics.weeklyEarnings.toFixed(3)} / BHD {metrics.earnings.toFixed(3)}
+                            </span>
+                          </div>
+                          <div className="w-full bg-grey-300 rounded-full h-3 overflow-hidden">
+                            <div 
+                              className="bg-success-btn h-full rounded-full transition-all duration-500"
+                              style={{ 
+                                width: `${metrics.earnings > 0 ? (metrics.weeklyEarnings / metrics.earnings) * 100 : 0}%` 
+                              }}
+                            ></div>
+                          </div>
+                          <p className="text-xs text-charcoal-400 mt-1">
+                            {metrics.earnings > 0 
+                              ? `${((metrics.weeklyEarnings / metrics.earnings) * 100).toFixed(1)}% of lifetime earnings`
+                              : 'Start earning to see progress'}
+                          </p>
+                        </div>
+
+                        {/* Acceptance Rate Bar */}
+                        <div>
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm font-medium text-charcoal-600">Acceptance Rate</span>
+                            <span className="text-sm font-semibold text-charcoal-700">
+                              {metrics.acceptanceRate}%
+                            </span>
+                          </div>
+                          <div className="w-full bg-grey-300 rounded-full h-3 overflow-hidden">
+                            <div 
+                              className={`h-full rounded-full transition-all duration-500 ${
+                                metrics.acceptanceRate >= 80 ? 'bg-success-btn' :
+                                metrics.acceptanceRate >= 50 ? 'bg-sage-500' : 'bg-error-btn'
+                              }`}
+                              style={{ width: `${metrics.acceptanceRate}%` }}
+                            ></div>
+                          </div>
+                          <p className="text-xs text-charcoal-400 mt-1">
+                            {metrics.acceptanceRate >= 80 ? '🎯 Excellent acceptance rate!' :
+                             metrics.acceptanceRate >= 50 ? '👍 Good acceptance rate' : 
+                             '⚠️ Consider accepting more deliveries'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
                 )}
 
                 {/* FULL PAGE TABS USING SAME TABLE UI */}
@@ -1267,6 +2041,13 @@ const DriverDashboard = () => {
                     <h2 className="text-card-h2 text-charcoal-600">
                       Available Delivery Jobs
                     </h2>
+                    {!isOnline && (
+                    <div className="bg-error-bg border-l-4 border-error-btn p-4 rounded-lg">
+                        <p className="text-body-medium text-error-text font-semibold">
+                        ⚠️ You are currently offline. Go online to accept new delivery requests.
+                        </p>
+                    </div>
+                    )}
                     {availableJobs.length === 0 ? (
                       <div className="bg-grey-200 rounded-lg p-12 text-center shadow-soft-lift border border-grey-stroke">
                         <Icon.Package
