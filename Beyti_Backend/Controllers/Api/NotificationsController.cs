@@ -23,7 +23,8 @@ namespace Beyti_Backend.Controllers.Api
         public async Task<ActionResult<IEnumerable<Notification>>> GetUserNotifications(int userId)
         {
             var notifications = await _context.Notifications
-                .Where(n => n.RecipientUserId == userId)
+                .AsNoTracking()
+                .Where(n => n.RecipientUserId == userId && !n.IsDeleted)
                 .OrderByDescending(n => n.CreatedAt)
                 .ToListAsync();
 
@@ -35,7 +36,8 @@ namespace Beyti_Backend.Controllers.Api
         public async Task<ActionResult<IEnumerable<Notification>>> GetUnreadNotifications(int userId)
         {
             var notifications = await _context.Notifications
-                .Where(n => n.RecipientUserId == userId && !n.IsRead)
+                .AsNoTracking()
+                .Where(n => n.RecipientUserId == userId && !n.IsRead && !n.IsDeleted)
                 .OrderByDescending(n => n.CreatedAt)
                 .ToListAsync();
 
@@ -47,7 +49,7 @@ namespace Beyti_Backend.Controllers.Api
         public async Task<ActionResult<int>> GetUnreadCount(int userId)
         {
             var count = await _context.Notifications
-                .CountAsync(n => n.RecipientUserId == userId && !n.IsRead);
+                .CountAsync(n => n.RecipientUserId == userId && !n.IsRead && !n.IsDeleted);
 
             return Ok(count);
         }
@@ -70,7 +72,7 @@ namespace Beyti_Backend.Controllers.Api
         public async Task<IActionResult> MarkAllAsRead(int userId)
         {
             var notifications = await _context.Notifications
-                .Where(n => n.RecipientUserId == userId && !n.IsRead)
+                .Where(n => n.RecipientUserId == userId && !n.IsRead && !n.IsDeleted)
                 .ToListAsync();
 
             foreach (var n in notifications)
@@ -82,13 +84,15 @@ namespace Beyti_Backend.Controllers.Api
         }
 
         // DELETE: api/Notifications/5
+        // Soft delete - marks notification as deleted but keeps it in database
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteNotification(int id)
         {
             var notification = await _context.Notifications.FindAsync(id);
             if (notification == null) return NotFound();
 
-            _context.Notifications.Remove(notification);
+            // Soft delete: mark as deleted instead of removing from database
+            notification.IsDeleted = true;
             await _context.SaveChangesAsync();
 
             return NoContent();

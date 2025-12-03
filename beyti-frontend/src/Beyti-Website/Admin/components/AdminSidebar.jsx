@@ -15,7 +15,8 @@ import {
   User,
   CaretDown,
   Tag,
-  Briefcase
+  Briefcase,
+  Bell
 } from '@phosphor-icons/react';
 import NavigationButton from '../../../components/NavigationButton';
 
@@ -82,6 +83,14 @@ const AdminSidebar = ({ currentPage, onNavigate }) => {
           onClick={() => onNavigate('/admin/category-moderation')}
         >
           Categories
+        </NavigationButton>
+
+        <NavigationButton
+          selected={currentPage === 'notifications'}
+          icon={<Bell size={20} weight={currentPage === 'notifications' ? 'fill' : 'regular'} />}
+          onClick={() => onNavigate('/admin/notifications')}
+        >
+          Notifications
         </NavigationButton>
       </nav>
 

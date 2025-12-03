@@ -18,9 +18,10 @@
  */
 
 import React, { useState } from 'react';
-import { MagnifyingGlass, Bell, CaretDown, User } from '@phosphor-icons/react';
+import { MagnifyingGlass, CaretDown, User } from '@phosphor-icons/react';
 import SettingsModal from './SettingsModal';
 import ProfileModal from './ProfileModal';
+import NotificationDropdown from './NotificationDropdown';
 
 const PageHeader = ({
   title,
@@ -32,6 +33,7 @@ const PageHeader = ({
   userRole = 'Admin',
   userProfile = null,
   entityId = null, // Service Provider ID, Seller ID, etc.
+  userId = null, // User ID for notifications
   onUserMenuClick,
   onProfileClick,
   onProfileUpdate, // Callback when profile is updated
@@ -117,14 +119,7 @@ const PageHeader = ({
       {/* Right: Controls */}
       <div className="flex items-center gap-4">
         {/* Notification Bell */}
-        <button className="relative p-2 bg-sage-500 dark:bg-sage-700 rounded-md hover:bg-sage-700 dark:hover:bg-sage-500 transition-colors">
-          <Bell size={20} weight="fill" className="text-sage-100 dark:text-cream-50" />
-          {notificationCount > 0 && (
-            <span className="absolute -top-1 -right-1 w-5 h-5 bg-error-btn text-white text-xs flex items-center justify-center rounded-full">
-              {notificationCount > 9 ? '9+' : notificationCount}
-            </span>
-          )}
-        </button>
+        <NotificationDropdown userId={userId} />
 
         {/* User Dropdown */}
         <div className="relative">
