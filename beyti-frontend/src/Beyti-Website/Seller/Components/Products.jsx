@@ -354,15 +354,9 @@ const removeVariant = async (variantId) => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-6 space-y-8 py-8">
-      {/* HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-display-h1 text-charcoal-600">Products</h1>
-          <p className="text-body-regular text-charcoal-400">
-            Manage your store items and inventory
-          </p>
-        </div>
+    <div className="max-w-7xl mx-auto space-y-6">
+      {/* ADD PRODUCT BUTTON */}
+      <div className="flex justify-end">
 
         <Button variant="primary" size="large" onClick={openNew}>
         Add Product
@@ -373,19 +367,19 @@ const removeVariant = async (variantId) => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <AnalyticsCard
           title="Total Products"
-          metrics={[{ value: metrics.total, label: "" }]}
+          metrics={[{ value: metrics.total, label: "All products" }]}
         />
         <AnalyticsCard
           title="Active"
-          metrics={[{ value: metrics.active, label: "" }]}
+          metrics={[{ value: metrics.active, label: "Currently listed" }]}
         />
         <AnalyticsCard
           title="Inactive"
-          metrics={[{ value: metrics.inactive, label: "" }]}
+          metrics={[{ value: metrics.inactive, label: "Not listed" }]}
         />
         <AnalyticsCard
           title="Total Value"
-          metrics={[{ value: formatCurrency(metrics.totalValue), label: "BHD" }]}
+          metrics={[{ value: formatCurrency(metrics.totalValue), label: "Inventory value" }]}
         />
       </div>
 

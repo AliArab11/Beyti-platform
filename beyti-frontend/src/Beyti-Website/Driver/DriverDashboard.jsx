@@ -6,9 +6,14 @@ import "leaflet/dist/leaflet.css";
 import L from 'leaflet'
 
 import { useNavigate, useLocation } from "react-router-dom";
+import PageHeader from "../../components/PageHeader";
 
 import DriverOrdersPage from "./Components/DriverOrders";
 import DriverAnalytics from "./Components/DriverAnalytics";
+
+
+
+import NavigationButton from "../../components/NavigationButton";
 
 // Ensure Leaflet CSS is loaded
 if (typeof window !== 'undefined') {
@@ -109,61 +114,22 @@ const isNewJob = (job) => {
   return diffMinutes <= 30; // treat as "new" for 30 minutes
 };
 
+// Get page title based on active route
+const getPageTitle = () => {
+  if (location.pathname.includes("/driver-dashboard/orders")) {
+    return "Order Management";
+  } else if (location.pathname.includes("/driver-dashboard/analytics")) {
+    return "Analytics";
+  } else {
+    return "Dashboard";
+  }
+};
+
 // ---------------------------------------------------------------------
 // Small shared UI components (matching Seller style)
 // ---------------------------------------------------------------------
-const NavigationButton = ({ icon, selected, onClick, children }) => (
-  <button
-    onClick={onClick}
-    className={`w-[220px] h-11 px-4 rounded-lg flex items-center gap-3 transition-colors ${
-      selected ? "bg-sage-700 text-white" : "text-sage-100 hover:bg-sage-600"
-    }`}
-  >
-    {icon}
-    <span className="text-body-medium">{children}</span>
-  </button>
-);
 
-const SidebarProfile = ({ userName, userRole }) => (
-  <div className="border-t border-sage-600 pt-4 px-4">
-    <div className="flex items-center gap-3">
-      <div className="w-10 h-10 rounded-full bg-sage-700 flex items-center justify-center">
-        <Icon.User size={20} weight="fill" className="text-white" />
-      </div>
-      <div>
-        <p className="text-body-medium text-white font-semibold">{userName}</p>
-        <p className="text-label-medium text-sage-100">{userRole}</p>
-      </div>
-    </div>
-  </div>
-);
 
-const PageHeader = ({ title, notificationCount, userName, userRole }) => (
-  <div className="h-20 px-6 flex items-center justify-between border-b border-grey-stroke bg-grey-200">
-    <h1 className="text-display-h1 text-charcoal-600">{title}</h1>
-    <div className="flex items-center gap-4">
-      <div className="relative">
-        <Icon.Bell size={24} className="text-charcoal-600" />
-        {notificationCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-danger-btn text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
-            {notificationCount}
-          </span>
-        )}
-      </div>
-      <div className="flex items-center gap-3">
-        <div className="text-right">
-          <p className="text-body-medium text-charcoal-600 font-semibold">
-            {userName}
-          </p>
-          <p className="text-label-medium text-charcoal-400">{userRole}</p>
-        </div>
-        <div className="w-10 h-10 rounded-full bg-sage-500 flex items-center justify-center">
-          <Icon.User size={20} weight="fill" className="text-white" />
-        </div>
-      </div>
-    </div>
-  </div>
-);
 
 const AnalyticsCard = ({ title, metrics, compact }) => (
   <div className={`bg-grey-200 rounded-lg shadow-soft-lift border border-grey-stroke ${compact ? 'p-4' : 'p-6'}`}>
@@ -263,6 +229,25 @@ const [viewMapModal, setViewMapModal] = useState({
   pickup: null, 
   delivery: null 
 });
+
+
+
+const handleProfileUpdate = async (updates) => {
+  try {
+    // Implement profile update logic here
+    // You'll need to create an API call similar to the service provider
+    console.log('Profile updates:', updates);
+    // Refresh driver data after update
+    const drivers = await getDrivers();
+    const updatedDriver = drivers.find(d => d.id === driverId);
+    if (updatedDriver) {
+      setDriverName(updatedDriver.fullName || driverName);
+    }
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    throw error;
+  }
+};
 
   // Disable body scroll when modal(s) are open
   useEffect(() => {
@@ -512,7 +497,7 @@ const ViewMapModal = ({ pickup, delivery, onClose }) => {
           </div>
           <button 
             onClick={onClose} 
-            className="text-charcoal-400 hover:text-charcoal-600 text-2xl leading-none"
+            className="text-charcoal-400 hover:text-charcoal-600 text-2xl leading-none cursor-pointer"
           >
             ×
           </button>
@@ -590,13 +575,13 @@ const ViewMapModal = ({ pickup, delivery, onClose }) => {
         <div className="p-6 border-t border-grey-stroke bg-grey-200 flex gap-3">
           <button
             onClick={handleResetView}
-            className="flex-1 bg-sage-500 hover:bg-sage-600 text-cream-50 py-2.5 rounded-lg font-semibold"
+            className="flex-1 bg-sage-500 hover:bg-sage-600 text-cream-50 py-2.5 rounded-lg font-semibold cursor-pointer"
           >
             Reset View
           </button>
           <button
             onClick={onClose}
-            className="flex-1 bg-grey-300 hover:bg-grey-400 text-charcoal-700 py-2.5 rounded-lg font-semibold"
+            className="flex-1 bg-grey-300 hover:bg-grey-400 text-charcoal-700 py-2.5 rounded-lg font-semibold cursor-pointer"
           >
             Close Map
           </button>
@@ -668,7 +653,7 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
           <button
             type="button"
             onClick={onClose}
-            className="w-full bg-grey-300 hover:bg-grey-400 text-charcoal-700 py-2.5 rounded-lg font-semibold"
+            className="w-full bg-grey-300 hover:bg-grey-400 text-charcoal-700 py-2.5 rounded-lg font-semibold cursor-pointer"
           >
             Close
           </button>
@@ -683,7 +668,7 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
                     type="button"
                     disabled={actionLoading || !isOnline || hasActiveDelivery}
                     onClick={handleAcceptModal}
-                    className="flex-1 bg-success-btn hover:bg-success-text disabled:bg-success-btn/60 text-white py-2.5 rounded-lg font-semibold"
+                    className="flex-1 bg-success-btn hover:bg-success-text disabled:bg-success-btn/60 text-white py-2.5 rounded-lg font-semibold cursor-pointer"
                 >
                     {hasActiveDelivery ? "🚫 Complete Active Delivery First" : (!isOnline ? "⚠️ You're Offline" : actionLoading ? "Accepting..." : "✓ Accept Job")}
                 </button>
@@ -694,7 +679,7 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
                 if (onDecline) onDecline(localJob.id);
                 onClose();
               }}
-              className="flex-1 bg-error-btn hover:bg-error-text text-white py-2.5 rounded-lg font-semibold"
+              className="flex-1 bg-error-btn hover:bg-error-text text-white py-2.5 rounded-lg font-semibold cursor-pointer"
             >
               Decline Job
             </button>
@@ -709,14 +694,14 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
               type="button"
               disabled={actionLoading}
               onClick={() => handleUpdateStatus("Picked Up")}
-              className="flex-1 bg-success-btn hover:bg-success-text disabled:bg-success-btn/60 text-white py-2.5 rounded-lg font-semibold"
+              className="flex-1 bg-success-btn hover:bg-success-text disabled:bg-success-btn/60 text-white py-2.5 rounded-lg font-semibold cursor-pointer"
             >
               {actionLoading ? "Updating..." : "→ Mark Picked Up"}
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 bg-grey-300 hover:bg-grey-400 text-charcoal-700 py-2.5 rounded-lg font-semibold"
+              className="flex-1 bg-grey-300 hover:bg-grey-400 text-charcoal-700 py-2.5 rounded-lg font-semibold cursor-pointer"
             >
               Close
             </button>
@@ -731,14 +716,14 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
               type="button"
               disabled={actionLoading}
               onClick={() => handleUpdateStatus("Delivered")}
-              className="flex-1 bg-success-btn hover:bg-success-text disabled:bg-success-btn/60 text-white py-2.5 rounded-lg font-semibold"
+              className="flex-1 bg-success-btn hover:bg-success-text disabled:bg-success-btn/60 text-white py-2.5 rounded-lg font-semibold cursor-pointer"
             >
               {actionLoading ? "Updating..." : "→ Mark Delivered"}
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 bg-grey-300 hover:bg-grey-400 text-charcoal-700 py-2.5 rounded-lg font-semibold"
+              className="flex-1 bg-grey-300 hover:bg-grey-400 text-charcoal-700 py-2.5 rounded-lg font-semibold cursor-pointer"
             >
               Close
             </button>
@@ -750,7 +735,7 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
         <button
           type="button"
           onClick={onClose}
-          className="w-full bg-grey-300 hover:bg-grey-400 text-charcoal-700 py-2.5 rounded-lg font-semibold"
+          className="w-full bg-grey-300 hover:bg-grey-400 text-charcoal-700 py-2.5 rounded-lg font-semibold cursor-pointer"
         >
           Close
         </button>
@@ -775,7 +760,7 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
             <button
               type="button"
               onClick={onClose}
-              className="text-charcoal-400 hover:text-charcoal-600 text-2xl leading-none"
+              className="text-charcoal-400 hover:text-charcoal-600 text-2xl leading-none cursor-pointer"
             >
               ×
             </button>
@@ -980,7 +965,7 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
                         delivery: localJob.deliveryAddress
                     });
                     }}
-                    className="w-full bg-sage-500 hover:bg-sage-600 text-cream-50 py-3 rounded-lg font-semibold flex items-center justify-center gap-2"
+                    className="w-full bg-sage-500 hover:bg-sage-600 text-cream-50 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 cursor-pointer"
                 >
                     <Icon.MapTrifold size={20} weight="fill" />
                     <span>🗺️ View Route on Map</span>
@@ -1039,7 +1024,7 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
           </select>
           <button
             onClick={() => setSelectModalOpen(false)}
-            className="w-full bg-error-btn hover:bg-error-text text-white py-2.5 rounded-lg font-semibold"
+            className="w-full bg-error-btn hover:bg-error-text text-white py-2.5 rounded-lg font-semibold cursor-pointer"
           >
             Close
           </button>
@@ -1118,7 +1103,7 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
                       <button
                         type="button"
                         onClick={() => toggleRow(job.id)}
-                        className="w-7 h-7 flex items-center justify-center rounded-full border border-grey-stroke bg-white hover:bg-grey-100 transition-transform"
+                        className="w-7 h-7 flex items-center justify-center rounded-full border border-grey-stroke bg-white hover:bg-grey-100 transition-transform cursor-pointer"
                       >
                         <Icon.CaretRight
                           size={16}
@@ -1223,7 +1208,7 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
                             </h4>
                             <button
                                 onClick={() => toggleRow(job.id)}
-                                className="text-charcoal-400 hover:text-charcoal-600 flex items-center gap-1 text-sm font-medium"
+                                className="text-charcoal-400 hover:text-charcoal-600 flex items-center gap-1 text-sm font-medium cursor-pointer"
                             >
                                 <span>Collapse</span>
                                 <Icon.CaretUp size={16} />
@@ -1388,7 +1373,7 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
   // Render
   // -------------------------------------------------------------------
   return (
-    <div className="min-h-screen bg-cream-50 flex">
+    <div className="flex min-h-screen bg-cream-50">
       <DriverSelectModal />
 
           {/* Map Modal */}
@@ -1410,72 +1395,100 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
       )}
 
       {/* Sidebar */}
-      <aside className="hidden lg:flex flex-col bg-sage-500 text-white w-64 p-4 justify-between">
-        <div className="space-y-3">
-          <div className="mb-4">
-            <h2 className="text-card-h2 text-cream-50">Beyti Driver</h2>
-            <p className="text-body-regular text-sage-100 opacity-80">
-              Your delivery hub
-            </p>
-          </div>
-
-          <NavigationButton
-          selected={location.pathname === "/driver-dashboard" || location.pathname === "/driver-dashboard/" || location.pathname === "/driver-dashboard/dashboard"}
-          onClick={() => navigate("/driver-dashboard/dashboard")}
-          icon={
-            <Icon.House
-              size={20}
-              weight={(location.pathname === "/driver-dashboard" || location.pathname === "/driver-dashboard/" || location.pathname === "/driver-dashboard/dashboard") ? "fill" : "regular"}
-            />
-          }
-        >
-          Dashboard
-        </NavigationButton>
-
-          <NavigationButton
-          selected={location.pathname.includes("/driver-dashboard/orders")}
-          onClick={() => navigate("/driver-dashboard/orders")}
-          icon={
-            <Icon.Package
-              size={20}
-              weight={location.pathname.includes("/driver-dashboard/orders") ? "fill" : "regular"}
-            />
-          }
-        >
-          Orders
-        </NavigationButton>
-
-          <NavigationButton
-          selected={location.pathname.includes("/driver-dashboard/analytics")}
-          onClick={() => navigate("/driver-dashboard/analytics")}
-          icon={
-            <Icon.ChartBar
-              size={20}
-              weight={location.pathname.includes("/driver-dashboard/analytics") ? "fill" : "regular"}
-            />
-          }
-        >
-          Analytics
-        </NavigationButton>
-
+      <aside className="w-64 bg-sage-500 flex flex-col fixed h-screen transition-colors border-r border-sage-700">
+        <div className="p-6 border-b border-sage-700">
+          <h1 className="text-display-h1 text-cream-200">Beyti</h1>
+          <p className="text-label-medium text-cream-100 mt-1">Driver Portal</p>
         </div>
 
-        <SidebarProfile userName={driverName} userRole="Driver" />
+        <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+          <NavigationButton
+            selected={location.pathname === "/driver-dashboard" || location.pathname === "/driver-dashboard/" || location.pathname === "/driver-dashboard/dashboard"}
+            onClick={() => {
+              navigate("/driver-dashboard/dashboard");
+              setActiveTab('dashboard');
+            }}
+            icon={
+              <Icon.House
+                size={20}
+                weight={(location.pathname === "/driver-dashboard" || location.pathname === "/driver-dashboard/" || location.pathname === "/driver-dashboard/dashboard") ? "fill" : "regular"}
+              />
+            }
+          >
+            Dashboard
+          </NavigationButton>
+
+          <NavigationButton
+            selected={location.pathname.includes("/driver-dashboard/orders")}
+            onClick={() => navigate("/driver-dashboard/orders")}
+            icon={
+              <Icon.Package
+                size={20}
+                weight={location.pathname.includes("/driver-dashboard/orders") ? "fill" : "regular"}
+              />
+            }
+          >
+            Orders
+          </NavigationButton>
+
+          <NavigationButton
+            selected={location.pathname.includes("/driver-dashboard/analytics")}
+            onClick={() => navigate("/driver-dashboard/analytics")}
+            icon={
+              <Icon.ChartBar
+                size={20}
+                weight={location.pathname.includes("/driver-dashboard/analytics") ? "fill" : "regular"}
+              />
+            }
+          >
+            Analytics
+          </NavigationButton>
+        </nav>
+
+        <div className="border-t border-sage-700 p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="w-10 h-10 rounded-full bg-sage-700 flex items-center justify-center flex-shrink-0">
+                <Icon.User size={20} weight="fill" className="text-cream-200" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-body-regular text-cream-200 truncate">{driverName}</p>
+                <p className="text-label-medium text-cream-100 truncate">Driver</p>
+              </div>
+            </div>
+            <button className="flex-shrink-0 p-1 hover:bg-sage-700 rounded transition-colors">
+              <Icon.CaretDown size={16} className="text-cream-200" />
+            </button>
+          </div>
+        </div>
       </aside>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 ml-64 flex flex-col">
         <PageHeader
-        title="Driver Dashboard"
-        notificationCount={isOnline ? metrics.available : 0}
-        userName={driverName}
-        userRole="Driver"
+          title={getPageTitle()}
+          notificationCount={isOnline ? metrics.available : 0}
+          userName={driverName}
+          userRole="Driver"
+          userProfile={{
+            userProfileId: driverId,
+            displayName: driverName,
+            roleType: 'Driver',
+            status: isOnline ? 'Available' : 'Offline',
+            phone: driverList.find(d => d.id === driverId)?.phone || '',
+            address: driverList.find(d => d.id === driverId)?.address || '',
+            createdAt: driverList.find(d => d.id === driverId)?.createdAt,
+            updatedAt: new Date().toISOString()
+          }}
+          entityId={driverId}
+          userId={driverId}
+          onProfileUpdate={handleProfileUpdate}
         />
 
         <main className="flex-1 p-6 lg:p-8">
-        <div className="max-w-7xl mx-auto space-y-6">
-            {/* Online/Offline Toggle - Compact */}
-                {driverId && (
+         <div className="max-w-7xl mx-auto space-y-6">
+              {/* Online/Offline Toggle - Only on Dashboard */}
+                {driverId && (location.pathname === "/driver-dashboard" || location.pathname === "/driver-dashboard/" || location.pathname === "/driver-dashboard/dashboard") && (
                 <div className="flex justify-end mb-0">
                     <div className="bg-grey-200 border border-grey-stroke rounded-lg px-4 py-2 shadow-soft-lift inline-flex items-center gap-3">
                     <div className="flex items-center gap-2">
@@ -1493,8 +1506,8 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
                             setIsOnline(!isOnline);
                         }}
                         disabled={isOnline && metrics.activeDelivery}
-                        className={`px-4 py-1.5 rounded-lg font-semibold text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                        isOnline 
+                        className={`px-4 py-1.5 rounded-lg font-semibold text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
+                          isOnline 
                             ? 'bg-error-btn hover:bg-error-text text-white' 
                             : 'bg-success-btn hover:bg-success-text text-white'
                         }`}
@@ -1640,7 +1653,7 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
                                               alert(err.message || "Failed to update status");
                                             }
                                           }}
-                                          className="flex-1 bg-success-btn hover:bg-success-text text-white py-2.5 rounded-lg font-semibold text-sm"
+                                          className="flex-1 bg-success-btn hover:bg-success-text text-white py-2.5 rounded-lg font-semibold text-sm cursor-pointer transition-colors"
                                         >
                                           ✓ Mark Picked Up
                                         </button>
@@ -1657,7 +1670,7 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
                                               alert(err.message || "Failed to update status");
                                             }
                                           }}
-                                          className="flex-1 bg-success-btn hover:bg-success-text text-white py-2.5 rounded-lg font-semibold text-sm"
+                                          className="flex-1 bg-success-btn hover:bg-success-text text-white py-2.5 rounded-lg font-semibold text-sm cursor-pointer transition-colors"
                                         >
                                           ✓ Mark Delivered
                                         </button>
@@ -1665,7 +1678,7 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
                                       
                                       <button
                                         onClick={() => openJobModal(metrics.activeDelivery)}
-                                        className="flex-1 bg-grey-300 hover:bg-grey-400 text-charcoal-700 py-2.5 rounded-lg font-semibold text-sm"
+                                        className="flex-1 bg-grey-300 hover:bg-grey-400 text-charcoal-700 py-2.5 rounded-lg font-semibold text-sm cursor-pointer transition-colors"
                                       >
                                         View Details
                                       </button>
@@ -1677,41 +1690,41 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
                             /* When there's NO active delivery - show deliveries table */
                             <div className="bg-grey-200 rounded-lg p-6 shadow-soft-lift border border-grey-stroke space-y-4">
                                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                                <div>
+                                  <div>
                                     <h2 className="text-card-h2 text-charcoal-600">
-                                    Deliveries
+                                      Deliveries
                                     </h2>
                                     <p className="text-body-regular text-charcoal-400">
-                                    Manage your current requests, ongoing tasks, and history from here.
+                                      Manage your current requests, ongoing tasks, and history from here.
                                     </p>
-                                </div>
-                                <div className="flex gap-3">
+                                  </div>
+                                  <div className="flex gap-3">
                                     <button
-                                    type="button"
-                                    className="px-4 py-2 bg-sage-500 hover:bg-sage-600 text-white rounded-lg font-semibold text-sm flex items-center gap-2 cursor-pointer"
-                                    onClick={() => fetchTickets()}
+                                      type="button"
+                                      className="px-4 py-2 bg-sage-500 hover:bg-sage-600 text-white rounded-lg font-semibold text-sm flex items-center gap-2 cursor-pointer"
+                                      onClick={() => fetchTickets()}
                                     >
-                                    <Icon.ArrowsClockwise size={16} weight="bold" />
-                                    Refresh
+                                      <Icon.ArrowsClockwise size={16} weight="bold" />
+                                      Refresh
                                     </button>
                                     <button
-                                    type="button"
-                                    className="text-sm font-medium text-sage-600 hover:text-sage-700 underline cursor-pointer"
-                                    onClick={() => {
+                                      type="button"
+                                      className="text-sm font-medium text-sage-600 hover:text-sage-700 underline cursor-pointer"
+                                      onClick={() => {
                                         navigate("/driver-dashboard/orders");
                                         window.scrollTo({ top: 0, behavior: "smooth" });
-                                    }}
+                                      }}
                                     >
-                                    Go to full view
+                                      Go to full view
                                     </button>
-                                </div>
+                                  </div>
                                 </div>
 
                                 {/* Inline Tabs */}
                                 <div className="border-b border-grey-stroke flex gap-4">
                                 <button
-                                    className={`px-4 py-2 text-sm font-medium ${
-                                    dashTab === "requests"
+                                    className={`px-4 py-2 text-sm font-medium cursor-pointer ${
+                                      dashTab === "requests"
                                         ? "text-sage-700 border-b-2 border-sage-600"
                                         : "text-charcoal-400"
                                     }`}
@@ -1720,7 +1733,7 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
                                     Current Requests
                                 </button>
                                 <button
-                                    className={`px-4 py-2 text-sm font-medium ${
+                                    className={`px-4 py-2 text-sm font-medium cursor-pointer ${
                                     dashTab === "ongoing"
                                         ? "text-sage-700 border-b-2 border-sage-600"
                                         : "text-charcoal-400"
@@ -1730,7 +1743,7 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
                                     Ongoing
                                 </button>
                                 <button
-                                    className={`px-4 py-2 text-sm font-medium ${
+                                    className={`px-4 py-2 text-sm font-medium cursor-pointer ${
                                     dashTab === "history"
                                         ? "text-sage-700 border-b-2 border-sage-600"
                                         : "text-charcoal-400"
@@ -1818,35 +1831,36 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
                         {metrics.activeDelivery && (
                         <div className="bg-grey-200 rounded-lg p-6 shadow-soft-lift border border-grey-stroke space-y-4">
                             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                                <div>
-                                    <h2 className="text-card-h2 text-charcoal-600">
-                                    Deliveries
-                                    </h2>
-                                    <p className="text-body-regular text-charcoal-400">
-                                    Manage your current requests, ongoing tasks, and history from here.
-                                    </p>
-                                </div>
-                                <div className="flex gap-3">
-                                    <button
-                                    type="button"
-                                    className="px-4 py-2 bg-sage-500 hover:bg-sage-600 text-white rounded-lg font-semibold text-sm flex items-center gap-2 cursor-pointer"
-                                    onClick={() => fetchTickets()}
-                                    >
-                                    <Icon.ArrowsClockwise size={16} weight="bold" />
-                                    Refresh
-                                    </button>
-                                    <button
-                                    type="button"
-                                    className="text-sm font-medium text-sage-600 hover:text-sage-700 underline cursor-pointer"
-                                    onClick={() => {
+                              <div>
+                                <h2 className="text-card-h2 text-charcoal-600">
+                                  Deliveries
+                                </h2>
+                                <p className="text-body-regular text-charcoal-400">
+                                  Manage your current requests, ongoing tasks, and history from here.
+                                </p>
+                              </div>
+                              <div className="flex gap-3">
+                                <button
+                                  type="button"
+                                  className="px-4 py-2 bg-sage-500 hover:bg-sage-600 text-white rounded-lg font-semibold text-sm flex items-center gap-2 cursor-pointer"
+                                  onClick={() => fetchTickets()}
+                                >
+                                  <Icon.ArrowsClockwise size={16} weight="bold" />
+                                  Refresh
+                                </button>
+                                <button
+                                  type="button"
+                                  className="px-4 py-2.5 bg-cream-50 hover:bg-grey-100 border border-grey-stroke text-charcoal-600 rounded-lg font-semibold text-sm flex items-center gap-2 cursor-pointer transition-colors"
+                                  onClick={() => {
                                     navigate("/driver-dashboard/orders");
                                     window.scrollTo({ top: 0, behavior: "smooth" });
-                                }}
-                                    >
-                                    Go to full view
-                                    </button>
-                                </div>
-                                </div>
+                                  }}
+                                >
+                                  View Full Orders
+                                  <Icon.ArrowRight size={16} weight="bold" />
+                                </button>
+                              </div>
+                            </div>
 
                             {/* Inline Tabs */}
                             <div className="border-b border-grey-stroke flex gap-4">
@@ -1928,57 +1942,100 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
                   </>
                 )}
 
-                {location.pathname.includes("/driver-dashboard/orders") ? (
-                <DriverOrdersPage
-                  driverId={driverId}
-                  driverName={driverName}
-                  tickets={tickets}
-                  isOnline={isOnline}
-                  metrics={metrics}
-                  availableJobs={availableJobs}
-                  currentJobs={currentJobs}
-                  historyJobs={historyJobs}
-                  onAcceptJob={handleAcceptJob}
-                  onDeclineJob={handleDeclineJob}
-                  onOpenJobModal={openJobModal}
-                  onRefresh={fetchTickets}
-                />
-              ) : location.pathname.includes("/driver-dashboard/analytics") ? (
-                <DriverAnalytics
-                  driverId={driverId}
-                  driverName={driverName}
-                  metrics={metrics}
-                />  
-              ) : null}
+                       {location.pathname.includes("/driver-dashboard/orders") ? (
+          <DriverOrdersPage
+            driverId={driverId}
+            driverName={driverName}
+            tickets={tickets}
+            isOnline={isOnline}
+            metrics={metrics}
+            availableJobs={availableJobs}
+            currentJobs={currentJobs}
+            historyJobs={historyJobs}
+            onAcceptJob={handleAcceptJob}
+            onDeclineJob={handleDeclineJob}
+            onOpenJobModal={openJobModal}
+            onRefresh={fetchTickets}
+            onUpdateStatus={async (jobId, newStatus) => {
+              try {
+                await updateDeliveryStatus(jobId, newStatus);
+                const updated = tickets.find(t => t.id === jobId);
+                if (updated) {
+                  handleJobUpdated({ ...updated, status: newStatus });
+                }
+                await fetchTickets();
+              } catch (err) {
+                throw err;
+              }
+            }}
+          />
+        ) : location.pathname.includes("/driver-dashboard/analytics") ? (
+          <DriverAnalytics
+            driverId={driverId}
+            driverName={driverName}
+            metrics={metrics}
+            historyJobs={historyJobs}
+          />  
+        ) : null}
 
-                {/* Top Restaurants - Only on Dashboard */}
-                {(location.pathname === "/driver-dashboard" || location.pathname === "/driver-dashboard/") && (
+
+               {/* Top Restaurants - Only on Dashboard */}
+                {(location.pathname === "/driver-dashboard" || location.pathname === "/driver-dashboard/" || location.pathname === "/driver-dashboard/dashboard") && (
                   <section className="mt-6">
                     <div className="bg-grey-200 rounded-lg shadow-soft-lift border border-grey-stroke p-6">
-                      <h3 className="text-card-h2 text-charcoal-600 mb-4">Top Restaurants</h3>
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h3 className="text-card-h2 text-charcoal-600">Top Restaurants</h3>
+                          <p className="text-body-regular text-charcoal-400 mt-1">
+                            Your most frequent delivery partners
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          className="px-4 py-2.5 bg-cream-50 hover:bg-grey-100 border border-grey-stroke text-charcoal-600 rounded-lg font-semibold text-sm flex items-center gap-2 cursor-pointer transition-colors"
+                          onClick={() => {
+                            navigate("/driver-dashboard/analytics");
+                            window.scrollTo({ top: 0, behavior: "smooth" });
+                          }}
+                        >
+                          View Full Analytics
+                          <Icon.ArrowRight size={16} weight="bold" />
+                        </button>
+                      </div>
                       
                       {metrics.topRestaurants.length === 0 ? (
-                        <p className="text-body-regular text-charcoal-400">
-                          No delivery history yet.
-                        </p>
+                        <div className="text-center py-12">
+                          <Icon.Storefront size={48} className="text-charcoal-300 mx-auto mb-3" />
+                          <p className="text-body-regular text-charcoal-400">
+                            No delivery history yet. Complete deliveries to see your top restaurants.
+                          </p>
+                        </div>
                       ) : (
                         <div className="space-y-3">
-                          {metrics.topRestaurants.map((restaurant) => (
+                          {metrics.topRestaurants.map((restaurant, index) => (
                             <div
                               key={restaurant.rank}
-                              className="flex items-center justify-between p-4 bg-cream-50 rounded-lg border border-grey-stroke"
+                              className="flex items-center justify-between bg-cream-50 rounded-lg p-4 border border-grey-stroke hover:shadow-md transition-shadow"
                             >
-                              <div className="flex items-center gap-3">
-                                <span className="text-2xl font-bold text-sage-700">
-                                  #{restaurant.rank}
+                              <div className="flex items-center gap-4">
+                                <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-sage-500 text-cream-50 font-semibold flex-shrink-0">
+                                  {index + 1}
                                 </span>
-                                <span className="text-base font-semibold text-charcoal-700">
-                                  {restaurant.name}
-                                </span>
+                                <div>
+                                  <p className="text-base font-semibold text-charcoal-700">
+                                    {restaurant.name}
+                                  </p>
+                                  <p className="text-sm text-charcoal-400">
+                                    {restaurant.count} {restaurant.count === 1 ? 'delivery' : 'deliveries'}
+                                  </p>
+                                </div>
                               </div>
-                              <span className="text-lg font-bold text-charcoal-600">
-                                {restaurant.count} {restaurant.count === 1 ? 'delivery' : 'deliveries'}
-                              </span>
+                              <div className="text-right">
+                                <p className="text-lg font-bold text-sage-700">
+                                  BHD {((restaurant.count * (metrics.earnings / metrics.completed)) || 0).toFixed(3)}
+                                </p>
+                                <p className="text-xs text-charcoal-400">Total earned</p>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -1986,6 +2043,8 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
                     </div>
                   </section>
                 )}
+
+                
 
                 
               </>

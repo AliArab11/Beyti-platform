@@ -473,17 +473,7 @@ const confirmVisibilityChange = async (reason) => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
-      {/* Header */}
-      <header className="space-y-2">
-        <h1 className="text-display-h1 text-charcoal-600">Reviews</h1>
-        <p className="text-body-regular text-charcoal-400">
-        Manage customer feedback and review visibility for{" "}
-        <span className="font-semibold text-charcoal-600">
-            {sellerName || "your store"}
-        </span>
-        </p>
-      </header>
+    <div className="max-w-7xl mx-auto space-y-6">
 
       {/* Loading / error */}
       {loading && (
