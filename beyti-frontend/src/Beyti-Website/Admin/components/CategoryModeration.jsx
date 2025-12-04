@@ -22,6 +22,7 @@ import {
   createSubCategory,
   updateSubCategory
 } from '../../../services/api';
+import { logAdminActivity } from '../../../utils/adminActivityLogger';
 
 // Import design system components
 import AnalyticsCard from '../../../components/AnalyticsCard';
@@ -90,9 +91,25 @@ const CategoryModeration = ({ onNavigate }) => {
     try {
       if (editingCategory) {
         await updateCategory(editingCategory.id, categoryFormData);
+
+        // Log the admin activity
+        logAdminActivity(
+          'moderation',
+          'Updated Category',
+          categoryFormData.Name
+        );
+
         alert('Category updated successfully!');
       } else {
         await createCategory(categoryFormData);
+
+        // Log the admin activity
+        logAdminActivity(
+          'user_created',
+          'Created New Category',
+          categoryFormData.Name
+        );
+
         alert('Category created successfully!');
       }
       setCategoryFormData({ Name: '', IsActive: true });
@@ -114,7 +131,16 @@ const CategoryModeration = ({ onNavigate }) => {
   const handleToggleCategoryStatus = async (category) => {
     if (window.confirm(`Are you sure you want to ${category.isActive ? 'deactivate' : 'activate'} ${category.name}?`)) {
       try {
-        await updateCategory(category.id, { Name: category.name, IsActive: !category.isActive });
+        const newStatus = !category.isActive;
+        await updateCategory(category.id, { Name: category.name, IsActive: newStatus });
+
+        // Log the admin activity
+        logAdminActivity(
+          newStatus ? 'approval' : 'suspension',
+          `${newStatus ? 'Activated' : 'Deactivated'} Category`,
+          category.name
+        );
+
         fetchCategories();
       } catch (err) {
         console.error('Error toggling category status:', err);
@@ -139,9 +165,25 @@ const CategoryModeration = ({ onNavigate }) => {
           CategoryId: subCategoryFormData.CategoryId,
           IsActive: subCategoryFormData.IsActive
         });
+
+        // Log the admin activity
+        logAdminActivity(
+          'moderation',
+          'Updated SubCategory',
+          `${subCategoryFormData.Name} - ${selectedCategoryForSubCategory?.name || ''}`
+        );
+
         alert('SubCategory updated successfully!');
       } else {
         await createSubCategory(subCategoryFormData);
+
+        // Log the admin activity
+        logAdminActivity(
+          'user_created',
+          'Created New SubCategory',
+          `${subCategoryFormData.Name} - ${selectedCategoryForSubCategory?.name || ''}`
+        );
+
         alert('SubCategory created successfully!');
       }
       setSubCategoryFormData({ Name: '', CategoryId: null });
@@ -176,11 +218,20 @@ const CategoryModeration = ({ onNavigate }) => {
     const currentStatus = subCategory.isActive !== undefined ? subCategory.isActive : true;
     if (window.confirm(`Are you sure you want to ${currentStatus ? 'deactivate' : 'activate'} ${subCategory.name}?`)) {
       try {
+        const newStatus = !currentStatus;
         await updateSubCategory(subCategory.id, {
           Name: subCategory.name,
           CategoryId: category.id,
-          IsActive: !currentStatus
+          IsActive: newStatus
         });
+
+        // Log the admin activity
+        logAdminActivity(
+          newStatus ? 'approval' : 'suspension',
+          `${newStatus ? 'Activated' : 'Deactivated'} SubCategory`,
+          `${subCategory.name} - ${category.name}`
+        );
+
         fetchCategories();
       } catch (err) {
         console.error('Error toggling subcategory status:', err);

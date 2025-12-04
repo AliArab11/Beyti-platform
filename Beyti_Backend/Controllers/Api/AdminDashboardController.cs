@@ -12,11 +12,13 @@ namespace Beyti_Backend.Controllers.Api
     {
         private readonly BeytiContext _context;
         private readonly INotificationService _notificationService;
+        private readonly IAuditLogService _auditLogService;
 
-        public AdminDashboardController(BeytiContext context, INotificationService notificationService)
+        public AdminDashboardController(BeytiContext context, INotificationService notificationService, IAuditLogService auditLogService)
         {
             _context = context;
             _notificationService = notificationService;
+            _auditLogService = auditLogService;
         }
 
         [HttpGet("Users")]
@@ -47,7 +49,7 @@ namespace Beyti_Backend.Controllers.Api
 
         // PUT: api/AdminDashboard/Users/5
         [HttpPut("Users/{id}")]
-        public async Task<IActionResult> UpdateUser(int id, JsonElement body)
+        public async Task<IActionResult> UpdateUser(int id, [FromQuery] int? adminUserProfileId, JsonElement body)
         {
             var user = await _context.UserProfiles.FindAsync(id);
             if (user == null) return NotFound();
@@ -68,6 +70,8 @@ namespace Beyti_Backend.Controllers.Api
             // Check if role is being changed
             if (!string.IsNullOrEmpty(newRoleType) && newRoleType != user.RoleType)
             {
+                string oldRoleType = user.RoleType;
+
                 // Mark current user as "Role Changed"
                 user.Status = "Role Changed";
                 user.UpdatedAt = DateTime.UtcNow;
@@ -111,6 +115,18 @@ namespace Beyti_Backend.Controllers.Api
 
                 await _context.SaveChangesAsync();
 
+                // Log role change in audit trail
+                if (adminUserProfileId.HasValue)
+                {
+                    await _auditLogService.LogRoleChangedAsync(
+                        adminUserProfileId.Value,
+                        user.Id,
+                        newUser.Id,
+                        oldRoleType,
+                        newRoleType
+                    );
+                }
+
                 return Ok(new
                 {
                     message = "Role changed. New user created.",
@@ -122,20 +138,40 @@ namespace Beyti_Backend.Controllers.Api
             {
                 // Normal update (no role change)
                 bool statusChanged = false;
+                bool displayNameChanged = false;
                 string oldStatus = user.Status;
+                string oldDisplayName = user.DisplayName ?? "Unknown";
+                List<string> changes = new List<string>();
 
-                if (!string.IsNullOrEmpty(newDisplayName))
+                if (!string.IsNullOrEmpty(newDisplayName) && newDisplayName != user.DisplayName)
+                {
                     user.DisplayName = newDisplayName;
+                    displayNameChanged = true;
+                    changes.Add($"Display name changed from '{oldDisplayName}' to '{newDisplayName}'");
+                }
 
                 if (!string.IsNullOrEmpty(newStatus) && newStatus != user.Status)
                 {
                     user.Status = newStatus;
                     statusChanged = true;
+                    changes.Add($"Status changed from '{oldStatus}' to '{newStatus}'");
                 }
 
                 user.UpdatedAt = DateTime.UtcNow;
 
                 await _context.SaveChangesAsync();
+
+                // Log user update in audit trail
+                if (adminUserProfileId.HasValue && changes.Count > 0)
+                {
+                    string changeDescription = string.Join(", ", changes);
+                    await _auditLogService.LogUserUpdatedAsync(
+                        adminUserProfileId.Value,
+                        user.Id,
+                        user.DisplayName ?? "Unknown",
+                        changeDescription
+                    );
+                }
 
                 // Send notification if status changed
                 if (statusChanged && newStatus != null)
@@ -152,7 +188,7 @@ namespace Beyti_Backend.Controllers.Api
 
                     await _notificationService.SendNotificationAsync(
                         recipientUserId: user.Id,
-                        senderUserId: null,
+                        senderUserId: adminUserProfileId,
                         type: notificationType,
                         title: notificationTitle,
                         body: notificationBody,
@@ -166,7 +202,7 @@ namespace Beyti_Backend.Controllers.Api
         }
 
         [HttpPost("Users")]
-        public async Task<ActionResult> AddUser([FromBody] UserProfile userProfile)
+        public async Task<ActionResult> AddUser([FromBody] UserProfile userProfile, [FromQuery] int? adminUserProfileId)
         {
             try
             {
@@ -205,6 +241,17 @@ namespace Beyti_Backend.Controllers.Api
 
                 await _context.SaveChangesAsync();
 
+                // Log user creation in audit trail
+                if (adminUserProfileId.HasValue)
+                {
+                    await _auditLogService.LogUserCreatedAsync(
+                        adminUserProfileId.Value,
+                        userProfile.Id,
+                        userProfile.DisplayName ?? "Unknown",
+                        userProfile.RoleType
+                    );
+                }
+
                 // Return minimal user data to avoid serialization issues
                 return CreatedAtAction(nameof(GetUsers), new { id = userProfile.Id }, new
                 {
@@ -224,7 +271,7 @@ namespace Beyti_Backend.Controllers.Api
 
         // PATCH: api/AdminDashboard/Users/5/toggle
         [HttpPatch("Users/{id}/toggle")]
-        public async Task<IActionResult> ToggleUserStatus(int id)
+        public async Task<IActionResult> ToggleUserStatus(int id, [FromQuery] int? adminUserProfileId)
         {
             var user = await _context.UserProfiles.FindAsync(id);
             if (user == null) return NotFound();
@@ -235,6 +282,27 @@ namespace Beyti_Backend.Controllers.Api
 
             await _context.SaveChangesAsync();
 
+            // Log activation/deactivation in audit trail
+            if (adminUserProfileId.HasValue)
+            {
+                if (user.Status == "Active")
+                {
+                    await _auditLogService.LogUserActivatedAsync(
+                        adminUserProfileId.Value,
+                        user.Id,
+                        user.DisplayName ?? "Unknown"
+                    );
+                }
+                else
+                {
+                    await _auditLogService.LogUserDeactivatedAsync(
+                        adminUserProfileId.Value,
+                        user.Id,
+                        user.DisplayName ?? "Unknown"
+                    );
+                }
+            }
+
             // Send notification about status toggle
             string notificationTitle = user.Status == "Active" ? "Account Activated" : "Account Deactivated";
             string notificationBody = $"Your account has been {(user.Status == "Active" ? "activated" : "deactivated")} by an administrator.";
@@ -242,7 +310,7 @@ namespace Beyti_Backend.Controllers.Api
 
             await _notificationService.SendNotificationAsync(
                 recipientUserId: user.Id,
-                senderUserId: null,
+                senderUserId: adminUserProfileId,
                 type: notificationType,
                 title: notificationTitle,
                 body: notificationBody,
@@ -280,7 +348,7 @@ namespace Beyti_Backend.Controllers.Api
 
         // PATCH: api/AdminDashboard/ServiceProviderRequests/5/approve
         [HttpPatch("ServiceProviderRequests/{id}/approve")]
-        public async Task<IActionResult> ApproveServiceProviderRequest(int id)
+        public async Task<IActionResult> ApproveServiceProviderRequest(int id, [FromQuery] int? adminUserProfileId)
         {
             try
             {
@@ -306,13 +374,24 @@ namespace Beyti_Backend.Controllers.Api
 
                 await _context.SaveChangesAsync();
 
+                // Get admin name for notification
+                string adminInfo = "";
+                if (adminUserProfileId.HasValue)
+                {
+                    var adminProfile = await _context.UserProfiles.FindAsync(adminUserProfileId.Value);
+                    if (adminProfile != null)
+                    {
+                        adminInfo = $" by Administrator {adminProfile.DisplayName}";
+                    }
+                }
+
                 // Send notification to the service provider
                 await _notificationService.SendNotificationAsync(
                     recipientUserId: request.ServiceProvider.UserProfileId,
-                    senderUserId: null,
+                    senderUserId: adminUserProfileId,
                     type: "application_approved",
                     title: "Application Approved",
-                    body: "Congratulations! Your service provider application has been approved. You can now start accepting service requests.",
+                    body: $"Congratulations! Your service provider application has been approved{adminInfo}. You can now start accepting service requests.",
                     relatedEntityType: "ProviderApplication",
                     relatedEntityId: request.Id
                 );
@@ -332,7 +411,7 @@ namespace Beyti_Backend.Controllers.Api
 
         // PATCH: api/AdminDashboard/ServiceProviderRequests/5/reject
         [HttpPatch("ServiceProviderRequests/{id}/reject")]
-        public async Task<IActionResult> RejectServiceProviderRequest(int id)
+        public async Task<IActionResult> RejectServiceProviderRequest(int id, [FromQuery] int? adminUserProfileId)
         {
             try
             {
@@ -357,13 +436,24 @@ namespace Beyti_Backend.Controllers.Api
 
                 await _context.SaveChangesAsync();
 
+                // Get admin name for notification
+                string adminInfo = "";
+                if (adminUserProfileId.HasValue)
+                {
+                    var adminProfile = await _context.UserProfiles.FindAsync(adminUserProfileId.Value);
+                    if (adminProfile != null)
+                    {
+                        adminInfo = $" by Administrator {adminProfile.DisplayName}";
+                    }
+                }
+
                 // Send notification to the service provider
                 await _notificationService.SendNotificationAsync(
                     recipientUserId: request.ServiceProvider.UserProfileId,
-                    senderUserId: null,
+                    senderUserId: adminUserProfileId,
                     type: "application_rejected",
                     title: "Application Rejected",
-                    body: "Your service provider application has been reviewed and unfortunately was not approved at this time. Please contact support for more information.",
+                    body: $"Your service provider application has been reviewed{adminInfo} and unfortunately was not approved at this time. Please contact support for more information.",
                     relatedEntityType: "ProviderApplication",
                     relatedEntityId: request.Id
                 );
@@ -755,7 +845,7 @@ namespace Beyti_Backend.Controllers.Api
 
         // PUT: api/AdminDashboard/SuspendUser/5
         [HttpPut("SuspendUser/{userId}")]
-        public async Task<IActionResult> SuspendUser(int userId, [FromBody] JsonElement body)
+        public async Task<IActionResult> SuspendUser(int userId, [FromQuery] int? adminUserProfileId, [FromBody] JsonElement body)
         {
             try
             {
@@ -816,10 +906,21 @@ namespace Beyti_Backend.Controllers.Api
 
                 await _context.SaveChangesAsync();
 
+                // Log user suspension in audit trail
+                if (adminUserProfileId.HasValue)
+                {
+                    await _auditLogService.LogUserSuspendedAsync(
+                        adminUserProfileId.Value,
+                        userId,
+                        user.DisplayName ?? "Unknown",
+                        reason ?? "No reason provided"
+                    );
+                }
+
                 // Send notification to the suspended user
                 await _notificationService.SendNotificationAsync(
                     recipientUserId: userId,
-                    senderUserId: null,
+                    senderUserId: adminUserProfileId,
                     type: "account_suspended",
                     title: "Account Suspended",
                     body: reason ?? "Your account has been suspended by an administrator. Please contact support for more information.",
@@ -843,7 +944,7 @@ namespace Beyti_Backend.Controllers.Api
 
         // PUT: api/AdminDashboard/ReactivateUser/5
         [HttpPut("ReactivateUser/{userId}")]
-        public async Task<IActionResult> ReactivateUser(int userId)
+        public async Task<IActionResult> ReactivateUser(int userId, [FromQuery] int? adminUserProfileId)
         {
             try
             {
@@ -881,10 +982,20 @@ namespace Beyti_Backend.Controllers.Api
 
                 await _context.SaveChangesAsync();
 
+                // Log user reactivation in audit trail
+                if (adminUserProfileId.HasValue)
+                {
+                    await _auditLogService.LogUserReactivatedAsync(
+                        adminUserProfileId.Value,
+                        userId,
+                        user.DisplayName ?? "Unknown"
+                    );
+                }
+
                 // Send notification to the reactivated user
                 await _notificationService.SendNotificationAsync(
                     recipientUserId: userId,
-                    senderUserId: null,
+                    senderUserId: adminUserProfileId,
                     type: "account_reactivated",
                     title: "Account Reactivated",
                     body: "Your account has been reactivated by an administrator. You can now access all features.",
@@ -897,6 +1008,46 @@ namespace Beyti_Backend.Controllers.Api
                     message = "User reactivated successfully",
                     userId,
                     userStatus = user.Status
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
+
+        // PUT: api/AdminDashboard/WarnUser/5
+        [HttpPut("WarnUser/{userId}")]
+        public async Task<IActionResult> WarnUser(int userId, [FromQuery] int? adminUserProfileId, [FromBody] JsonElement body)
+        {
+            try
+            {
+                var user = await _context.UserProfiles.FindAsync(userId);
+                if (user == null) return NotFound();
+
+                string? message = null;
+                if (body.TryGetProperty("message", out var messageProp))
+                    message = messageProp.GetString();
+
+                if (string.IsNullOrWhiteSpace(message))
+                    return BadRequest(new { error = "Warning message is required" });
+
+                // Send warning notification to the user
+                await _notificationService.SendNotificationAsync(
+                    recipientUserId: userId,
+                    senderUserId: adminUserProfileId,
+                    type: "user_warning",
+                    title: "Warning from Administration",
+                    body: message,
+                    relatedEntityType: "UserProfile",
+                    relatedEntityId: userId
+                );
+
+                return Ok(new
+                {
+                    message = "Warning sent successfully",
+                    userId,
+                    warningMessage = message
                 });
             }
             catch (Exception ex)

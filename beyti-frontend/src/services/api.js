@@ -258,22 +258,32 @@ export const getUser = async (id) => {
   return await fetchAPI(`/AdminDashboard/Users/${id}`);
 };
 
-export const createUser = async (data) => {
-  return await fetchAPI('/AdminDashboard/Users', {
+export const createUser = async (data, adminUserProfileId = null) => {
+  const url = adminUserProfileId
+    ? `/AdminDashboard/Users?adminUserProfileId=${adminUserProfileId}`
+    : '/AdminDashboard/Users';
+
+  return await fetchAPI(url, {
     method: 'POST',
     body: JSON.stringify(data),
   });
 };
 
-export const updateUser = async (id, data) => {
-  return await fetchAPI(`/AdminDashboard/Users/${id}`, {
+export const updateUser = async (id, data, adminUserProfileId = null) => {
+  const url = adminUserProfileId
+    ? `/AdminDashboard/Users/${id}?adminUserProfileId=${adminUserProfileId}`
+    : `/AdminDashboard/Users/${id}`;
+  return await fetchAPI(url, {
     method: 'PUT',
     body: JSON.stringify(data),
   });
 };
 
-export const toggleUserStatus = async (id) => {
-  return await fetchAPI(`/AdminDashboard/Users/${id}/toggle`, {
+export const toggleUserStatus = async (id, adminUserProfileId = null) => {
+  const url = adminUserProfileId
+    ? `/AdminDashboard/Users/${id}/toggle?adminUserProfileId=${adminUserProfileId}`
+    : `/AdminDashboard/Users/${id}/toggle`;
+  return await fetchAPI(url, {
     method: 'PATCH',
   });
 };
@@ -287,14 +297,20 @@ export const getAllServiceProviderRequests = async () => {
   return await fetchAPI('/AdminDashboard/ServiceProviderRequests');
 };
 
-export const approveServiceProviderRequest = async (id) => {
-  return await fetchAPI(`/AdminDashboard/ServiceProviderRequests/${id}/approve`, {
+export const approveServiceProviderRequest = async (id, adminUserProfileId = null) => {
+  const url = adminUserProfileId
+    ? `/AdminDashboard/ServiceProviderRequests/${id}/approve?adminUserProfileId=${adminUserProfileId}`
+    : `/AdminDashboard/ServiceProviderRequests/${id}/approve`;
+  return await fetchAPI(url, {
     method: 'PATCH',
   });
 };
 
-export const rejectServiceProviderRequest = async (id) => {
-  return await fetchAPI(`/AdminDashboard/ServiceProviderRequests/${id}/reject`, {
+export const rejectServiceProviderRequest = async (id, adminUserProfileId = null) => {
+  const url = adminUserProfileId
+    ? `/AdminDashboard/ServiceProviderRequests/${id}/reject?adminUserProfileId=${adminUserProfileId}`
+    : `/AdminDashboard/ServiceProviderRequests/${id}/reject`;
+  return await fetchAPI(url, {
     method: 'PATCH',
   });
 };
@@ -313,21 +329,30 @@ export const getUserViolations = async (userId) => {
   return await fetchAPI(`/AdminDashboard/UserViolations/${userId}`);
 };
 
-export const suspendUser = async (userId, reason) => {
-  return await fetchAPI(`/AdminDashboard/SuspendUser/${userId}`, {
+export const suspendUser = async (userId, reason, adminUserProfileId = null) => {
+  const url = adminUserProfileId
+    ? `/AdminDashboard/SuspendUser/${userId}?adminUserProfileId=${adminUserProfileId}`
+    : `/AdminDashboard/SuspendUser/${userId}`;
+  return await fetchAPI(url, {
     method: 'PUT',
     body: JSON.stringify({ reason }),
   });
 };
 
-export const reactivateUser = async (userId) => {
-  return await fetchAPI(`/AdminDashboard/ReactivateUser/${userId}`, {
+export const reactivateUser = async (userId, adminUserProfileId = null) => {
+  const url = adminUserProfileId
+    ? `/AdminDashboard/ReactivateUser/${userId}?adminUserProfileId=${adminUserProfileId}`
+    : `/AdminDashboard/ReactivateUser/${userId}`;
+  return await fetchAPI(url, {
     method: 'PUT',
   });
 };
 
-export const warnUser = async (userId, message) => {
-  return await fetchAPI(`/AdminDashboard/WarnUser/${userId}`, {
+export const warnUser = async (userId, message, adminUserProfileId = null) => {
+  const url = adminUserProfileId
+    ? `/AdminDashboard/WarnUser/${userId}?adminUserProfileId=${adminUserProfileId}`
+    : `/AdminDashboard/WarnUser/${userId}`;
+  return await fetchAPI(url, {
     method: 'PUT',
     body: JSON.stringify({ message }),
   });
@@ -352,14 +377,20 @@ export const getProductDetails = async (id) => {
   return await fetchAPI(`/ProductModeration/Products/${id}`);
 };
 
-export const approveProduct = async (id) => {
-  return await fetchAPI(`/ProductModeration/Products/${id}/approve`, {
+export const approveProduct = async (id, adminUserProfileId = null) => {
+  const url = adminUserProfileId
+    ? `/ProductModeration/Products/${id}/approve?adminUserProfileId=${adminUserProfileId}`
+    : `/ProductModeration/Products/${id}/approve`;
+  return await fetchAPI(url, {
     method: 'PUT',
   });
 };
 
-export const suspendProduct = async (id, reason) => {
-  return await fetchAPI(`/ProductModeration/Products/${id}/suspend`, {
+export const suspendProduct = async (id, reason, adminUserProfileId = null) => {
+  const url = adminUserProfileId
+    ? `/ProductModeration/Products/${id}/suspend?adminUserProfileId=${adminUserProfileId}`
+    : `/ProductModeration/Products/${id}/suspend`;
+  return await fetchAPI(url, {
     method: 'PUT',
     body: JSON.stringify({ reason }),
   });
@@ -1570,8 +1601,11 @@ export const getServiceDetails = async (id) => {
  * @param {number} id - Service ID
  * @returns {Promise<object>} - Response
  */
-export const approveService = async (id) => {
-  return await fetchAPI(`/ServiceModeration/Services/${id}/approve`, {
+export const approveService = async (id, adminUserProfileId = null) => {
+  const url = adminUserProfileId
+    ? `/ServiceModeration/Services/${id}/approve?adminUserProfileId=${adminUserProfileId}`
+    : `/ServiceModeration/Services/${id}/approve`;
+  return await fetchAPI(url, {
     method: 'PUT',
   });
 };
@@ -1580,10 +1614,14 @@ export const approveService = async (id) => {
  * Suspend a service with reason
  * @param {number} id - Service ID
  * @param {string} reason - Suspension reason
+ * @param {number} adminUserProfileId - Admin user profile ID (optional)
  * @returns {Promise<object>} - Response
  */
-export const suspendService = async (id, reason) => {
-  return await fetchAPI(`/ServiceModeration/Services/${id}/suspend`, {
+export const suspendService = async (id, reason, adminUserProfileId = null) => {
+  const url = adminUserProfileId
+    ? `/ServiceModeration/Services/${id}/suspend?adminUserProfileId=${adminUserProfileId}`
+    : `/ServiceModeration/Services/${id}/suspend`;
+  return await fetchAPI(url, {
     method: 'PUT',
     body: JSON.stringify({ reason }),
   });
@@ -1721,4 +1759,23 @@ export const deleteNotification = async (id) => {
   return await fetchAPI(`/Notifications/${id}`, {
     method: 'DELETE',
   });
+};
+
+// ================== AUDIT LOGS API ==================
+
+/**
+ * Get all audit logs
+ * @returns {Promise<Array>} - Array of audit log objects
+ */
+export const getAuditLogs = async () => {
+  return await fetchAPI('/AuditLogs');
+};
+
+/**
+ * Get a single audit log by ID
+ * @param {number} id - Audit log ID
+ * @returns {Promise<Object>} - Audit log object
+ */
+export const getAuditLog = async (id) => {
+  return await fetchAPI(`/AuditLogs/${id}`);
 };

@@ -9,6 +9,7 @@ import ProfilePage from '../../components/ProfilePage';
 import ServiceProviderSidebar from './components/ServiceProviderSidebar';
 import PageHeader from '../../components/PageHeader';
 import { getUserProfile, updateUserProfile, updateProviderStatus } from '../../services/api';
+import { logProviderActivity } from '../../utils/providerActivityLogger';
 
 export default function ServiceProviderDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
@@ -18,6 +19,9 @@ export default function ServiceProviderDashboard() {
   const [providerStatus, setProviderStatus] = useState('Available');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [reviewSearchQuery, setReviewSearchQuery] = useState('');
+  const [notificationSearchQuery, setNotificationSearchQuery] = useState('');
+  const [serviceSearchQuery, setServiceSearchQuery] = useState('');
+  const [activityRefreshKey, setActivityRefreshKey] = useState(0);
 
   // Hardcoded login credentials - TODO: Replace with actual authentication/context
   const userProfileId = 1031; // Logged-in service provider's UserProfile ID
@@ -68,6 +72,15 @@ export default function ServiceProviderDashboard() {
   const handleProfileUpdate = async (updates) => {
     try {
       await updateUserProfile(userProfileId, 'ServiceProvider', updates);
+
+      // Log activity
+      logProviderActivity(
+        serviceProviderId,
+        'profile',
+        'Updated Business Profile',
+        updates.displayName ? `Changed display name to ${updates.displayName}` : 'Updated profile information'
+      );
+
       // Refresh the profile after update
       await fetchUserProfile();
     } catch (error) {
@@ -89,6 +102,17 @@ export default function ServiceProviderDashboard() {
       setProviderStatus(newStatus); // Optimistic update
       const response = await updateProviderStatus(serviceProviderId, newStatus);
       console.log('[handleStatusChange] Update response:', response);
+
+      // Log activity for status change
+      logProviderActivity(
+        serviceProviderId,
+        'profile',
+        'Changed Availability Status',
+        `Status updated from ${previousStatus} to ${newStatus}`
+      );
+
+      // Trigger activity refresh by updating the key
+      setActivityRefreshKey(prev => prev + 1);
     } catch (error) {
       console.error('Error updating provider status:', error);
       // Revert on error
@@ -149,13 +173,21 @@ export default function ServiceProviderDashboard() {
         {/* Header */}
         <PageHeader
           title={getPageTitle()}
-          withSearch={activeTab === 'reviews' || activeTab === 'notifications'}
+          withSearch={activeTab === 'reviews' || activeTab === 'notifications' || activeTab === 'services'}
           searchPlaceholder={
             activeTab === 'notifications'
               ? 'Search notifications by title, content, or type...'
+              : activeTab === 'services'
+              ? 'Search by service name, category, or description...'
               : 'Search by customer, service, or comment...'
           }
-          onSearch={setReviewSearchQuery}
+          onSearch={
+            activeTab === 'notifications'
+              ? setNotificationSearchQuery
+              : activeTab === 'services'
+              ? setServiceSearchQuery
+              : setReviewSearchQuery
+          }
           notificationCount={0}
           userName={displayName}
           userRole="Service Provider"
@@ -204,11 +236,12 @@ export default function ServiceProviderDashboard() {
                 <ProviderOverview
                   serviceProviderId={serviceProviderId}
                   onNavigateToBookings={handleNavigateToBookings}
+                  activityRefreshKey={activityRefreshKey}
                 />
               </>
             )}
             {activeTab === 'services' && (
-              <ServicesManagement serviceProviderId={serviceProviderId} />
+              <ServicesManagement serviceProviderId={serviceProviderId} searchTerm={serviceSearchQuery} />
             )}
             {activeTab === 'schedule' && (
               <ScheduleManagement serviceProviderId={serviceProviderId} />
@@ -226,7 +259,7 @@ export default function ServiceProviderDashboard() {
               />
             )}
             {activeTab === 'notifications' && (
-              <NotificationsPage userId={userProfileId} />
+              <NotificationsPage userId={userProfileId} searchQuery={notificationSearchQuery} />
             )}
             {activeTab === 'profile' && (
               <ProfilePage

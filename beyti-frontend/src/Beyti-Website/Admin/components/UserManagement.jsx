@@ -13,8 +13,7 @@ import {
   CheckCircle,
   ProhibitInset,
   Eye,
-  Users,
-  MagnifyingGlass
+  Users
 } from '@phosphor-icons/react';
 import {
   getUsers,
@@ -32,7 +31,7 @@ import { Table, TableHeader, TableBody, TableRow } from '../../../components/Tab
 import PageHeader from '../../../components/PageHeader';
 import AdminSidebar from './AdminSidebar';
 
-const UserManagement = ({ onNavigate }) => {
+const UserManagement = ({ onNavigate, adminUserProfileId }) => {
 
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -102,7 +101,7 @@ const UserManagement = ({ onNavigate }) => {
     e.preventDefault();
     try {
       if (editingId) {
-        const result = await updateUser(editingId, formData);
+        const result = await updateUser(editingId, formData, adminUserProfileId);
         if (result.message) {
           alert(`${result.message}\nOld user (${result.oldUser.roleType}) marked as "Role Changed".\nNew user created as ${result.newUser.roleType}.`);
         }
@@ -117,7 +116,7 @@ const UserManagement = ({ onNavigate }) => {
         setEditingId(null);
         setOriginalRole(null);
       } else {
-        await createUser(formData);
+        await createUser(formData, adminUserProfileId);
 
         // Log the admin activity
         logAdminActivity(
@@ -154,7 +153,7 @@ const UserManagement = ({ onNavigate }) => {
   const handleToggleStatus = async (user) => {
     if (window.confirm(`Are you sure you want to ${user.status === 'Active' ? 'deactivate' : 'activate'} ${user.displayName}?`)) {
       try {
-        await toggleUserStatus(user.id);
+        await toggleUserStatus(user.id, adminUserProfileId);
 
         // Log the admin activity
         const action = user.status === 'Active' ? 'Deactivated' : 'Activated';
@@ -244,6 +243,9 @@ const UserManagement = ({ onNavigate }) => {
         {/* Header */}
         <PageHeader
           title="User Management"
+          withSearch={true}
+          searchPlaceholder="Search by name or role..."
+          onSearch={(value) => setSearchTerm(value)}
           notificationCount={notificationCount}
           userName="Admin User"
           userRole="Super Admin"
@@ -285,76 +287,65 @@ const UserManagement = ({ onNavigate }) => {
 
             {/* Tabs and Content */}
             <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none transition-colors">
-              <div className="flex flex-wrap border-b border-grey-stroke">
-                <button
-                  onClick={() => setActiveSection('all')}
-                  className={`px-6 py-4 font-semibold transition ${
-                    activeSection === 'all'
-                      ? 'border-b-2 border-sage-500 text-sage-700 bg-sage-100/30'
-                      : 'text-charcoal-400 hover:text-charcoal-600 hover:bg-cream-100'
-                  }`}
-                >
-                  <div className="flex items-center justify-center gap-2">
-                    <Users size={20} weight={activeSection === 'all' ? 'fill' : 'regular'} />
-                    <span>All Users ({stats.totalUsers})</span>
-                  </div>
-                </button>
-                <button
-                  onClick={() => setActiveSection('customers')}
-                  className={`px-6 py-4 font-semibold transition ${
-                    activeSection === 'customers'
-                      ? 'border-b-2 border-sage-500 text-sage-700 bg-sage-100/30'
-                      : 'text-charcoal-400 hover:text-charcoal-600 hover:bg-cream-100'
-                  }`}
-                >
-                  <span>Customers ({stats.customers})</span>
-                </button>
-                <button
-                  onClick={() => setActiveSection('sellers')}
-                  className={`px-6 py-4 font-semibold transition ${
-                    activeSection === 'sellers'
-                      ? 'border-b-2 border-sage-500 text-sage-700 bg-sage-100/30'
-                      : 'text-charcoal-400 hover:text-charcoal-600 hover:bg-cream-100'
-                  }`}
-                >
-                  <span>Sellers ({stats.sellers})</span>
-                </button>
-                <button
-                  onClick={() => setActiveSection('service-providers')}
-                  className={`px-6 py-4 font-semibold transition ${
-                    activeSection === 'service-providers'
-                      ? 'border-b-2 border-sage-500 text-sage-700 bg-sage-100/30'
-                      : 'text-charcoal-400 hover:text-charcoal-600 hover:bg-cream-100'
-                  }`}
-                >
-                  <span>Service Providers ({stats.serviceProviders})</span>
-                </button>
-                <button
-                  onClick={() => setActiveSection('drivers')}
-                  className={`px-6 py-4 font-semibold transition ${
-                    activeSection === 'drivers'
-                      ? 'border-b-2 border-sage-500 text-sage-700 bg-sage-100/30'
-                      : 'text-charcoal-400 hover:text-charcoal-600 hover:bg-cream-100'
-                  }`}
-                >
-                  <span>Drivers ({stats.drivers})</span>
-                </button>
-              </div>
+              <div className="flex flex-wrap items-center justify-between border-b border-grey-stroke">
+                <div className="flex flex-wrap">
+                  <button
+                    onClick={() => setActiveSection('all')}
+                    className={`px-6 py-4 font-semibold transition ${
+                      activeSection === 'all'
+                        ? 'border-b-2 border-sage-500 text-sage-700 bg-sage-100/30'
+                        : 'text-charcoal-400 hover:text-charcoal-600 hover:bg-cream-100'
+                    }`}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <Users size={20} weight={activeSection === 'all' ? 'fill' : 'regular'} />
+                      <span>All Users ({stats.totalUsers})</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setActiveSection('customers')}
+                    className={`px-6 py-4 font-semibold transition ${
+                      activeSection === 'customers'
+                        ? 'border-b-2 border-sage-500 text-sage-700 bg-sage-100/30'
+                        : 'text-charcoal-400 hover:text-charcoal-600 hover:bg-cream-100'
+                    }`}
+                  >
+                    <span>Customers ({stats.customers})</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveSection('sellers')}
+                    className={`px-6 py-4 font-semibold transition ${
+                      activeSection === 'sellers'
+                        ? 'border-b-2 border-sage-500 text-sage-700 bg-sage-100/30'
+                        : 'text-charcoal-400 hover:text-charcoal-600 hover:bg-cream-100'
+                    }`}
+                  >
+                    <span>Sellers ({stats.sellers})</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveSection('service-providers')}
+                    className={`px-6 py-4 font-semibold transition ${
+                      activeSection === 'service-providers'
+                        ? 'border-b-2 border-sage-500 text-sage-700 bg-sage-100/30'
+                        : 'text-charcoal-400 hover:text-charcoal-600 hover:bg-cream-100'
+                    }`}
+                  >
+                    <span>Service Providers ({stats.serviceProviders})</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveSection('drivers')}
+                    className={`px-6 py-4 font-semibold transition ${
+                      activeSection === 'drivers'
+                        ? 'border-b-2 border-sage-500 text-sage-700 bg-sage-100/30'
+                        : 'text-charcoal-400 hover:text-charcoal-600 hover:bg-cream-100'
+                    }`}
+                  >
+                    <span>Drivers ({stats.drivers})</span>
+                  </button>
+                </div>
 
-              {/* Tab Content */}
-              <div className="p-6">
-                {/* Search and Actions Bar */}
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-                  <div className="flex-1 relative">
-                    <MagnifyingGlass size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-charcoal-400" />
-                    <input
-                      type="text"
-                      placeholder="Search by name or role..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 border border-grey-stroke rounded-lg focus:ring-2 focus:ring-sage-500 focus:border-sage-500 text-body-regular"
-                    />
-                  </div>
+                {/* Add User Button */}
+                <div className="px-6 py-2">
                   <CRUDButton
                     variant="success"
                     onClick={() => setShowForm(!showForm)}
@@ -372,6 +363,10 @@ const UserManagement = ({ onNavigate }) => {
                     )}
                   </CRUDButton>
                 </div>
+              </div>
+
+              {/* Tab Content */}
+              <div className="p-6">
 
                 {/* Add/Edit Form */}
                 {showForm && (

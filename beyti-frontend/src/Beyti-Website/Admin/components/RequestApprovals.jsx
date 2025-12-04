@@ -7,7 +7,6 @@
 
 import React, { useEffect, useState } from 'react';
 import {
-  MagnifyingGlass,
   CheckCircle,
   XCircle,
   Eye
@@ -27,12 +26,13 @@ import StatusChip from '../../../components/StatusChip';
 import PageHeader from '../../../components/PageHeader';
 import AdminSidebar from './AdminSidebar';
 
-const RequestApprovals = ({ onNavigate }) => {
+const RequestApprovals = ({ onNavigate, adminUserProfileId }) => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
+  const [filterRoleType, setFilterRoleType] = useState('All');
   const [notificationCount] = useState(0);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
@@ -83,7 +83,7 @@ const RequestApprovals = ({ onNavigate }) => {
       try {
         setProcessingId(id);
         const request = requests.find(r => r.id === id);
-        await approveServiceProviderRequest(id);
+        await approveServiceProviderRequest(id, adminUserProfileId);
 
         // Log the admin activity
         logAdminActivity(
@@ -108,7 +108,7 @@ const RequestApprovals = ({ onNavigate }) => {
       try {
         setProcessingId(id);
         const request = requests.find(r => r.id === id);
-        await rejectServiceProviderRequest(id);
+        await rejectServiceProviderRequest(id, adminUserProfileId);
 
         // Log the admin activity
         logAdminActivity(
@@ -147,13 +147,18 @@ const RequestApprovals = ({ onNavigate }) => {
       filtered = filtered.filter(r => r.status === filterStatus);
     }
 
-    // Filter by search term
+    // Filter by role type (case-insensitive comparison)
+    if (filterRoleType !== 'All') {
+      filtered = filtered.filter(r =>
+        r.userRoleType?.toLowerCase() === filterRoleType.toLowerCase()
+      );
+    }
+
+    // Filter by search term (business name and provider only)
     if (searchTerm) {
       filtered = filtered.filter(request =>
         request.businessName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        request.userDisplayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        request.userRoleType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        request.notes?.toLowerCase().includes(searchTerm.toLowerCase())
+        request.userDisplayName?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -194,6 +199,9 @@ const RequestApprovals = ({ onNavigate }) => {
         {/* Header */}
         <PageHeader
           title="Request Approvals"
+          withSearch={true}
+          searchPlaceholder="Search by business name or provider..."
+          onSearch={setSearchTerm}
           notificationCount={notificationCount}
           userName="Admin User"
           userRole="Super Admin"
@@ -233,38 +241,59 @@ const RequestApprovals = ({ onNavigate }) => {
               />
             </div>
 
+            {/* Filters */}
+            <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none p-6 transition-colors">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1">
+                  <label className="block text-label-medium text-charcoal-600 dark:text-white mb-2">Provider Type</label>
+                  <select
+                    value={filterRoleType}
+                    onChange={(e) => setFilterRoleType(e.target.value)}
+                    className="w-full border border-grey-stroke rounded-lg px-4 py-2 text-body-regular focus:ring-2 focus:ring-sage-500 focus:border-sage-500 bg-white dark:bg-[#1F1F1F] dark:text-white"
+                  >
+                    <option value="All">All Types</option>
+                    <option value="Seller">Seller</option>
+                    <option value="ServiceProvider">Service Provider</option>
+                    <option value="Driver">Driver</option>
+                  </select>
+                </div>
+                <div className="flex-1">
+                  <label className="block text-label-medium text-charcoal-600 dark:text-white mb-2">Status</label>
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className="w-full border border-grey-stroke rounded-lg px-4 py-2 text-body-regular focus:ring-2 focus:ring-sage-500 focus:border-sage-500 bg-white dark:bg-[#1F1F1F] dark:text-white"
+                  >
+                    <option value="All">All Status</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Rejected">Rejected</option>
+                  </select>
+                </div>
+                {(filterStatus !== 'All' || filterRoleType !== 'All' || searchTerm) && (
+                  <div className="flex items-end">
+                    <CRUDButton
+                      variant="warning"
+                      onClick={() => {
+                        setFilterStatus('All');
+                        setFilterRoleType('All');
+                        setSearchTerm('');
+                      }}
+                    >
+                      Clear Filters
+                    </CRUDButton>
+                  </div>
+                )}
+              </div>
+              {(filterStatus !== 'All' || filterRoleType !== 'All' || searchTerm) && (
+                <div className="mt-4 text-body-regular text-charcoal-600 dark:text-gray-400">
+                  Showing {filteredRequests.length} of {requests.length} requests
+                </div>
+              )}
+            </div>
+
             {/* Requests Table */}
             <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none transition-colors">
-              <div className="p-6 border-b border-grey-stroke dark:border-charcoal-500">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                  {/* Search Bar */}
-                  <div className="flex-1 relative">
-                    <MagnifyingGlass size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-charcoal-400" />
-                    <input
-                      type="text"
-                      placeholder="Search by business name, provider, user type, or notes..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 border border-grey-stroke rounded-lg focus:ring-2 focus:ring-sage-500 focus:border-sage-500 text-body-regular"
-                    />
-                  </div>
-
-                  {/* Status Filter */}
-                  <div className="flex items-center gap-3">
-                    <label className="text-body-regular text-charcoal-600 font-semibold">Status:</label>
-                    <select
-                      value={filterStatus}
-                      onChange={(e) => setFilterStatus(e.target.value)}
-                      className="border border-grey-stroke rounded-lg px-4 py-2 focus:ring-2 focus:ring-sage-500 focus:border-sage-500 text-body-regular bg-white"
-                    >
-                      <option value="All">All</option>
-                      <option value="Pending">Pending</option>
-                      <option value="Approved">Approved</option>
-                      <option value="Rejected">Rejected</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
 
               {/* Table Content */}
               <div className="p-6">

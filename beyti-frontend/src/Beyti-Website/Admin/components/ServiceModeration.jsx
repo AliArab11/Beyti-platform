@@ -21,6 +21,7 @@ import {
   suspendService,
   deleteService
 } from '../../../services/api';
+import { logAdminActivity } from '../../../utils/adminActivityLogger';
 
 // Import design system components
 import AnalyticsCard from '../../../components/AnalyticsCard';
@@ -30,7 +31,7 @@ import { Table, TableHeader, TableBody, TableRow } from '../../../components/Tab
 import PageHeader from '../../../components/PageHeader';
 import AdminSidebar from './AdminSidebar';
 
-const ServiceModeration = ({ onNavigate }) => {
+const ServiceModeration = ({ onNavigate, adminUserProfileId }) => {
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -97,7 +98,16 @@ const ServiceModeration = ({ onNavigate }) => {
   const handleApprove = async (serviceId) => {
     if (window.confirm('Are you sure you want to approve this service?')) {
       try {
-        await approveService(serviceId);
+        const service = services.find(s => s.id === serviceId);
+        await approveService(serviceId, adminUserProfileId);
+
+        // Log the admin activity
+        logAdminActivity(
+          'approval',
+          'Approved Service',
+          service?.name || `Service #${serviceId}`
+        );
+
         alert('Service approved successfully!');
         fetchServices();
         fetchStatistics();
@@ -126,7 +136,15 @@ const ServiceModeration = ({ onNavigate }) => {
     }
 
     try {
-      await suspendService(serviceToSuspend.id, suspendReason);
+      await suspendService(serviceToSuspend.id, suspendReason, adminUserProfileId);
+
+      // Log the admin activity
+      logAdminActivity(
+        'suspension',
+        'Suspended Service',
+        serviceToSuspend?.name || `Service #${serviceToSuspend.id}`
+      );
+
       alert('Service suspended successfully!');
       setShowSuspendModal(false);
       setServiceToSuspend(null);
@@ -146,7 +164,16 @@ const ServiceModeration = ({ onNavigate }) => {
   const handleDelete = async (serviceId) => {
     if (window.confirm('Are you sure you want to DELETE this service? This action cannot be undone!')) {
       try {
+        const service = services.find(s => s.id === serviceId);
         await deleteService(serviceId);
+
+        // Log the admin activity
+        logAdminActivity(
+          'moderation',
+          'Deleted Service',
+          service?.name || `Service #${serviceId}`
+        );
+
         alert('Service deleted successfully!');
         fetchServices();
         fetchStatistics();

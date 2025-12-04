@@ -21,6 +21,7 @@ import {
   reactivateUser,
   warnUser
 } from '../../../services/api';
+import { logAdminActivity } from '../../../utils/adminActivityLogger';
 
 // Import design system components
 import AnalyticsCard from '../../../components/AnalyticsCard';
@@ -29,7 +30,7 @@ import StatusChip from '../../../components/StatusChip';
 import PageHeader from '../../../components/PageHeader';
 import AdminSidebar from './AdminSidebar';
 
-const UsersFlagged = ({ onNavigate }) => {
+const UsersFlagged = ({ onNavigate, adminUserProfileId }) => {
   const [flaggedData, setFlaggedData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -81,7 +82,15 @@ const UsersFlagged = ({ onNavigate }) => {
     if (reason) {
       if (window.confirm(`Are you sure you want to suspend ${userName}? This will deactivate all their products/services.`)) {
         try {
-          await suspendUser(userId, reason);
+          await suspendUser(userId, reason, adminUserProfileId);
+
+          // Log the admin activity
+          logAdminActivity(
+            'suspension',
+            'User Account Suspended',
+            userName
+          );
+
           alert('User suspended successfully!');
           handleCloseModal();
           fetchFlaggedUsers();
@@ -96,7 +105,15 @@ const UsersFlagged = ({ onNavigate }) => {
   const handleReactivateUser = async (userId, userName) => {
     if (window.confirm(`Are you sure you want to reactivate ${userName}?`)) {
       try {
-        await reactivateUser(userId);
+        await reactivateUser(userId, adminUserProfileId);
+
+        // Log the admin activity
+        logAdminActivity(
+          'approval',
+          'User Account Reactivated',
+          userName
+        );
+
         alert('User reactivated successfully!');
         fetchFlaggedUsers();
       } catch (err) {
@@ -110,7 +127,15 @@ const UsersFlagged = ({ onNavigate }) => {
     const message = prompt(`Enter warning message for ${userName}:`);
     if (message) {
       try {
-        await warnUser(userId, message);
+        await warnUser(userId, message, adminUserProfileId);
+
+        // Log the admin activity
+        logAdminActivity(
+          'moderation',
+          'Warning Message Sent',
+          `to ${userName}`
+        );
+
         alert('Warning sent to user!');
       } catch (err) {
         console.error('Error warning user:', err);

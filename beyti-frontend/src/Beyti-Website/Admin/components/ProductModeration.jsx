@@ -31,7 +31,7 @@ import { Table, TableHeader, TableBody, TableRow } from '../../../components/Tab
 import PageHeader from '../../../components/PageHeader';
 import AdminSidebar from './AdminSidebar';
 
-const ProductModeration = ({ onNavigate }) => {
+const ProductModeration = ({ onNavigate, adminUserProfileId }) => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -100,7 +100,7 @@ const ProductModeration = ({ onNavigate }) => {
     if (window.confirm('Are you sure you want to approve this product?')) {
       try {
         const product = products.find(p => p.id === productId);
-        await approveProduct(productId);
+        await approveProduct(productId, adminUserProfileId);
 
         // Log the admin activity
         logAdminActivity(
@@ -137,7 +137,7 @@ const ProductModeration = ({ onNavigate }) => {
     }
 
     try {
-      await suspendProduct(productToSuspend.id, suspendReason);
+      await suspendProduct(productToSuspend.id, suspendReason, adminUserProfileId);
 
       // Log the admin activity
       logAdminActivity(

@@ -37,6 +37,7 @@ import CategoryModeration from './components/CategoryModeration';
 import ProductModeration from './components/ProductModeration';
 import ServiceModeration from './components/ServiceModeration';
 import NotificationsPage from '../ServiceProvider/components/NotificationsPage';
+import AuditLogs from './components/AuditLogs';
 import AdminSidebar from './components/AdminSidebar';
 
 const AdminView = () => {
@@ -236,6 +237,7 @@ const AdminView = () => {
       '/admin/service-moderation': 'service-moderation',
       '/admin/category-moderation': 'category-moderation',
       '/admin/notifications': 'notifications',
+      '/admin/audit-logs': 'audit-logs',
     };
 
     const view = viewMap[path] || 'dashboard';
@@ -244,23 +246,23 @@ const AdminView = () => {
 
   // Render different views based on currentView
   if (currentView === 'users') {
-    return <UserManagement onNavigate={handleNavigate} />;
+    return <UserManagement onNavigate={handleNavigate} adminUserProfileId={userProfileId} />;
   }
 
   if (currentView === 'approvals') {
-    return <RequestApprovals onNavigate={handleNavigate} />;
+    return <RequestApprovals onNavigate={handleNavigate} adminUserProfileId={userProfileId} />;
   }
 
   if (currentView === 'flagged-users') {
-    return <UsersFlagged onNavigate={handleNavigate} />;
+    return <UsersFlagged onNavigate={handleNavigate} adminUserProfileId={userProfileId} />;
   }
 
   if (currentView === 'product-moderation') {
-    return <ProductModeration onNavigate={handleNavigate} />;
+    return <ProductModeration onNavigate={handleNavigate} adminUserProfileId={userProfileId} />;
   }
 
   if (currentView === 'service-moderation') {
-    return <ServiceModeration onNavigate={handleNavigate} />;
+    return <ServiceModeration onNavigate={handleNavigate} adminUserProfileId={userProfileId} />;
   }
 
   if (currentView === 'category-moderation') {
@@ -291,6 +293,10 @@ const AdminView = () => {
         </div>
       </div>
     );
+  }
+
+  if (currentView === 'audit-logs') {
+    return <AuditLogs onNavigate={handleNavigate} />;
   }
 
   return (
@@ -531,9 +537,9 @@ const AdminView = () => {
                         ]}
                         actions={
                           <>
-                            <CRUDButton 
+                            <CRUDButton
                               variant="success"
-                              onClick={() => handleNavigate(`/admin/approvals/${request.id}`)}
+                              onClick={() => handleNavigate('/admin/approvals')}
                             >
                               Review
                             </CRUDButton>
