@@ -4,6 +4,12 @@ import * as Icon from "@phosphor-icons/react";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from 'leaflet'
+
+import { useNavigate, useLocation } from "react-router-dom";
+
+import DriverOrdersPage from "./Components/DriverOrders";
+import DriverAnalytics from "./Components/DriverAnalytics";
+
 // Ensure Leaflet CSS is loaded
 if (typeof window !== 'undefined') {
   import('leaflet/dist/leaflet.css');
@@ -224,8 +230,11 @@ const CRUDButton = ({ variant, onClick, children, disabled }) => {
 // Main Driver Dashboard
 // ---------------------------------------------------------------------
 const DriverDashboard = () => {
-  // sidebar "page" level tabs
-  const [activeTab, setActiveTab] = useState("dashboard");
+
+  const navigate = useNavigate();
+  const location = useLocation();
+
+
 
   // inline tabs inside main dashboard
   const [dashTab, setDashTab] = useState("requests");
@@ -360,6 +369,7 @@ if (!tickets || tickets.length === 0) {
         weeklyDeliveries: 0,
         weeklyEarnings: 0,
         avgDeliveryValue: 0,
+        topRestaurants: [],
       },
       availableJobs: [],
       currentJobs: [],
@@ -430,6 +440,24 @@ if (!tickets || tickets.length === 0) {
   const weeklyEarnings = last7DaysJobs.reduce((sum, job) => sum + (job.order?.deliveryFee || 0), 0);
   const avgDeliveryValue = weeklyDeliveries > 0 ? weeklyEarnings / weeklyDeliveries : 0;
 
+  // Calculate top 3 restaurants
+  const restaurantCount = {};
+  historyJobs.forEach(job => {
+    const name = job.order?.sellerName;
+    if (!name) return;
+    restaurantCount[name] = (restaurantCount[name] || 0) + 1;
+  });
+
+  const topRestaurants = Object.entries(restaurantCount)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([name, count], index) => ({
+      rank: index + 1,
+      name,
+      count,
+    }));
+
+
 return {
     metrics: {
       available: availableJobs.length,
@@ -443,6 +471,7 @@ return {
       weeklyDeliveries,
       weeklyEarnings,
       avgDeliveryValue,
+      topRestaurants,
     },
     availableJobs,
     currentJobs,
@@ -1391,56 +1420,44 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
           </div>
 
           <NavigationButton
-            selected={activeTab === "dashboard"}
-            onClick={() => setActiveTab("dashboard")}
-            icon={
-              <Icon.House
-                size={20}
-                weight={activeTab === "dashboard" ? "fill" : "regular"}
-              />
-            }
-          >
-            Dashboard
-          </NavigationButton>
+          selected={location.pathname === "/driver-dashboard" || location.pathname === "/driver-dashboard/" || location.pathname === "/driver-dashboard/dashboard"}
+          onClick={() => navigate("/driver-dashboard/dashboard")}
+          icon={
+            <Icon.House
+              size={20}
+              weight={(location.pathname === "/driver-dashboard" || location.pathname === "/driver-dashboard/" || location.pathname === "/driver-dashboard/dashboard") ? "fill" : "regular"}
+            />
+          }
+        >
+          Dashboard
+        </NavigationButton>
 
           <NavigationButton
-            selected={activeTab === "available"}
-            onClick={() => setActiveTab("available")}
-            icon={
-              <Icon.Package
-                size={20}
-                weight={activeTab === "available" ? "fill" : "regular"}
-              />
-            }
-          >
-            Available Jobs
-          </NavigationButton>
+          selected={location.pathname.includes("/driver-dashboard/orders")}
+          onClick={() => navigate("/driver-dashboard/orders")}
+          icon={
+            <Icon.Package
+              size={20}
+              weight={location.pathname.includes("/driver-dashboard/orders") ? "fill" : "regular"}
+            />
+          }
+        >
+          Orders
+        </NavigationButton>
 
           <NavigationButton
-            selected={activeTab === "current"}
-            onClick={() => setActiveTab("current")}
-            icon={
-              <Icon.Truck
-                size={20}
-                weight={activeTab === "current" ? "fill" : "regular"}
-              />
-            }
-          >
-            Current Deliveries
-          </NavigationButton>
+          selected={location.pathname.includes("/driver-dashboard/analytics")}
+          onClick={() => navigate("/driver-dashboard/analytics")}
+          icon={
+            <Icon.ChartBar
+              size={20}
+              weight={location.pathname.includes("/driver-dashboard/analytics") ? "fill" : "regular"}
+            />
+          }
+        >
+          Analytics
+        </NavigationButton>
 
-          <NavigationButton
-            selected={activeTab === "history"}
-            onClick={() => setActiveTab("history")}
-            icon={
-              <Icon.ClockCounterClockwise
-                size={20}
-                weight={activeTab === "history" ? "fill" : "regular"}
-              />
-            }
-          >
-            History
-          </NavigationButton>
         </div>
 
         <SidebarProfile userName={driverName} userRole="Driver" />
@@ -1511,7 +1528,7 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
 
             {driverId && !loading && !error && (
               <>
-                {activeTab === "dashboard" && (
+                {(location.pathname === "/driver-dashboard" || location.pathname === "/driver-dashboard/" || location.pathname === "/driver-dashboard/dashboard") && (
                   <>
                     {/* OVERVIEW CARDS */}
                         <section className="space-y-4">
@@ -1609,12 +1626,50 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
                                         </p>
                                     </div>
                                     </div>
-                                    <CRUDButton
-                                    variant="outline"
-                                    onClick={() => openJobModal(metrics.activeDelivery)}
-                                    >
-                                    Manage Delivery →
-                                    </CRUDButton>
+                                    
+                                    {/* Quick Action Buttons */}
+                                    <div className="flex gap-2 mb-3">
+                                      {metrics.activeDelivery.status === "Accepted" && (
+                                        <button
+                                          onClick={async () => {
+                                            try {
+                                              await updateDeliveryStatus(metrics.activeDelivery.id, "Picked Up");
+                                              const updated = { ...metrics.activeDelivery, status: "Picked Up" };
+                                              handleJobUpdated(updated);
+                                            } catch (err) {
+                                              alert(err.message || "Failed to update status");
+                                            }
+                                          }}
+                                          className="flex-1 bg-success-btn hover:bg-success-text text-white py-2.5 rounded-lg font-semibold text-sm"
+                                        >
+                                          ✓ Mark Picked Up
+                                        </button>
+                                      )}
+                                      
+                                      {metrics.activeDelivery.status === "Picked Up" && (
+                                        <button
+                                          onClick={async () => {
+                                            try {
+                                              await updateDeliveryStatus(metrics.activeDelivery.id, "Delivered");
+                                              const updated = { ...metrics.activeDelivery, status: "Delivered" };
+                                              handleJobUpdated(updated);
+                                            } catch (err) {
+                                              alert(err.message || "Failed to update status");
+                                            }
+                                          }}
+                                          className="flex-1 bg-success-btn hover:bg-success-text text-white py-2.5 rounded-lg font-semibold text-sm"
+                                        >
+                                          ✓ Mark Delivered
+                                        </button>
+                                      )}
+                                      
+                                      <button
+                                        onClick={() => openJobModal(metrics.activeDelivery)}
+                                        className="flex-1 bg-grey-300 hover:bg-grey-400 text-charcoal-700 py-2.5 rounded-lg font-semibold text-sm"
+                                      >
+                                        View Details
+                                      </button>
+                                    </div>
                                 </div>
                                 </div>
                             </div>
@@ -1643,7 +1698,7 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
                                     type="button"
                                     className="text-sm font-medium text-sage-600 hover:text-sage-700 underline cursor-pointer"
                                     onClick={() => {
-                                        setActiveTab("current");
+                                        navigate("/driver-dashboard/orders");
                                         window.scrollTo({ top: 0, behavior: "smooth" });
                                     }}
                                     >
@@ -1784,9 +1839,9 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
                                     type="button"
                                     className="text-sm font-medium text-sage-600 hover:text-sage-700 underline cursor-pointer"
                                     onClick={() => {
-                                        setActiveTab("current");
-                                        window.scrollTo({ top: 0, behavior: "smooth" });
-                                    }}
+                                    navigate("/driver-dashboard/orders");
+                                    window.scrollTo({ top: 0, behavior: "smooth" });
+                                }}
                                     >
                                     Go to full view
                                     </button>
@@ -1873,238 +1928,66 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
                   </>
                 )}
 
-                {/* ANALYTICS SECTION - Shows on Dashboard only */}
-                {activeTab === "dashboard" && driverId && (
-                  <section className="space-y-4 mt-8">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h2 className="text-card-h2 text-charcoal-600">Weekly Performance</h2>
-                        <p className="text-body-regular text-charcoal-400">Your last 7 days overview</p>
-                      </div>
-                    </div>
+                {location.pathname.includes("/driver-dashboard/orders") ? (
+                <DriverOrdersPage
+                  driverId={driverId}
+                  driverName={driverName}
+                  tickets={tickets}
+                  isOnline={isOnline}
+                  metrics={metrics}
+                  availableJobs={availableJobs}
+                  currentJobs={currentJobs}
+                  historyJobs={historyJobs}
+                  onAcceptJob={handleAcceptJob}
+                  onDeclineJob={handleDeclineJob}
+                  onOpenJobModal={openJobModal}
+                  onRefresh={fetchTickets}
+                />
+              ) : location.pathname.includes("/driver-dashboard/analytics") ? (
+                <DriverAnalytics
+                  driverId={driverId}
+                  driverName={driverName}
+                  metrics={metrics}
+                />  
+              ) : null}
 
-                    {/* Weekly Stats Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      {/* Weekly Deliveries */}
-                      <div className="bg-gradient-to-br from-sage-50 to-cream-50 rounded-lg shadow-soft-lift border-2 border-sage-300 p-6">
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="w-12 h-12 rounded-full bg-sage-500 flex items-center justify-center">
-                            <Icon.Package size={24} weight="fill" className="text-white" />
-                          </div>
-                          <span className="text-xs font-semibold text-sage-700 bg-sage-100 px-2 py-1 rounded-full">
-                            Last 7 Days
-                          </span>
-                        </div>
-                        <h3 className="text-3xl font-bold text-sage-700 mb-1">
-                          {metrics.weeklyDeliveries}
-                        </h3>
-                        <p className="text-sm text-charcoal-500 mb-3">Deliveries Completed</p>
-                        <div className="pt-3 border-t border-sage-200">
-                          <p className="text-xs text-charcoal-400">
-                            {metrics.weeklyDeliveries > metrics.deliveriesToday 
-                              ? `${metrics.weeklyDeliveries - metrics.deliveriesToday} from previous days`
-                              : 'All completed today'}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Weekly Earnings */}
-                      <div className="bg-gradient-to-br from-success-bg to-cream-50 rounded-lg shadow-soft-lift border-2 border-success-btn/30 p-6">
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="w-12 h-12 rounded-full bg-success-btn flex items-center justify-center">
-                            <Icon.CurrencyDollar size={24} weight="fill" className="text-white" />
-                          </div>
-                          <span className="text-xs font-semibold text-success-text bg-success-bg px-2 py-1 rounded-full">
-                            Last 7 Days
-                          </span>
-                        </div>
-                        <h3 className="text-3xl font-bold text-success-text mb-1">
-                          BHD {metrics.weeklyEarnings.toFixed(3)}
-                        </h3>
-                        <p className="text-sm text-charcoal-500 mb-3">Total Earnings</p>
-                        <div className="pt-3 border-t border-success-btn/20">
-                          <p className="text-xs text-charcoal-400">
-                            BHD {metrics.earningsToday.toFixed(3)} earned today
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Average per Delivery */}
-                      <div className="bg-gradient-to-br from-grey-100 to-cream-50 rounded-lg shadow-soft-lift border-2 border-grey-stroke p-6">
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="w-12 h-12 rounded-full bg-charcoal-600 flex items-center justify-center">
-                            <Icon.ChartLine size={24} weight="fill" className="text-white" />
-                          </div>
-                          <span className="text-xs font-semibold text-charcoal-600 bg-grey-200 px-2 py-1 rounded-full">
-                            Average
-                          </span>
-                        </div>
-                        <h3 className="text-3xl font-bold text-charcoal-700 mb-1">
-                          BHD {metrics.avgDeliveryValue.toFixed(3)}
-                        </h3>
-                        <p className="text-sm text-charcoal-500 mb-3">Per Delivery (Weekly)</p>
-                        <div className="pt-3 border-t border-grey-stroke">
-                          <p className="text-xs text-charcoal-400">
-                            {metrics.completed > 0 
-                              ? `Lifetime avg: BHD ${(metrics.earnings / metrics.completed).toFixed(3)}`
-                              : 'No lifetime data yet'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Performance Breakdown */}
+                {/* Top Restaurants - Only on Dashboard */}
+                {(location.pathname === "/driver-dashboard" || location.pathname === "/driver-dashboard/") && (
+                  <section className="mt-6">
                     <div className="bg-grey-200 rounded-lg shadow-soft-lift border border-grey-stroke p-6">
-                      <h3 className="text-lg font-semibold text-charcoal-700 mb-4 flex items-center gap-2">
-                        <Icon.ChartBar size={20} className="text-sage-600" />
-                        Performance Breakdown
-                      </h3>
+                      <h3 className="text-card-h2 text-charcoal-600 mb-4">Top Restaurants</h3>
                       
-                      <div className="space-y-4">
-                        {/* Deliveries Progress Bar */}
-                        <div>
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="text-sm font-medium text-charcoal-600">Weekly vs Lifetime</span>
-                            <span className="text-sm font-semibold text-sage-700">
-                              {metrics.weeklyDeliveries} / {metrics.completed} deliveries
-                            </span>
-                          </div>
-                          <div className="w-full bg-grey-300 rounded-full h-3 overflow-hidden">
-                            <div 
-                              className="bg-sage-500 h-full rounded-full transition-all duration-500"
-                              style={{ 
-                                width: `${metrics.completed > 0 ? (metrics.weeklyDeliveries / metrics.completed) * 100 : 0}%` 
-                              }}
-                            ></div>
-                          </div>
-                          <p className="text-xs text-charcoal-400 mt-1">
-                            {metrics.completed > 0 
-                              ? `${((metrics.weeklyDeliveries / metrics.completed) * 100).toFixed(1)}% of lifetime deliveries`
-                              : 'Start delivering to see progress'}
-                          </p>
+                      {metrics.topRestaurants.length === 0 ? (
+                        <p className="text-body-regular text-charcoal-400">
+                          No delivery history yet.
+                        </p>
+                      ) : (
+                        <div className="space-y-3">
+                          {metrics.topRestaurants.map((restaurant) => (
+                            <div
+                              key={restaurant.rank}
+                              className="flex items-center justify-between p-4 bg-cream-50 rounded-lg border border-grey-stroke"
+                            >
+                              <div className="flex items-center gap-3">
+                                <span className="text-2xl font-bold text-sage-700">
+                                  #{restaurant.rank}
+                                </span>
+                                <span className="text-base font-semibold text-charcoal-700">
+                                  {restaurant.name}
+                                </span>
+                              </div>
+                              <span className="text-lg font-bold text-charcoal-600">
+                                {restaurant.count} {restaurant.count === 1 ? 'delivery' : 'deliveries'}
+                              </span>
+                            </div>
+                          ))}
                         </div>
-
-                        {/* Earnings Progress Bar */}
-                        <div>
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="text-sm font-medium text-charcoal-600">Weekly vs Lifetime Earnings</span>
-                            <span className="text-sm font-semibold text-success-text">
-                              BHD {metrics.weeklyEarnings.toFixed(3)} / BHD {metrics.earnings.toFixed(3)}
-                            </span>
-                          </div>
-                          <div className="w-full bg-grey-300 rounded-full h-3 overflow-hidden">
-                            <div 
-                              className="bg-success-btn h-full rounded-full transition-all duration-500"
-                              style={{ 
-                                width: `${metrics.earnings > 0 ? (metrics.weeklyEarnings / metrics.earnings) * 100 : 0}%` 
-                              }}
-                            ></div>
-                          </div>
-                          <p className="text-xs text-charcoal-400 mt-1">
-                            {metrics.earnings > 0 
-                              ? `${((metrics.weeklyEarnings / metrics.earnings) * 100).toFixed(1)}% of lifetime earnings`
-                              : 'Start earning to see progress'}
-                          </p>
-                        </div>
-
-                        {/* Acceptance Rate Bar */}
-                        <div>
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="text-sm font-medium text-charcoal-600">Acceptance Rate</span>
-                            <span className="text-sm font-semibold text-charcoal-700">
-                              {metrics.acceptanceRate}%
-                            </span>
-                          </div>
-                          <div className="w-full bg-grey-300 rounded-full h-3 overflow-hidden">
-                            <div 
-                              className={`h-full rounded-full transition-all duration-500 ${
-                                metrics.acceptanceRate >= 80 ? 'bg-success-btn' :
-                                metrics.acceptanceRate >= 50 ? 'bg-sage-500' : 'bg-error-btn'
-                              }`}
-                              style={{ width: `${metrics.acceptanceRate}%` }}
-                            ></div>
-                          </div>
-                          <p className="text-xs text-charcoal-400 mt-1">
-                            {metrics.acceptanceRate >= 80 ? '🎯 Excellent acceptance rate!' :
-                             metrics.acceptanceRate >= 50 ? '👍 Good acceptance rate' : 
-                             '⚠️ Consider accepting more deliveries'}
-                          </p>
-                        </div>
-                      </div>
+                      )}
                     </div>
                   </section>
                 )}
 
-                {/* FULL PAGE TABS USING SAME TABLE UI */}
-                {activeTab === "available" && (
-                  <section className="space-y-4">
-                    <h2 className="text-card-h2 text-charcoal-600">
-                      Available Delivery Jobs
-                    </h2>
-                    {!isOnline && (
-                    <div className="bg-error-bg border-l-4 border-error-btn p-4 rounded-lg">
-                        <p className="text-body-medium text-error-text font-semibold">
-                        ⚠️ You are currently offline. Go online to accept new delivery requests.
-                        </p>
-                    </div>
-                    )}
-                    {availableJobs.length === 0 ? (
-                      <div className="bg-grey-200 rounded-lg p-12 text-center shadow-soft-lift border border-grey-stroke">
-                        <Icon.Package
-                          size={64}
-                          className="text-charcoal-400 mx-auto mb-4"
-                        />
-                        <p className="text-body-medium text-charcoal-400">
-                          No available jobs right now. Check back soon.
-                        </p>
-                      </div>
-                    ) : (
-                      <JobTable jobs={availableJobs} />
-                    )}
-                  </section>
-                )}
-
-                {activeTab === "current" && (
-                  <section className="space-y-4">
-                    <h2 className="text-card-h2 text-charcoal-600">
-                      Current Deliveries
-                    </h2>
-                    {currentJobs.length === 0 ? (
-                      <div className="bg-grey-200 rounded-lg p-12 text-center shadow-soft-lift border border-grey-stroke">
-                        <Icon.Truck
-                          size={64}
-                          className="text-charcoal-400 mx-auto mb-4"
-                        />
-                        <p className="text-body-medium text-charcoal-400">
-                          No active deliveries.
-                        </p>
-                      </div>
-                    ) : (
-                      <JobTable jobs={currentJobs} />
-                    )}
-                  </section>
-                )}
-
-                {activeTab === "history" && (
-                  <section className="space-y-4">
-                    <h2 className="text-card-h2 text-charcoal-600">
-                      Delivery History
-                    </h2>
-                    {historyJobs.length === 0 ? (
-                      <div className="bg-grey-200 rounded-lg p-12 text-center shadow-soft-lift border border-grey-stroke">
-                        <Icon.ClockCounterClockwise
-                          size={64}
-                          className="text-charcoal-400 mx-auto mb-4"
-                        />
-                        <p className="text-body-medium text-charcoal-400">
-                          No completed deliveries yet.
-                        </p>
-                      </div>
-                    ) : (
-                      <JobTable jobs={historyJobs} />
-                    )}
-                  </section>
-                )}
+                
               </>
             )}
           </div>
