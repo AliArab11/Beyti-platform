@@ -13,6 +13,8 @@ import Analytics from "./Components/Analytics";
 import Products from "./Components/Products";
 import Reviews from "./Components/Reviews";
 
+import { Outlet, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 
 import * as Icon from "@phosphor-icons/react";
 
@@ -363,7 +365,10 @@ const OrderDetailsModal = ({ order, onClose, onOrderUpdated }) => {
 
 // ---------- Main Component ----------
 const SellerDashboard = () => {
-  const [activeTab, setActiveTab] = useState("dashboard");
+
+  const navigate = useNavigate();
+  const location = useLocation();
+  
   const [sellerId, setSellerId] = useState(null);
   const [sellerName, setSellerName] = useState("My Store");
 
@@ -626,70 +631,76 @@ useEffect(() => {
             </p>
           </div>
 
+          {/* Dashboard */}
           <NavigationButton
-            selected={activeTab === "dashboard"}
-            onClick={() => setActiveTab("dashboard")}
+            selected={location.pathname.includes("/seller-dashboard/dashboard")}
+            onClick={() => navigate("dashboard")}
             icon={
-                <Icon.House
+              <Icon.House
                 size={20}
-                weight={activeTab === "dashboard" ? "fill" : "regular"}
-                />
+                weight={location.pathname.includes("/seller-dashboard/dashboard") ? "fill" : "regular"}
+              />
             }
-            >
+          >
             Dashboard
-            </NavigationButton>
+          </NavigationButton>
 
-            <NavigationButton
-            selected={activeTab === "orders"}
-            onClick={() => setActiveTab("orders")}
+          {/* Orders */}
+          <NavigationButton
+            selected={location.pathname.includes("/seller-dashboard/orders")}
+            onClick={() => navigate("orders")}
             icon={
-                <Icon.Receipt
+              <Icon.Receipt
                 size={20}
-                weight={activeTab === "orders" ? "fill" : "regular"}
-                />
+                weight={location.pathname.includes("/seller-dashboard/orders") ? "fill" : "regular"}
+              />
             }
-            >
+          >
             Orders
-            </NavigationButton>
+          </NavigationButton>
 
-            <NavigationButton
-            selected={activeTab === "products"}
-            onClick={() => setActiveTab("products")}
+          {/* Products */}
+          <NavigationButton
+            selected={location.pathname.includes("/seller-dashboard/products")}
+            onClick={() => navigate("products")}
             icon={
-                <Icon.Package
+              <Icon.Package
                 size={20}
-                weight={activeTab === "products" ? "fill" : "regular"}
-                />
+                weight={location.pathname.includes("/seller-dashboard/products") ? "fill" : "regular"}
+              />
             }
-            >
+          >
             Products
-            </NavigationButton>
+          </NavigationButton>
 
-            <NavigationButton
-            selected={activeTab === "analytics"}
-            onClick={() => setActiveTab("analytics")}
+          {/* Analytics */}
+          <NavigationButton
+            selected={location.pathname.includes("/seller-dashboard/analytics")}
+            onClick={() => navigate("analytics")}
             icon={
-                <Icon.ChartBar
+              <Icon.ChartBar
                 size={20}
-                weight={activeTab === "analytics" ? "fill" : "regular"}
-                />
+                weight={location.pathname.includes("/seller-dashboard/analytics") ? "fill" : "regular"}
+              />
             }
-            >
+          >
             Analytics
-            </NavigationButton>
+          </NavigationButton>
 
-            <NavigationButton
-                selected={activeTab === "reviews"}
-                onClick={() => setActiveTab("reviews")}
-                icon={
-                    <Icon.Star
-                    size={20}
-                    weight={activeTab === "reviews" ? "fill" : "regular"}
-                    />
-                }
-                >
-                Reviews
-                </NavigationButton>
+          {/* Reviews */}
+          <NavigationButton
+            selected={location.pathname.includes("/seller-dashboard/reviews")}
+            onClick={() => navigate("reviews")}
+            icon={
+              <Icon.Star
+                size={20}
+                weight={location.pathname.includes("/seller-dashboard/reviews") ? "fill" : "regular"}
+              />
+            }
+          >
+            Reviews
+          </NavigationButton>
+
 
         </div>
 
@@ -735,10 +746,10 @@ useEffect(() => {
               </div>
             )}
 
-            {/* DASHBOARD CONTENT */}
+             {/* DASHBOARD CONTENT */}
             {sellerId && !loading && !error && (
               <>
-              {activeTab === "dashboard" ? (
+                {location.pathname === "/seller-dashboard" || location.pathname === "/seller-dashboard/dashboard" ? (
                 <>
                 {/* TOP METRIC CARDS */}
                 <section className="space-y-4">
@@ -810,9 +821,9 @@ useEffect(() => {
                             type="button"
                             className="text-sm font-medium text-sage-600 hover:text-sage-700 underline cursor-pointer"
                             onClick={() => {
-                            setActiveTab("orders");
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                            }}
+                              navigate("orders");
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
                             >
                             View all
                             </button>
@@ -908,8 +919,11 @@ useEffect(() => {
                       </div>
                       <button
                         type="button"
-                        className="text-sm font-medium text-sage-600 hover:text-sage-700 underline"
-                        onClick={() => console.log("Go to Products page")}
+                        className="text-sm font-medium text-sage-600 hover:text-sage-700 underline cursor-pointer"
+                        onClick={() => {
+                          navigate("products");
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
                       >
                         View all
                       </button>
@@ -974,10 +988,10 @@ useEffect(() => {
                       <button
                         type="button"
                         className="text-sm font-medium text-sage-600 hover:text-sage-700 underline cursor-pointer"
-                            onClick={() => {
-                            setActiveTab("analytics");
+                           onClick={() => {
+                            navigate("analytics");
                             window.scrollTo({ top: 0, behavior: 'smooth' });
-                            }}
+                        }}
                             
                             
                       >
@@ -1046,7 +1060,7 @@ useEffect(() => {
                   </div>
                 </section>
               </>
-                ) : activeTab === "orders" ? (
+                ) : location.pathname.includes("/seller-dashboard/orders") ? (
                     <Orders
                         sellerId={sellerId}
                         sellerName={sellerName}
@@ -1054,18 +1068,18 @@ useEffect(() => {
                         orders={orders}
                         onOrderUpdate={handleOrderUpdated}
                     />
-                    ) : activeTab === "products" ? (
+                    ) : location.pathname.includes("/seller-dashboard/products") ? (
                     <Products
                         sellerId={sellerId}
                         sellerName={sellerName}
                     />
-                    ) : activeTab === "analytics" ? (
+                    ) : location.pathname.includes("/seller-dashboard/analytics") ? (
                     <Analytics
                         sellerId={sellerId}
                         sellerName={sellerName}
                         orders={orders}
                     />
-                    ) : activeTab === "reviews" ? (
+                    ) : location.pathname.includes("/seller-dashboard/reviews") ? (
                     <Reviews sellerId={sellerId} sellerName={sellerName} />
                     ) : null}
             </>
