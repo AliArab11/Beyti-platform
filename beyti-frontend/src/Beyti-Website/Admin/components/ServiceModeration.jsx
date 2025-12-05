@@ -244,49 +244,21 @@ const ServiceModeration = ({ onNavigate, adminUserProfileId }) => {
   if (loading && services.length === 0) {
     return (
       <div className="flex min-h-screen bg-cream-50">
-        <AdminSidebar currentPage="service-moderation" onNavigate={onNavigate} />
-
-        <div className="flex-1 ml-[250px] flex flex-col">
-          <PageHeader
-            title="Service Moderation"
-            notificationCount={notificationCount}
-            userName={displayName}
-            userRole="Super Admin"
-            userProfile={userProfile}
-            entityId={null}
-            userId={adminUserProfileId}
-            onProfileUpdate={handleProfileUpdate}
-          />
+        
           <main className="flex-1 p-8 overflow-y-auto">
             <div className="flex items-center justify-center h-64">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sage-500"></div>
             </div>
           </main>
         </div>
-      </div>
+      
     );
   }
 
   return (
     <div className="flex min-h-screen bg-cream-50">
-      <AdminSidebar currentPage="service-moderation" onNavigate={onNavigate} />
-
-      {/* Main Content */}
-      <div className="flex-1 ml-[250px] flex flex-col">
-        {/* Header with Search */}
-        <PageHeader
-          title="Service Moderation"
-          withSearch
-          searchPlaceholder="Search services, categories..."
-          onSearch={(value) => setSearchTerm(value)}
-          notificationCount={notificationCount}
-          userName={displayName}
-          userRole="Super Admin"
-          userProfile={userProfile}
-          entityId={null}
-          userId={adminUserProfileId}
-          onProfileUpdate={handleProfileUpdate}
-        />
+      
+     
 
         {/* Main Content Area */}
         <main className="flex-1 p-8 overflow-y-auto">
@@ -446,7 +418,7 @@ const ServiceModeration = ({ onNavigate, adminUserProfileId }) => {
             </div>
           </div>
         </main>
-      </div>
+      
 
       {/* Service Details Modal */}
       {showDetailsModal && selectedService && (

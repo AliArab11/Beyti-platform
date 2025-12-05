@@ -244,83 +244,68 @@ const AdminView = () => {
     setCurrentView(view);
   };
 
-  // Render different views based on currentView
-  if (currentView === 'users') {
-    return <UserManagement onNavigate={handleNavigate} adminUserProfileId={userProfileId} />;
-  }
+  // Get page title based on current view
+  const getPageTitle = () => {
+    const titles = {
+      'dashboard': 'Admin Dashboard',
+      'users': 'User Management',
+      'approvals': 'Request Approvals',
+      'flagged-users': 'User Moderation',
+      'product-moderation': 'Product Moderation',
+      'service-moderation': 'Service Moderation',
+      'category-moderation': 'Category Moderation',
+      'notifications': 'Notifications',
+      'audit-logs': 'Audit Logs',
+    };
+    return titles[currentView] || 'Admin Dashboard';
+  };
 
-  if (currentView === 'approvals') {
-    return <RequestApprovals onNavigate={handleNavigate} adminUserProfileId={userProfileId} />;
-  }
+  // Get search placeholder based on current view
+  const getSearchPlaceholder = () => {
+    const placeholders = {
+      'users': 'Search by name or role...',
+      'approvals': 'Search by business name or provider...',
+      'product-moderation': 'Search products, sellers, categories...',
+      'service-moderation': 'Search services, categories...',
+      'category-moderation': 'Search categories or subcategories...',
+      'notifications': 'Search notifications by title, content, or type...',
+      'audit-logs': 'Search by event type, description, or table...',
+    };
+    return placeholders[currentView] || '';
+  };
 
-  if (currentView === 'flagged-users') {
-    return <UsersFlagged onNavigate={handleNavigate} adminUserProfileId={userProfileId} />;
-  }
+  // Check if current view should have search
+  const hasSearch = () => {
+    return ['users', 'approvals', 'product-moderation', 'service-moderation', 'category-moderation', 'notifications', 'audit-logs'].includes(currentView);
+  };
 
-  if (currentView === 'product-moderation') {
-    return <ProductModeration onNavigate={handleNavigate} adminUserProfileId={userProfileId} />;
-  }
+  // Render the content for each view (without sidebar and header)
+  const renderViewContent = () => {
+    switch (currentView) {
+      case 'users':
+        return <UserManagement onNavigate={handleNavigate} adminUserProfileId={userProfileId} renderContentOnly={true} />;
+      case 'approvals':
+        return <RequestApprovals onNavigate={handleNavigate} adminUserProfileId={userProfileId} renderContentOnly={true} />;
+      case 'flagged-users':
+        return <UsersFlagged onNavigate={handleNavigate} adminUserProfileId={userProfileId} renderContentOnly={true} />;
+      case 'product-moderation':
+        return <ProductModeration onNavigate={handleNavigate} adminUserProfileId={userProfileId} renderContentOnly={true} />;
+      case 'service-moderation':
+        return <ServiceModeration onNavigate={handleNavigate} adminUserProfileId={userProfileId} renderContentOnly={true} />;
+      case 'category-moderation':
+        return <CategoryModeration onNavigate={handleNavigate} adminUserProfileId={userProfileId} renderContentOnly={true} />;
+      case 'notifications':
+        return <NotificationsPage userId={userProfileId} />;
+      case 'audit-logs':
+        return <AuditLogs onNavigate={handleNavigate} adminUserProfileId={userProfileId} renderContentOnly={true} />;
+      default:
+        return renderDashboardContent();
+    }
+  };
 
-  if (currentView === 'service-moderation') {
-    return <ServiceModeration onNavigate={handleNavigate} adminUserProfileId={userProfileId} />;
-  }
-
-  if (currentView === 'category-moderation') {
-    return <CategoryModeration onNavigate={handleNavigate} />;
-  }
-
-  if (currentView === 'notifications') {
-    return (
-      <div className="flex min-h-screen bg-cream-50">
-        <AdminSidebar currentPage="notifications" onNavigate={handleNavigate} />
-        <div className="flex-1 ml-[250px] flex flex-col">
-          <PageHeader
-            title="Notifications"
-            withSearch={true}
-            searchPlaceholder="Search notifications by title, content, or type..."
-            userName={displayName}
-            userRole="Super Admin"
-            userProfile={userProfile}
-            entityId={null}
-            userId={userProfileId}
-            onProfileUpdate={handleProfileUpdate}
-          />
-          <main className="flex-1 p-8 overflow-y-auto">
-            <div className="max-w-7xl mx-auto">
-              <NotificationsPage userId={userProfileId} />
-            </div>
-          </main>
-        </div>
-      </div>
-    );
-  }
-
-  if (currentView === 'audit-logs') {
-    return <AuditLogs onNavigate={handleNavigate} />;
-  }
-
-  return (
-    <div className="flex min-h-screen bg-cream-50">
-      {/* Sidebar */}
-      <AdminSidebar currentPage="dashboard" onNavigate={handleNavigate} />
-
-      {/* Main Content */}
-      <div className="flex-1 ml-[250px] flex flex-col">
-        {/* Header */}
-        <PageHeader
-          title="Admin Dashboard"
-          notificationCount={notificationCount}
-          userName={displayName}
-          userRole="Super Admin"
-          userProfile={userProfile}
-          entityId={null} // Admins don't have entity IDs
-          userId={userProfileId}
-          onProfileUpdate={handleProfileUpdate}
-        />
-
-        {/* Main Content Area */}
-        <main className="flex-1 p-8 overflow-y-auto">
-          <div className="max-w-7xl mx-auto space-y-8">
+  // Render dashboard content
+  const renderDashboardContent = () => (
+    <>
             {/* Welcome Message */}
             <div className="mb-6">
               <h2 className="text-2xl font-semibold text-gray-800 dark:text-white">
@@ -635,6 +620,35 @@ const AdminView = () => {
                 )}
               </div>
             </div>
+    </>
+  );
+
+  // Main render - Always render sidebar and header, switch content based on view
+  return (
+    <div className="flex min-h-screen bg-cream-50">
+      {/* Sidebar - Always visible */}
+      <AdminSidebar currentPage={currentView} onNavigate={handleNavigate} />
+
+      {/* Main Content */}
+      <div className="flex-1 ml-[250px] flex flex-col">
+        {/* Header - Always visible, updates based on view */}
+        <PageHeader
+          title={getPageTitle()}
+          withSearch={hasSearch()}
+          searchPlaceholder={getSearchPlaceholder()}
+          notificationCount={notificationCount}
+          userName={displayName}
+          userRole="Super Admin"
+          userProfile={userProfile}
+          entityId={null}
+          userId={userProfileId}
+          onProfileUpdate={handleProfileUpdate}
+        />
+
+        {/* Main Content Area - switches based on view */}
+        <main className="flex-1 p-8 overflow-y-auto">
+          <div className="max-w-7xl mx-auto space-y-8">
+            {renderViewContent()}
           </div>
         </main>
       </div>
