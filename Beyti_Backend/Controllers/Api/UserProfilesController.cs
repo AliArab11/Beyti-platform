@@ -90,11 +90,11 @@ namespace Beyti_Backend.Controllers.Api
                             response.Add("ServiceProviderId", provider.Id);
                             response.Add("BusinessName", provider.BusinessName);
                             response.Add("Phone", provider.Phone);
-                            // Override UserProfile.Status with ServiceProvider.Status for service providers
-                            // ServiceProvider.Status is user-controlled (Available/Busy/Unavailable)
-                            // UserProfile.Status is admin-controlled (Active/Inactive)
-                            response["Status"] = provider.Status;
-                            Console.WriteLine($"[GetCompleteProfile] Returning Status: '{response["Status"]}'");
+                            // Keep UserProfile.Status as AccountStatus for suspension checking
+                            // ServiceProvider.Status is for availability (Available/Busy/Unavailable)
+                            response.Add("AccountStatus", userProfile.Status); // Admin-controlled (Active/Suspended)
+                            response["Status"] = provider.Status; // User-controlled availability
+                            Console.WriteLine($"[GetCompleteProfile] Returning Status: '{response["Status"]}', AccountStatus: '{response["AccountStatus"]}'");
 
                             var primaryAddress = provider.ServiceProviderAddresses
                                 .Select(spa => spa.Address)

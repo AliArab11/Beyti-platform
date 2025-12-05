@@ -1,12 +1,17 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using BeytiDB.Data;
 using System.Text.Json;
+using Beyti_Backend.Authorization;
 
 namespace Beyti_Backend.Controllers.Api
 {
     [Route("api/[controller]")]
     [ApiController]
+    // TODO: Uncomment these when proper authentication is implemented
+    // [Authorize] // Require authentication
+    // [NotSuspended] // Require account not suspended
     public class ServiceProviderDashboardController : ControllerBase
     {
         private readonly BeytiContext _context;

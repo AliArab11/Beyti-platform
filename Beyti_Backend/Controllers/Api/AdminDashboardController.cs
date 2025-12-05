@@ -677,9 +677,21 @@ namespace Beyti_Backend.Controllers.Api
                 // Flag service providers with issues (NOT suspended)
                 var flaggedServiceProviders = await _context.ServiceProviders
                     .Include(sp => sp.UserProfile)
+                    .Include(sp => sp.ProviderApplications)
+                        .ThenInclude(pa => pa.ProviderApplicationServices)
+                        .ThenInclude(pas => pas.ServiceCatalog)
                     .Where(sp =>
-                        sp.UserProfile.Status == "Active" && // Only active accounts
-                        sp.Status == "Unavailable" // Provider marked as unavailable
+                        sp.UserProfile.Status == "Active" && ( // Only active accounts
+                            sp.Status == "Unavailable" || // Provider marked as unavailable
+                            sp.ProviderApplications.Any(pa =>
+                                pa.ProviderApplicationServices.Any(pas =>
+                                    prohibitedKeywords.Any(keyword =>
+                                        pas.ServiceCatalog.Name.ToLower().Contains(keyword) ||
+                                        (pas.ServiceCatalog.Description != null && pas.ServiceCatalog.Description.ToLower().Contains(keyword))
+                                    )
+                                )
+                            ) // Has services with prohibited keywords
+                        )
                     )
                     .Select(sp => new
                     {
@@ -691,10 +703,28 @@ namespace Beyti_Backend.Controllers.Api
                         phone = sp.Phone,
                         availabilityStatus = sp.Status,
                         userStatus = sp.UserProfile.Status,
+                        totalServices = sp.ProviderApplications
+                            .SelectMany(pa => pa.ProviderApplicationServices)
+                            .Count(),
+                        inappropriateServices = sp.ProviderApplications
+                            .SelectMany(pa => pa.ProviderApplicationServices)
+                            .Count(pas =>
+                                prohibitedKeywords.Any(keyword =>
+                                    pas.ServiceCatalog.Name.ToLower().Contains(keyword) ||
+                                    (pas.ServiceCatalog.Description != null && pas.ServiceCatalog.Description.ToLower().Contains(keyword))
+                                )
+                            ),
                         createdAt = sp.CreatedAt,
                         updatedAt = sp.UpdatedAt,
                         verifiedAt = sp.VerifiedAt,
-                        flagReason = "Marked as Unavailable"
+                        flagReason = sp.ProviderApplications.Any(pa =>
+                            pa.ProviderApplicationServices.Any(pas =>
+                                prohibitedKeywords.Any(keyword =>
+                                    pas.ServiceCatalog.Name.ToLower().Contains(keyword) ||
+                                    (pas.ServiceCatalog.Description != null && pas.ServiceCatalog.Description.ToLower().Contains(keyword))
+                                )
+                            )
+                        ) ? "Inappropriate Content" : "Marked as Unavailable"
                     })
                     .ToListAsync();
 
@@ -792,6 +822,9 @@ namespace Beyti_Backend.Controllers.Api
 
                 // Check if user is a service provider
                 var serviceProvider = await _context.ServiceProviders
+                    .Include(sp => sp.ProviderApplications)
+                        .ThenInclude(pa => pa.ProviderApplicationServices)
+                        .ThenInclude(pas => pas.ServiceCatalog)
                     .FirstOrDefaultAsync(sp => sp.UserProfileId == userId);
 
                 if (serviceProvider != null)
@@ -825,6 +858,37 @@ namespace Beyti_Backend.Controllers.Api
                             flaggedKeywords = new List<string>()
                         });
                     }
+
+                    // Get services with inappropriate content
+                    var inappropriateServices = serviceProvider.ProviderApplications
+                        .SelectMany(pa => pa.ProviderApplicationServices)
+                        .Where(pas =>
+                            prohibitedKeywords.Any(keyword =>
+                                pas.ServiceCatalog.Name.ToLower().Contains(keyword) ||
+                                (pas.ServiceCatalog.Description != null && pas.ServiceCatalog.Description.ToLower().Contains(keyword))
+                            )
+                        )
+                        .Select(pas => new
+                        {
+                            id = pas.ServiceCatalog.Id,
+                            name = pas.ServiceCatalog.Name,
+                            description = pas.ServiceCatalog.Description,
+                            minPrice = pas.ServiceCatalog.MinPrice,
+                            maxPrice = pas.ServiceCatalog.MaxPrice,
+                            isActive = pas.ServiceCatalog.IsActive,
+                            createdAt = pas.ServiceCatalog.CreatedAt,
+                            updatedAt = DateTime.Now,
+                            violationType = pas.ServiceCatalog.IsActive ? "Inappropriate Content (Active)" : "Inappropriate Content (Inactive)",
+                            flaggedKeywords = prohibitedKeywords
+                                .Where(keyword =>
+                                    pas.ServiceCatalog.Name.ToLower().Contains(keyword) ||
+                                    (pas.ServiceCatalog.Description != null && pas.ServiceCatalog.Description.ToLower().Contains(keyword))
+                                )
+                                .ToList()
+                        })
+                        .ToList();
+
+                    violations.AddRange(inappropriateServices);
                 }
 
                 return Ok(new

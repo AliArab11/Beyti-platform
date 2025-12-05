@@ -19,7 +19,9 @@ import {
   getUsers,
   createUser,
   updateUser,
-  toggleUserStatus
+  toggleUserStatus,
+  getUserProfile,
+  updateUserProfile
 } from '../../../services/api';
 import { logAdminActivity } from '../../../utils/adminActivityLogger';
 
@@ -44,6 +46,10 @@ const UserManagement = ({ onNavigate, adminUserProfileId }) => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [notificationCount] = useState(0);
+
+  // User profile state
+  const [userProfile, setUserProfile] = useState(null);
+  const [displayName, setDisplayName] = useState("Admin User");
 
   // Statistics state
   const [stats, setStats] = useState({
@@ -93,8 +99,44 @@ const UserManagement = ({ onNavigate, adminUserProfileId }) => {
     }
   };
 
+  // Fetch user profile details
+  const fetchUserProfile = async () => {
+    try {
+      const profile = await getUserProfile(adminUserProfileId);
+      if (profile) {
+        const normalizedProfile = {
+          userProfileId: profile.UserProfileId,
+          displayName: profile.DisplayName,
+          roleType: profile.RoleType,
+          status: profile.Status,
+          phone: profile.Phone,
+          createdAt: profile.CreatedAt,
+          updatedAt: profile.UpdatedAt,
+        };
+        setUserProfile(normalizedProfile);
+        if (normalizedProfile.displayName) {
+          setDisplayName(normalizedProfile.displayName);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+  };
+
+  // Handle profile update
+  const handleProfileUpdate = async (updates) => {
+    try {
+      await updateUserProfile(adminUserProfileId, 'Admin', updates);
+      await fetchUserProfile();
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      throw error;
+    }
+  };
+
   useEffect(() => {
     fetchUsersList();
+    fetchUserProfile();
   }, []);
 
   const handleSubmit = async (e) => {
@@ -221,8 +263,12 @@ const UserManagement = ({ onNavigate, adminUserProfileId }) => {
           <PageHeader
             title="User Management"
             notificationCount={notificationCount}
-            userName="Admin User"
+            userName={displayName}
             userRole="Super Admin"
+            userProfile={userProfile}
+            entityId={null}
+            userId={adminUserProfileId}
+            onProfileUpdate={handleProfileUpdate}
           />
           <main className="flex-1 p-8 overflow-y-auto">
             <div className="flex items-center justify-center h-64">
@@ -247,8 +293,12 @@ const UserManagement = ({ onNavigate, adminUserProfileId }) => {
           searchPlaceholder="Search by name or role..."
           onSearch={(value) => setSearchTerm(value)}
           notificationCount={notificationCount}
-          userName="Admin User"
+          userName={displayName}
           userRole="Super Admin"
+          userProfile={userProfile}
+          entityId={null}
+          userId={adminUserProfileId}
+          onProfileUpdate={handleProfileUpdate}
         />
 
         {/* Main Content Area */}

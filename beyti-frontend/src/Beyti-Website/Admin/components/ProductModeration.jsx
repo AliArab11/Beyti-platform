@@ -19,7 +19,9 @@ import {
   getProductDetails,
   approveProduct,
   suspendProduct,
-  deleteProducts
+  deleteProducts,
+  getUserProfile,
+  updateUserProfile
 } from '../../../services/api';
 import { logAdminActivity } from '../../../utils/adminActivityLogger';
 
@@ -37,6 +39,10 @@ const ProductModeration = ({ onNavigate, adminUserProfileId }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all'); // all, active, inactive
   const [notificationCount] = useState(0);
+
+  // User profile state
+  const [userProfile, setUserProfile] = useState(null);
+  const [displayName, setDisplayName] = useState("Admin User");
 
   // Details modal state
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -77,9 +83,45 @@ const ProductModeration = ({ onNavigate, adminUserProfileId }) => {
     }
   };
 
+  // Fetch user profile details
+  const fetchUserProfile = async () => {
+    try {
+      const profile = await getUserProfile(adminUserProfileId);
+      if (profile) {
+        const normalizedProfile = {
+          userProfileId: profile.UserProfileId,
+          displayName: profile.DisplayName,
+          roleType: profile.RoleType,
+          status: profile.Status,
+          phone: profile.Phone,
+          createdAt: profile.CreatedAt,
+          updatedAt: profile.UpdatedAt,
+        };
+        setUserProfile(normalizedProfile);
+        if (normalizedProfile.displayName) {
+          setDisplayName(normalizedProfile.displayName);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+  };
+
+  // Handle profile update
+  const handleProfileUpdate = async (updates) => {
+    try {
+      await updateUserProfile(adminUserProfileId, 'Admin', updates);
+      await fetchUserProfile();
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      throw error;
+    }
+  };
+
   useEffect(() => {
     fetchStatistics();
     fetchProducts();
+    fetchUserProfile();
   }, [filterStatus]);
 
 
@@ -211,8 +253,12 @@ const ProductModeration = ({ onNavigate, adminUserProfileId }) => {
           <PageHeader
             title="Product Moderation"
             notificationCount={notificationCount}
-            userName="Admin User"
+            userName={displayName}
             userRole="Super Admin"
+            userProfile={userProfile}
+            entityId={null}
+            userId={adminUserProfileId}
+            onProfileUpdate={handleProfileUpdate}
           />
           <main className="flex-1 p-8 overflow-y-auto">
             <div className="flex items-center justify-center h-64">
@@ -237,8 +283,12 @@ const ProductModeration = ({ onNavigate, adminUserProfileId }) => {
           searchPlaceholder="Search products, sellers, categories..."
           onSearch={(value) => setSearchTerm(value)}
           notificationCount={notificationCount}
-          userName="Admin User"
+          userName={displayName}
           userRole="Super Admin"
+          userProfile={userProfile}
+          entityId={null}
+          userId={adminUserProfileId}
+          onProfileUpdate={handleProfileUpdate}
         />
 
         {/* Main Content Area */}

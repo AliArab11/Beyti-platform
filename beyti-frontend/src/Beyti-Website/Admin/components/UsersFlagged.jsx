@@ -19,7 +19,9 @@ import {
   getUserViolations,
   suspendUser,
   reactivateUser,
-  warnUser
+  warnUser,
+  getUserProfile,
+  updateUserProfile
 } from '../../../services/api';
 import { logAdminActivity } from '../../../utils/adminActivityLogger';
 
@@ -40,6 +42,10 @@ const UsersFlagged = ({ onNavigate, adminUserProfileId }) => {
   const [activeSection, setActiveSection] = useState('flagged'); // flagged, suspended
   const [notificationCount] = useState(0); // Placeholder
 
+  // User profile state
+  const [userProfile, setUserProfile] = useState(null);
+  const [displayName, setDisplayName] = useState("Admin User");
+
   const fetchFlaggedUsers = async () => {
     try {
       setLoading(true);
@@ -52,8 +58,44 @@ const UsersFlagged = ({ onNavigate, adminUserProfileId }) => {
     }
   };
 
+  // Fetch user profile details
+  const fetchUserProfile = async () => {
+    try {
+      const profile = await getUserProfile(adminUserProfileId);
+      if (profile) {
+        const normalizedProfile = {
+          userProfileId: profile.UserProfileId,
+          displayName: profile.DisplayName,
+          roleType: profile.RoleType,
+          status: profile.Status,
+          phone: profile.Phone,
+          createdAt: profile.CreatedAt,
+          updatedAt: profile.UpdatedAt,
+        };
+        setUserProfile(normalizedProfile);
+        if (normalizedProfile.displayName) {
+          setDisplayName(normalizedProfile.displayName);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+  };
+
+  // Handle profile update
+  const handleProfileUpdate = async (updates) => {
+    try {
+      await updateUserProfile(adminUserProfileId, 'Admin', updates);
+      await fetchUserProfile();
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      throw error;
+    }
+  };
+
   useEffect(() => {
     fetchFlaggedUsers();
+    fetchUserProfile();
   }, []);
 
   const handleViewDetails = async (user) => {
@@ -154,8 +196,12 @@ const UsersFlagged = ({ onNavigate, adminUserProfileId }) => {
           <PageHeader
             title="User Moderation"
             notificationCount={notificationCount}
-            userName="Admin User"
+            userName={displayName}
             userRole="Super Admin"
+            userProfile={userProfile}
+            entityId={null}
+            userId={adminUserProfileId}
+            onProfileUpdate={handleProfileUpdate}
           />
           <main className="flex-1 p-8 overflow-y-auto">
             <div className="flex items-center justify-center h-64">
@@ -193,8 +239,12 @@ const UsersFlagged = ({ onNavigate, adminUserProfileId }) => {
         <PageHeader
           title="User Moderation"
           notificationCount={notificationCount}
-          userName="Admin User"
+          userName={displayName}
           userRole="Super Admin"
+          userProfile={userProfile}
+          entityId={null}
+          userId={adminUserProfileId}
+          onProfileUpdate={handleProfileUpdate}
         />
 
         {/* Main Content Area */}
@@ -331,21 +381,37 @@ const UsersFlagged = ({ onNavigate, adminUserProfileId }) => {
 
                             {/* Stats for Service Providers */}
                             {user.type === 'ServiceProvider' && (
-                              <div className="mb-4 p-4 bg-white rounded-lg">
-                                <div className="flex justify-between items-center">
-                                  <span className="text-body-regular text-charcoal-400">Availability:</span>
-                                  <StatusChip
-                                    variant={
-                                      user.availabilityStatus === 'Available'
-                                        ? 'success'
-                                        : user.availabilityStatus === 'Busy'
-                                        ? 'danger'
-                                        : 'error'
-                                    }
-                                  >
-                                    {user.availabilityStatus}
-                                  </StatusChip>
+                              <div className="mb-4 space-y-2">
+                                <div className="p-4 bg-white rounded-lg">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-body-regular text-charcoal-400">Availability:</span>
+                                    <StatusChip
+                                      variant={
+                                        user.availabilityStatus === 'Available'
+                                          ? 'success'
+                                          : user.availabilityStatus === 'Busy'
+                                          ? 'danger'
+                                          : 'error'
+                                      }
+                                    >
+                                      {user.availabilityStatus}
+                                    </StatusChip>
+                                  </div>
                                 </div>
+                                {user.totalServices > 0 && (
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div className="text-center p-3 bg-white rounded-lg">
+                                      <p className="text-metric-h3 text-charcoal-600">{user.totalServices}</p>
+                                      <p className="text-label-medium text-charcoal-400">Total Services</p>
+                                    </div>
+                                    {user.inappropriateServices > 0 && (
+                                      <div className="text-center p-3 bg-white rounded-lg">
+                                        <p className="text-metric-h3 text-danger-btn">{user.inappropriateServices}</p>
+                                        <p className="text-label-medium text-charcoal-400">Flagged</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             )}
 

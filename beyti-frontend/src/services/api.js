@@ -17,9 +17,17 @@ const fetchAPI = async (endpoint, options = {}) => {
   try {
     const url = `${BASE_URL}${endpoint}`;
 
+    // Get auth token from localStorage
+    const authToken = localStorage.getItem('authToken');
+
     const defaultHeaders = {
       'Content-Type': 'application/json',
     };
+
+    // Add Authorization header if token exists
+    if (authToken) {
+      defaultHeaders['Authorization'] = `Bearer ${authToken}`;
+    }
 
     const config = {
       ...options,
@@ -35,11 +43,12 @@ const fetchAPI = async (endpoint, options = {}) => {
     if (!response.ok) {
       // Try to parse error response
       let errorMessage;
+      let errorData = {};
       const contentType = response.headers.get('content-type');
 
       if (contentType && contentType.includes('application/json')) {
         // JSON error response
-        const errorData = await response.json().catch(() => ({}));
+        errorData = await response.json().catch(() => ({}));
         errorMessage = errorData.message || errorData.Message || errorData.title;
       } else {
         // Plain text error response (common for auth endpoints)
@@ -51,7 +60,14 @@ const fetchAPI = async (endpoint, options = {}) => {
         errorMessage = `Request failed with status ${response.status}`;
       }
 
-      throw new Error(errorMessage);
+      // Create error object with status and additional data
+      const error = new Error(errorMessage);
+      error.status = response.status;
+      error.statusCode = response.status;
+      error.isSuspended = errorData.isSuspended || false;
+      error.error = errorData.error || errorMessage;
+
+      throw error;
     }
 
     // Handle 204 No Content responses

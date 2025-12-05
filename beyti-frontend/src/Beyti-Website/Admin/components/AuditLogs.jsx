@@ -15,7 +15,11 @@ import {
   CheckCircle,
   XCircle
 } from '@phosphor-icons/react';
-import { getAuditLogs } from '../../../services/api';
+import {
+  getAuditLogs,
+  getUserProfile,
+  updateUserProfile
+} from '../../../services/api';
 
 // Import design system components
 import AnalyticsCard from '../../../components/AnalyticsCard';
@@ -24,13 +28,17 @@ import { Table, TableHeader, TableBody, TableRow } from '../../../components/Tab
 import PageHeader from '../../../components/PageHeader';
 import AdminSidebar from './AdminSidebar';
 
-const AuditLogs = ({ onNavigate }) => {
+const AuditLogs = ({ onNavigate, adminUserProfileId = 4037 }) => {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterEventType, setFilterEventType] = useState('All');
   const [filterSeverity, setFilterSeverity] = useState('All');
   const [notificationCount] = useState(0);
+
+  // User profile state
+  const [userProfile, setUserProfile] = useState(null);
+  const [displayName, setDisplayName] = useState("Admin User");
 
   // Statistics state
   const [stats, setStats] = useState({
@@ -73,8 +81,44 @@ const AuditLogs = ({ onNavigate }) => {
     }
   };
 
+  // Fetch user profile details
+  const fetchUserProfile = async () => {
+    try {
+      const profile = await getUserProfile(adminUserProfileId);
+      if (profile) {
+        const normalizedProfile = {
+          userProfileId: profile.UserProfileId,
+          displayName: profile.DisplayName,
+          roleType: profile.RoleType,
+          status: profile.Status,
+          phone: profile.Phone,
+          createdAt: profile.CreatedAt,
+          updatedAt: profile.UpdatedAt,
+        };
+        setUserProfile(normalizedProfile);
+        if (normalizedProfile.displayName) {
+          setDisplayName(normalizedProfile.displayName);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+  };
+
+  // Handle profile update
+  const handleProfileUpdate = async (updates) => {
+    try {
+      await updateUserProfile(adminUserProfileId, 'Admin', updates);
+      await fetchUserProfile();
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      throw error;
+    }
+  };
+
   useEffect(() => {
     fetchAuditLogs();
+    fetchUserProfile();
   }, []);
 
   // Filter logs based on search term, event type, and severity
@@ -166,8 +210,12 @@ const AuditLogs = ({ onNavigate }) => {
           <PageHeader
             title="Audit Logs"
             notificationCount={notificationCount}
-            userName="Admin User"
+            userName={displayName}
             userRole="Super Admin"
+            userProfile={userProfile}
+            entityId={null}
+            userId={adminUserProfileId}
+            onProfileUpdate={handleProfileUpdate}
           />
           <main className="flex-1 p-8 overflow-y-auto">
             <div className="flex items-center justify-center h-64">
@@ -192,8 +240,12 @@ const AuditLogs = ({ onNavigate }) => {
           searchPlaceholder="Search by event type, description, or table..."
           onSearch={(value) => setSearchTerm(value)}
           notificationCount={notificationCount}
-          userName="Admin User"
+          userName={displayName}
           userRole="Super Admin"
+          userProfile={userProfile}
+          entityId={null}
+          userId={adminUserProfileId}
+          onProfileUpdate={handleProfileUpdate}
         />
 
         {/* Main Content Area */}

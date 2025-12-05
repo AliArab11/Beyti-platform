@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ProviderOverview from './components/ProviderOverview';
 import ServicesManagement from './components/ServicesManagement';
 import ScheduleManagement from './components/ScheduleManagement';
@@ -10,8 +11,10 @@ import ServiceProviderSidebar from './components/ServiceProviderSidebar';
 import PageHeader from '../../components/PageHeader';
 import { getUserProfile, updateUserProfile, updateProviderStatus } from '../../services/api';
 import { logProviderActivity } from '../../utils/providerActivityLogger';
+import { isAuthenticated, getUserId, handleSuspensionError } from '../../utils/authUtils';
 
 export default function ServiceProviderDashboard() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   const [bookingFilter, setBookingFilter] = useState(null);
   const [displayName, setDisplayName] = useState("Service Provider");
@@ -23,9 +26,16 @@ export default function ServiceProviderDashboard() {
   const [serviceSearchQuery, setServiceSearchQuery] = useState('');
   const [activityRefreshKey, setActivityRefreshKey] = useState(0);
 
-  // Hardcoded login credentials - TODO: Replace with actual authentication/context
-  const userProfileId = 1031; // Logged-in service provider's UserProfile ID
-  const serviceProviderId = 6; // Logged-in service provider's ID in ServiceProvider table
+  // Check authentication on mount
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      navigate('/login');
+    }
+  }, [navigate]);
+
+  // Get user ID from localStorage (will be replaced with context in future)
+  const userProfileId = parseInt(getUserId()) || 1031;
+  const serviceProviderId = 6; // TODO: Get from API based on userProfileId
 
   // Fetch user profile details
   const fetchUserProfile = async () => {
@@ -39,6 +49,7 @@ export default function ServiceProviderDashboard() {
           displayName: profile.DisplayName,
           roleType: profile.RoleType,
           status: profile.Status, // This is ServiceProvider.Status from the API
+          accountStatus: profile.AccountStatus, // UserProfile.Status (Active/Suspended)
           phone: profile.Phone,
           businessName: profile.BusinessName,
           street: profile.Street,
@@ -52,6 +63,14 @@ export default function ServiceProviderDashboard() {
         };
 
         console.log('[fetchUserProfile] Normalized profile status:', normalizedProfile.status);
+        console.log('[fetchUserProfile] Account status:', normalizedProfile.accountStatus);
+
+        // Check if account is suspended
+        if (normalizedProfile.accountStatus === 'Suspended') {
+          navigate('/account-suspended');
+          return;
+        }
+
         setUserProfile(normalizedProfile);
         if (normalizedProfile.displayName) {
           setDisplayName(normalizedProfile.displayName);
@@ -65,6 +84,11 @@ export default function ServiceProviderDashboard() {
       }
     } catch (error) {
       console.error('Error fetching user profile:', error);
+      // Check if error is due to suspension
+      if (!handleSuspensionError(error, navigate)) {
+        // Handle other errors
+        console.error('Failed to load profile');
+      }
     }
   };
 

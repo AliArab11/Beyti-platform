@@ -14,7 +14,9 @@ import {
 import {
   getAllServiceProviderRequests,
   approveServiceProviderRequest,
-  rejectServiceProviderRequest
+  rejectServiceProviderRequest,
+  getUserProfile,
+  updateUserProfile
 } from '../../../services/api';
 import { logAdminActivity } from '../../../utils/adminActivityLogger';
 
@@ -36,6 +38,10 @@ const RequestApprovals = ({ onNavigate, adminUserProfileId }) => {
   const [notificationCount] = useState(0);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
+
+  // User profile state
+  const [userProfile, setUserProfile] = useState(null);
+  const [displayName, setDisplayName] = useState("Admin User");
 
   // Statistics state
   const [stats, setStats] = useState({
@@ -74,8 +80,44 @@ const RequestApprovals = ({ onNavigate, adminUserProfileId }) => {
     }
   };
 
+  // Fetch user profile details
+  const fetchUserProfile = async () => {
+    try {
+      const profile = await getUserProfile(adminUserProfileId);
+      if (profile) {
+        const normalizedProfile = {
+          userProfileId: profile.UserProfileId,
+          displayName: profile.DisplayName,
+          roleType: profile.RoleType,
+          status: profile.Status,
+          phone: profile.Phone,
+          createdAt: profile.CreatedAt,
+          updatedAt: profile.UpdatedAt,
+        };
+        setUserProfile(normalizedProfile);
+        if (normalizedProfile.displayName) {
+          setDisplayName(normalizedProfile.displayName);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+  };
+
+  // Handle profile update
+  const handleProfileUpdate = async (updates) => {
+    try {
+      await updateUserProfile(adminUserProfileId, 'Admin', updates);
+      await fetchUserProfile();
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      throw error;
+    }
+  };
+
   useEffect(() => {
     fetchRequests();
+    fetchUserProfile();
   }, []);
 
   const handleApprove = async (id) => {
@@ -177,8 +219,12 @@ const RequestApprovals = ({ onNavigate, adminUserProfileId }) => {
           <PageHeader
             title="Request Approvals"
             notificationCount={notificationCount}
-            userName="Admin User"
+            userName={displayName}
             userRole="Super Admin"
+            userProfile={userProfile}
+            entityId={null}
+            userId={adminUserProfileId}
+            onProfileUpdate={handleProfileUpdate}
           />
           <main className="flex-1 p-8 overflow-y-auto">
             <div className="flex items-center justify-center h-64">
@@ -203,8 +249,12 @@ const RequestApprovals = ({ onNavigate, adminUserProfileId }) => {
           searchPlaceholder="Search by business name or provider..."
           onSearch={setSearchTerm}
           notificationCount={notificationCount}
-          userName="Admin User"
+          userName={displayName}
           userRole="Super Admin"
+          userProfile={userProfile}
+          entityId={null}
+          userId={adminUserProfileId}
+          onProfileUpdate={handleProfileUpdate}
         />
 
         {/* Main Content Area */}
