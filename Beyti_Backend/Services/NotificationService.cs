@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.SignalR;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using BeytiDB.Data;
 using Beyti_SignalR;
 
@@ -29,6 +30,19 @@ namespace Beyti_Backend.Services
             string? relatedEntityType = null,
             int? relatedEntityId = null)
         {
+            // If senderUserId is provided (admin action), append admin name to body
+            string finalBody = body;
+            if (senderUserId.HasValue)
+            {
+                var senderProfile = await _context.UserProfiles.FindAsync(senderUserId.Value);
+                if (senderProfile != null && senderProfile.RoleType == "Admin")
+                {
+                    string adminName = senderProfile.DisplayName ?? "Administrator";
+                    // Append admin name after "administrator" in the message
+                    finalBody = body.Replace("by an administrator", $"by Administrator {adminName}");
+                }
+            }
+
             // Save to database
             var notification = new Notification
             {
@@ -36,7 +50,7 @@ namespace Beyti_Backend.Services
                 SenderUserId = senderUserId,
                 Type = type,
                 Title = title,
-                Body = body,
+                Body = finalBody,
                 RelatedEntityType = relatedEntityType,
                 RelatedEntityId = relatedEntityId,
                 IsRead = false,

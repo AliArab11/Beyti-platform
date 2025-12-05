@@ -20,8 +20,11 @@ import {
   createCategory,
   updateCategory,
   createSubCategory,
-  updateSubCategory
+  updateSubCategory,
+  getUserProfile,
+  updateUserProfile
 } from '../../../services/api';
+import { logAdminActivity } from '../../../utils/adminActivityLogger';
 
 // Import design system components
 import AnalyticsCard from '../../../components/AnalyticsCard';
@@ -31,12 +34,16 @@ import { Table, TableHeader, TableBody, TableRow } from '../../../components/Tab
 import PageHeader from '../../../components/PageHeader';
 import AdminSidebar from './AdminSidebar';
 
-const CategoryModeration = ({ onNavigate }) => {
+const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedCategories, setExpandedCategories] = useState(new Set());
   const [notificationCount] = useState(0);
+
+  // User profile state
+  const [userProfile, setUserProfile] = useState(null);
+  const [displayName, setDisplayName] = useState("Admin User");
 
   // Form states
   const [showCategoryForm, setShowCategoryForm] = useState(false);
@@ -79,8 +86,44 @@ const CategoryModeration = ({ onNavigate }) => {
     }
   };
 
+  // Fetch user profile details
+  const fetchUserProfile = async () => {
+    try {
+      const profile = await getUserProfile(adminUserProfileId);
+      if (profile) {
+        const normalizedProfile = {
+          userProfileId: profile.UserProfileId,
+          displayName: profile.DisplayName,
+          roleType: profile.RoleType,
+          status: profile.Status,
+          phone: profile.Phone,
+          createdAt: profile.CreatedAt,
+          updatedAt: profile.UpdatedAt,
+        };
+        setUserProfile(normalizedProfile);
+        if (normalizedProfile.displayName) {
+          setDisplayName(normalizedProfile.displayName);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+  };
+
+  // Handle profile update
+  const handleProfileUpdate = async (updates) => {
+    try {
+      await updateUserProfile(adminUserProfileId, 'Admin', updates);
+      await fetchUserProfile();
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      throw error;
+    }
+  };
+
   useEffect(() => {
     fetchCategories();
+    fetchUserProfile();
   }, []);
 
 
@@ -90,9 +133,25 @@ const CategoryModeration = ({ onNavigate }) => {
     try {
       if (editingCategory) {
         await updateCategory(editingCategory.id, categoryFormData);
+
+        // Log the admin activity
+        logAdminActivity(
+          'moderation',
+          'Updated Category',
+          categoryFormData.Name
+        );
+
         alert('Category updated successfully!');
       } else {
         await createCategory(categoryFormData);
+
+        // Log the admin activity
+        logAdminActivity(
+          'user_created',
+          'Created New Category',
+          categoryFormData.Name
+        );
+
         alert('Category created successfully!');
       }
       setCategoryFormData({ Name: '', IsActive: true });
@@ -114,7 +173,16 @@ const CategoryModeration = ({ onNavigate }) => {
   const handleToggleCategoryStatus = async (category) => {
     if (window.confirm(`Are you sure you want to ${category.isActive ? 'deactivate' : 'activate'} ${category.name}?`)) {
       try {
-        await updateCategory(category.id, { Name: category.name, IsActive: !category.isActive });
+        const newStatus = !category.isActive;
+        await updateCategory(category.id, { Name: category.name, IsActive: newStatus });
+
+        // Log the admin activity
+        logAdminActivity(
+          newStatus ? 'approval' : 'suspension',
+          `${newStatus ? 'Activated' : 'Deactivated'} Category`,
+          category.name
+        );
+
         fetchCategories();
       } catch (err) {
         console.error('Error toggling category status:', err);
@@ -139,9 +207,25 @@ const CategoryModeration = ({ onNavigate }) => {
           CategoryId: subCategoryFormData.CategoryId,
           IsActive: subCategoryFormData.IsActive
         });
+
+        // Log the admin activity
+        logAdminActivity(
+          'moderation',
+          'Updated SubCategory',
+          `${subCategoryFormData.Name} - ${selectedCategoryForSubCategory?.name || ''}`
+        );
+
         alert('SubCategory updated successfully!');
       } else {
         await createSubCategory(subCategoryFormData);
+
+        // Log the admin activity
+        logAdminActivity(
+          'user_created',
+          'Created New SubCategory',
+          `${subCategoryFormData.Name} - ${selectedCategoryForSubCategory?.name || ''}`
+        );
+
         alert('SubCategory created successfully!');
       }
       setSubCategoryFormData({ Name: '', CategoryId: null });
@@ -176,11 +260,20 @@ const CategoryModeration = ({ onNavigate }) => {
     const currentStatus = subCategory.isActive !== undefined ? subCategory.isActive : true;
     if (window.confirm(`Are you sure you want to ${currentStatus ? 'deactivate' : 'activate'} ${subCategory.name}?`)) {
       try {
+        const newStatus = !currentStatus;
         await updateSubCategory(subCategory.id, {
           Name: subCategory.name,
           CategoryId: category.id,
-          IsActive: !currentStatus
+          IsActive: newStatus
         });
+
+        // Log the admin activity
+        logAdminActivity(
+          newStatus ? 'approval' : 'suspension',
+          `${newStatus ? 'Activated' : 'Deactivated'} SubCategory`,
+          `${subCategory.name} - ${category.name}`
+        );
+
         fetchCategories();
       } catch (err) {
         console.error('Error toggling subcategory status:', err);
@@ -225,43 +318,20 @@ const CategoryModeration = ({ onNavigate }) => {
   if (loading) {
     return (
       <div className="flex min-h-screen bg-cream-50">
-        <AdminSidebar currentPage="category-moderation" onNavigate={onNavigate} />
-
-        {/* Main Content - Loading */}
-        <div className="flex-1 ml-[250px] flex flex-col">
-          <PageHeader
-            title="Category Moderation"
-            notificationCount={notificationCount}
-            userName="Admin User"
-            userRole="Super Admin"
-          />
+       
           <main className="flex-1 p-8 overflow-y-auto">
             <div className="flex items-center justify-center h-64">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sage-500"></div>
             </div>
           </main>
         </div>
-      </div>
+     
     );
   }
 
   return (
     <div className="flex min-h-screen bg-cream-50">
-      <AdminSidebar currentPage="category-moderation" onNavigate={onNavigate} />
-
-      {/* Main Content */}
-      <div className="flex-1 ml-[250px] flex flex-col">
-        {/* Header with Search */}
-        <PageHeader
-          title="Category Moderation"
-          withSearch
-          searchPlaceholder="Search categories or subcategories..."
-          onSearch={(value) => setSearchTerm(value)}
-          notificationCount={notificationCount}
-          userName="Admin User"
-          userRole="Super Admin"
-        />
-
+      
         {/* Main Content Area */}
         <main className="flex-1 p-8 overflow-y-auto">
           <div className="max-w-7xl mx-auto space-y-8">
@@ -539,7 +609,7 @@ const CategoryModeration = ({ onNavigate }) => {
           </div>
         </main>
       </div>
-    </div>
+    
   );
 };
 

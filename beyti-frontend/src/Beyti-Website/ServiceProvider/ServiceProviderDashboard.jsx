@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ProviderOverview from './components/ProviderOverview';
 import ServicesManagement from './components/ServicesManagement';
 import ScheduleManagement from './components/ScheduleManagement';
@@ -9,8 +10,11 @@ import ProfilePage from '../../components/ProfilePage';
 import ServiceProviderSidebar from './components/ServiceProviderSidebar';
 import PageHeader from '../../components/PageHeader';
 import { getUserProfile, updateUserProfile, updateProviderStatus } from '../../services/api';
+import { logProviderActivity } from '../../utils/providerActivityLogger';
+import { isAuthenticated, getUserId, handleSuspensionError } from '../../utils/authUtils';
 
 export default function ServiceProviderDashboard() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   const [bookingFilter, setBookingFilter] = useState(null);
   const [displayName, setDisplayName] = useState("Service Provider");
@@ -18,10 +22,20 @@ export default function ServiceProviderDashboard() {
   const [providerStatus, setProviderStatus] = useState('Available');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [reviewSearchQuery, setReviewSearchQuery] = useState('');
+  const [notificationSearchQuery, setNotificationSearchQuery] = useState('');
+  const [serviceSearchQuery, setServiceSearchQuery] = useState('');
+  const [activityRefreshKey, setActivityRefreshKey] = useState(0);
 
-  // Hardcoded login credentials - TODO: Replace with actual authentication/context
-  const userProfileId = 1031; // Logged-in service provider's UserProfile ID
-  const serviceProviderId = 6; // Logged-in service provider's ID in ServiceProvider table
+  // Check authentication on mount
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      navigate('/login');
+    }
+  }, [navigate]);
+
+  // Get user ID from localStorage (will be replaced with context in future)
+  const userProfileId = parseInt(getUserId()) || 1031;
+  const serviceProviderId = 6; // TODO: Get from API based on userProfileId
 
   // Fetch user profile details
   const fetchUserProfile = async () => {
@@ -35,6 +49,7 @@ export default function ServiceProviderDashboard() {
           displayName: profile.DisplayName,
           roleType: profile.RoleType,
           status: profile.Status, // This is ServiceProvider.Status from the API
+          accountStatus: profile.AccountStatus, // UserProfile.Status (Active/Suspended)
           phone: profile.Phone,
           businessName: profile.BusinessName,
           street: profile.Street,
@@ -48,6 +63,14 @@ export default function ServiceProviderDashboard() {
         };
 
         console.log('[fetchUserProfile] Normalized profile status:', normalizedProfile.status);
+        console.log('[fetchUserProfile] Account status:', normalizedProfile.accountStatus);
+
+        // Check if account is suspended
+        if (normalizedProfile.accountStatus === 'Suspended') {
+          navigate('/account-suspended');
+          return;
+        }
+
         setUserProfile(normalizedProfile);
         if (normalizedProfile.displayName) {
           setDisplayName(normalizedProfile.displayName);
@@ -61,6 +84,11 @@ export default function ServiceProviderDashboard() {
       }
     } catch (error) {
       console.error('Error fetching user profile:', error);
+      // Check if error is due to suspension
+      if (!handleSuspensionError(error, navigate)) {
+        // Handle other errors
+        console.error('Failed to load profile');
+      }
     }
   };
 
@@ -68,6 +96,15 @@ export default function ServiceProviderDashboard() {
   const handleProfileUpdate = async (updates) => {
     try {
       await updateUserProfile(userProfileId, 'ServiceProvider', updates);
+
+      // Log activity
+      logProviderActivity(
+        serviceProviderId,
+        'profile',
+        'Updated Business Profile',
+        updates.displayName ? `Changed display name to ${updates.displayName}` : 'Updated profile information'
+      );
+
       // Refresh the profile after update
       await fetchUserProfile();
     } catch (error) {
@@ -89,6 +126,17 @@ export default function ServiceProviderDashboard() {
       setProviderStatus(newStatus); // Optimistic update
       const response = await updateProviderStatus(serviceProviderId, newStatus);
       console.log('[handleStatusChange] Update response:', response);
+
+      // Log activity for status change
+      logProviderActivity(
+        serviceProviderId,
+        'profile',
+        'Changed Availability Status',
+        `Status updated from ${previousStatus} to ${newStatus}`
+      );
+
+      // Trigger activity refresh by updating the key
+      setActivityRefreshKey(prev => prev + 1);
     } catch (error) {
       console.error('Error updating provider status:', error);
       // Revert on error
@@ -149,13 +197,21 @@ export default function ServiceProviderDashboard() {
         {/* Header */}
         <PageHeader
           title={getPageTitle()}
-          withSearch={activeTab === 'reviews' || activeTab === 'notifications'}
+          withSearch={activeTab === 'reviews' || activeTab === 'notifications' || activeTab === 'services'}
           searchPlaceholder={
             activeTab === 'notifications'
               ? 'Search notifications by title, content, or type...'
+              : activeTab === 'services'
+              ? 'Search by service name, category, or description...'
               : 'Search by customer, service, or comment...'
           }
-          onSearch={setReviewSearchQuery}
+          onSearch={
+            activeTab === 'notifications'
+              ? setNotificationSearchQuery
+              : activeTab === 'services'
+              ? setServiceSearchQuery
+              : setReviewSearchQuery
+          }
           notificationCount={0}
           userName={displayName}
           userRole="Service Provider"
@@ -204,11 +260,12 @@ export default function ServiceProviderDashboard() {
                 <ProviderOverview
                   serviceProviderId={serviceProviderId}
                   onNavigateToBookings={handleNavigateToBookings}
+                  activityRefreshKey={activityRefreshKey}
                 />
               </>
             )}
             {activeTab === 'services' && (
-              <ServicesManagement serviceProviderId={serviceProviderId} />
+              <ServicesManagement serviceProviderId={serviceProviderId} searchTerm={serviceSearchQuery} />
             )}
             {activeTab === 'schedule' && (
               <ScheduleManagement serviceProviderId={serviceProviderId} />
@@ -226,7 +283,7 @@ export default function ServiceProviderDashboard() {
               />
             )}
             {activeTab === 'notifications' && (
-              <NotificationsPage userId={userProfileId} />
+              <NotificationsPage userId={userProfileId} searchQuery={notificationSearchQuery} />
             )}
             {activeTab === 'profile' && (
               <ProfilePage

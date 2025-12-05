@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using BeytiDB.Data;
 using System.Text.Json;
+using Beyti_Backend.Services;
 
 namespace Beyti_Backend.Controllers.Api
 {
@@ -10,10 +11,12 @@ namespace Beyti_Backend.Controllers.Api
     public class ServiceModerationController : ControllerBase
     {
         private readonly BeytiContext _context;
+        private readonly INotificationService _notificationService;
 
-        public ServiceModerationController(BeytiContext context)
+        public ServiceModerationController(BeytiContext context, INotificationService notificationService)
         {
             _context = context;
+            _notificationService = notificationService;
         }
 
         // GET: api/ServiceModeration/Statistics
@@ -130,16 +133,54 @@ namespace Beyti_Backend.Controllers.Api
 
         // PUT: api/ServiceModeration/Services/5/approve
         [HttpPut("Services/{id}/approve")]
-        public async Task<IActionResult> ApproveService(int id)
+        public async Task<IActionResult> ApproveService(int id, [FromQuery] int? adminUserProfileId)
         {
             try
             {
-                var service = await _context.ServiceCatalogs.FindAsync(id);
+                var service = await _context.ServiceCatalogs
+                    .Include(s => s.SubCategory)
+                        .ThenInclude(sc => sc.Category)
+                    .FirstOrDefaultAsync(s => s.Id == id);
+
                 if (service == null) return NotFound();
 
                 service.IsActive = true;
 
                 await _context.SaveChangesAsync();
+
+                // Find all service providers that offer this service
+                var serviceProviderIds = await _context.ProviderApplicationServices
+                    .Where(pas => pas.ServiceCatalogId == id)
+                    .Include(pas => pas.ProviderApplication)
+                        .ThenInclude(pa => pa.ServiceProvider)
+                    .Select(pas => pas.ProviderApplication.ServiceProvider.UserProfileId)
+                    .Distinct()
+                    .ToListAsync();
+
+                // Get admin name for notification
+                string adminInfo = "";
+                if (adminUserProfileId.HasValue)
+                {
+                    var adminProfile = await _context.UserProfiles.FindAsync(adminUserProfileId.Value);
+                    if (adminProfile != null)
+                    {
+                        adminInfo = $" by Administrator {adminProfile.DisplayName}";
+                    }
+                }
+
+                // Send notification to each service provider
+                foreach (var userProfileId in serviceProviderIds)
+                {
+                    await _notificationService.SendNotificationAsync(
+                        recipientUserId: userProfileId,
+                        senderUserId: adminUserProfileId,
+                        type: "service_approved",
+                        title: "Service Approved",
+                        body: $"The service '{service.Name}' has been approved{adminInfo} and is now active. Customers can now book this service from you.",
+                        relatedEntityType: "ServiceCatalog",
+                        relatedEntityId: service.Id
+                    );
+                }
 
                 return Ok(new { message = "Service approved successfully", service });
             }
@@ -151,11 +192,15 @@ namespace Beyti_Backend.Controllers.Api
 
         // PUT: api/ServiceModeration/Services/5/suspend
         [HttpPut("Services/{id}/suspend")]
-        public async Task<IActionResult> SuspendService(int id, [FromBody] JsonElement body)
+        public async Task<IActionResult> SuspendService(int id, [FromQuery] int? adminUserProfileId, [FromBody] JsonElement body)
         {
             try
             {
-                var service = await _context.ServiceCatalogs.FindAsync(id);
+                var service = await _context.ServiceCatalogs
+                    .Include(s => s.SubCategory)
+                        .ThenInclude(sc => sc.Category)
+                    .FirstOrDefaultAsync(s => s.Id == id);
+
                 if (service == null) return NotFound();
 
                 service.IsActive = false;
@@ -166,6 +211,46 @@ namespace Beyti_Backend.Controllers.Api
                     reason = reasonProp.GetString();
 
                 await _context.SaveChangesAsync();
+
+                // Find all service providers that offer this service
+                var serviceProviderIds = await _context.ProviderApplicationServices
+                    .Where(pas => pas.ServiceCatalogId == id)
+                    .Include(pas => pas.ProviderApplication)
+                        .ThenInclude(pa => pa.ServiceProvider)
+                    .Select(pas => pas.ProviderApplication.ServiceProvider.UserProfileId)
+                    .Distinct()
+                    .ToListAsync();
+
+                // Get admin name for notification
+                string adminInfo = "";
+                if (adminUserProfileId.HasValue)
+                {
+                    var adminProfile = await _context.UserProfiles.FindAsync(adminUserProfileId.Value);
+                    if (adminProfile != null)
+                    {
+                        adminInfo = $" by Administrator {adminProfile.DisplayName}";
+                    }
+                }
+
+                // Send notification to each service provider
+                string notificationBody = $"The service '{service.Name}' has been suspended{adminInfo} and is no longer available for booking.";
+                if (!string.IsNullOrEmpty(reason))
+                {
+                    notificationBody += $" Reason: {reason}";
+                }
+
+                foreach (var userProfileId in serviceProviderIds)
+                {
+                    await _notificationService.SendNotificationAsync(
+                        recipientUserId: userProfileId,
+                        senderUserId: adminUserProfileId,
+                        type: "service_suspended",
+                        title: "Service Suspended",
+                        body: notificationBody,
+                        relatedEntityType: "ServiceCatalog",
+                        relatedEntityId: service.Id
+                    );
+                }
 
                 return Ok(new
                 {

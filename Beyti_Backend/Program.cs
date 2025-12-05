@@ -75,6 +75,9 @@ builder.Services.AddSignalR();
 // Add NotificationService
 builder.Services.AddScoped<INotificationService, NotificationService>();
 
+// Add AuditLogService
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("FrontendPolicy", policy =>

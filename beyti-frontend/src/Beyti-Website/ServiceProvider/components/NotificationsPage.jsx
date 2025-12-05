@@ -14,11 +14,10 @@ import {
   deleteNotification
 } from '../../../services/api';
 
-const NotificationsPage = ({ userId }) => {
+const NotificationsPage = ({ userId, searchQuery = '' }) => {
   const [notifications, setNotifications] = useState([]);
   const [filteredNotifications, setFilteredNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all'); // 'all', 'unread', 'read'
 
   // Fetch notifications
@@ -100,7 +99,8 @@ const NotificationsPage = ({ userId }) => {
 
   // Format timestamp
   const formatTime = (timestamp) => {
-    const date = new Date(timestamp);
+    // Ensure timestamp is treated as UTC if it doesn't have timezone info
+    const date = new Date(timestamp + (timestamp.endsWith('Z') ? '' : 'Z'));
     const now = new Date();
     const diffMs = now - date;
     const diffMins = Math.floor(diffMs / 60000);

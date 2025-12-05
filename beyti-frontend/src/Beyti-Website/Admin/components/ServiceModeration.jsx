@@ -19,8 +19,11 @@ import {
   getServiceDetails,
   approveService,
   suspendService,
-  deleteService
+  deleteService,
+  getUserProfile,
+  updateUserProfile
 } from '../../../services/api';
+import { logAdminActivity } from '../../../utils/adminActivityLogger';
 
 // Import design system components
 import AnalyticsCard from '../../../components/AnalyticsCard';
@@ -30,12 +33,16 @@ import { Table, TableHeader, TableBody, TableRow } from '../../../components/Tab
 import PageHeader from '../../../components/PageHeader';
 import AdminSidebar from './AdminSidebar';
 
-const ServiceModeration = ({ onNavigate }) => {
+const ServiceModeration = ({ onNavigate, adminUserProfileId }) => {
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all'); // all, active, inactive
   const [notificationCount] = useState(0);
+
+  // User profile state
+  const [userProfile, setUserProfile] = useState(null);
+  const [displayName, setDisplayName] = useState("Admin User");
 
   // Details modal state
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -76,9 +83,45 @@ const ServiceModeration = ({ onNavigate }) => {
     }
   };
 
+  // Fetch user profile details
+  const fetchUserProfile = async () => {
+    try {
+      const profile = await getUserProfile(adminUserProfileId);
+      if (profile) {
+        const normalizedProfile = {
+          userProfileId: profile.UserProfileId,
+          displayName: profile.DisplayName,
+          roleType: profile.RoleType,
+          status: profile.Status,
+          phone: profile.Phone,
+          createdAt: profile.CreatedAt,
+          updatedAt: profile.UpdatedAt,
+        };
+        setUserProfile(normalizedProfile);
+        if (normalizedProfile.displayName) {
+          setDisplayName(normalizedProfile.displayName);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+  };
+
+  // Handle profile update
+  const handleProfileUpdate = async (updates) => {
+    try {
+      await updateUserProfile(adminUserProfileId, 'Admin', updates);
+      await fetchUserProfile();
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      throw error;
+    }
+  };
+
   useEffect(() => {
     fetchStatistics();
     fetchServices();
+    fetchUserProfile();
   }, [filterStatus]);
 
   // View service details
@@ -97,7 +140,16 @@ const ServiceModeration = ({ onNavigate }) => {
   const handleApprove = async (serviceId) => {
     if (window.confirm('Are you sure you want to approve this service?')) {
       try {
-        await approveService(serviceId);
+        const service = services.find(s => s.id === serviceId);
+        await approveService(serviceId, adminUserProfileId);
+
+        // Log the admin activity
+        logAdminActivity(
+          'approval',
+          'Approved Service',
+          service?.name || `Service #${serviceId}`
+        );
+
         alert('Service approved successfully!');
         fetchServices();
         fetchStatistics();
@@ -126,7 +178,15 @@ const ServiceModeration = ({ onNavigate }) => {
     }
 
     try {
-      await suspendService(serviceToSuspend.id, suspendReason);
+      await suspendService(serviceToSuspend.id, suspendReason, adminUserProfileId);
+
+      // Log the admin activity
+      logAdminActivity(
+        'suspension',
+        'Suspended Service',
+        serviceToSuspend?.name || `Service #${serviceToSuspend.id}`
+      );
+
       alert('Service suspended successfully!');
       setShowSuspendModal(false);
       setServiceToSuspend(null);
@@ -146,7 +206,16 @@ const ServiceModeration = ({ onNavigate }) => {
   const handleDelete = async (serviceId) => {
     if (window.confirm('Are you sure you want to DELETE this service? This action cannot be undone!')) {
       try {
+        const service = services.find(s => s.id === serviceId);
         await deleteService(serviceId);
+
+        // Log the admin activity
+        logAdminActivity(
+          'moderation',
+          'Deleted Service',
+          service?.name || `Service #${serviceId}`
+        );
+
         alert('Service deleted successfully!');
         fetchServices();
         fetchStatistics();
@@ -175,41 +244,21 @@ const ServiceModeration = ({ onNavigate }) => {
   if (loading && services.length === 0) {
     return (
       <div className="flex min-h-screen bg-cream-50">
-        <AdminSidebar currentPage="service-moderation" onNavigate={onNavigate} />
-
-        <div className="flex-1 ml-[250px] flex flex-col">
-          <PageHeader
-            title="Service Moderation"
-            notificationCount={notificationCount}
-            userName="Admin User"
-            userRole="Super Admin"
-          />
+        
           <main className="flex-1 p-8 overflow-y-auto">
             <div className="flex items-center justify-center h-64">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sage-500"></div>
             </div>
           </main>
         </div>
-      </div>
+      
     );
   }
 
   return (
     <div className="flex min-h-screen bg-cream-50">
-      <AdminSidebar currentPage="service-moderation" onNavigate={onNavigate} />
-
-      {/* Main Content */}
-      <div className="flex-1 ml-[250px] flex flex-col">
-        {/* Header with Search */}
-        <PageHeader
-          title="Service Moderation"
-          withSearch
-          searchPlaceholder="Search services, categories..."
-          onSearch={(value) => setSearchTerm(value)}
-          notificationCount={notificationCount}
-          userName="Admin User"
-          userRole="Super Admin"
-        />
+      
+     
 
         {/* Main Content Area */}
         <main className="flex-1 p-8 overflow-y-auto">
@@ -369,7 +418,7 @@ const ServiceModeration = ({ onNavigate }) => {
             </div>
           </div>
         </main>
-      </div>
+      
 
       {/* Service Details Modal */}
       {showDetailsModal && selectedService && (

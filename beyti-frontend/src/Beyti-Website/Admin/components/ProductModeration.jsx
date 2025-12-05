@@ -19,7 +19,9 @@ import {
   getProductDetails,
   approveProduct,
   suspendProduct,
-  deleteProducts
+  deleteProducts,
+  getUserProfile,
+  updateUserProfile
 } from '../../../services/api';
 import { logAdminActivity } from '../../../utils/adminActivityLogger';
 
@@ -31,12 +33,16 @@ import { Table, TableHeader, TableBody, TableRow } from '../../../components/Tab
 import PageHeader from '../../../components/PageHeader';
 import AdminSidebar from './AdminSidebar';
 
-const ProductModeration = ({ onNavigate }) => {
+const ProductModeration = ({ onNavigate, adminUserProfileId }) => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all'); // all, active, inactive
   const [notificationCount] = useState(0);
+
+  // User profile state
+  const [userProfile, setUserProfile] = useState(null);
+  const [displayName, setDisplayName] = useState("Admin User");
 
   // Details modal state
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -77,9 +83,45 @@ const ProductModeration = ({ onNavigate }) => {
     }
   };
 
+  // Fetch user profile details
+  const fetchUserProfile = async () => {
+    try {
+      const profile = await getUserProfile(adminUserProfileId);
+      if (profile) {
+        const normalizedProfile = {
+          userProfileId: profile.UserProfileId,
+          displayName: profile.DisplayName,
+          roleType: profile.RoleType,
+          status: profile.Status,
+          phone: profile.Phone,
+          createdAt: profile.CreatedAt,
+          updatedAt: profile.UpdatedAt,
+        };
+        setUserProfile(normalizedProfile);
+        if (normalizedProfile.displayName) {
+          setDisplayName(normalizedProfile.displayName);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+  };
+
+  // Handle profile update
+  const handleProfileUpdate = async (updates) => {
+    try {
+      await updateUserProfile(adminUserProfileId, 'Admin', updates);
+      await fetchUserProfile();
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      throw error;
+    }
+  };
+
   useEffect(() => {
     fetchStatistics();
     fetchProducts();
+    fetchUserProfile();
   }, [filterStatus]);
 
 
@@ -100,7 +142,7 @@ const ProductModeration = ({ onNavigate }) => {
     if (window.confirm('Are you sure you want to approve this product?')) {
       try {
         const product = products.find(p => p.id === productId);
-        await approveProduct(productId);
+        await approveProduct(productId, adminUserProfileId);
 
         // Log the admin activity
         logAdminActivity(
@@ -137,7 +179,7 @@ const ProductModeration = ({ onNavigate }) => {
     }
 
     try {
-      await suspendProduct(productToSuspend.id, suspendReason);
+      await suspendProduct(productToSuspend.id, suspendReason, adminUserProfileId);
 
       // Log the admin activity
       logAdminActivity(
@@ -204,42 +246,26 @@ const ProductModeration = ({ onNavigate }) => {
   if (loading && products.length === 0) {
     return (
       <div className="flex min-h-screen bg-cream-50">
-        <AdminSidebar currentPage="product-moderation" onNavigate={onNavigate} />
+        
 
-        {/* Main Content - Loading */}
-        <div className="flex-1 ml-[250px] flex flex-col">
-          <PageHeader
-            title="Product Moderation"
-            notificationCount={notificationCount}
-            userName="Admin User"
-            userRole="Super Admin"
-          />
+        
           <main className="flex-1 p-8 overflow-y-auto">
             <div className="flex items-center justify-center h-64">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sage-500"></div>
             </div>
           </main>
         </div>
-      </div>
+      
     );
   }
 
   return (
     <div className="flex min-h-screen bg-cream-50">
-      <AdminSidebar currentPage="product-moderation" onNavigate={onNavigate} />
+      
 
       {/* Main Content */}
-      <div className="flex-1 ml-[250px] flex flex-col">
-        {/* Header with Search */}
-        <PageHeader
-          title="Product Moderation"
-          withSearch
-          searchPlaceholder="Search products, sellers, categories..."
-          onSearch={(value) => setSearchTerm(value)}
-          notificationCount={notificationCount}
-          userName="Admin User"
-          userRole="Super Admin"
-        />
+      
+       
 
         {/* Main Content Area */}
         <main className="flex-1 p-8 overflow-y-auto">
@@ -397,7 +423,7 @@ const ProductModeration = ({ onNavigate }) => {
             </div>
           </div>
         </main>
-      </div>
+     
 
       {/* Product Details Modal */}
       {showDetailsModal && selectedProduct && (

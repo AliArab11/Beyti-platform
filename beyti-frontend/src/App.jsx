@@ -36,6 +36,7 @@ import SellerOnboarding from './Beyti-Website/Registration/SellerOnboarding';
 import ProviderOnboarding from './Beyti-Website/Registration/ProviderOnboarding';
 import DriverOnboarding from './Beyti-Website/Registration/DriverOnboarding';
 import AdminView from './Beyti-Website/Admin/AdminView.jsx';
+import AccountSuspended from './Beyti-Website/Auth/AccountSuspended';
 
 // Placeholder components for pages that don't exist yet
 const PlaceholderPage = ({ pageName }) => (
@@ -187,6 +188,7 @@ export default function App() {
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/serviceprovider" element={<ServiceProviderPage />} />
             <Route path="/serviceprovider-dashboard" element={<ServiceProviderDashboard />} />
+            <Route path="/account-suspended" element={<AccountSuspended />} />
             <Route path="/admin-view" element={<AdminView />} />
             <Route path="/admindashboard" element={<AdminUsersPage />} />
             <Route path="/servicerequest" element={<ServiceProviderRequests />} />
