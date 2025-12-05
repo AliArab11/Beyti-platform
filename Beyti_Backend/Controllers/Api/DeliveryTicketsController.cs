@@ -69,12 +69,14 @@ namespace Beyti_Backend.Controllers.Api
                     {
                         dt.Order.Id,
                         dt.Order.TotalAmount,
+                        dt.Order.SubtotalAmount,
+                        dt.Order.DeliveryFee,
                         dt.Order.PaymentMethod,
                         dt.Order.Status,
                         customerName = dt.Order.Customer.UserProfile.DisplayName,
                         sellerName = dt.Order.Seller.UserProfile.DisplayName
                     },
-                    // CHANGE THIS SECTION - If pickupAddress is null, get from seller's first address
+                    
                     pickupAddress = dt.PickupAddress != null ? new
                     {
                         dt.PickupAddress.Street,

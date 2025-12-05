@@ -13,6 +13,8 @@ import Analytics from "./Components/Analytics";
 import Products from "./Components/Products";
 import Reviews from "./Components/Reviews";
 
+import { Outlet, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 
 import * as Icon from "@phosphor-icons/react";
 
@@ -363,7 +365,25 @@ const OrderDetailsModal = ({ order, onClose, onOrderUpdated }) => {
 
 // ---------- Main Component ----------
 const SellerDashboard = () => {
-  const [activeTab, setActiveTab] = useState("dashboard");
+
+    const getPageTitle = () => {
+    if (location.pathname.includes("/seller-dashboard/orders")) {
+      return "Order Management";
+    } else if (location.pathname.includes("/seller-dashboard/products")) {
+      return "Product Management";
+    } else if (location.pathname.includes("/seller-dashboard/analytics")) {
+      return "Analytics & Insights";
+    } else if (location.pathname.includes("/seller-dashboard/reviews")) {
+      return "Customer Reviews";
+    } else {
+      return "Seller Dashboard";
+    }
+  };
+
+
+  const navigate = useNavigate();
+  const location = useLocation();
+  
   const [sellerId, setSellerId] = useState(null);
   const [sellerName, setSellerName] = useState("My Store");
 
@@ -617,95 +637,136 @@ useEffect(() => {
       )}
 
       {/* Sidebar */}
-      <aside className="hidden lg:flex flex-col bg-sage-500 text-white w-64 p-4 justify-between">
-        <div className="space-y-3">
-          <div className="mb-4">
-            <h2 className="text-card-h2 text-cream-50">Beyti Seller</h2>
-            <p className="text-body-regular text-sage-100 opacity-80">
-              Manage your store at a glance.
-            </p>
-          </div>
-
-          <NavigationButton
-            selected={activeTab === "dashboard"}
-            onClick={() => setActiveTab("dashboard")}
-            icon={
-                <Icon.House
-                size={20}
-                weight={activeTab === "dashboard" ? "fill" : "regular"}
-                />
-            }
-            >
-            Dashboard
-            </NavigationButton>
-
-            <NavigationButton
-            selected={activeTab === "orders"}
-            onClick={() => setActiveTab("orders")}
-            icon={
-                <Icon.Receipt
-                size={20}
-                weight={activeTab === "orders" ? "fill" : "regular"}
-                />
-            }
-            >
-            Orders
-            </NavigationButton>
-
-            <NavigationButton
-            selected={activeTab === "products"}
-            onClick={() => setActiveTab("products")}
-            icon={
-                <Icon.Package
-                size={20}
-                weight={activeTab === "products" ? "fill" : "regular"}
-                />
-            }
-            >
-            Products
-            </NavigationButton>
-
-            <NavigationButton
-            selected={activeTab === "analytics"}
-            onClick={() => setActiveTab("analytics")}
-            icon={
-                <Icon.ChartBar
-                size={20}
-                weight={activeTab === "analytics" ? "fill" : "regular"}
-                />
-            }
-            >
-            Analytics
-            </NavigationButton>
-
-            <NavigationButton
-                selected={activeTab === "reviews"}
-                onClick={() => setActiveTab("reviews")}
-                icon={
-                    <Icon.Star
-                    size={20}
-                    weight={activeTab === "reviews" ? "fill" : "regular"}
-                    />
-                }
-                >
-                Reviews
-                </NavigationButton>
-
+      <aside className="w-64 bg-sage-500 flex flex-col fixed h-screen transition-colors border-r border-sage-700">
+        <div className="p-6 border-b border-sage-700">
+          <h1 className="text-display-h1 text-cream-200">Beyti</h1>
+          <p className="text-label-medium text-cream-100 mt-1">Seller Portal</p>
         </div>
 
-        <SidebarProfile userName={sellerName} userRole="Seller" />
+        <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+          {/* Dashboard */}
+          <NavigationButton
+            selected={location.pathname.includes("/seller-dashboard/dashboard") || location.pathname === "/seller-dashboard"}
+            onClick={() => navigate("dashboard")}
+            icon={
+              <Icon.House
+                size={20}
+                weight={(location.pathname.includes("/seller-dashboard/dashboard") || location.pathname === "/seller-dashboard") ? "fill" : "regular"}
+              />
+            }
+          >
+            Dashboard
+          </NavigationButton>
+
+          {/* Orders */}
+          <NavigationButton
+            selected={location.pathname.includes("/seller-dashboard/orders")}
+            onClick={() => navigate("orders")}
+            icon={
+              <Icon.Receipt
+                size={20}
+                weight={location.pathname.includes("/seller-dashboard/orders") ? "fill" : "regular"}
+              />
+            }
+          >
+            Orders
+          </NavigationButton>
+
+          {/* Products */}
+          <NavigationButton
+            selected={location.pathname.includes("/seller-dashboard/products")}
+            onClick={() => navigate("products")}
+            icon={
+              <Icon.Package
+                size={20}
+                weight={location.pathname.includes("/seller-dashboard/products") ? "fill" : "regular"}
+              />
+            }
+          >
+            Products
+          </NavigationButton>
+
+          {/* Analytics */}
+          <NavigationButton
+            selected={location.pathname.includes("/seller-dashboard/analytics")}
+            onClick={() => navigate("analytics")}
+            icon={
+              <Icon.ChartBar
+                size={20}
+                weight={location.pathname.includes("/seller-dashboard/analytics") ? "fill" : "regular"}
+              />
+            }
+          >
+            Analytics
+          </NavigationButton>
+
+          {/* Reviews */}
+          <NavigationButton
+            selected={location.pathname.includes("/seller-dashboard/reviews")}
+            onClick={() => navigate("reviews")}
+            icon={
+              <Icon.Star
+                size={20}
+                weight={location.pathname.includes("/seller-dashboard/reviews") ? "fill" : "regular"}
+              />
+            }
+          >
+            Reviews
+          </NavigationButton>
+        </nav>
+
+        <div className="border-t border-sage-700 p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="w-10 h-10 rounded-full bg-sage-700 flex items-center justify-center flex-shrink-0">
+                <Icon.User size={20} weight="fill" className="text-cream-200" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-body-regular text-cream-200 truncate">{sellerName}</p>
+                <p className="text-label-medium text-cream-100 truncate">Seller</p>
+              </div>
+            </div>
+            <button className="flex-shrink-0 p-1 hover:bg-sage-700 rounded transition-colors">
+              <Icon.CaretDown size={16} className="text-cream-200" />
+            </button>
+          </div>
+        </div>
       </aside>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 ml-64 flex flex-col">
         <div className="border-b border-grey-stroke bg-grey-200">
-          <PageHeader
-            title="Seller Dashboard"
-            withSearch
-            notificationCount={metrics.pendingOrders || 0}
-            userName={sellerName}
-            userRole="Seller"
-          />
+         <PageHeader
+          title={getPageTitle()}
+          notificationCount={metrics.pendingOrders || 0}
+          userName={sellerName}
+          userRole="Seller"
+          userProfile={{
+            userProfileId: sellerId,
+            displayName: sellerName,
+            roleType: 'Seller',
+            status: 'Active',
+            phone: sellerList.find(s => s.id === sellerId)?.phone || '',
+            address: sellerList.find(s => s.id === sellerId)?.address || '',
+            createdAt: sellerList.find(s => s.id === sellerId)?.createdAt,
+            updatedAt: new Date().toISOString()
+          }}
+          entityId={sellerId}
+          userId={sellerId}
+          onProfileUpdate={async (updates) => {
+            try {
+              console.log('Profile updates:', updates);
+              const sellers = await getSellers();
+              const updatedSeller = sellers.find(s => s.id === sellerId);
+              if (updatedSeller) {
+                setSellerName(updatedSeller.storeName || sellerName);
+              }
+            } catch (error) {
+              console.error('Error updating profile:', error);
+              throw error;
+            }
+          }}
+        />
         </div>
 
         <main className="flex-1 p-6 lg:p-8">
@@ -735,10 +796,10 @@ useEffect(() => {
               </div>
             )}
 
-            {/* DASHBOARD CONTENT */}
+             {/* DASHBOARD CONTENT */}
             {sellerId && !loading && !error && (
               <>
-              {activeTab === "dashboard" ? (
+                {location.pathname === "/seller-dashboard" || location.pathname === "/seller-dashboard/dashboard" ? (
                 <>
                 {/* TOP METRIC CARDS */}
                 <section className="space-y-4">
@@ -810,9 +871,9 @@ useEffect(() => {
                             type="button"
                             className="text-sm font-medium text-sage-600 hover:text-sage-700 underline cursor-pointer"
                             onClick={() => {
-                            setActiveTab("orders");
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                            }}
+                              navigate("orders");
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
                             >
                             View all
                             </button>
@@ -895,8 +956,8 @@ useEffect(() => {
                     )}
                   </div>
 
-                  {/* Top Products */}
-                  <div className="bg-grey-200 rounded-lg p-6 shadow-soft-lift border border-grey-stroke space-y-4">
+                                    {/* Top Products */}
+                  <div className="bg-grey-200 rounded-lg p-6 shadow-soft-lift border border-grey-stroke space-y-4 flex flex-col">
                     <div className="flex items-center justify-between">
                       <div>
                         <h2 className="text-card-h2 text-charcoal-600">
@@ -908,18 +969,43 @@ useEffect(() => {
                       </div>
                       <button
                         type="button"
-                        className="text-sm font-medium text-sage-600 hover:text-sage-700 underline"
-                        onClick={() => console.log("Go to Products page")}
+                        className="text-sm font-medium text-sage-600 hover:text-sage-700 underline cursor-pointer"
+                        onClick={() => {
+                          navigate("products");
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
                       >
                         View all
                       </button>
                     </div>
 
                     {topProducts.length === 0 ? (
-                      <p className="text-body-regular text-charcoal-400">
-                        No product data yet. Once orders start coming in,
-                        you’ll see your top items here.
-                      </p>
+                      <div className="flex-1 flex flex-col items-center justify-center text-center py-12 px-4">
+                        {/* Icon */}
+                        <div className="w-20 h-20 rounded-full bg-sage-100 flex items-center justify-center mb-6">
+                          <Icon.Package size={40} className="text-sage-500" weight="duotone" />
+                        </div>
+
+                        {/* Text Content */}
+                        <h3 className="text-card-h2 text-charcoal-600 mb-2">
+                          Stock Your Shelves
+                        </h3>
+                        <p className="text-body-regular text-charcoal-400 mb-6 max-w-xs">
+                          Your shop is looking a little empty. Add your first product to get ready for launch.
+                        </p>
+
+                        {/* CTA Button */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigate("products");
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                          className="w-full max-w-xs bg-sage-500 hover:bg-sage-600 text-cream-50 py-3 px-6 rounded-lg font-semibold text-sm shadow-soft-lift transition-colors"
+                        >
+                          Add Your First Product
+                        </button>
+                      </div>
                     ) : (
                       <ul className="space-y-3">
                         {topProducts.map((product) => (
@@ -974,10 +1060,10 @@ useEffect(() => {
                       <button
                         type="button"
                         className="text-sm font-medium text-sage-600 hover:text-sage-700 underline cursor-pointer"
-                            onClick={() => {
-                            setActiveTab("analytics");
+                           onClick={() => {
+                            navigate("analytics");
                             window.scrollTo({ top: 0, behavior: 'smooth' });
-                            }}
+                        }}
                             
                             
                       >
@@ -1046,7 +1132,7 @@ useEffect(() => {
                   </div>
                 </section>
               </>
-                ) : activeTab === "orders" ? (
+                ) : location.pathname.includes("/seller-dashboard/orders") ? (
                     <Orders
                         sellerId={sellerId}
                         sellerName={sellerName}
@@ -1054,18 +1140,18 @@ useEffect(() => {
                         orders={orders}
                         onOrderUpdate={handleOrderUpdated}
                     />
-                    ) : activeTab === "products" ? (
+                    ) : location.pathname.includes("/seller-dashboard/products") ? (
                     <Products
                         sellerId={sellerId}
                         sellerName={sellerName}
                     />
-                    ) : activeTab === "analytics" ? (
+                    ) : location.pathname.includes("/seller-dashboard/analytics") ? (
                     <Analytics
                         sellerId={sellerId}
                         sellerName={sellerName}
                         orders={orders}
                     />
-                    ) : activeTab === "reviews" ? (
+                    ) : location.pathname.includes("/seller-dashboard/reviews") ? (
                     <Reviews sellerId={sellerId} sellerName={sellerName} />
                     ) : null}
             </>

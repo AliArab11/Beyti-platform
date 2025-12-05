@@ -183,14 +183,7 @@ const Orders = ({ sellerId, sellerName, onOpenOrderModal, orders: externalOrders
   );
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
-      {/* HEADER SECTION */}
-      <div>
-        <h1 className="text-display-h1 text-charcoal-600">Orders</h1>
-        <p className="text-body-regular text-charcoal-400 mt-1">
-          Manage and track all your store orders
-        </p>
-      </div>
+    <div className="max-w-7xl mx-auto space-y-6">
 
       {/* CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
