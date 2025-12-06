@@ -13,10 +13,13 @@ import Analytics from "./Components/Analytics";
 import Products from "./Components/Products";
 import Reviews from "./Components/Reviews";
 
+import './Components/modalAnimations.css';
+
 import { Outlet, useNavigate } from "react-router-dom";
 import { useLocation } from "react-router-dom";
 
 import * as Icon from "@phosphor-icons/react";
+
 
 
 
@@ -223,8 +226,8 @@ const OrderDetailsModal = ({ order, onClose, onOrderUpdated }) => {
   if (!localOrder) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="bg-cream-50 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-grey-stroke">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm modal-backdrop-enter">
+      <div className="bg-cream-50 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-grey-stroke modal-content-enter">
         {/* Header */}
         <div className="px-6 py-4 border-b border-grey-stroke flex items-center justify-between">
           <div>
@@ -576,8 +579,8 @@ useEffect(() => {
     if (!selectModalOpen) return null;
 
     return (
-      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-40 p-4">
-        <div className="bg-cream-50 rounded-2xl shadow-2xl w-full max-w-md p-6 border border-grey-stroke">
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-40 p-4 modal-backdrop-enter">
+        <div className="bg-cream-50 rounded-2xl shadow-2xl w-full max-w-md p-6 border border-grey-stroke modal-content-enter">
           <h2 className="text-2xl font-semibold text-charcoal-700 mb-2">
             Select a Store
           </h2>

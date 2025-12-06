@@ -979,8 +979,8 @@ const ReviewVisibilityModal = ({ show, mode, review, onClose, onConfirm }) => {
   const [reason, setReason] = React.useState("");
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
-      <div className="bg-cream-50 w-full max-w-lg rounded-xl border border-grey-stroke shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 modal-backdrop-enter">
+      <div className="bg-cream-50 w-full max-w-lg rounded-xl border border-grey-stroke shadow-2xl overflow-hidden modal-content-enter">
         
         {/* Header Section */}
         <div className="bg-grey-200 px-6 py-4 border-b border-grey-stroke">
