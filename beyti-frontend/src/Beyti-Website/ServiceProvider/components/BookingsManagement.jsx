@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { getProviderBookings, updateBookingStatus } from '../../../services/api';
 import CRUDButton from '../../../components/CRUDButton';
 import StatusChip from '../../../components/StatusChip';
+import { logProviderActivity } from '../../../utils/providerActivityLogger';
 
 export default function BookingsManagement({ serviceProviderId, initialFilter = null }) {
   const [bookings, setBookings] = useState([]);
@@ -46,6 +47,15 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
         status: 'DepositPending',
         quotedPrice: parseFloat(quotePrice)
       });
+
+      // Log activity
+      logProviderActivity(
+        serviceProviderId,
+        'booking',
+        'Sent Quote',
+        `Customer: ${selectedBooking.customerName || 'N/A'} - ${parseFloat(quotePrice).toFixed(2)} BHD`
+      );
+
       alert('Quote sent successfully!');
       setShowQuoteModal(false);
       setSelectedBooking(null);
@@ -59,7 +69,24 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
 
   const handleStatusChange = async (bookingId, newStatus) => {
     try {
+      const booking = bookings.find(b => b.id === bookingId);
       await updateBookingStatus(bookingId, { status: newStatus });
+
+      // Log activity
+      const actionMap = {
+        'Confirmed': 'Confirmed Booking',
+        'InProgress': 'Started Service',
+        'Completed': 'Completed Service',
+        'Canceled': 'Canceled Booking',
+        'Rejected': 'Rejected Booking'
+      };
+      logProviderActivity(
+        serviceProviderId,
+        'booking',
+        actionMap[newStatus] || 'Updated Booking',
+        `Customer: ${booking?.customerName || 'N/A'}`
+      );
+
       fetchBookings();
     } catch (err) {
       console.error('Error updating status:', err);

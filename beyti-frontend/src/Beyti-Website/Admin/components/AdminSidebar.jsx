@@ -16,7 +16,8 @@ import {
   CaretDown,
   Tag,
   Briefcase,
-  Bell
+  Bell,
+  ClockClockwise
 } from '@phosphor-icons/react';
 import NavigationButton from '../../../components/NavigationButton';
 
@@ -91,6 +92,14 @@ const AdminSidebar = ({ currentPage, onNavigate }) => {
           onClick={() => onNavigate('/admin/notifications')}
         >
           Notifications
+        </NavigationButton>
+
+        <NavigationButton
+          selected={currentPage === 'audit-logs'}
+          icon={<ClockClockwise size={20} weight={currentPage === 'audit-logs' ? 'fill' : 'regular'} />}
+          onClick={() => onNavigate('/admin/audit-logs')}
+        >
+          Audit Logs
         </NavigationButton>
       </nav>
 
