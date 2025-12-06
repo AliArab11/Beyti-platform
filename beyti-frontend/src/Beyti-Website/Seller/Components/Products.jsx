@@ -554,8 +554,8 @@ const removeVariant = async (variantId) => {
 
       {/* ADD / EDIT MODAL */}
       {showModal && (
-        <div className="fixed inset-0 bg-charcoal-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-cream-50 rounded-2xl shadow-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-charcoal-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 modal-backdrop-enter">
+          <div className="bg-cream-50 rounded-2xl shadow-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto modal-content-enter">
             <div className="bg-sage-500 p-8 rounded-t-2xl">
                 <h2 className="text-display-h2 text-white font-bold">
                     {editing ? "Edit Product" : "Add New Product"}
@@ -733,8 +733,8 @@ const removeVariant = async (variantId) => {
 
       {/* VARIANT MANAGEMENT MODAL */}
 {showVariantModal && selectedProduct && (
-  <div className="fixed inset-0 bg-charcoal-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-    <div className="bg-cream-50 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+  <div className="fixed inset-0 bg-charcoal-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 modal-backdrop-enter">
+    <div className="bg-cream-50 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto modal-content-enter">
       {/* Modal Header */}
       <div className="bg-sage-500 p-8 rounded-t-2xl sticky top-0 z-10">
         <div className="flex items-start justify-between">
