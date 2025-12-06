@@ -7,7 +7,9 @@
       "Bash(tree:*)",
       "Bash(test:*)",
       "Bash(find:*)",
-      "Bash(netstat:*)"
+      "Bash(netstat:*)",
+      "Bash(taskkill:*)",
+      "Bash(cmd /c \"taskkill /F /PID 24248\")"
     ],
     "deny": [],
     "ask": []

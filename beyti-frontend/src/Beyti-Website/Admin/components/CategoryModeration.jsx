@@ -317,26 +317,17 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen bg-cream-50">
-       
-          <main className="flex-1 p-8 overflow-y-auto">
-            <div className="flex items-center justify-center h-64">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sage-500"></div>
-            </div>
-          </main>
-        </div>
-     
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sage-500"></div>
+      </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-cream-50">
-      
-        {/* Main Content Area */}
-        <main className="flex-1 p-8 overflow-y-auto">
-          <div className="max-w-7xl mx-auto space-y-8">
-            {/* Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <>
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* Statistics Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <AnalyticsCard
                 title="Total Categories"
                 metrics={[
@@ -604,12 +595,10 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
                     </TableBody>
                   </Table>
                 )}
-              </div>
             </div>
           </div>
-        </main>
-      </div>
-    
+        </div>
+    </>
   );
 };
 
