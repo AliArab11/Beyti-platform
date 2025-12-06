@@ -12,6 +12,8 @@ import DriverOrdersPage from "./Components/DriverOrders";
 import DriverAnalytics from "./Components/DriverAnalytics";
 
 
+import '../Seller/Components/modalAnimations.css';
+
 
 import NavigationButton from "../../components/NavigationButton";
 
@@ -484,8 +486,8 @@ const ViewMapModal = ({ pickup, delivery, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
-      <div className="bg-cream-50 rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col border border-grey-stroke">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 modal-backdrop-enter">
+      <div className="bg-cream-50 rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col border border-grey-stroke modal-content-enter">
         {/* Header */}
         <div className="p-6 border-b border-grey-stroke flex justify-between items-center bg-grey-200">
           <div>
@@ -745,8 +747,8 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
     if (!localJob) return null;
 
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-        <div className="bg-cream-50 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-grey-stroke">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm modal-backdrop-enter">
+        <div className="bg-cream-50 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-grey-stroke modal-content-enter">
           {/* Header */}
           <div className="px-6 py-4 border-b border-grey-stroke flex items-center justify-between">
             <div>
@@ -995,8 +997,8 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
   const DriverSelectModal = () => {
     if (!selectModalOpen) return null;
     return (
-      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="bg-cream-50 rounded-2xl shadow-2xl w-full max-w-md p-6 border border-grey-stroke">
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 modal-backdrop-enter">
+        <div className="bg-cream-50 rounded-2xl shadow-2xl w-full max-w-md p-6 border border-grey-stroke modal-content-enter">
           <h2 className="text-display-h2 text-charcoal-700 mb-2">
             Select Driver Profile
           </h2>
