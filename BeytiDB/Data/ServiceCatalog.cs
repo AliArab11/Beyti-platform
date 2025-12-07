@@ -7,15 +7,16 @@ using Microsoft.EntityFrameworkCore;
 namespace BeytiDB.Data;
 
 [Table("ServiceCatalog")]
-[Index("SubCategoryId", Name = "IX_ServiceCatalog_SubCat")]
+
 public partial class ServiceCatalog
 {
     [Key]
     public int Id { get; set; }
 
-    public int SubCategoryId { get; set; }
+    public int ServiceCategoryId { get; set; }
 
-    [StringLength(120)]
+    [Required]
+    [StringLength(100)]
     public string Name { get; set; } = null!;
 
     [StringLength(255)]
@@ -40,7 +41,7 @@ public partial class ServiceCatalog
     [InverseProperty("ServiceCatalog")]
     public virtual ICollection<ServiceBooking> ServiceBookings { get; set; } = new List<ServiceBooking>();
 
-    [ForeignKey("SubCategoryId")]
-    [InverseProperty("ServiceCatalogs")]
-    public virtual SubCategory SubCategory { get; set; } = null!;
+    [ForeignKey("ServiceCategoryId")]
+    public virtual ServiceCategory ServiceCategory { get; set; } = null!;
+
 }

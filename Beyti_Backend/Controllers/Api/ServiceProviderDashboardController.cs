@@ -114,11 +114,28 @@ namespace Beyti_Backend.Controllers.Api
                 if (body.TryGetProperty("DisplayName", out var displayName) && displayName.ValueKind != JsonValueKind.Null)
                     userProfile.DisplayName = displayName.GetString();
 
-                // Update phone (stored in ServiceProvider table)
+                // Update phone and business name (stored in ServiceProvider table)
                 var provider = await _context.ServiceProviders.FirstOrDefaultAsync(sp => sp.UserProfileId == userProfileId);
-                if (provider != null && body.TryGetProperty("Phone", out var phone) && phone.ValueKind != JsonValueKind.Null)
+                if (provider != null)
                 {
-                    provider.Phone = phone.GetString();
+                    if (body.TryGetProperty("Phone", out var phone) && phone.ValueKind != JsonValueKind.Null)
+                    {
+                        provider.Phone = phone.GetString();
+                    }
+
+                    if (body.TryGetProperty("BusinessName", out var businessName) && businessName.ValueKind != JsonValueKind.Null)
+                    {
+                        var businessNameValue = businessName.GetString();
+                        if (!string.IsNullOrWhiteSpace(businessNameValue))
+                        {
+                            provider.BusinessName = businessNameValue;
+                            provider.UpdatedAt = DateTime.UtcNow;
+                        }
+                        else
+                        {
+                            return BadRequest("Business name cannot be empty");
+                        }
+                    }
                 }
 
                 // Note: Email and Address updates would require schema changes
@@ -264,16 +281,17 @@ namespace Beyti_Backend.Controllers.Api
         {
             try
             {
-                var categories = await _context.Categories
-                    .Include(c => c.SubCategories)
+                var categories = await _context.ServiceCategories
+                    .Include(c => c.ServiceCatalogs)
                     .Where(c => c.IsActive)
                     .Select(c => new
                     {
                         c.Id,
                         c.Name,
-                        SubCategories = c.SubCategories
+                        c.Description,
+                        ServiceCatalogs = c.ServiceCatalogs
                             .Where(sc => sc.IsActive)
-                            .Select(sc => new { sc.Id, sc.Name })
+                            .Select(sc => new { sc.Id, sc.Name, sc.Description })
                     })
                     .ToListAsync();
 
@@ -295,8 +313,7 @@ namespace Beyti_Backend.Controllers.Api
                 var services = await _context.ProviderApplicationServices
                     .Include(pas => pas.ProviderApplication)
                     .Include(pas => pas.ServiceCatalog)
-                        .ThenInclude(sc => sc.SubCategory)
-                            .ThenInclude(sub => sub.Category)
+                        .ThenInclude(sc => sc.ServiceCategory)
                     .Where(pas => pas.ProviderApplication.ServiceProviderId == serviceProviderId)
                     .Select(pas => new
                     {
@@ -307,9 +324,8 @@ namespace Beyti_Backend.Controllers.Api
                         pas.ServiceCatalog.MaxPrice,
                         pas.ServiceCatalog.EstimatedDuration,
                         pas.ServiceCatalog.IsActive,
-                        Category = pas.ServiceCatalog.SubCategory.Category.Name,
-                        SubCategory = pas.ServiceCatalog.SubCategory.Name,
-                        SubCategoryId = pas.ServiceCatalog.SubCategoryId,
+                        Category = pas.ServiceCatalog.ServiceCategory.Name,
+                        CategoryId = pas.ServiceCatalog.ServiceCategoryId,
                         ApplicationStatus = pas.ProviderApplication.Status
                     })
                     .ToListAsync();
@@ -329,7 +345,7 @@ namespace Beyti_Backend.Controllers.Api
             try
             {
                 int serviceProviderId = body.GetProperty("serviceProviderId").GetInt32();
-                int subCategoryId = body.GetProperty("subCategoryId").GetInt32();
+                int serviceCategoryId = body.GetProperty("serviceCategoryId").GetInt32();
                 string name = body.GetProperty("name").GetString()!;
 
                 string? description = null;
@@ -395,7 +411,7 @@ namespace Beyti_Backend.Controllers.Api
                 // Create service in catalog
                 var serviceCatalog = new ServiceCatalog
                 {
-                    SubCategoryId = subCategoryId,
+                    ServiceCategoryId = serviceCategoryId,
                     Name = name,
                     Description = description,
                     MinPrice = minPrice,
@@ -457,21 +473,21 @@ namespace Beyti_Backend.Controllers.Api
                 if (service == null)
                     return NotFound("Service not found");
 
-                // Update SubCategoryId if provided
-                if (body.TryGetProperty("subCategoryId", out var subCatProp))
+                // Update ServiceCategoryId if provided
+                if (body.TryGetProperty("serviceCategoryId", out var catProp))
                 {
-                    if (subCatProp.ValueKind == JsonValueKind.Number)
+                    if (catProp.ValueKind == JsonValueKind.Number)
                     {
-                        service.SubCategoryId = subCatProp.GetInt32();
+                        service.ServiceCategoryId = catProp.GetInt32();
                     }
-                    else if (subCatProp.ValueKind == JsonValueKind.String)
+                    else if (catProp.ValueKind == JsonValueKind.String)
                     {
-                        service.SubCategoryId = int.Parse(subCatProp.GetString()!);
+                        service.ServiceCategoryId = int.Parse(catProp.GetString()!);
                     }
                 }
 
                 if (body.TryGetProperty("name", out var name))
-                    service.Name = name.GetString();
+                    service.Name = name.GetString()!;
 
                 if (body.TryGetProperty("description", out var desc))
                     service.Description = desc.GetString();
@@ -689,7 +705,7 @@ namespace Beyti_Backend.Controllers.Api
                     .Include(sb => sb.Customer)
                         .ThenInclude(c => c.UserProfile)
                     .Include(sb => sb.ServiceCatalog)
-                        .ThenInclude(sc => sc.SubCategory)
+                        .ThenInclude(sc => sc.ServiceCategory)
                     .Include(sb => sb.ServiceAddress)
                     .Where(sb => sb.ServiceProviderId == serviceProviderId);
 
@@ -711,7 +727,7 @@ namespace Beyti_Backend.Controllers.Api
                         CustomerName = sb.Customer.UserProfile.DisplayName,
                         CustomerPhone = sb.Customer.Phone,
                         ServiceName = sb.ServiceCatalog.Name,
-                        Category = sb.ServiceCatalog.SubCategory.Name,
+                        Category = sb.ServiceCatalog.ServiceCategory.Name,
                         Address = new
                         {
                             sb.ServiceAddress.Street,

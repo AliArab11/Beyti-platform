@@ -26,6 +26,8 @@ namespace Beyti_Backend.Controllers.Api
         {
             var providers = await _context.ServiceProviders
                 .Include(sp => sp.UserProfile)
+                .Include(sp => sp.ServiceReviews)
+                .Where(sp => sp.UserProfile.Status == "Active" && sp.UserProfile.RoleType == "ServiceProvider")
                 .Select(sp => new
                 {
                     sp.Id,
@@ -38,7 +40,13 @@ namespace Beyti_Backend.Controllers.Api
                     sp.CreatedAt,
                     sp.UpdatedAt,
                     sp.VerifiedAt,
-                    DisplayName = sp.UserProfile.DisplayName
+                    DisplayName = sp.UserProfile != null && !string.IsNullOrEmpty(sp.UserProfile.DisplayName)
+                        ? sp.UserProfile.DisplayName
+                        : sp.BusinessName,
+                    AverageRating = sp.ServiceReviews.Any(r => !r.IsHidden)
+                        ? sp.ServiceReviews.Where(r => !r.IsHidden).Average(r => (double)r.OverallRating)
+                        : 0,
+                    ReviewCount = sp.ServiceReviews.Count(r => !r.IsHidden)
                 })
                 .ToListAsync();
 

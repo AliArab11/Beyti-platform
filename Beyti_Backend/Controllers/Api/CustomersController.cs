@@ -10,6 +10,21 @@ namespace Beyti_Backend.Controllers.Api
         public string Phone { get; set; }
     }
 
+    public class UpdateCustomerProfileDto
+    {
+        public string DisplayName { get; set; }
+        public string Phone { get; set; }
+    }
+
+    public class UpdateCustomerAddressDto
+    {
+        public string Street { get; set; }
+        public string City { get; set; }
+        public string Region { get; set; }
+        public string PostalCode { get; set; }
+        public string Country { get; set; }
+    }
+
     [Route("api/[controller]")]
     [ApiController]
     public class CustomersController : ControllerBase
@@ -159,6 +174,135 @@ namespace Beyti_Backend.Controllers.Api
             _context.Customers.Remove(customer);
             await _context.SaveChangesAsync();
             return NoContent();
+        }
+
+        // PUT: api/Customers/UpdateProfile/{userProfileId}
+        [HttpPut("UpdateProfile/{userProfileId}")]
+        public async Task<IActionResult> UpdateProfile(int userProfileId, [FromBody] UpdateCustomerProfileDto dto)
+        {
+            try
+            {
+                // Find customer by UserProfileId
+                var customer = await _context.Customers
+                    .Include(c => c.UserProfile)
+                    .FirstOrDefaultAsync(c => c.UserProfileId == userProfileId);
+
+                if (customer == null)
+                {
+                    return NotFound(new { message = "Customer not found" });
+                }
+
+                // Update UserProfile DisplayName
+                if (!string.IsNullOrEmpty(dto.DisplayName))
+                {
+                    customer.UserProfile.DisplayName = dto.DisplayName;
+                    customer.UserProfile.UpdatedAt = DateTime.UtcNow;
+                }
+
+                // Update Customer Phone
+                if (!string.IsNullOrEmpty(dto.Phone))
+                {
+                    customer.Phone = dto.Phone;
+                    customer.UpdatedAt = DateTime.UtcNow;
+                }
+
+                await _context.SaveChangesAsync();
+
+                return Ok(new
+                {
+                    message = "Profile updated successfully",
+                    displayName = customer.UserProfile.DisplayName,
+                    phone = customer.Phone
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    error = "Failed to update profile",
+                    details = ex.Message
+                });
+            }
+        }
+
+        // PUT: api/Customers/UpdateAddress/{customerId}
+        [HttpPut("UpdateAddress/{customerId}")]
+        public async Task<IActionResult> UpdateAddress(int customerId, [FromBody] UpdateCustomerAddressDto dto)
+        {
+            try
+            {
+                // Find customer with their addresses
+                var customer = await _context.Customers
+                    .Include(c => c.CustomerAddresses)
+                        .ThenInclude(ca => ca.Address)
+                    .FirstOrDefaultAsync(c => c.Id == customerId);
+
+                if (customer == null)
+                {
+                    return NotFound(new { message = "Customer not found" });
+                }
+
+                // Get the default address or first address
+                var customerAddress = customer.CustomerAddresses
+                    .FirstOrDefault(ca => ca.Address.IsDefault)
+                    ?? customer.CustomerAddresses.FirstOrDefault();
+
+                if (customerAddress != null)
+                {
+                    // Update existing address
+                    var address = customerAddress.Address;
+                    address.Street = dto.Street ?? address.Street;
+                    address.City = dto.City ?? address.City;
+                    address.Region = dto.Region ?? address.Region;
+                    address.PostalCode = dto.PostalCode ?? address.PostalCode;
+                    address.Country = dto.Country ?? address.Country;
+                    address.UpdatedAt = DateTime.UtcNow;
+                }
+                else
+                {
+                    // Create new address if none exists
+                    var newAddress = new Address
+                    {
+                        Street = dto.Street,
+                        City = dto.City,
+                        Region = dto.Region,
+                        PostalCode = dto.PostalCode,
+                        Country = dto.Country,
+                        IsDefault = true,
+                        IsActive = true,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+
+                    _context.Addresses.Add(newAddress);
+                    await _context.SaveChangesAsync();
+
+                    // Link address to customer
+                    var newCustomerAddress = new CustomerAddress
+                    {
+                        CustomerId = customerId,
+                        AddressId = newAddress.Id
+                    };
+
+                    _context.CustomerAddresses.Add(newCustomerAddress);
+                }
+
+                customer.UpdatedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+
+                return Ok(new
+                {
+                    message = "Address updated successfully"
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    error = "Failed to update address",
+                    details = ex.Message
+                });
+            }
         }
     }
 }

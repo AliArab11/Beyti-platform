@@ -74,13 +74,20 @@ const AdminView = () => {
   const [userProfile, setUserProfile] = useState(null);
   const [displayName, setDisplayName] = useState("Admin User");
 
-  // Hardcoded login credentials - TODO: Replace with actual authentication/context
-  const userProfileId = 4037; // Logged-in admin's UserProfile ID
-  const adminProfileId = 1006; // Logged-in admin's ID in AdminProfile table
-  const userRole = 'Admin'; // Admin role type
+  // Get user credentials from authentication context/localStorage
+  // These should be set during login and stored in context or localStorage
+  const userProfileId = null; // TODO: Get from auth context
+  const adminProfileId = null; // TODO: Get from auth context
+  const userRole = 'Admin'; // TODO: Get from auth context
 
   // Fetch user profile details
   const fetchUserProfile = async () => {
+    // Don't fetch if userProfileId is not set
+    if (!userProfileId) {
+      console.warn('User profile ID not available. Please implement authentication.');
+      return;
+    }
+
     try {
       const profile = await getUserProfile(userProfileId);
       if (profile) {
@@ -107,6 +114,12 @@ const AdminView = () => {
 
   // Handle profile update
   const handleProfileUpdate = async (updates) => {
+    // Don't update if userProfileId is not set
+    if (!userProfileId) {
+      console.warn('User profile ID not available. Cannot update profile.');
+      return;
+    }
+
     try {
       await updateUserProfile(userProfileId, userRole, updates);
       // Refresh the profile after update

@@ -85,6 +85,11 @@ const ProductModeration = ({ onNavigate, adminUserProfileId }) => {
 
   // Fetch user profile details
   const fetchUserProfile = async () => {
+    if (!adminUserProfileId) {
+      console.warn('No adminUserProfileId provided, skipping profile fetch');
+      return;
+    }
+
     try {
       const profile = await getUserProfile(adminUserProfileId);
       if (profile) {
@@ -122,7 +127,7 @@ const ProductModeration = ({ onNavigate, adminUserProfileId }) => {
     fetchStatistics();
     fetchProducts();
     fetchUserProfile();
-  }, [filterStatus]);
+  }, [filterStatus, adminUserProfileId]);
 
 
   // View product details

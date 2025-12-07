@@ -30,6 +30,5 @@ public partial class SubCategory
     [InverseProperty("SubCategory")]
     public virtual ICollection<Product> Products { get; set; } = new List<Product>();
 
-    [InverseProperty("SubCategory")]
-    public virtual ICollection<ServiceCatalog> ServiceCatalogs { get; set; } = new List<ServiceCatalog>();
+    
 }

@@ -85,6 +85,12 @@ const ServiceModeration = ({ onNavigate, adminUserProfileId }) => {
 
   // Fetch user profile details
   const fetchUserProfile = async () => {
+    // Skip if adminUserProfileId is not provided
+    if (!adminUserProfileId) {
+      console.warn('Admin user profile ID not provided, skipping profile fetch');
+      return;
+    }
+
     try {
       const profile = await getUserProfile(adminUserProfileId);
       if (profile) {

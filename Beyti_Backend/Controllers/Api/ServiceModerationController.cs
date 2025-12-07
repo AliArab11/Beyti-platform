@@ -55,35 +55,35 @@ namespace Beyti_Backend.Controllers.Api
         {
             try
             {
-                var query = _context.ServiceCatalogs
-                    .Include(s => s.SubCategory)
-                        .ThenInclude(sc => sc.Category)
-                    .AsQueryable();
+                var query = from s in _context.ServiceCatalogs
+                            join sc in _context.ServiceCategories on s.ServiceCategoryId equals sc.Id into categoryGroup
+                            from category in categoryGroup.DefaultIfEmpty()
+                            select new { Service = s, CategoryName = category != null ? category.Name : "Uncategorized" };
 
                 // Filter by active status
                 if (isActive.HasValue)
-                    query = query.Where(s => s.IsActive == isActive.Value);
+                    query = query.Where(x => x.Service.IsActive == isActive.Value);
 
                 // Search by name or description
                 if (!string.IsNullOrEmpty(search))
-                    query = query.Where(s =>
-                        s.Name.Contains(search) ||
-                        (s.Description != null && s.Description.Contains(search)));
+                    query = query.Where(x =>
+                        x.Service.Name.Contains(search) ||
+                        (x.Service.Description != null && x.Service.Description.Contains(search)));
 
                 var services = await query
-                    .OrderByDescending(s => s.CreatedAt)
-                    .Select(s => new
+                    .OrderByDescending(x => x.Service.CreatedAt)
+                    .Select(x => new
                     {
-                        s.Id,
-                        s.Name,
-                        s.Description,
-                        s.MinPrice,
-                        s.MaxPrice,
-                        s.EstimatedDuration,
-                        s.IsActive,
-                        category = s.SubCategory.Category.Name,
-                        subCategory = s.SubCategory.Name,
-                        s.CreatedAt
+                        id = x.Service.Id,
+                        name = x.Service.Name,
+                        description = x.Service.Description,
+                        minPrice = x.Service.MinPrice,
+                        maxPrice = x.Service.MaxPrice,
+                        estimatedDuration = x.Service.EstimatedDuration,
+                        isActive = x.Service.IsActive,
+                        category = x.CategoryName,
+                        subCategory = "", // Add subCategory field for frontend compatibility
+                        createdAt = x.Service.CreatedAt
                     })
                     .ToListAsync();
 
@@ -91,7 +91,14 @@ namespace Beyti_Backend.Controllers.Api
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { error = ex.Message });
+                // Log the full exception details for debugging
+                Console.WriteLine($"Error in GetServices: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                }
+                return StatusCode(500, new { error = ex.Message, details = ex.InnerException?.Message });
             }
         }
 
@@ -101,24 +108,23 @@ namespace Beyti_Backend.Controllers.Api
         {
             try
             {
-                var service = await _context.ServiceCatalogs
-                    .Include(s => s.SubCategory)
-                        .ThenInclude(sc => sc.Category)
-                    .Where(s => s.Id == id)
-                    .Select(s => new
-                    {
-                        s.Id,
-                        s.Name,
-                        s.Description,
-                        s.MinPrice,
-                        s.MaxPrice,
-                        s.EstimatedDuration,
-                        s.IsActive,
-                        category = s.SubCategory.Category.Name,
-                        subCategory = s.SubCategory.Name,
-                        s.CreatedAt
-                    })
-                    .FirstOrDefaultAsync();
+                var service = await (from s in _context.ServiceCatalogs
+                                     join sc in _context.ServiceCategories on s.ServiceCategoryId equals sc.Id into categoryGroup
+                                     from category in categoryGroup.DefaultIfEmpty()
+                                     where s.Id == id
+                                     select new
+                                     {
+                                         id = s.Id,
+                                         name = s.Name,
+                                         description = s.Description,
+                                         minPrice = s.MinPrice,
+                                         maxPrice = s.MaxPrice,
+                                         estimatedDuration = s.EstimatedDuration,
+                                         isActive = s.IsActive,
+                                         category = category != null ? category.Name : "Uncategorized",
+                                         subCategory = "", // Add subCategory field for frontend compatibility
+                                         createdAt = s.CreatedAt
+                                     }).FirstOrDefaultAsync();
 
                 if (service == null)
                     return NotFound();
@@ -127,7 +133,13 @@ namespace Beyti_Backend.Controllers.Api
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { error = ex.Message });
+                Console.WriteLine($"Error in GetServiceDetails: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                }
+                return StatusCode(500, new { error = ex.Message, details = ex.InnerException?.Message });
             }
         }
 
@@ -138,8 +150,6 @@ namespace Beyti_Backend.Controllers.Api
             try
             {
                 var service = await _context.ServiceCatalogs
-                    .Include(s => s.SubCategory)
-                        .ThenInclude(sc => sc.Category)
                     .FirstOrDefaultAsync(s => s.Id == id);
 
                 if (service == null) return NotFound();
@@ -197,8 +207,6 @@ namespace Beyti_Backend.Controllers.Api
             try
             {
                 var service = await _context.ServiceCatalogs
-                    .Include(s => s.SubCategory)
-                        .ThenInclude(sc => sc.Category)
                     .FirstOrDefaultAsync(s => s.Id == id);
 
                 if (service == null) return NotFound();

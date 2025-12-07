@@ -21,7 +21,7 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
   const [priceFilter, setPriceFilter] = useState('all'); // 'all', 'low', 'medium', 'high'
   const [formData, setFormData] = useState({
     name: '',
-    subCategoryId: '',
+    serviceCategoryId: '',
     description: '',
     minPrice: '',
     maxPrice: '',
@@ -59,7 +59,7 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
     try {
       if (editingService) {
         const updateData = {
-          subCategoryId: parseInt(formData.subCategoryId),
+          serviceCategoryId: parseInt(formData.serviceCategoryId),
           name: formData.name,
           description: formData.description || null,
           minPrice: formData.minPrice ? parseFloat(formData.minPrice) : null,
@@ -80,7 +80,7 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
       } else {
         const addData = {
           serviceProviderId,
-          subCategoryId: parseInt(formData.subCategoryId),
+          serviceCategoryId: parseInt(formData.serviceCategoryId),
           name: formData.name,
           description: formData.description || null,
           minPrice: formData.minPrice ? parseFloat(formData.minPrice) : null,
@@ -102,7 +102,7 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
 
       setFormData({
         name: '',
-        subCategoryId: '',
+        serviceCategoryId: '',
         description: '',
         minPrice: '',
         maxPrice: '',
@@ -121,7 +121,7 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
     setEditingService(service);
     setFormData({
       name: service.name,
-      subCategoryId: service.subCategoryId,
+      serviceCategoryId: service.categoryId,
       description: service.description || '',
       minPrice: service.minPrice || '',
       maxPrice: service.maxPrice || '',
@@ -155,7 +155,7 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
     setEditingService(null);
     setFormData({
       name: '',
-      subCategoryId: '',
+      serviceCategoryId: '',
       description: '',
       minPrice: '',
       maxPrice: '',
@@ -179,7 +179,6 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
       filtered = filtered.filter(service =>
         service.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         service.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        service.subCategory?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         service.description?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
@@ -324,20 +323,16 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
             <div>
               <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">Category *</label>
               <select
-                value={formData.subCategoryId}
-                onChange={(e) => setFormData({ ...formData, subCategoryId: e.target.value })}
+                value={formData.serviceCategoryId}
+                onChange={(e) => setFormData({ ...formData, serviceCategoryId: e.target.value })}
                 className="w-full border border-grey-stroke rounded-lg px-4 py-2 text-body-regular focus:ring-2 focus:ring-sage-500 focus:border-sage-500"
                 required
               >
                 <option value="">Select a category</option>
                 {categories.map((category) => (
-                  <optgroup key={category.id} label={category.name}>
-                    {category.subCategories.map((sub) => (
-                      <option key={sub.id} value={sub.id}>
-                        {sub.name}
-                      </option>
-                    ))}
-                  </optgroup>
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
                 ))}
               </select>
             </div>

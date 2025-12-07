@@ -93,6 +93,8 @@ public partial class BeytiContext : DbContext
 
     public virtual DbSet<vw_ServiceProviderBooking> vw_ServiceProviderBookings { get; set; }
 
+    public virtual DbSet<ServiceCategory> ServiceCategories { get; set; }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
         => optionsBuilder.UseSqlServer("Server=(localdb)\\MSSQLLocalDB;Database=Beyti-V1;Trusted_Connection=True;");
@@ -373,12 +375,23 @@ public partial class BeytiContext : DbContext
 
         modelBuilder.Entity<ServiceCatalog>(entity =>
         {
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())");
+            // 1. Match the SQL default (changed from sysutcdatetime to sysdatetime)
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysdatetime())");
+
             entity.Property(e => e.IsActive).HasDefaultValue(true);
 
-            entity.HasOne(d => d.SubCategory).WithMany(p => p.ServiceCatalogs)
+            // 2. Point to the NEW ServiceCategory table
+            entity.HasOne(d => d.ServiceCategory)
+                .WithMany(p => p.ServiceCatalogs) // Matches the list in ServiceCategory.cs
+                .HasForeignKey(d => d.ServiceCategoryId) // Matches the new int column
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_ServiceCatalog_SubCategory");
+                .HasConstraintName("FK_ServiceCatalog_ServiceCategory"); // Matches the new SQL Constraint
+        });
+
+        modelBuilder.Entity<ServiceCategory>(entity =>
+        {
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysdatetime())");
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
         });
 
         modelBuilder.Entity<ServiceProvider>(entity =>

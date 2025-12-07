@@ -1418,19 +1418,31 @@ export const getUserProfile = async (userId) => {
  * @returns {Promise<object>} - Updated profile data
  */
 export const updateUserProfile = async (userId, userRole, updates) => {
-  // For now, use ServiceProviderDashboard endpoint for all profile updates
-  // This can be extended to route based on role if needed
+  // Route profile updates based on role
   const profileUpdates = {
     DisplayName: updates.displayName,
     Phone: updates.phone,
   };
 
-  await fetchAPI(`/ServiceProviderDashboard/UpdateProfile/${userId}`, {
-    method: 'PUT',
-    body: JSON.stringify(profileUpdates),
-  });
+  // Add BusinessName for Service Providers
+  if (userRole === 'ServiceProvider' && updates.businessName) {
+    profileUpdates.BusinessName = updates.businessName;
+  }
 
-  // If address updates are provided and user has associated provider/seller/driver ID
+  // Route to appropriate endpoint based on role
+  if (userRole === 'Customer') {
+    await fetchAPI(`/Customers/UpdateProfile/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(profileUpdates),
+    });
+  } else if (userRole === 'ServiceProvider') {
+    await fetchAPI(`/ServiceProviderDashboard/UpdateProfile/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(profileUpdates),
+    });
+  }
+
+  // If address updates are provided and user has associated entity ID
   if (updates.address && updates.entityId) {
     const addressUpdates = {
       Street: updates.address.street,
@@ -1441,7 +1453,12 @@ export const updateUserProfile = async (userId, userRole, updates) => {
     };
 
     // Route address update based on role
-    if (userRole === 'ServiceProvider') {
+    if (userRole === 'Customer') {
+      await fetchAPI(`/Customers/UpdateAddress/${updates.entityId}`, {
+        method: 'PUT',
+        body: JSON.stringify(addressUpdates),
+      });
+    } else if (userRole === 'ServiceProvider') {
       await fetchAPI(`/ServiceProviderDashboard/UpdateAddress/${updates.entityId}`, {
         method: 'PUT',
         body: JSON.stringify(addressUpdates),
@@ -1774,6 +1791,104 @@ export const markNotificationRead = async (id) => {
 export const deleteNotification = async (id) => {
   return await fetchAPI(`/Notifications/${id}`, {
     method: 'DELETE',
+  });
+};
+
+// Fetch sent notifications for user
+export const getSentNotifications = async (userId) => {
+  return await fetchAPI(`/Notifications/user/${userId}/sent`);
+};
+
+// --- Service Category APIs ---
+
+/**
+ * Get all service categories
+ * @returns {Promise<Array>} - Array of service categories
+ */
+export const getServiceCategoryList = async () => {
+  return await fetchAPI('/ServiceCategories');
+};
+
+/**
+ * Get a single service category by ID
+ * @param {number} id - Service Category ID
+ * @returns {Promise<object>} - Service Category object
+ */
+export const getServiceCategoryById = async (id) => {
+  return await fetchAPI(`/ServiceCategories/${id}`);
+};
+
+/**
+ * Create a new service category
+ * @param {object} data - Service category data (Name, Description, IsActive)
+ * @returns {Promise<object>} - Created service category
+ */
+export const createServiceCategory = async (data) => {
+  return await fetchAPI('/ServiceCategories', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Update an existing service category
+ * @param {number} id - Service Category ID
+ * @param {object} data - Updated service category data
+ * @returns {Promise<void>}
+ */
+export const updateServiceCategory = async (id, data) => {
+  return await fetchAPI(`/ServiceCategories/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ ...data, Id: id }),
+  });
+};
+
+// --- Service Catalog APIs ---
+
+/**
+ * Get all service catalogs
+ * @param {number} [categoryId] - Optional: Filter by category ID
+ * @returns {Promise<Array>} - Array of service catalogs
+ */
+export const getServiceCatalogs = async (categoryId = null) => {
+  let url = '/ServiceCatalogs';
+  if (categoryId) {
+    url += `?categoryId=${categoryId}`;
+  }
+  return await fetchAPI(url);
+};
+
+/**
+ * Get a single service catalog by ID
+ * @param {number} id - Service Catalog ID
+ * @returns {Promise<object>} - Service Catalog object
+ */
+export const getServiceCatalogById = async (id) => {
+  return await fetchAPI(`/ServiceCatalogs/${id}`);
+};
+
+/**
+ * Create a new service catalog
+ * @param {object} data - Service catalog data (Name, Description, ServiceCategoryId, IsActive, etc.)
+ * @returns {Promise<object>} - Created service catalog
+ */
+export const createServiceCatalog = async (data) => {
+  return await fetchAPI('/ServiceCatalogs', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Update an existing service catalog
+ * @param {number} id - Service Catalog ID
+ * @param {object} data - Updated service catalog data
+ * @returns {Promise<void>}
+ */
+export const updateServiceCatalog = async (id, data) => {
+  return await fetchAPI(`/ServiceCatalogs/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ ...data, Id: id }),
   });
 };
 

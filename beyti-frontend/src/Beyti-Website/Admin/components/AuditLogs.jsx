@@ -83,6 +83,12 @@ const AuditLogs = ({ onNavigate, adminUserProfileId = 4037 }) => {
 
   // Fetch user profile details
   const fetchUserProfile = async () => {
+    // Don't fetch if adminUserProfileId is not set
+    if (!adminUserProfileId) {
+      console.warn('Admin user profile ID not available. Skipping profile fetch.');
+      return;
+    }
+
     try {
       const profile = await getUserProfile(adminUserProfileId);
       if (profile) {

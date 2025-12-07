@@ -138,7 +138,6 @@ namespace Beyti_Backend.Controllers.Api
             {
                 // Normal update (no role change)
                 bool statusChanged = false;
-                bool displayNameChanged = false;
                 string oldStatus = user.Status;
                 string oldDisplayName = user.DisplayName ?? "Unknown";
                 List<string> changes = new List<string>();
@@ -146,7 +145,6 @@ namespace Beyti_Backend.Controllers.Api
                 if (!string.IsNullOrEmpty(newDisplayName) && newDisplayName != user.DisplayName)
                 {
                     user.DisplayName = newDisplayName;
-                    displayNameChanged = true;
                     changes.Add($"Display name changed from '{oldDisplayName}' to '{newDisplayName}'");
                 }
 
