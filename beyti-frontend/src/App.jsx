@@ -14,6 +14,7 @@ import StoresPage from "./Pages/Seller/Store";
 import MainStoreView from "./Beyti-Website/Store/MainStoreView.jsx";
 import StoreTypeSelection from "./Beyti-Website/Store/StoreTypeSelection.jsx";
 import ServiceProviderStoresView from "./Beyti-Website/Store/ServiceProviderStoresView.jsx";
+import StoreView from "./Beyti-Website/Store/StoreView.jsx";
 import StoreDetailsPage from "./Pages/Seller/StoreDetails";
 
 import SellerDashboardLayout from "./Beyti-Website/Seller/SellerDashboard.jsx";
@@ -181,6 +182,7 @@ export default function App() {
             <Route path="/stores" element={<StoreTypeSelection />} />
             <Route path="/mainStore" element={<MainStoreView />} />
             <Route path="/serviceProviders" element={<ServiceProviderStoresView />} />
+            <Route path="/store/:storeId" element={<StoreView />} />
             <Route path="/store/:id" element={<StoreDetailsPage />} />
             <Route path="/product" element={<ProductsPage />} />
             <Route path="/category" element={<CategoryPage />} />
