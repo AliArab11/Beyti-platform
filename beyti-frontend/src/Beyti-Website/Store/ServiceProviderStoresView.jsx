@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Scissors, ListDashes, PushPinSimple } from "@phosphor-icons/react";
-import { getServiceProviders, getServiceCategoryList, getServiceCatalogs, getUserProfile, updateUserProfile } from "../../services/api";
+import { getServiceProviders, getServiceCategoryList, getServiceCatalogs, getUserProfile, updateUserProfile, getServiceProviderServices } from "../../services/api";
 import { isAuthenticated, getUserId, handleSuspensionError } from "../../utils/authUtils";
 import PageHeader from "../../components/PageHeader";
 
@@ -154,8 +154,9 @@ const StarRating = ({ rating, reviewCount }) => {
 };
 
 // Service Provider Card Component
-const ProviderCard = ({ provider, onClick }) => {
+const ProviderCard = ({ provider, onClick, services }) => {
   console.log('[ProviderCard] Rendering provider:', provider);
+  console.log('[ProviderCard] Services:', services);
 
   // Get status color
   const getStatusColor = (status) => {
@@ -170,6 +171,11 @@ const ProviderCard = ({ provider, onClick }) => {
         return 'bg-grey-200 text-charcoal-600';
     }
   };
+
+  // Get active services count
+  // Handle both PascalCase and camelCase property names from API
+  const activeServicesCount = services?.filter(s => s.isActive || s.IsActive).length || 0;
+  const displayServices = services?.filter(s => s.isActive || s.IsActive).slice(0, 3) || [];
 
   return (
     <div
@@ -194,6 +200,53 @@ const ProviderCard = ({ provider, onClick }) => {
         <div className="mb-2">
           <StarRating rating={provider.averageRating || 0} reviewCount={provider.reviewCount || 0} />
         </div>
+
+        {/* Services List */}
+        {displayServices.length > 0 && (
+          <div className="mb-3 mt-3">
+            <p className="text-xs font-semibold text-charcoal-500 mb-2" style={{ fontFamily: 'Inter, sans-serif' }}>
+              Services Offered:
+            </p>
+            <div className="space-y-1">
+              {displayServices.map((service, idx) => {
+                // Handle both PascalCase and camelCase property names
+                const serviceName = service.name || service.Name;
+                const minPrice = service.minPrice || service.MinPrice;
+                const maxPrice = service.maxPrice || service.MaxPrice;
+
+                return (
+                  <div key={service.id || service.Id || idx} className="flex items-start gap-2">
+                    <span className="text-sage-500 text-xs mt-0.5">•</span>
+                    <div className="flex-1">
+                      <p className="text-xs text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>
+                        {serviceName}
+                        {minPrice && maxPrice && (
+                          <span className="text-charcoal-400 ml-1">
+                            (${minPrice} - ${maxPrice})
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+              {activeServicesCount > 3 && (
+                <p className="text-xs text-sage-500 font-medium mt-1" style={{ fontFamily: 'Inter, sans-serif' }}>
+                  +{activeServicesCount - 3} more services
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* No Services Message */}
+        {(!services || services.length === 0) && (
+          <div className="mb-3 mt-3">
+            <p className="text-xs text-charcoal-400 italic" style={{ fontFamily: 'Inter, sans-serif' }}>
+              No services listed yet
+            </p>
+          </div>
+        )}
 
         {/* Phone from ServiceProvider */}
         {provider.phone && (
@@ -232,6 +285,7 @@ const ServiceProviderStoresView = () => {
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const [displayName, setDisplayName] = useState("Customer");
   const [userProfile, setUserProfile] = useState(null);
+  const [providerServices, setProviderServices] = useState({}); // Map of providerId -> services array
 
   // Check authentication on mount
   useEffect(() => {
@@ -320,6 +374,7 @@ const ServiceProviderStoresView = () => {
   const fetchInitialData = async () => {
     try {
       setLoading(true);
+      console.log('[fetchInitialData] ===== STARTING DATA FETCH =====');
       const [providersData, categoriesData, catalogsData] = await Promise.all([
         getServiceProviders(),
         getServiceCategoryList(),
@@ -336,6 +391,26 @@ const ServiceProviderStoresView = () => {
       setProviders(normalizedProviders);
       setCategories(Array.isArray(categoriesData) ? categoriesData : []);
       setCatalogs(Array.isArray(catalogsData) ? catalogsData : []);
+
+      // Fetch services for each provider
+      if (normalizedProviders.length > 0) {
+        const servicesMap = {};
+        await Promise.all(
+          normalizedProviders.map(async (provider) => {
+            try {
+              const services = await getServiceProviderServices(provider.id);
+              console.log(`[fetchInitialData] Services for provider ${provider.id}:`, services);
+              console.log(`[fetchInitialData] First service structure:`, services[0]);
+              servicesMap[provider.id] = Array.isArray(services) ? services : [];
+            } catch (error) {
+              console.error(`Failed to fetch services for provider ${provider.id}:`, error);
+              servicesMap[provider.id] = [];
+            }
+          })
+        );
+        console.log('[fetchInitialData] Final servicesMap:', servicesMap);
+        setProviderServices(servicesMap);
+      }
 
       // Set first category as default
       if (categoriesData && categoriesData.length > 0) {
@@ -468,6 +543,7 @@ const ServiceProviderStoresView = () => {
                 <ProviderCard
                   key={provider.id || `provider-${idx}`}
                   provider={provider}
+                  services={providerServices[provider.id] || []}
                   onClick={() => navigate(`/service-provider/${provider.id}`)}
                 />
               ))}

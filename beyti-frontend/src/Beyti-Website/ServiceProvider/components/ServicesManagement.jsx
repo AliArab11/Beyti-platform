@@ -14,6 +14,7 @@ import { logProviderActivity } from '../../../utils/providerActivityLogger';
 export default function ServicesManagement({ serviceProviderId, searchTerm = '' }) {
   const [services, setServices] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [serviceCatalogs, setServiceCatalogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingService, setEditingService] = useState(null);
@@ -21,7 +22,7 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
   const [priceFilter, setPriceFilter] = useState('all'); // 'all', 'low', 'medium', 'high'
   const [formData, setFormData] = useState({
     name: '',
-    serviceCategoryId: '',
+    serviceCategoryId: '', // This will be serviceCatalogId
     description: '',
     minPrice: '',
     maxPrice: '',
@@ -44,6 +45,15 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
     try {
       const data = await getServiceCategories();
       setCategories(data);
+      // Flatten ServiceCatalogs for the dropdown
+      const allCatalogs = data.flatMap(cat =>
+        cat.serviceCatalogs?.map(sc => ({
+          id: sc.id,
+          name: sc.name,
+          categoryName: cat.name
+        })) || []
+      );
+      setServiceCatalogs(allCatalogs);
     } catch (err) {
       console.error('Error fetching categories:', err);
     }
@@ -66,7 +76,7 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
           maxPrice: formData.maxPrice ? parseFloat(formData.maxPrice) : null,
           estimatedDuration: formData.estimatedDuration ? parseInt(formData.estimatedDuration) : null
         };
-        await updateService(editingService.serviceCatalogId, updateData);
+        await updateService(editingService.serviceId, updateData);
 
         // Log activity
         logProviderActivity(
@@ -121,7 +131,7 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
     setEditingService(service);
     setFormData({
       name: service.name,
-      serviceCategoryId: service.categoryId,
+      serviceCategoryId: service.serviceCatalogId,
       description: service.description || '',
       minPrice: service.minPrice || '',
       maxPrice: service.maxPrice || '',
@@ -130,10 +140,10 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
     setShowForm(true);
   };
 
-  const handleToggle = async (serviceCatalogId) => {
+  const handleToggle = async (serviceId) => {
     try {
-      const service = services.find(s => s.serviceCatalogId === serviceCatalogId);
-      await toggleServiceStatus(serviceCatalogId);
+      const service = services.find(s => s.serviceId === serviceId);
+      await toggleServiceStatus(serviceId);
 
       // Log activity
       logProviderActivity(
@@ -321,17 +331,17 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
             </div>
 
             <div>
-              <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">Category *</label>
+              <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">Service Category *</label>
               <select
                 value={formData.serviceCategoryId}
                 onChange={(e) => setFormData({ ...formData, serviceCategoryId: e.target.value })}
-                className="w-full border border-grey-stroke rounded-lg px-4 py-2 text-body-regular focus:ring-2 focus:ring-sage-500 focus:border-sage-500"
+                className="w-full border border-grey-stroke rounded-lg px-4 py-2 text-body-regular focus:ring-2 focus:ring-sage-500 focus:border-sage-500 bg-white dark:bg-[#1F1F1F] dark:text-white"
                 required
               >
-                <option value="">Select a category</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
+                <option value="">Select a service category</option>
+                {serviceCatalogs.map((catalog) => (
+                  <option key={catalog.id} value={catalog.id}>
+                    {catalog.categoryName} - {catalog.name}
                   </option>
                 ))}
               </select>
@@ -418,30 +428,30 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
             ) : (
               filteredServices.map((service) => (
                 <TableRow
-                  key={service.serviceCatalogId}
+                  key={service.serviceId}
                   data={[
                     <div>
-                      <p className="text-body-medium text-charcoal-600 font-semibold">{service.name}</p>
+                      <p className="text-body-medium text-charcoal-600 dark:text-white font-semibold">{service.name}</p>
                       {service.description && (
-                        <p className="text-label-medium text-charcoal-400 mt-1">{service.description}</p>
+                        <p className="text-label-medium text-charcoal-400 dark:text-gray-400 mt-1">{service.description}</p>
                       )}
                     </div>,
-                    <span className="text-body-regular text-charcoal-400">
+                    <span className="text-body-regular text-charcoal-400 dark:text-gray-400">
                       {service.category} / {service.subCategory}
                     </span>,
                     service.minPrice && service.maxPrice ? (
-                      <span className="text-body-regular text-charcoal-600">
+                      <span className="text-body-regular text-charcoal-600 dark:text-white">
                         {service.minPrice} - {service.maxPrice} BHD
                       </span>
                     ) : (
-                      <span className="text-body-regular text-charcoal-400">Not set</span>
+                      <span className="text-body-regular text-charcoal-400 dark:text-gray-400">Not set</span>
                     ),
                     service.estimatedDuration ? (
-                      <span className="text-body-regular text-charcoal-600">
+                      <span className="text-body-regular text-charcoal-600 dark:text-white">
                         {service.estimatedDuration} mins
                       </span>
                     ) : (
-                      <span className="text-body-regular text-charcoal-400">Not set</span>
+                      <span className="text-body-regular text-charcoal-400 dark:text-gray-400">Not set</span>
                     ),
                     <StatusChip variant={service.isActive ? 'success' : 'error'}>
                       {service.isActive ? 'Active' : 'Inactive'}
@@ -457,7 +467,7 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
                       </CRUDButton>
                       <CRUDButton
                         variant={service.isActive ? 'error' : 'success'}
-                        onClick={() => handleToggle(service.serviceCatalogId)}
+                        onClick={() => handleToggle(service.serviceId)}
                       >
                         {service.isActive ? 'Deactivate' : 'Activate'}
                       </CRUDButton>

@@ -552,6 +552,15 @@ export const getServiceProvider = async (id) => {
 // Alias for consistency with other API naming conventions
 export const getServiceProviderById = getServiceProvider;
 
+/**
+ * Get all services for a specific service provider
+ * @param {number} serviceProviderId - Service Provider ID
+ * @returns {Promise<Array>} - Array of service objects
+ */
+export const getServiceProviderServices = async (serviceProviderId) => {
+  return await fetchAPI(`/ServiceProviders/${serviceProviderId}/services`);
+};
+
 export const createServiceProvider = async (data) => {
   return await fetchAPI('/ServiceProviders', {
     method: 'POST',

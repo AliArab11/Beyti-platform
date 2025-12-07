@@ -309,24 +309,24 @@ namespace Beyti_Backend.Controllers.Api
         {
             try
             {
-                // Get services through ProviderApplication
-                var services = await _context.ProviderApplicationServices
-                    .Include(pas => pas.ProviderApplication)
-                    .Include(pas => pas.ServiceCatalog)
+                // Get services from Service table
+                var services = await _context.Services
+                    .Include(s => s.ServiceCatalog)
                         .ThenInclude(sc => sc.ServiceCategory)
-                    .Where(pas => pas.ProviderApplication.ServiceProviderId == serviceProviderId)
-                    .Select(pas => new
+                    .Where(s => s.ServiceProviderId == serviceProviderId)
+                    .Select(s => new
                     {
-                        ServiceCatalogId = pas.ServiceCatalog.Id,
-                        pas.ServiceCatalog.Name,
-                        pas.ServiceCatalog.Description,
-                        pas.ServiceCatalog.MinPrice,
-                        pas.ServiceCatalog.MaxPrice,
-                        pas.ServiceCatalog.EstimatedDuration,
-                        pas.ServiceCatalog.IsActive,
-                        Category = pas.ServiceCatalog.ServiceCategory.Name,
-                        CategoryId = pas.ServiceCatalog.ServiceCategoryId,
-                        ApplicationStatus = pas.ProviderApplication.Status
+                        ServiceId = s.Id,
+                        s.Name,
+                        s.Description,
+                        s.MinPrice,
+                        s.MaxPrice,
+                        s.EstimatedDuration,
+                        s.IsActive,
+                        Category = s.ServiceCatalog.ServiceCategory.Name,
+                        SubCategory = s.ServiceCatalog.Name,
+                        CategoryId = s.ServiceCatalog.ServiceCategoryId,
+                        ServiceCatalogId = s.ServiceCatalogId
                     })
                     .ToListAsync();
 
@@ -345,7 +345,7 @@ namespace Beyti_Backend.Controllers.Api
             try
             {
                 int serviceProviderId = body.GetProperty("serviceProviderId").GetInt32();
-                int serviceCategoryId = body.GetProperty("serviceCategoryId").GetInt32();
+                int serviceCatalogId = body.GetProperty("serviceCategoryId").GetInt32(); // Frontend sends serviceCategoryId but it's actually serviceCatalogId
                 string name = body.GetProperty("name").GetString()!;
 
                 string? description = null;
@@ -406,12 +406,13 @@ namespace Beyti_Backend.Controllers.Api
                     }
                 }
 
-                var now = DateTime.UtcNow;
+                var now = DateTime.Now;
 
-                // Create service in catalog
-                var serviceCatalog = new ServiceCatalog
+                // Create service in Service table
+                var service = new Service
                 {
-                    ServiceCategoryId = serviceCategoryId,
+                    ServiceProviderId = serviceProviderId,
+                    ServiceCatalogId = serviceCatalogId,
                     Name = name,
                     Description = description,
                     MinPrice = minPrice,
@@ -421,40 +422,13 @@ namespace Beyti_Backend.Controllers.Api
                     CreatedAt = now
                 };
 
-                _context.ServiceCatalogs.Add(serviceCatalog);
-                await _context.SaveChangesAsync();
-
-                // Find or create provider application
-                var application = await _context.ProviderApplications
-                    .FirstOrDefaultAsync(pa => pa.ServiceProviderId == serviceProviderId);
-
-                if (application == null)
-                {
-                    application = new ProviderApplication
-                    {
-                        ServiceProviderId = serviceProviderId,
-                        Status = "Approved", // Auto-approve for existing providers
-                        CreatedAt = now,
-                        UpdatedAt = now
-                    };
-                    _context.ProviderApplications.Add(application);
-                    await _context.SaveChangesAsync();
-                }
-
-                // Link service to provider
-                var providerApplicationService = new ProviderApplicationService
-                {
-                    ProviderApplicationId = application.Id,
-                    ServiceCatalogId = serviceCatalog.Id
-                };
-
-                _context.ProviderApplicationServices.Add(providerApplicationService);
+                _context.Services.Add(service);
                 await _context.SaveChangesAsync();
 
                 return Ok(new
                 {
                     message = "Service added successfully",
-                    serviceId = serviceCatalog.Id
+                    serviceId = service.Id
                 });
             }
             catch (Exception ex)
@@ -464,25 +438,25 @@ namespace Beyti_Backend.Controllers.Api
         }
 
         // PUT: api/ServiceProviderDashboard/UpdateService/5
-        [HttpPut("UpdateService/{serviceCatalogId}")]
-        public async Task<IActionResult> UpdateService(int serviceCatalogId, JsonElement body)
+        [HttpPut("UpdateService/{serviceId}")]
+        public async Task<IActionResult> UpdateService(int serviceId, JsonElement body)
         {
             try
             {
-                var service = await _context.ServiceCatalogs.FindAsync(serviceCatalogId);
+                var service = await _context.Services.FindAsync(serviceId);
                 if (service == null)
                     return NotFound("Service not found");
 
-                // Update ServiceCategoryId if provided
+                // Update ServiceCatalogId if provided (frontend sends this as serviceCategoryId)
                 if (body.TryGetProperty("serviceCategoryId", out var catProp))
                 {
                     if (catProp.ValueKind == JsonValueKind.Number)
                     {
-                        service.ServiceCategoryId = catProp.GetInt32();
+                        service.ServiceCatalogId = catProp.GetInt32();
                     }
                     else if (catProp.ValueKind == JsonValueKind.String)
                     {
-                        service.ServiceCategoryId = int.Parse(catProp.GetString()!);
+                        service.ServiceCatalogId = int.Parse(catProp.GetString()!);
                     }
                 }
 
@@ -557,12 +531,12 @@ namespace Beyti_Backend.Controllers.Api
         }
 
         // PUT: api/ServiceProviderDashboard/ToggleService/5
-        [HttpPut("ToggleService/{serviceCatalogId}")]
-        public async Task<IActionResult> ToggleServiceStatus(int serviceCatalogId)
+        [HttpPut("ToggleService/{serviceId}")]
+        public async Task<IActionResult> ToggleServiceStatus(int serviceId)
         {
             try
             {
-                var service = await _context.ServiceCatalogs.FindAsync(serviceCatalogId);
+                var service = await _context.Services.FindAsync(serviceId);
                 if (service == null)
                     return NotFound("Service not found");
 

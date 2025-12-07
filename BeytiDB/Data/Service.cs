@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -6,20 +6,23 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BeytiDB.Data;
 
-[Table("ServiceCatalog")]
-
-public partial class ServiceCatalog
+[Table("Service")]
+[Index("ServiceProviderId", Name = "IX_Service_Provider")]
+[Index("ServiceCatalogId", Name = "IX_Service_Catalog")]
+public partial class Service
 {
     [Key]
     public int Id { get; set; }
 
-    public int ServiceCategoryId { get; set; }
+    public int ServiceProviderId { get; set; }
+
+    public int ServiceCatalogId { get; set; }
 
     [Required]
     [StringLength(100)]
     public string Name { get; set; } = null!;
 
-    [StringLength(255)]
+    [StringLength(500)]
     public string? Description { get; set; }
 
     [Column(TypeName = "decimal(10, 2)")]
@@ -35,16 +38,14 @@ public partial class ServiceCatalog
     [Precision(3)]
     public DateTime CreatedAt { get; set; }
 
-    [InverseProperty("ServiceCatalog")]
-    public virtual ICollection<ProviderApplicationService> ProviderApplicationServices { get; set; } = new List<ProviderApplicationService>();
+    [ForeignKey("ServiceProviderId")]
+    [InverseProperty("Services")]
+    public virtual ServiceProvider ServiceProvider { get; set; } = null!;
 
-    [InverseProperty("ServiceCatalog")]
-    public virtual ICollection<Service> Services { get; set; } = new List<Service>();
+    [ForeignKey("ServiceCatalogId")]
+    [InverseProperty("Services")]
+    public virtual ServiceCatalog ServiceCatalog { get; set; } = null!;
 
-    [InverseProperty("ServiceCatalog")]
+    [InverseProperty("Service")]
     public virtual ICollection<ServiceBooking> ServiceBookings { get; set; } = new List<ServiceBooking>();
-
-    [ForeignKey("ServiceCategoryId")]
-    public virtual ServiceCategory ServiceCategory { get; set; } = null!;
-
 }

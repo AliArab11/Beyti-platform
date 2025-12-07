@@ -22,6 +22,8 @@ public partial class ServiceBooking
 
     public int ServiceCatalogId { get; set; }
 
+    public int? ServiceId { get; set; }
+
     public int ServiceAddressId { get; set; }
 
     public int? TimeSlotId { get; set; }
@@ -76,6 +78,10 @@ public partial class ServiceBooking
     [ForeignKey("ServiceCatalogId")]
     [InverseProperty("ServiceBookings")]
     public virtual ServiceCatalog ServiceCatalog { get; set; } = null!;
+
+    [ForeignKey("ServiceId")]
+    [InverseProperty("ServiceBookings")]
+    public virtual Service? Service { get; set; }
 
     [ForeignKey("ServiceProviderId")]
     [InverseProperty("ServiceBookings")]

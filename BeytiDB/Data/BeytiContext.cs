@@ -67,6 +67,8 @@ public partial class BeytiContext : DbContext
 
     public virtual DbSet<ServiceCatalog> ServiceCatalogs { get; set; }
 
+    public virtual DbSet<Service> Services { get; set; }
+
     public virtual DbSet<ServiceProvider> ServiceProviders { get; set; }
 
     public virtual DbSet<ServiceProviderAddress> ServiceProviderAddresses { get; set; }
@@ -366,6 +368,11 @@ public partial class BeytiContext : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_ServiceBooking_ServiceCatalog");
 
+            entity.HasOne(d => d.Service).WithMany(p => p.ServiceBookings)
+                .HasForeignKey(d => d.ServiceId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("FK_ServiceBooking_Service");
+
             entity.HasOne(d => d.ServiceProvider).WithMany(p => p.ServiceBookings)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_ServiceBooking_Provider");
@@ -392,6 +399,24 @@ public partial class BeytiContext : DbContext
         {
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysdatetime())");
             entity.Property(e => e.IsActive).HasDefaultValue(true);
+        });
+
+        modelBuilder.Entity<Service>(entity =>
+        {
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysdatetime())");
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+
+            entity.HasOne(d => d.ServiceProvider)
+                .WithMany(p => p.Services)
+                .HasForeignKey(d => d.ServiceProviderId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Service_ServiceProvider");
+
+            entity.HasOne(d => d.ServiceCatalog)
+                .WithMany(p => p.Services)
+                .HasForeignKey(d => d.ServiceCatalogId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Service_ServiceCatalog");
         });
 
         modelBuilder.Entity<ServiceProvider>(entity =>

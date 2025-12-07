@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Scissors, Star, MagnifyingGlass, ArrowLeft } from "@phosphor-icons/react";
-import { getServiceProviderById, getServiceCatalogs } from "../../services/api";
+import { getServiceProviderById, getServiceCatalogs, getServiceProviderServices } from "../../services/api";
 import { isAuthenticated } from "../../utils/authUtils";
 import PageHeader from "../../components/PageHeader";
 
@@ -189,7 +189,7 @@ const CategorySidebar = ({ catalogs, selected, onSelect }) => {
   );
 };
 
-// Service Card Component (placeholder for services)
+// Service Card Component with MinPrice "Starting from" badge
 const ServiceCard = ({ service }) => (
   <div className="bg-white rounded-2xl overflow-hidden cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all group">
     {/* Service Icon */}
@@ -200,11 +200,14 @@ const ServiceCard = ({ service }) => (
         </div>
       </div>
 
-      {/* Price Badge */}
-      <div className="absolute top-4 right-4 bg-white px-4 py-2 rounded-full shadow-lg">
-        <span className="text-lg font-bold text-sage-700">
-          {service?.price ? `${service.price.toFixed(3)} BD` : "20.000 BD"}
-        </span>
+      {/* MinPrice Badge - "Starting from" */}
+      <div className="absolute top-4 right-4 bg-white px-4 py-2.5 rounded-full shadow-lg">
+        <div className="text-xs font-medium text-sage-600 text-center" style={{ fontFamily: 'Inter, sans-serif', lineHeight: '1.2' }}>
+          Starting from
+        </div>
+        <div className="text-base font-bold text-sage-700 text-center" style={{ fontFamily: 'Inter, sans-serif', lineHeight: '1.2' }}>
+          {service?.minPrice ? `${service.minPrice.toFixed(3)} BD` : "20.000 BD"}
+        </div>
       </div>
     </div>
 
@@ -214,11 +217,23 @@ const ServiceCard = ({ service }) => (
         {service?.name || "Service"}
       </h3>
 
+      {/* Dynamic Star Rating */}
       <div className="flex items-center gap-1 mb-3">
         {[...Array(5)].map((_, i) => (
-          <Star key={i} className="w-4 h-4 text-[#F5C563]" weight="fill" />
+          <Star 
+            key={i} 
+            className="w-4 h-4" 
+            weight="fill"
+            style={{ 
+              color: i < Math.floor(service?.averageRating || 0) 
+                ? '#F5C563' 
+                : '#E5E7EB' 
+            }}
+          />
         ))}
-        <span className="text-sm font-semibold text-charcoal-600 ml-1">5.0</span>
+        <span className="text-sm font-semibold text-charcoal-600 ml-1">
+          {service?.averageRating ? service.averageRating.toFixed(1) : "N/A"}
+        </span>
       </div>
 
       {service?.description && (
@@ -245,6 +260,7 @@ const ServiceProviderDetailView = () => {
   const [selectedCatalog, setSelectedCatalog] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("popular");
+  const [services, setServices] = useState([]);
 
   // Check authentication on mount
   useEffect(() => {
@@ -272,6 +288,11 @@ const ServiceProviderDetailView = () => {
         console.log('[ServiceProviderDetailView] Catalogs data:', catalogsData);
         setCatalogs(Array.isArray(catalogsData) ? catalogsData : []);
 
+        // Fetch services for this provider
+        const servicesData = await getServiceProviderServices(providerId);
+        console.log('[ServiceProviderDetailView] Services data:', servicesData);
+        setServices(Array.isArray(servicesData) ? servicesData : []);
+
         // Set first catalog as default
         if (catalogsData && catalogsData.length > 0) {
           setSelectedCatalog(catalogsData[0].id);
@@ -295,12 +316,35 @@ const ServiceProviderDetailView = () => {
     return catalog?.name || "Services";
   };
 
-  // Placeholder services - replace with actual API call
-  const services = [];
+  // Filter services by selected catalog and search query
+  const filteredServices = services.filter(service => {
+    // Filter by catalog
+    const matchesCatalog = selectedCatalog 
+      ? service.serviceCatalogId === selectedCatalog 
+      : true;
+    
+    // Filter by search query
+    const matchesSearch = searchQuery.trim() === '' 
+      ? true 
+      : service.name?.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    return matchesCatalog && matchesSearch;
+  });
 
-  const filteredServices = services.filter(service =>
-    service.name?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Sort filtered services
+  const sortedServices = [...filteredServices].sort((a, b) => {
+    switch (sortBy) {
+      case 'price-low':
+        return (a.minPrice || 0) - (b.minPrice || 0);
+      case 'price-high':
+        return (b.minPrice || 0) - (a.minPrice || 0);
+      case 'newest':
+        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+      case 'popular':
+      default:
+        return (b.averageRating || 0) - (a.averageRating || 0);
+    }
+  });
 
   if (loading) {
     return (
@@ -401,9 +445,9 @@ const ServiceProviderDetailView = () => {
             </div>
 
             {/* Services Grid */}
-            {filteredServices.length > 0 ? (
+            {sortedServices.length > 0 ? (
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredServices.map(service => (
+                {sortedServices.map(service => (
                   <ServiceCard
                     key={service.id}
                     service={service}
@@ -416,7 +460,9 @@ const ServiceProviderDetailView = () => {
                   <Scissors className="w-12 h-12 text-charcoal-400" weight="regular" />
                 </div>
                 <h3 className="text-xl font-bold text-charcoal-600 mb-2">No Services Found</h3>
-                <p className="text-charcoal-400">This service provider hasn't added any services yet.</p>
+                <p className="text-charcoal-400">
+                  {searchQuery ? 'No services match your search.' : 'This category has no services yet.'}
+                </p>
               </div>
             )}
           </div>
