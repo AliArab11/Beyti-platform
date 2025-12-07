@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
-import { Cake, BowlFood, Heart, Bread, Coffee, ArrowLeft, Star, MagnifyingGlass } from "@phosphor-icons/react";
-
+import { useParams, useNavigate } from "react-router-dom";
+import { Cake, Heart, Star, MagnifyingGlass, ArrowLeft, Bread, ShoppingCartSimple, X } from "@phosphor-icons/react";
+import ProductDetailsSheet from './Components/ProductDetails.jsx';
+import Checkout from './Components/Checkout';
 // Mock API call - replace with your actual API
 const getStoreDetails = async (storeId) => {
   try {
@@ -12,6 +14,7 @@ const getStoreDetails = async (storeId) => {
     return null;
   }
 };
+
 
 // Header Component
 const StoreHeader = ({ storeName, onBack }) => (
@@ -59,7 +62,7 @@ const StoreHeader = ({ storeName, onBack }) => (
   </header>
 );
 
-// Store Info Section - Redesigned to match reference image
+// Store Info Section
 const StoreInfo = ({ store }) => (
   <div className="bg-cream-50 px-8 py-6">
     <div className="max-w-[1400px] mx-auto">
@@ -67,20 +70,20 @@ const StoreInfo = ({ store }) => (
       {/* Main Card Container */}
       <div className="bg-white rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.08)] relative">
         
-        {/* Banner Section (Top) - Dynamic Color with Cool Design */}
+        {/* Banner Section (Top) */}
         {(() => {
           const storeName = store?.storeName || "Cookies by Maryam";
           const hash = storeName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
           
           const bannerGradients = [
-            'from-[#6366F1]/20 via-[#8B5CF6]/15 to-[#EC4899]/20', // Purple to Pink
-            'from-[#F59E0B]/20 via-[#EF4444]/15 to-[#DC2626]/20', // Orange to Red
-            'from-[#10B981]/20 via-[#059669]/15 to-[#047857]/20', // Green shades
-            'from-[#3B82F6]/20 via-[#2563EB]/15 to-[#1D4ED8]/20', // Blue shades
-            'from-[#EC4899]/20 via-[#DB2777]/15 to-[#BE185D]/20', // Pink shades
-            'from-[#8B5CF6]/20 via-[#7C3AED]/15 to-[#6D28D9]/20', // Purple shades
-            'from-[#14B8A6]/20 via-[#0D9488]/15 to-[#0F766E]/20', // Teal shades
-            'from-[#F97316]/20 via-[#EA580C]/15 to-[#C2410C]/20', // Orange shades
+            'from-[#6366F1]/20 via-[#8B5CF6]/15 to-[#EC4899]/20',
+            'from-[#F59E0B]/20 via-[#EF4444]/15 to-[#DC2626]/20',
+            'from-[#10B981]/20 via-[#059669]/15 to-[#047857]/20',
+            'from-[#3B82F6]/20 via-[#2563EB]/15 to-[#1D4ED8]/20',
+            'from-[#EC4899]/20 via-[#DB2777]/15 to-[#BE185D]/20',
+            'from-[#8B5CF6]/20 via-[#7C3AED]/15 to-[#6D28D9]/20',
+            'from-[#14B8A6]/20 via-[#0D9488]/15 to-[#0F766E]/20',
+            'from-[#F97316]/20 via-[#EA580C]/15 to-[#C2410C]/20',
           ];
           
           const accentColors = [
@@ -95,9 +98,7 @@ const StoreInfo = ({ store }) => (
           return (
             <div className={`relative h-[180px] bg-gradient-to-br ${gradient} rounded-t-3xl overflow-hidden`}
                  style={{ backgroundColor: '#F5F5F7' }}>
-              {/* Geometric Pattern Background */}
               <div className="absolute inset-0 opacity-30">
-                {/* Diagonal lines pattern */}
                 <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
                   <defs>
                     <pattern id="diagonalLines" patternUnits="userSpaceOnUse" width="40" height="40" patternTransform="rotate(45)">
@@ -108,7 +109,6 @@ const StoreInfo = ({ store }) => (
                 </svg>
               </div>
               
-              {/* Decorative Circles */}
               <div className="absolute inset-0">
                 <div className="absolute top-8 right-16 w-32 h-32 rounded-full opacity-20"
                      style={{ background: `radial-gradient(circle, ${accentColor} 0%, transparent 70%)` }}></div>
@@ -118,7 +118,6 @@ const StoreInfo = ({ store }) => (
                      style={{ background: `radial-gradient(circle, ${accentColor} 0%, transparent 70%)` }}></div>
               </div>
               
-              {/* Wave Pattern at Bottom */}
               <div className="absolute bottom-0 left-0 right-0">
                 <svg viewBox="0 0 1200 60" className="w-full" preserveAspectRatio="none">
                   <path d="M0,30 Q300,10 600,30 T1200,30 L1200,60 L0,60 Z" 
@@ -130,19 +129,19 @@ const StoreInfo = ({ store }) => (
             </div>
           );
         })()}
-          {/* Circular Logo - Only 20% on banner, 80% below */}
+          
+          {/* Circular Logo */}
           <div className="absolute -bottom-[112px] left-12 z-30">
             {(() => {
-              // Random gradient colors - different each time
               const gradients = [
-                'from-[#6366F1] via-[#8B5CF6] to-[#EC4899]', // Purple to Pink
-                'from-[#F59E0B] via-[#EF4444] to-[#DC2626]', // Orange to Red
-                'from-[#10B981] via-[#059669] to-[#047857]', // Green shades
-                'from-[#3B82F6] via-[#2563EB] to-[#1D4ED8]', // Blue shades
-                'from-[#EC4899] via-[#DB2777] to-[#BE185D]', // Pink shades
-                'from-[#8B5CF6] via-[#7C3AED] to-[#6D28D9]', // Purple shades
-                'from-[#14B8A6] via-[#0D9488] to-[#0F766E]', // Teal shades
-                'from-[#F97316] via-[#EA580C] to-[#C2410C]', // Orange shades
+                'from-[#6366F1] via-[#8B5CF6] to-[#EC4899]',
+                'from-[#F59E0B] via-[#EF4444] to-[#DC2626]',
+                'from-[#10B981] via-[#059669] to-[#047857]',
+                'from-[#3B82F6] via-[#2563EB] to-[#1D4ED8]',
+                'from-[#EC4899] via-[#DB2777] to-[#BE185D]',
+                'from-[#8B5CF6] via-[#7C3AED] to-[#6D28D9]',
+                'from-[#14B8A6] via-[#0D9488] to-[#0F766E]',
+                'from-[#F97316] via-[#EA580C] to-[#C2410C]',
               ];
               
               const shadowColors = [
@@ -165,7 +164,6 @@ const StoreInfo = ({ store }) => (
               return (
                 <div className={`w-[140px] h-[140px] rounded-full bg-gradient-to-br ${gradient} border-[6px] border-white flex items-center justify-center overflow-hidden relative`}
                      style={{ boxShadow: `0 8px 30px ${shadowColor}` }}>
-                  {/* Animated background pattern */}
                   <div className="absolute inset-0 opacity-20">
                     <div className="absolute top-0 left-0 w-full h-full" 
                          style={{
@@ -175,16 +173,13 @@ const StoreInfo = ({ store }) => (
                     </div>
                   </div>
                   
-                  {/* Cool Logo Design */}
                   <div className="relative z-10 w-full h-full flex flex-col items-center justify-center p-3">
-                    {/* Hexagon/Badge Shape Background */}
                     <div className="absolute inset-0 flex items-center justify-center opacity-15">
                       <svg viewBox="0 0 100 100" className="w-28 h-28 text-white">
                         <polygon points="50,5 90,27.5 90,72.5 50,95 10,72.5 10,27.5" fill="currentColor" stroke="currentColor" strokeWidth="3"/>
                       </svg>
                     </div>
                     
-                    {/* Store Name Initials - Modern Monogram */}
                     <div className="relative">
                       {(() => {
                         const words = storeName.split(' ').filter(w => w.length > 0);
@@ -201,7 +196,6 @@ const StoreInfo = ({ store }) => (
                       })()}
                     </div>
                     
-                    {/* Minimal underline accent */}
                     <div className="w-14 h-1 bg-white/90 rounded-full mt-1 shadow-[0_2px_6px_rgba(0,0,0,0.3)]"></div>
                   </div>
                 </div>
@@ -210,7 +204,7 @@ const StoreInfo = ({ store }) => (
           </div>
         </div>
 
-        {/* White Info Section (Bottom) - Reduced height by 10% total */}
+        {/* White Info Section (Bottom) */}
         <div className="pt-7 pb-3 px-10 bg-white rounded-b-3xl">
           
           {/* HORIZONTAL LAYOUT */}
@@ -230,9 +224,9 @@ const StoreInfo = ({ store }) => (
                     {store?.storeName || "Cookies by Maryam"}
                   </h1>
                   
-                  {/* Rating inline with name - GREEN and BIGGER */}
+                  {/* Rating inline with name */}
                   <div className="flex items-center gap-2.5">
-                    <Star className="w-7 h-7 text-[#556B5C] drop-shadow-[0_2px_4px_rgba(85,107,92,0.3)]" weight="fill" />
+                    <Star className="w-7 h-7 text-[#556B5C]" weight="fill" />
                     <span className="text-[22px] font-semibold text-[#556B5C]" 
                           style={{ fontFamily: "Inter, sans-serif" }}>
                       {store?.rating || "2.3"}
@@ -251,7 +245,7 @@ const StoreInfo = ({ store }) => (
             {/* VERTICAL DIVIDER LINE */}
             <div className="w-[2px] h-16 bg-grey-stroke self-start"></div>
 
-            {/* RIGHT SIDE: Store Information - More space */}
+            {/* RIGHT SIDE: Store Information */}
             <div className="flex-1 pr-8">
               {/* Inline Details */}
               <div className="space-y-1.5 text-[15px]" 
@@ -284,7 +278,6 @@ const StoreInfo = ({ store }) => (
         </div>
       </div>
     </div>
-
 );
 
 // Category Sidebar
@@ -328,8 +321,11 @@ const CategorySidebar = ({ selected, onSelect }) => {
 };
 
 // Product Card
-const ProductCard = ({ product }) => (
-  <div className="bg-white rounded-2xl overflow-hidden cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all group">
+const ProductCard = ({ product, onClick }) => (
+  <div 
+    onClick={onClick}
+    className="bg-white rounded-2xl overflow-hidden cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all group"
+  >
     {/* Product Image */}
     <div className="relative h-48 bg-gradient-to-br from-[#D8E8DC] to-[#C9DFD0] overflow-hidden">
       <div className="absolute inset-0 flex items-center justify-center">
@@ -368,51 +364,74 @@ const ProductCard = ({ product }) => (
       )}
       
       <button className="w-full bg-sage-500 hover:bg-sage-600 text-white font-semibold py-3 rounded-xl transition-all shadow-[0_2px_8px_rgba(85,107,92,0.2)]">
-        Add to Cart
+        View Details
       </button>
     </div>
   </div>
 );
 
-// Search and Sort Bar
-const SearchSortBar = ({ searchQuery, onSearchChange, sortBy, onSortChange }) => (
-  <div className="flex gap-4 items-center mb-8">
-    <div className="flex-1 relative">
-      <input
-        type="text"
-        value={searchQuery}
-        onChange={(e) => onSearchChange(e.target.value)}
-        placeholder="Search Products..."
-        className="w-full pl-12 pr-4 py-3.5 bg-white rounded-full border border-grey-stroke focus:outline-none focus:border-sage-500 text-charcoal-600 shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
-        style={{ fontFamily: 'Inter, sans-serif', fontSize: '16px' }}
-      />
-      <MagnifyingGlass className="w-5 h-5 text-charcoal-400 absolute left-4 top-1/2 -translate-y-1/2" weight="bold" />
-    </div>
-    
-    <select
-      value={sortBy}
-      onChange={(e) => onSortChange(e.target.value)}
-      className="px-6 py-3.5 bg-white rounded-full border border-grey-stroke hover:border-sage-500 transition-all shadow-[0_2px_8px_rgba(0,0,0,0.06)] text-charcoal-600 font-semibold cursor-pointer"
-      style={{ fontFamily: 'Inter, sans-serif' }}
-    >
-      <option value="popular">Most Popular</option>
-      <option value="price-low">Price: Low to High</option>
-      <option value="price-high">Price: High to Low</option>
-      <option value="newest">Newest First</option>
-    </select>
-  </div>
-);
-
 // Main Store View Component
-const StoreView = ({ storeId, onBack }) => {
+const StoreView = () => {
+  const { storeId } = useParams();
+  const navigate = useNavigate();
   const [store, setStore] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState("popular");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("popular");
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [showProductSheet, setShowProductSheet] = useState(false);
+  const [cart, setCart] = useState([]);
+  const [showCartModal, setShowCartModal] = useState(false);
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+
+const handleProductClick = (product) => {
+  setSelectedProduct(product);
+  setShowProductSheet(true);
+};
+
+const handleAddToCart = (item) => {
+  // Check if item already exists in cart
+  const existingItem = cart.find(cartItem => cartItem.id === item.id);
+  
+  if (existingItem) {
+    // Update quantity if item exists
+    setCart(cart.map(cartItem => 
+      cartItem.id === item.id 
+        ? { ...cartItem, quantity: cartItem.quantity + item.quantity }
+        : cartItem
+    ));
+  } else {
+    // Add new item to cart
+    setCart([...cart, item]);
+  }
+  
+  // Show success message (optional)
+  alert(`Added ${item.quantity}x ${item.name} to cart!`);
+};
+
+const handleUpdateQuantity = (productId, newQuantity) => {
+  if (newQuantity < 1) {
+    handleRemoveFromCart(productId);
+    return;
+  }
+  setCart(cart.map(item => 
+    item.id === productId 
+      ? { ...item, quantity: newQuantity, totalPrice: item.basePrice * newQuantity }
+      : item
+  ));
+};
+
+const handleRemoveFromCart = (productId) => {
+  setCart(cart.filter(item => item.id !== productId));
+};
 
   useEffect(() => {
+
+    // Scroll to top when component mounts or storeId changes
+    window.scrollTo({ top: 70, behavior: 'smooth' });
+
     const loadStore = async () => {
       try {
         setLoading(true);
@@ -430,6 +449,19 @@ const StoreView = ({ storeId, onBack }) => {
       loadStore();
     }
   }, [storeId]);
+
+  // Get category title
+  const getCategoryTitle = (categoryId) => {
+    const titles = {
+      popular: "Most Popular",
+      cookies: "Cookies",
+      offers: "Offers",
+      newest: "Newest Cookies",
+      chocolate: "Chocolate Cookies",
+      cakes: "Cookies Cakes"
+    };
+    return titles[categoryId] || "Products";
+  };
 
   const filteredProducts = store?.products?.filter(product =>
     product.name?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -458,7 +490,7 @@ const StoreView = ({ storeId, onBack }) => {
           <h3 className="text-xl font-bold text-charcoal-600 mb-2">Error Loading Store</h3>
           <p className="text-charcoal-400 mb-6">{error}</p>
           <button
-            onClick={onBack}
+            onClick={() => navigate(-1)}
             className="px-6 py-3 bg-sage-500 hover:bg-sage-600 text-white font-semibold rounded-full"
           >
             Back to Stores
@@ -470,7 +502,7 @@ const StoreView = ({ storeId, onBack }) => {
 
   return (
     <div className="min-h-screen bg-cream-50">
-      <StoreHeader storeName={store?.storeName} onBack={onBack} />
+      <StoreHeader storeName={store?.storeName} onBack={() => navigate(-1)} />
       <StoreInfo store={store} />
       
       <div className="max-w-[1440px] mx-auto px-12 py-8">
@@ -478,18 +510,50 @@ const StoreView = ({ storeId, onBack }) => {
           <CategorySidebar selected={selectedCategory} onSelect={setSelectedCategory} />
           
           <div className="flex-1">
-            <SearchSortBar
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              sortBy={sortBy}
-              onSortChange={setSortBy}
-            />
+            {/* Category Title with Search and Sort - ALL IN ONE ROW */}
+            <div className="flex items-center justify-between mb-8">
+              {/* Category Title on the left */}
+              <h2 className="text-3xl font-bold text-[#556B5C]" style={{ fontFamily: 'Merriweather, serif' }}>
+                {getCategoryTitle(selectedCategory)}
+              </h2>
+              
+              {/* Search and Sort on the right */}
+              <div className="flex gap-3 items-center">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="px-5 py-2.5 bg-white rounded-full border border-grey-stroke hover:border-sage-500 transition-all shadow-[0_2px_8px_rgba(0,0,0,0.06)] text-charcoal-600 font-medium cursor-pointer text-sm"
+                  style={{ fontFamily: 'Inter, sans-serif' }}
+                >
+                  <option value="popular">Sort All</option>
+                  <option value="price-low">Price: Low to High</option>
+                  <option value="price-high">Price: High to Low</option>
+                  <option value="newest">Newest First</option>
+                </select>
+                
+                <div className="relative w-64">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search Products..."
+                    className="w-full pl-10 pr-4 py-2.5 bg-white rounded-full border border-grey-stroke focus:outline-none focus:border-sage-500 text-charcoal-600 shadow-[0_2px_8px_rgba(0,0,0,0.06)] text-sm"
+                    style={{ fontFamily: 'Inter, sans-serif' }}
+                  />
+                  <MagnifyingGlass className="w-4 h-4 text-charcoal-400 absolute left-3.5 top-1/2 -translate-y-1/2" weight="bold" />
+                </div>
+              </div>
+            </div>
             
             {/* Products Grid */}
             {filteredProducts.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredProducts.map(product => (
-                  <ProductCard key={product.id} product={product} />
+                  <ProductCard 
+                    key={product.id} 
+                    product={product}
+                    onClick={() => handleProductClick(product)}
+                  />
                 ))}
               </div>
             ) : (
@@ -506,6 +570,125 @@ const StoreView = ({ storeId, onBack }) => {
           </div>
         </div>
       </div>
+
+      {/* Product Details Bottom Sheet */}
+      <ProductDetailsSheet
+        product={selectedProduct}
+        isOpen={showProductSheet}
+        onClose={() => setShowProductSheet(false)}
+        onAddToCart={handleAddToCart}
+        storeName={store?.storeName}
+        />
+        {/* Floating Cart Button */}
+        {cart.length > 0 && (
+        <button
+            onClick={() => setShowCheckoutModal(true)}
+            className="fixed bottom-8 right-8 z-50 bg-sage-500 hover:bg-sage-600 text-white w-16 h-16 rounded-full shadow-[0_8px_30px_rgba(85,107,92,0.4)] hover:shadow-[0_12px_40px_rgba(85,107,92,0.5)] transition-all transform hover:scale-110 flex items-center justify-center"
+        >
+            <ShoppingCartSimple className="w-9 h-9 drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]" weight="regular" />
+            
+            {/* Item Count Badge */}
+            <span className="absolute -top-1 -right-1 bg-red-800 text-white min-w-[24px] h-6 px-1.5 rounded-full flex items-center justify-center text-xs font-bold shadow-[0_4px_12px_rgba(153,27,27,0.6)]">
+            {cart.reduce((total, item) => total + item.quantity, 0)}
+            </span>
+        </button>
+        )}
+
+      {/* Cart Modal */}
+      {showCartModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-6 text-center">
+              <h2 className="text-3xl font-black text-white mb-2">Your Cart</h2>
+              <p className="text-white/90 font-medium">
+                {cart.length} item{cart.length !== 1 ? 's' : ''} • {cart.reduce((total, item) => total + item.quantity, 0)} total
+              </p>
+            </div>
+
+            {/* Cart Items */}
+            <div className="p-6 overflow-y-auto max-h-[50vh]">
+              {cart.map((item) => (
+                <div key={item.id} className="bg-cream-50 p-5 rounded-xl mb-4 border border-grey-stroke">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-charcoal-600 mb-2">{item.name}</h3>
+                      <p className="text-sage-600 font-semibold">
+                        {item.basePrice.toFixed(3)} BD × {item.quantity}
+                      </p>
+                      {item.selectedVariant && (
+                        <p className="text-sm text-charcoal-400 mt-1">
+                          Variant: {item.selectedVariant.colorValue || ''} {item.selectedVariant.sizeValue || ''}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-black text-sage-700">
+                        {item.totalPrice.toFixed(3)} BD
+                      </p>
+                      <button
+                        onClick={() => setCart(cart.filter(c => c.id !== item.id))}
+                        className="mt-2 text-red-500 hover:text-red-700 font-semibold text-sm"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Total */}
+            <div className="border-t border-grey-stroke p-6 bg-cream-50">
+              <div className="flex justify-between items-center mb-4">
+                <span className="text-xl font-bold text-charcoal-600">Total:</span>
+                <span className="text-3xl font-black text-sage-700">
+                  {cart.reduce((total, item) => total + item.totalPrice, 0).toFixed(3)} BD
+                </span>
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowCartModal(false)}
+                  className="flex-1 bg-grey-200 hover:bg-grey-300 text-charcoal-600 font-bold py-3 rounded-xl transition-all"
+                >
+                  Continue Shopping
+                </button>
+                <button
+                onClick={() => {
+                    setShowCartModal(false);
+                    setShowCheckoutModal(true);
+                }}
+                className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-bold py-3 rounded-xl transition-all"
+                >
+                Checkout
+                </button>
+              </div>
+            </div>
+
+            {/* Close Button */}
+            <button
+              onClick={() => setShowCartModal(false)}
+              className="absolute top-4 right-4 bg-white/90 p-2 rounded-full shadow-lg hover:bg-white transition-all"
+            >
+              <X size={20} className="text-charcoal-600" weight="bold" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Checkout Modal */}
+      {showCheckoutModal && (
+        <Checkout
+          cart={cart}
+          storeName={store?.storeName}
+          onClose={() => setShowCheckoutModal(false)}
+          onUpdateQuantity={handleUpdateQuantity}
+          onRemoveItem={handleRemoveFromCart}
+        />
+      )}
+
+
     </div>
   );
 };
