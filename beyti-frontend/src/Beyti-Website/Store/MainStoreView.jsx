@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Cake, BowlFood, Heart, Bread, Coffee } from "@phosphor-icons/react";
+import StoreView from "./StoreView";
 
 // Mock getSellers function
 const getSellers = async () => {
@@ -131,7 +132,7 @@ const SearchBar = ({ value, onChange }) => (
 );
 
 // Featured Carousel Component
-const FeaturedCarousel = ({ stores }) => {
+const FeaturedCarousel = ({ stores, onStoreClick }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   
   // Get first 6 stores for featured carousel
@@ -163,8 +164,12 @@ const FeaturedCarousel = ({ stores }) => {
 
       <div className="overflow-hidden px-12 py-3">
         <div className="flex gap-6 transition-transform duration-500" style={{ transform: `translateX(-${currentIndex * (100 / 3)}%)` }}>
-          {featured.map((store, idx) => (
-            <div key={store.id || idx} className="flex-shrink-0 w-[calc(33.333%-16px)] bg-white rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.1)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-all">
+                    {featured.map((store, idx) => (
+            <div 
+              key={store.id || idx} 
+              onClick={() => onStoreClick(store.id)} // 🆕 ADD THIS
+              className="flex-shrink-0 w-[calc(33.333%-16px)] bg-white rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.1)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-all cursor-pointer" // 🆕 ADD cursor-pointer
+            >
               <div className="relative h-40 bg-gradient-to-br from-[#D8E8DC] to-[#C9DFD0]">
                 <div className="absolute -bottom-9 left-5">
                   <div className="w-[4.5rem] h-[4.5rem] bg-white rounded-full flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.15)] border-4 border-white">
@@ -252,6 +257,7 @@ const MainStoreView = () => {
   const [selectedCategory, setSelectedCategory] = useState("Food & Drink");
   const [selectedSubcategory, setSelectedSubcategory] = useState("sweets");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedStoreId, setSelectedStoreId] = useState(null);
 
   const categories = ["Food & Drink", "Clothing & Accessories", "Self-Care & Beauty"];
   
@@ -284,6 +290,13 @@ const MainStoreView = () => {
     store.storeName?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+    if (selectedStoreId) {
+    return (
+      <StoreView storeId={selectedStoreId} onBack={() => setSelectedStoreId(null)} />
+    );
+  }
+
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#FAF7F2' }}>
       <Header />
@@ -305,8 +318,11 @@ const MainStoreView = () => {
           />
 
           <div className="flex-1">
-            <SearchBar value={searchQuery} onChange={setSearchQuery} />
-            <FeaturedCarousel stores={stores} />
+           <SearchBar value={searchQuery} onChange={setSearchQuery} />
+            <FeaturedCarousel 
+              stores={stores} 
+              onStoreClick={(id) => setSelectedStoreId(id)} // 🆕 ADD THIS LINE
+            />
 
             {loading ? (
               <div className="flex items-center justify-center py-16">
@@ -315,7 +331,9 @@ const MainStoreView = () => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {filteredStores.map(store => (
-                  <StoreCard key={store.id} store={store} />
+                  <div key={store.id} onClick={() => setSelectedStoreId(store.id)}> {/* 🆕 WRAP IN DIV */}
+                    <StoreCard store={store} />
+                  </div>
                 ))}
               </div>
             )}
