@@ -154,7 +154,7 @@ const StarRating = ({ rating, reviewCount }) => {
 };
 
 // Service Provider Card Component
-const ProviderCard = ({ provider }) => {
+const ProviderCard = ({ provider, onClick }) => {
   console.log('[ProviderCard] Rendering provider:', provider);
 
   // Get status color
@@ -172,7 +172,10 @@ const ProviderCard = ({ provider }) => {
   };
 
   return (
-    <div className="bg-white rounded-2xl overflow-hidden cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all">
+    <div
+      onClick={onClick}
+      className="bg-white rounded-2xl overflow-hidden cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all"
+    >
       <div className="relative h-32 bg-gradient-to-br from-[#E8D8E0] to-[#DFC9D8]">
         <div className="absolute -bottom-8 left-4">
           <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.15)] border-4 border-white">
@@ -462,7 +465,11 @@ const ServiceProviderStoresView = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {filteredProviders.map((provider, idx) => (
-                <ProviderCard key={provider.id || `provider-${idx}`} provider={provider} />
+                <ProviderCard
+                  key={provider.id || `provider-${idx}`}
+                  provider={provider}
+                  onClick={() => navigate(`/service-provider/${provider.id}`)}
+                />
               ))}
             </div>
           )}

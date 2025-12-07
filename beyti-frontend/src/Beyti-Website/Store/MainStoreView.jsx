@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Cake, BowlFood, Heart, Bread, Coffee } from "@phosphor-icons/react";
+import { Cake, BowlFood, Heart, Bread, Coffee, Storefront } from "@phosphor-icons/react";
 import StoreView from "./StoreView";
 
 // Get customers function
