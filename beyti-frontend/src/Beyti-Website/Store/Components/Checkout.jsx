@@ -1,23 +1,33 @@
 import { useState, useEffect } from 'react';
-import { X, MapPin, Plus, Minus, ShoppingCart, CreditCard, Wallet, Storefront } from '@phosphor-icons/react';
+import { X, MapPin, Plus, Minus, ShoppingCart, CreditCard, Wallet, Storefront, User } from '@phosphor-icons/react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
-const Checkout = ({ cart, onClose, onUpdateQuantity, onRemoveItem, storeName }) => {
-  const [step, setStep] = useState(1); // 1: Cart Review, 2: Fulfillment, 3: Address, 4: Payment
-  const [fulfillmentType, setFulfillmentType] = useState(''); // 'Delivery' or 'Pickup'
+const Checkout = ({ 
+  cart, 
+  onClose, 
+  onUpdateQuantity, 
+  onRemoveItem, 
+  storeName,
+  customerId,     
+  customerName,
+  customerAddresses,
+  showSnackbar
+}) => {
+
+  const [step, setStep] = useState(1);
+  const [fulfillmentType, setFulfillmentType] = useState('');
   const [selectedAddress, setSelectedAddress] = useState(null);
+  const [savedLocation, setSavedLocation] = useState(null);
+  const [addingAddress, setAddingAddress] = useState(false);
+  const [addressError, setAddressError] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState('');
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
   const [mapLocation, setMapLocation] = useState(null);
-  const [paymentMethod, setPaymentMethod] = useState('');
   
-  // Mock addresses - replace with real data
-  const [addresses, setAddresses] = useState([
-    { id: 1, street: '123 Main St', city: 'Manama', region: 'Capital', country: 'Bahrain' }
-  ]);
+  const [addresses, setAddresses] = useState([]);
 
-  // New address form
   const [newAddress, setNewAddress] = useState({
     street: '',
     city: '',
@@ -31,80 +41,201 @@ const Checkout = ({ cart, onClose, onUpdateQuantity, onRemoveItem, storeName }) 
   const total = subtotal + (fulfillmentType === 'Delivery' ? DELIVERY_FEE : 0);
 
   const MapSelector = () => {
-    useMapEvents({
-      click(e) {
-        setMapLocation(e.latlng);
-        // Auto-fill address fields using reverse geocoding (mock for now)
-        setNewAddress(prev => ({
-          ...prev,
-          street: `Location: ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`,
-        }));
-      }
+  useMapEvents({
+    click(e) {
+      setMapLocation(e.latlng); // Just set the temporary marker
+    }
+  });
+  return null; // Don't render marker here
+};
+
+
+// Load customer addresses when checkout opens
+useEffect(() => {
+  console.log("🛒 Checkout received customerAddresses:", customerAddresses);
+  console.log("🛒 customerAddresses length:", customerAddresses?.length);
+  
+  if (customerAddresses && customerAddresses.length > 0) {
+    // Map customer addresses to the format we need
+    const formattedAddresses = customerAddresses.map((ca, index) => {
+      console.log(`🏠 Processing address ${index + 1}:`, ca);
+      const formatted = {
+        id: ca.address?.id || ca.addressId || ca.id,
+        street: ca.address?.street || '',
+        city: ca.address?.city || '',
+        region: ca.address?.region || '',
+        country: ca.address?.country || 'Bahrain',
+        postalCode: ca.address?.postalCode || ''
+      };
+      console.log(`✅ Formatted address ${index + 1}:`, formatted);
+      return formatted;
     });
-    return mapLocation ? <Marker position={[mapLocation.lat, mapLocation.lng]} /> : null;
-  };
+    console.log("📦 All formatted addresses:", formattedAddresses);
+    setAddresses(formattedAddresses);
+  } else {
+    console.log("⚠️ No addresses available or customerAddresses is empty");
+    setAddresses([]); // No addresses available
+  }
+}, [customerAddresses]);
 
-  // Auto-fill when map location is selected
-  useEffect(() => {
-    if (mapLocation) {
-      // In a real app, you'd use reverse geocoding API here
-      // For now, we'll just mark that a location was picked
-      if (!newAddress.city) {
-        setNewAddress(prev => ({
-          ...prev,
-          city: 'Manama', // Default
-          region: 'Capital', // Default
-        }));
-      }
-    }
-  }, [mapLocation]);
+const handleSaveAddress = async () => {
+  // Validation
+  if (!newAddress.street || !newAddress.city || !newAddress.country) {
+    setAddressError('Please fill required fields: Street, City, and Country');
+    return;
+  }
 
-  const handleSaveAddress = () => {
-    if (!newAddress.street || !newAddress.city || !newAddress.region) {
-      alert('Please fill required fields');
-      return;
+  if (!customerId) {
+    setAddressError('Customer ID is missing');
+    return;
+  }
+
+  setAddingAddress(true);
+  setAddressError(null);
+
+  try {
+    // Step 1: Create the address in the database
+    const response = await fetch('https://localhost:7062/api/Addresses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        Label: null,
+        Street: newAddress.street,
+        City: newAddress.city,
+        Region: newAddress.region || null,
+        PostalCode: newAddress.postalCode || null,
+        Country: newAddress.country,
+        Latitude: savedLocation?.lat || null,
+        Longitude: savedLocation?.lng || null,
+        IsDefault: false
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to create address');
     }
-    const address = {
-      id: addresses.length + 1,
-      ...newAddress,
-      lat: mapLocation?.lat,
-      lng: mapLocation?.lng
+
+    const createdAddress = await response.json();
+
+    // Step 2: Link the address to the customer
+    const linkResponse = await fetch('https://localhost:7062/api/CustomerAddresses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        CustomerId: customerId,
+        AddressId: createdAddress.id
+      }),
+    });
+
+    if (!linkResponse.ok) {
+      throw new Error('Failed to link address to customer');
+    }
+
+    // Step 3: Add to local addresses list
+    const newAddr = {
+      id: createdAddress.id,
+      street: createdAddress.street,
+      city: createdAddress.city,
+      region: createdAddress.region,
+      country: createdAddress.country,
+      postalCode: createdAddress.postalCode
     };
-    setAddresses([...addresses, address]);
+    
+    setAddresses([...addresses, newAddr]);
+
+    // Reset form
     setNewAddress({ street: '', city: '', region: '', country: 'Bahrain', postalCode: '' });
     setMapLocation(null);
+    setSavedLocation(null);
     setShowAddressModal(false);
-  };
+    setShowMapModal(false);
+    
+    showSnackbar('Address added successfully! ✓', 'success');
+  } catch (err) {
+    console.error('Error adding address:', err);
+    setAddressError(err.message || 'Failed to add address');
+  } finally {
+    setAddingAddress(false);
+  }
+};
+
+const handleMapSave = async () => {
+  if (!mapLocation) {
+    showSnackbar('Please pick a location on the map', 'warning');
+    return;
+  }
+
+  try {
+    const { lat, lng } = mapLocation;
+
+    // Fetch address details from coordinates
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
+    );
+    const data = await res.json();
+    const addr = data.address || {};
+
+    // Auto-fill the form fields
+    setNewAddress({
+      street: addr.road || newAddress.street || '',
+      city: addr.city || addr.town || addr.village || newAddress.city || '',
+      country: addr.country || newAddress.country || 'Bahrain',
+      region: addr.state || newAddress.region || '',
+      postalCode: addr.postcode || newAddress.postalCode || ''
+    });
+
+    // Save the location
+    setSavedLocation({ lat, lng });
+    setShowMapModal(false);
+    
+    showSnackbar('Location saved! Form fields have been auto-filled.', 'success');
+  } catch (err) {
+    console.error('Error fetching address:', err);
+    showSnackbar('Failed to fetch location details, but coordinates are saved.', 'warning');
+    setSavedLocation({ lat: mapLocation.lat, lng: mapLocation.lng });
+    setShowMapModal(false);
+  }
+};
 
   const handleContinue = () => {
     if (step === 1 && cart.length === 0) {
-      alert('Cart is empty');
+      showSnackbar('Cart is empty', 'error');
       return;
     }
     if (step === 2 && !fulfillmentType) {
-      alert('Please select fulfillment type');
+     showSnackbar('Please select fulfillment type', 'warning');
       return;
     }
     if (step === 3 && fulfillmentType === 'Delivery' && !selectedAddress) {
-      alert('Please select delivery address');
+      showSnackbar('Please select delivery address', 'warning');
       return;
     }
     if (step === 4 && !paymentMethod) {
-      alert('Please select payment method');
+      showSnackbar('Please select payment method', 'warning');
       return;
     }
     
     if (step < 4) {
-      // Skip address step if Pickup
       if (step === 2 && fulfillmentType === 'Pickup') {
         setStep(4);
       } else {
         setStep(step + 1);
       }
-    } else {
-      alert('Order placed successfully! 🎉');
-      onClose();
-    }
+} else {
+  // Place order with customer info
+  console.log('Placing order:', {
+    customerId,
+    customerName,
+    cart,
+    fulfillmentType,
+    selectedAddress,
+    paymentMethod,
+    total
+  });
+  
+  showSnackbar(`Order placed successfully for ${customerName}! 🎉`, 'success');
+  onClose();
+}
   };
 
   return (
@@ -152,6 +283,20 @@ const Checkout = ({ cart, onClose, onUpdateQuantity, onRemoveItem, storeName }) 
                   <span style={{ fontFamily: 'Inter, sans-serif' }}>{storeName}</span>
                 </div>
               </div>
+              
+              {/* Customer Info Banner */}
+              {customerName && (
+                <div className="bg-sage-100 border-2 border-sage-300 rounded-xl p-3 flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 bg-sage-500 rounded-full flex items-center justify-center flex-shrink-0">
+                    <User size={20} weight="fill" className="text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs text-sage-700 font-semibold">Ordering for:</p>
+                    <p className="text-sm font-bold text-charcoal-600">{customerName}</p>
+                  </div>
+                </div>
+              )}
+              
               {cart.map(item => (
                 <div key={item.id} className="bg-white p-4 rounded-xl border border-grey-stroke flex items-center gap-3">
                   <div className="w-16 h-16 bg-gradient-to-br from-sage-100 to-sage-200 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -249,6 +394,12 @@ const Checkout = ({ cart, onClose, onUpdateQuantity, onRemoveItem, storeName }) 
               <div className="bg-gradient-to-br from-sage-100 to-sage-200 p-5 rounded-xl border-2 border-sage-300">
                 <h4 className="font-bold text-charcoal-600 mb-3">Order Summary</h4>
                 <div className="space-y-1.5 text-charcoal-600 text-sm">
+                  {customerName && (
+                    <div className="flex justify-between pb-2 mb-2 border-b border-sage-300">
+                      <span className="font-semibold">Customer:</span>
+                      <span className="font-bold">{customerName}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between"><span>Subtotal:</span><span className="font-bold">{subtotal.toFixed(3)} BD</span></div>
                   {fulfillmentType === 'Delivery' && <div className="flex justify-between"><span>Delivery Fee:</span><span className="font-bold">{DELIVERY_FEE.toFixed(3)} BD</span></div>}
                   <div className="border-t-2 border-sage-300 pt-2 mt-2 flex justify-between text-lg font-black text-sage-700">
@@ -276,7 +427,7 @@ const Checkout = ({ cart, onClose, onUpdateQuantity, onRemoveItem, storeName }) 
         </div>
       </div>
 
-      {/* Add Address Modal */}
+      {/* Add Address Modal - unchanged */}
       {showAddressModal && (
         <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
@@ -287,61 +438,157 @@ const Checkout = ({ cart, onClose, onUpdateQuantity, onRemoveItem, storeName }) 
               </button>
             </div>
             <div className="p-5 space-y-3">
-              <div className="relative h-48 rounded-xl overflow-hidden border-2 border-grey-stroke">
-                {mapLocation ? (
-                  <MapContainer center={[mapLocation.lat, mapLocation.lng]} zoom={13} style={{ height: '100%', width: '100%' }}>
-                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                    <Marker position={[mapLocation.lat, mapLocation.lng]} />
-                  </MapContainer>
+            {addressError && (
+                <div className="p-3 rounded-lg bg-red-50 border-l-4 border-red-500">
+                <p className="text-sm text-red-700 font-medium">{addressError}</p>
+                </div>
+            )}
+
+            {/* Pick from Map Button */}
+            <button 
+                type="button"
+                onClick={() => setShowMapModal(true)}
+                className="w-full bg-sage-500 hover:bg-sage-600 text-white px-4 py-3 rounded-xl font-bold flex items-center justify-center gap-2"
+            >
+                <MapPin size={20} weight="fill" />
+                📍 Pick Location from Map
+                {savedLocation && <span className="ml-2 text-xs">✓ Location Set</span>}
+            </button>
+
+            {/* Street Input */}
+            <div>
+                <label className="block text-sm font-medium text-charcoal-600 mb-1">
+                Street <span className="text-red-500">*</span>
+                </label>
+                <input 
+                value={newAddress.street} 
+                onChange={e => setNewAddress({...newAddress, street: e.target.value})} 
+                placeholder="Enter street address" 
+                className="w-full border-2 border-grey-stroke rounded-lg p-2.5 text-sm focus:border-sage-500 focus:outline-none" 
+                required
+                />
+            </div>
+
+            {/* City & Country */}
+            <div className="grid grid-cols-2 gap-3">
+                <div>
+                <label className="block text-sm font-medium text-charcoal-600 mb-1">
+                    City <span className="text-red-500">*</span>
+                </label>
+                <input 
+                    value={newAddress.city} 
+                    onChange={e => setNewAddress({...newAddress, city: e.target.value})} 
+                    placeholder="City" 
+                    className="w-full border-2 border-grey-stroke rounded-lg p-2.5 text-sm focus:border-sage-500 focus:outline-none" 
+                    required
+                />
+                </div>
+                <div>
+                <label className="block text-sm font-medium text-charcoal-600 mb-1">
+                    Country <span className="text-red-500">*</span>
+                </label>
+                <input 
+                    value={newAddress.country} 
+                    onChange={e => setNewAddress({...newAddress, country: e.target.value})} 
+                    placeholder="Country" 
+                    className="w-full border-2 border-grey-stroke rounded-lg p-2.5 text-sm focus:border-sage-500 focus:outline-none" 
+                    required
+                />
+                </div>
+            </div>
+
+            {/* Region & Postal Code */}
+            <div className="grid grid-cols-2 gap-3">
+                <div>
+                <label className="block text-sm font-medium text-charcoal-600 mb-1">
+                    Region (Optional)
+                </label>
+                <input 
+                    value={newAddress.region} 
+                    onChange={e => setNewAddress({...newAddress, region: e.target.value})} 
+                    placeholder="Region" 
+                    className="w-full border-2 border-grey-stroke rounded-lg p-2.5 text-sm focus:border-sage-500 focus:outline-none" 
+                />
+                </div>
+                <div>
+                <label className="block text-sm font-medium text-charcoal-600 mb-1">
+                    Postal Code (Optional)
+                </label>
+                <input 
+                    value={newAddress.postalCode} 
+                    onChange={e => setNewAddress({...newAddress, postalCode: e.target.value})} 
+                    placeholder="Postal Code" 
+                    className="w-full border-2 border-grey-stroke rounded-lg p-2.5 text-sm focus:border-sage-500 focus:outline-none" 
+                />
+                </div>
+            </div>
+
+            {/* Save Button */}
+            <button 
+                onClick={handleSaveAddress} 
+                disabled={addingAddress}
+                className="w-full bg-sage-500 text-white font-bold py-3 rounded-xl hover:bg-sage-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+                {addingAddress ? (
+                <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Saving Address...
+                </>
                 ) : (
-                  <div className="h-full bg-grey-200 flex items-center justify-center">
-                    <MapPin size={40} className="text-grey-stroke" />
-                  </div>
+                'Save Address'
                 )}
-                <button onClick={() => setShowMapModal(true)} className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/30 transition-all">
-                  <div className="bg-white px-5 py-2.5 rounded-lg font-bold text-sage-600 shadow-lg text-sm">
-                    {mapLocation ? 'Change Location' : 'Pick Location'}
-                  </div>
-                </button>
-              </div>
-              <input value={newAddress.street} onChange={e => setNewAddress({...newAddress, street: e.target.value})} placeholder="Street *" className="w-full border-2 border-grey-stroke rounded-lg p-2.5 text-sm" />
-              <div className="grid grid-cols-2 gap-3">
-                <input value={newAddress.city} onChange={e => setNewAddress({...newAddress, city: e.target.value})} placeholder="City *" className="border-2 border-grey-stroke rounded-lg p-2.5 text-sm" />
-                <input value={newAddress.region} onChange={e => setNewAddress({...newAddress, region: e.target.value})} placeholder="Region *" className="border-2 border-grey-stroke rounded-lg p-2.5 text-sm" />
-              </div>
-              <input value={newAddress.postalCode} onChange={e => setNewAddress({...newAddress, postalCode: e.target.value})} placeholder="Postal Code" className="w-full border-2 border-grey-stroke rounded-lg p-2.5 text-sm" />
-              <button onClick={handleSaveAddress} className="w-full bg-sage-500 text-white font-bold py-2.5 rounded-xl hover:bg-sage-600">
-                Save Address
-              </button>
+            </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Map Modal */}
-      {showMapModal && (
-        <div className="fixed inset-0 bg-black/70 z-[70] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden">
-            <div className="p-5 border-b border-grey-stroke flex justify-between items-center">
-              <h3 className="text-xl font-bold text-charcoal-600">Pick Location</h3>
-              <button onClick={() => setShowMapModal(false)} className="p-2 hover:bg-grey-100 rounded-full">
-                <X size={20} weight="bold" />
-              </button>
-            </div>
-            <div className="h-80">
-              <MapContainer center={[26.0667, 50.5577]} zoom={12} style={{ height: '100%', width: '100%' }}>
-                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                <MapSelector />
-              </MapContainer>
-            </div>
-            <div className="p-5">
-              <button onClick={() => { setShowMapModal(false); }} disabled={!mapLocation} className="w-full bg-sage-500 text-white font-bold py-2.5 rounded-xl hover:bg-sage-600 disabled:opacity-50">
-                Confirm Location
-              </button>
-            </div>
-          </div>
+{showMapModal && (
+  <div className="fixed inset-0 bg-black/70 z-[70] flex items-center justify-center p-4">
+    <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden">
+      <div className="p-5 border-b border-grey-stroke flex justify-between items-center">
+        <h3 className="text-xl font-bold text-charcoal-600">Pick Location on Map</h3>
+        <button onClick={() => setShowMapModal(false)} className="p-2 hover:bg-grey-100 rounded-full">
+          <X size={20} weight="bold" />
+        </button>
+      </div>
+      <div className="h-80">
+        <MapContainer center={[26.0667, 50.5577]} zoom={12} style={{ height: '100%', width: '100%' }}>
+          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <MapSelector />
+          {mapLocation && <Marker position={[mapLocation.lat, mapLocation.lng]} />}
+        </MapContainer>
+      </div>
+      <div className="p-5 space-y-2">
+        {mapLocation && (
+          <p className="text-sm text-charcoal-600 text-center">
+            📍 Location: {mapLocation.lat.toFixed(4)}, {mapLocation.lng.toFixed(4)}
+          </p>
+        )}
+        <div className="flex gap-3">
+          <button 
+            onClick={handleMapSave}
+            disabled={!mapLocation}
+            className="flex-1 bg-sage-500 text-white font-bold py-2.5 rounded-xl hover:bg-sage-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Save Location & Auto-Fill
+          </button>
+          <button 
+            onClick={() => setShowMapModal(false)}
+            className="flex-1 bg-grey-300 text-charcoal-600 font-bold py-2.5 rounded-xl hover:bg-grey-400"
+          >
+            Cancel
+          </button>
         </div>
-      )}
+      </div>
+    </div>
+  </div>
+
+  
+
+  
+)}
+
     </div>
   );
 };
