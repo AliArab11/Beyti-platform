@@ -4,6 +4,8 @@ import { Scissors, Star, MagnifyingGlass, ArrowLeft } from "@phosphor-icons/reac
 import { getServiceProviderById, getServiceCatalogs, getServiceProviderServices } from "../../services/api";
 import { isAuthenticated } from "../../utils/authUtils";
 import PageHeader from "../../components/PageHeader";
+import ServiceDetailsSheet from "./Components/ServiceDetailsSheet";
+import ServiceCheckout from "./Components/ServiceCheckout";
 
 // Service Provider Info Section
 const ServiceProviderInfo = ({ provider }) => {
@@ -190,8 +192,11 @@ const CategorySidebar = ({ catalogs, selected, onSelect }) => {
 };
 
 // Service Card Component with MinPrice "Starting from" badge
-const ServiceCard = ({ service }) => (
-  <div className="bg-white rounded-2xl overflow-hidden cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all group">
+const ServiceCard = ({ service, onClick }) => (
+  <div
+    onClick={onClick}
+    className="bg-white rounded-2xl overflow-hidden cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all group"
+  >
     {/* Service Icon */}
     <div className="relative h-48 bg-gradient-to-br from-[#E8D8E0] to-[#DFC9D8] overflow-hidden">
       <div className="absolute inset-0 flex items-center justify-center">
@@ -262,6 +267,12 @@ const ServiceProviderDetailView = () => {
   const [sortBy, setSortBy] = useState("popular");
   const [services, setServices] = useState([]);
 
+  // Service booking states
+  const [selectedService, setSelectedService] = useState(null);
+  const [showServiceDetails, setShowServiceDetails] = useState(false);
+  const [showServiceCheckout, setShowServiceCheckout] = useState(false);
+  const [bookingData, setBookingData] = useState(null);
+
   // Check authentication on mount
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -314,6 +325,30 @@ const ServiceProviderDetailView = () => {
   const getCatalogTitle = (catalogId) => {
     const catalog = catalogs.find(c => c.id === catalogId);
     return catalog?.name || "Services";
+  };
+
+  // Handle service card click
+  const handleServiceClick = (service) => {
+    setSelectedService(service);
+    setShowServiceDetails(true);
+  };
+
+  // Handle book service
+  const handleBookService = (bookingInfo) => {
+    setBookingData(bookingInfo);
+    setShowServiceDetails(false);
+    setShowServiceCheckout(true);
+  };
+
+  // Close modals
+  const closeServiceDetails = () => {
+    setShowServiceDetails(false);
+    setSelectedService(null);
+  };
+
+  const closeServiceCheckout = () => {
+    setShowServiceCheckout(false);
+    setBookingData(null);
   };
 
   // Filter services by selected catalog and search query
@@ -451,6 +486,7 @@ const ServiceProviderDetailView = () => {
                   <ServiceCard
                     key={service.id}
                     service={service}
+                    onClick={() => handleServiceClick(service)}
                   />
                 ))}
               </div>
@@ -468,6 +504,23 @@ const ServiceProviderDetailView = () => {
           </div>
         </div>
       </div>
+
+      {/* Service Details Modal */}
+      <ServiceDetailsSheet
+        service={selectedService}
+        provider={provider}
+        isOpen={showServiceDetails}
+        onClose={closeServiceDetails}
+        onBookService={handleBookService}
+      />
+
+      {/* Service Checkout Modal */}
+      {showServiceCheckout && bookingData && (
+        <ServiceCheckout
+          bookingData={bookingData}
+          onClose={closeServiceCheckout}
+        />
+      )}
     </div>
   );
 };

@@ -51,6 +51,9 @@ namespace Beyti_Backend.Controllers.Api
                 return BadRequest();
             }
 
+            // Update timestamp
+            serviceBooking.UpdatedAt = DateTime.UtcNow;
+
             _context.Entry(serviceBooking).State = EntityState.Modified;
 
             try
@@ -77,10 +80,37 @@ namespace Beyti_Backend.Controllers.Api
         [HttpPost]
         public async Task<ActionResult<ServiceBooking>> PostServiceBooking(ServiceBooking serviceBooking)
         {
-            _context.ServiceBookings.Add(serviceBooking);
-            await _context.SaveChangesAsync();
+            // Set timestamps FIRST
+            serviceBooking.CreatedAt = DateTime.UtcNow;
+            serviceBooking.UpdatedAt = DateTime.UtcNow;
 
-            return CreatedAtAction("GetServiceBooking", new { id = serviceBooking.Id }, serviceBooking);
+            // Remove navigation properties from ModelState BEFORE any validation
+            ModelState.Remove("serviceBooking.Customer");
+            ModelState.Remove("serviceBooking.ServiceAddress");
+            ModelState.Remove("serviceBooking.ServiceCatalog");
+            ModelState.Remove("serviceBooking.ServiceProvider");
+            ModelState.Remove("serviceBooking.Service");
+            ModelState.Remove("serviceBooking.TimeSlot");
+            ModelState.Remove("serviceBooking.Payments");
+            ModelState.Remove("serviceBooking.ServiceReviews");
+
+            // Validate model state
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            try
+            {
+                _context.ServiceBookings.Add(serviceBooking);
+                await _context.SaveChangesAsync();
+
+                return CreatedAtAction("GetServiceBooking", new { id = serviceBooking.Id }, serviceBooking);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message, innerError = ex.InnerException?.Message });
+            }
         }
 
         // DELETE: api/ServiceBookings/5

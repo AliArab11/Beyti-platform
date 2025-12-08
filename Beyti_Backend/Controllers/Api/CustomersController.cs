@@ -38,12 +38,51 @@ namespace Beyti_Backend.Controllers.Api
 
         // GET: api/Customers
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<object>>> GetCustomers()
+        public async Task<ActionResult<IEnumerable<object>>> GetCustomers([FromQuery] int? userProfileId = null)
         {
-            return await _context.Customers
+            var query = _context.Customers
                 .Include(c => c.UserProfile)
                 .Include(c => c.CustomerAddresses)
-                    .ThenInclude(ca => ca.Address)
+                    .ThenInclude(ca => ca.Address);
+
+            // Filter by userProfileId if provided
+            if (userProfileId.HasValue)
+            {
+                var customer = await query
+                    .Where(c => c.UserProfileId == userProfileId.Value)
+                    .Select(c => new
+                    {
+                        c.Id,
+                        c.UserProfileId,
+                        fullName = c.UserProfile.DisplayName,
+                        c.Phone,
+                        c.CreatedAt,
+                        customerAddresses = c.CustomerAddresses.Select(ca => new
+                        {
+                            ca.Id,
+                            address = new
+                            {
+                                ca.Address.Id,
+                                ca.Address.Label,
+                                ca.Address.Street,
+                                ca.Address.City,
+                                ca.Address.Region,
+                                ca.Address.PostalCode,
+                                ca.Address.Country,
+                                ca.Address.Latitude,
+                                ca.Address.Longitude
+                            }
+                        })
+                    })
+                    .FirstOrDefaultAsync();
+
+                if (customer == null)
+                    return NotFound(new { message = "Customer not found for the specified user profile" });
+
+                return Ok(customer);
+            }
+
+            return await query
                 .Select(c => new
                 {
                     c.Id,
@@ -62,8 +101,8 @@ namespace Beyti_Backend.Controllers.Api
                             ca.Address.Region,
                             ca.Address.PostalCode,
                             ca.Address.Country,
-                            ca.Address.Latitude,    
-                            ca.Address.Longitude    
+                            ca.Address.Latitude,
+                            ca.Address.Longitude
                         }
                     })
                 })

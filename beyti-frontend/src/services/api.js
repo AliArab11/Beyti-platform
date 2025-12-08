@@ -1132,6 +1132,15 @@ export const getCustomer = async (id) => {
 };
 
 /**
+ * Get customer by UserProfileId
+ * @param {number} userProfileId - UserProfile ID
+ * @returns {Promise<object>} - Customer object
+ */
+export const getCustomerByUserProfileId = async (userProfileId) => {
+  return await fetchAPI(`/Customers?userProfileId=${userProfileId}`);
+};
+
+/**
  * Create a new customer
  * @param {object} data - Customer data (PascalCase: UserProfileId, FullName, Phone)
  * @returns {Promise<object>} - Created customer object
@@ -1901,6 +1910,92 @@ export const updateServiceCatalog = async (id, data) => {
   return await fetchAPI(`/ServiceCatalogs/${id}`, {
     method: 'PUT',
     body: JSON.stringify({ ...data, Id: id }),
+  });
+};
+
+// ================== SERVICE BOOKING & TIME SLOTS API ==================
+
+/**
+ * Get time slots for a service provider
+ * @param {number} serviceProviderId - Service provider ID
+ * @returns {Promise<Array>} - Array of time slot objects
+ */
+export const getTimeSlots = async (serviceProviderId) => {
+  return await fetchAPI(`/TimeSlots?serviceProviderId=${serviceProviderId}`);
+};
+
+/**
+ * Get a single time slot by ID
+ * @param {number} id - Time slot ID
+ * @returns {Promise<Object>} - Time slot object
+ */
+export const getTimeSlot = async (id) => {
+  return await fetchAPI(`/TimeSlots/${id}`);
+};
+
+/**
+ * Create a new time slot
+ * @param {object} data - Time slot payload
+ * @returns {Promise<Object>} - Created time slot object
+ */
+export const createTimeSlot = async (data) => {
+  return await fetchAPI('/TimeSlots', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Get service bookings
+ * @param {number} serviceProviderId - Optional service provider ID
+ * @param {number} customerId - Optional customer ID
+ * @returns {Promise<Array>} - Array of service booking objects
+ */
+export const getServiceBookings = async (serviceProviderId = null, customerId = null) => {
+  let url = '/ServiceBookings';
+  const params = [];
+
+  if (serviceProviderId) params.push(`serviceProviderId=${serviceProviderId}`);
+  if (customerId) params.push(`customerId=${customerId}`);
+
+  if (params.length > 0) {
+    url += '?' + params.join('&');
+  }
+
+  return await fetchAPI(url);
+};
+
+/**
+ * Get a single service booking by ID
+ * @param {number} id - Service booking ID
+ * @returns {Promise<Object>} - Service booking object
+ */
+export const getServiceBooking = async (id) => {
+  return await fetchAPI(`/ServiceBookings/${id}`);
+};
+
+/**
+ * Create a new service booking
+ * @param {object} data - Service booking payload
+ * @returns {Promise<Object>} - Created service booking object
+ */
+export const createServiceBooking = async (data) => {
+  return await fetchAPI('/ServiceBookings', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Update an existing service booking
+ * @param {number} id - Service booking ID
+ * @param {object} data - Updated booking data
+ * @returns {Promise<Object>} - Updated service booking object
+ */
+export const updateServiceBooking = async (id, data) => {
+  return await fetchAPI(`/ServiceBookings/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
   });
 };
 

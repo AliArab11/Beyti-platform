@@ -309,6 +309,16 @@ namespace Beyti_Backend.Controllers.Api
         {
             try
             {
+                // Prohibited keywords for content moderation
+                var prohibitedKeywords = new[]
+                {
+                    "drug", "drugs", "cocaine", "heroin", "marijuana", "weed", "cannabis", "meth",
+                    "cigarette", "cigar", "tobacco", "vape", "e-cigarette", "smoking",
+                    "weapon", "gun", "rifle", "pistol", "ammunition", "firearm", "knife",
+                    "alcohol", "beer", "wine", "vodka", "whiskey", "liquor",
+                    "porn", "adult", "xxx", "explicit", "sex"
+                };
+
                 // Get services from Service table
                 var services = await _context.Services
                     .Include(s => s.ServiceCatalog)
@@ -326,7 +336,13 @@ namespace Beyti_Backend.Controllers.Api
                         Category = s.ServiceCatalog.ServiceCategory.Name,
                         SubCategory = s.ServiceCatalog.Name,
                         CategoryId = s.ServiceCatalog.ServiceCategoryId,
-                        ServiceCatalogId = s.ServiceCatalogId
+                        ServiceCatalogId = s.ServiceCatalogId,
+                        FlaggedKeywords = prohibitedKeywords
+                            .Where(keyword =>
+                                s.Name.ToLower().Contains(keyword) ||
+                                (s.Description != null && s.Description.ToLower().Contains(keyword))
+                            )
+                            .ToList()
                     })
                     .ToListAsync();
 
@@ -702,13 +718,13 @@ namespace Beyti_Backend.Controllers.Api
                         CustomerPhone = sb.Customer.Phone,
                         ServiceName = sb.ServiceCatalog.Name,
                         Category = sb.ServiceCatalog.ServiceCategory.Name,
-                        Address = new
+                        Address = sb.ServiceAddress != null ? new
                         {
                             sb.ServiceAddress.Street,
                             sb.ServiceAddress.City,
                             sb.ServiceAddress.Latitude,
                             sb.ServiceAddress.Longitude
-                        },
+                        } : null,
                         sb.CreatedAt
                     })
                     .ToListAsync();
@@ -751,6 +767,7 @@ namespace Beyti_Backend.Controllers.Api
         // ==================== STATISTICS ====================
 
         // GET: api/ServiceProviderDashboard/Statistics/5
+       
         [HttpGet("Statistics/{serviceProviderId}")]
         public async Task<IActionResult> GetStatistics(int serviceProviderId)
         {
@@ -759,29 +776,46 @@ namespace Beyti_Backend.Controllers.Api
                 var totalBookings = await _context.ServiceBookings
                     .CountAsync(sb => sb.ServiceProviderId == serviceProviderId);
 
+                // Count only Pending bookings (simple flow - no quote needed)
                 var pendingBookings = await _context.ServiceBookings
-                    .CountAsync(sb => sb.ServiceProviderId == serviceProviderId && sb.Status == "PendingQuote");
+                    .CountAsync(sb => sb.ServiceProviderId == serviceProviderId &&
+                                     sb.Status == "Pending");
 
                 var completedBookings = await _context.ServiceBookings
-                    .CountAsync(sb => sb.ServiceProviderId == serviceProviderId && sb.Status == "Completed");
+                    .CountAsync(sb => sb.ServiceProviderId == serviceProviderId &&
+                                     sb.Status == "Completed");
 
-                var totalRevenue = await _context.ServiceBookings
-                    .Where(sb => sb.ServiceProviderId == serviceProviderId && sb.Status == "Completed")
-                    .SumAsync(sb => (decimal?)sb.QuotedPrice) ?? 0;
+                // Get all completed bookings and calculate total earnings
+                var completedBookingsList = await _context.ServiceBookings
+                    .Where(sb => sb.ServiceProviderId == serviceProviderId &&
+                                sb.Status == "Completed")
+                    .Select(sb => new
+                    {
+                        sb.QuotedPrice,
+                        sb.FinalAmount,
+                        sb.DepositAmount
+                    })
+                    .ToListAsync();
 
-                var activeServices = await _context.ProviderApplicationServices
-                    .Include(pas => pas.ProviderApplication)
-                    .Include(pas => pas.ServiceCatalog)
-                    .CountAsync(pas =>
-                        pas.ProviderApplication.ServiceProviderId == serviceProviderId &&
-                        pas.ServiceCatalog.IsActive);
+                // Sum up all the prices from completed bookings
+                decimal totalEarnings = 0;
+                foreach (var booking in completedBookingsList)
+                {
+                    // Use FinalAmount if available, otherwise QuotedPrice, otherwise 0
+                    totalEarnings += booking.FinalAmount ?? booking.QuotedPrice ?? 0;
+                }
+
+                // Query the Services table for active services count
+                var activeServices = await _context.Services
+                    .CountAsync(s => s.ServiceProviderId == serviceProviderId &&
+                                    s.IsActive);
 
                 return Ok(new
                 {
                     totalBookings,
-                    pendingBookings,
+                    pendingBookings,      // Only Pending status (no PendingQuote)
                     completedBookings,
-                    totalRevenue,
+                    totalEarnings,
                     activeServices
                 });
             }

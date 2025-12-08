@@ -359,6 +359,18 @@ const ServiceModeration = ({ onNavigate, adminUserProfileId }) => {
                               <div className="text-label-medium text-charcoal-400 truncate max-w-xs">
                                 {service.description || 'No description'}
                               </div>
+                              {service.flaggedKeywords && service.flaggedKeywords.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-1">
+                                  {service.flaggedKeywords.map((keyword, idx) => (
+                                    <span
+                                      key={idx}
+                                      className="inline-flex items-center px-2 py-0.5 rounded-full text-label-medium font-medium bg-danger-btn text-white"
+                                    >
+                                      {keyword}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                             </div>,
                             <div>
                               <div className="text-charcoal-600">{service.category}</div>
@@ -445,6 +457,37 @@ const ServiceModeration = ({ onNavigate, adminUserProfileId }) => {
               <h4 className="text-card-h2 text-charcoal-600 dark:text-white mb-4">Service Details</h4>
 
               <div className="space-y-4">
+                {/* Flagged Keywords Warning */}
+                {selectedService.flaggedKeywords && selectedService.flaggedKeywords.length > 0 && (
+                  <div className="bg-danger-bg border-l-4 border-danger-btn rounded-lg p-4">
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0">
+                        <svg className="h-5 w-5 text-danger-btn" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <h3 className="text-body-medium text-danger-text font-semibold">
+                          Prohibited Content Detected
+                        </h3>
+                        <div className="mt-2 text-body-regular text-danger-text">
+                          <p>This service contains prohibited keywords:</p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {selectedService.flaggedKeywords.map((keyword, idx) => (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-label-medium font-medium bg-danger-btn text-white"
+                              >
+                                {keyword}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Description */}
                 <div className="bg-cream-50 rounded-lg p-4">
                   <h5 className="text-body-medium text-charcoal-600 font-semibold mb-2">

@@ -55,6 +55,16 @@ namespace Beyti_Backend.Controllers.Api
         {
             try
             {
+                // Prohibited keywords for content moderation
+                var prohibitedKeywords = new[]
+                {
+                    "drug", "drugs", "cocaine", "heroin", "marijuana", "weed", "cannabis", "meth",
+                    "cigarette", "cigar", "tobacco", "vape", "e-cigarette", "smoking",
+                    "weapon", "gun", "rifle", "pistol", "ammunition", "firearm", "knife",
+                    "alcohol", "beer", "wine", "vodka", "whiskey", "liquor",
+                    "porn", "adult", "xxx", "explicit", "sex"
+                };
+
                 var query = from s in _context.ServiceCatalogs
                             join sc in _context.ServiceCategories on s.ServiceCategoryId equals sc.Id into categoryGroup
                             from category in categoryGroup.DefaultIfEmpty()
@@ -83,7 +93,13 @@ namespace Beyti_Backend.Controllers.Api
                         isActive = x.Service.IsActive,
                         category = x.CategoryName,
                         subCategory = "", // Add subCategory field for frontend compatibility
-                        createdAt = x.Service.CreatedAt
+                        createdAt = x.Service.CreatedAt,
+                        flaggedKeywords = prohibitedKeywords
+                            .Where(keyword =>
+                                x.Service.Name.ToLower().Contains(keyword) ||
+                                (x.Service.Description != null && x.Service.Description.ToLower().Contains(keyword))
+                            )
+                            .ToList()
                     })
                     .ToListAsync();
 
@@ -108,6 +124,16 @@ namespace Beyti_Backend.Controllers.Api
         {
             try
             {
+                // Prohibited keywords for content moderation
+                var prohibitedKeywords = new[]
+                {
+                    "drug", "drugs", "cocaine", "heroin", "marijuana", "weed", "cannabis", "meth",
+                    "cigarette", "cigar", "tobacco", "vape", "e-cigarette", "smoking",
+                    "weapon", "gun", "rifle", "pistol", "ammunition", "firearm", "knife",
+                    "alcohol", "beer", "wine", "vodka", "whiskey", "liquor",
+                    "porn", "adult", "xxx", "explicit", "sex"
+                };
+
                 var service = await (from s in _context.ServiceCatalogs
                                      join sc in _context.ServiceCategories on s.ServiceCategoryId equals sc.Id into categoryGroup
                                      from category in categoryGroup.DefaultIfEmpty()
@@ -123,7 +149,13 @@ namespace Beyti_Backend.Controllers.Api
                                          isActive = s.IsActive,
                                          category = category != null ? category.Name : "Uncategorized",
                                          subCategory = "", // Add subCategory field for frontend compatibility
-                                         createdAt = s.CreatedAt
+                                         createdAt = s.CreatedAt,
+                                         flaggedKeywords = prohibitedKeywords
+                                             .Where(keyword =>
+                                                 s.Name.ToLower().Contains(keyword) ||
+                                                 (s.Description != null && s.Description.ToLower().Contains(keyword))
+                                             )
+                                             .ToList()
                                      }).FirstOrDefaultAsync();
 
                 if (service == null)
