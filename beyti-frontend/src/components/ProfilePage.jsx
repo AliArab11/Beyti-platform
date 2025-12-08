@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { User, Envelope, Phone, MapPin, Calendar, IdentificationCard, CheckCircle, XCircle } from '@phosphor-icons/react';
+import { User, Envelope, Phone, MapPin, Calendar, IdentificationCard, CheckCircle, XCircle, Buildings } from '@phosphor-icons/react';
 
 export default function ProfilePage({
   userProfile,
@@ -20,6 +20,7 @@ export default function ProfilePage({
   const [saveMessage, setSaveMessage] = useState(null);
   const [formData, setFormData] = useState({
     displayName: '',
+    businessName: '',
     phone: '',
     street: '',
     city: '',
@@ -33,6 +34,7 @@ export default function ProfilePage({
     if (userProfile) {
       setFormData({
         displayName: userProfile.displayName || '',
+        businessName: userProfile.businessName || '',
         phone: userProfile.phone || '',
         street: userProfile.street || '',
         city: userProfile.city || '',
@@ -61,6 +63,11 @@ export default function ProfilePage({
         displayName: formData.displayName,
         phone: formData.phone,
       };
+
+      // Add business name for Service Providers
+      if (userRole === 'ServiceProvider' && formData.businessName) {
+        updates.businessName = formData.businessName;
+      }
 
       // Add address updates if any field has changed
       const hasAddressChanged =
@@ -101,6 +108,7 @@ export default function ProfilePage({
     if (userProfile) {
       setFormData({
         displayName: userProfile.displayName || '',
+        businessName: userProfile.businessName || '',
         phone: userProfile.phone || '',
         street: userProfile.street || '',
         city: userProfile.city || '',
@@ -242,6 +250,32 @@ export default function ProfilePage({
                 )}
               </div>
             </div>
+
+            {/* Business Name - Only show for Service Providers */}
+            {userRole === 'ServiceProvider' && (
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-md bg-sage-100 dark:bg-sage-900 flex items-center justify-center flex-shrink-0 mt-1">
+                  <Buildings size={20} className="text-sage-700 dark:text-sage-300" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-label-medium text-charcoal-400 dark:text-gray-400 mb-1">Business Name</p>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      name="businessName"
+                      value={formData.businessName}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-charcoal-400 dark:border-charcoal-500 dark:bg-charcoal-600 rounded-md text-body-regular text-charcoal-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-sage-500"
+                      placeholder="Enter your business name"
+                    />
+                  ) : (
+                    <p className="text-body-regular text-charcoal-600 dark:text-white font-medium">
+                      {formData.businessName || 'Not provided'}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Phone - Only show for non-Admin users */}
             {showContactFields && (

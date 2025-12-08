@@ -67,6 +67,8 @@ public partial class BeytiContext : DbContext
 
     public virtual DbSet<ServiceCatalog> ServiceCatalogs { get; set; }
 
+    public virtual DbSet<Service> Services { get; set; }
+
     public virtual DbSet<ServiceProvider> ServiceProviders { get; set; }
 
     public virtual DbSet<ServiceProviderAddress> ServiceProviderAddresses { get; set; }
@@ -92,6 +94,8 @@ public partial class BeytiContext : DbContext
     public virtual DbSet<vw_ProviderAvailability> vw_ProviderAvailabilities { get; set; }
 
     public virtual DbSet<vw_ServiceProviderBooking> vw_ServiceProviderBookings { get; set; }
+
+    public virtual DbSet<ServiceCategory> ServiceCategories { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
@@ -364,6 +368,11 @@ public partial class BeytiContext : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_ServiceBooking_ServiceCatalog");
 
+            entity.HasOne(d => d.Service).WithMany(p => p.ServiceBookings)
+                .HasForeignKey(d => d.ServiceId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("FK_ServiceBooking_Service");
+
             entity.HasOne(d => d.ServiceProvider).WithMany(p => p.ServiceBookings)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_ServiceBooking_Provider");
@@ -373,12 +382,41 @@ public partial class BeytiContext : DbContext
 
         modelBuilder.Entity<ServiceCatalog>(entity =>
         {
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())");
+            // 1. Match the SQL default (changed from sysutcdatetime to sysdatetime)
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysdatetime())");
+
             entity.Property(e => e.IsActive).HasDefaultValue(true);
 
-            entity.HasOne(d => d.SubCategory).WithMany(p => p.ServiceCatalogs)
+            // 2. Point to the NEW ServiceCategory table
+            entity.HasOne(d => d.ServiceCategory)
+                .WithMany(p => p.ServiceCatalogs) // Matches the list in ServiceCategory.cs
+                .HasForeignKey(d => d.ServiceCategoryId) // Matches the new int column
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_ServiceCatalog_SubCategory");
+                .HasConstraintName("FK_ServiceCatalog_ServiceCategory"); // Matches the new SQL Constraint
+        });
+
+        modelBuilder.Entity<ServiceCategory>(entity =>
+        {
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysdatetime())");
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+        });
+
+        modelBuilder.Entity<Service>(entity =>
+        {
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysdatetime())");
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+
+            entity.HasOne(d => d.ServiceProvider)
+                .WithMany(p => p.Services)
+                .HasForeignKey(d => d.ServiceProviderId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Service_ServiceProvider");
+
+            entity.HasOne(d => d.ServiceCatalog)
+                .WithMany(p => p.Services)
+                .HasForeignKey(d => d.ServiceCatalogId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Service_ServiceCatalog");
         });
 
         modelBuilder.Entity<ServiceProvider>(entity =>

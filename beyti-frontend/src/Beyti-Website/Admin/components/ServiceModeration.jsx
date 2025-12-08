@@ -19,8 +19,11 @@ import {
   getServiceDetails,
   approveService,
   suspendService,
-  deleteService
+  deleteService,
+  getUserProfile,
+  updateUserProfile
 } from '../../../services/api';
+import { logAdminActivity } from '../../../utils/adminActivityLogger';
 
 // Import design system components
 import AnalyticsCard from '../../../components/AnalyticsCard';
@@ -30,12 +33,16 @@ import { Table, TableHeader, TableBody, TableRow } from '../../../components/Tab
 import PageHeader from '../../../components/PageHeader';
 import AdminSidebar from './AdminSidebar';
 
-const ServiceModeration = ({ onNavigate }) => {
+const ServiceModeration = ({ onNavigate, adminUserProfileId }) => {
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all'); // all, active, inactive
   const [notificationCount] = useState(0);
+
+  // User profile state
+  const [userProfile, setUserProfile] = useState(null);
+  const [displayName, setDisplayName] = useState("Admin User");
 
   // Details modal state
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -76,9 +83,51 @@ const ServiceModeration = ({ onNavigate }) => {
     }
   };
 
+  // Fetch user profile details
+  const fetchUserProfile = async () => {
+    // Skip if adminUserProfileId is not provided
+    if (!adminUserProfileId) {
+      console.warn('Admin user profile ID not provided, skipping profile fetch');
+      return;
+    }
+
+    try {
+      const profile = await getUserProfile(adminUserProfileId);
+      if (profile) {
+        const normalizedProfile = {
+          userProfileId: profile.UserProfileId,
+          displayName: profile.DisplayName,
+          roleType: profile.RoleType,
+          status: profile.Status,
+          phone: profile.Phone,
+          createdAt: profile.CreatedAt,
+          updatedAt: profile.UpdatedAt,
+        };
+        setUserProfile(normalizedProfile);
+        if (normalizedProfile.displayName) {
+          setDisplayName(normalizedProfile.displayName);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+  };
+
+  // Handle profile update
+  const handleProfileUpdate = async (updates) => {
+    try {
+      await updateUserProfile(adminUserProfileId, 'Admin', updates);
+      await fetchUserProfile();
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      throw error;
+    }
+  };
+
   useEffect(() => {
     fetchStatistics();
     fetchServices();
+    fetchUserProfile();
   }, [filterStatus]);
 
   // View service details
@@ -97,7 +146,16 @@ const ServiceModeration = ({ onNavigate }) => {
   const handleApprove = async (serviceId) => {
     if (window.confirm('Are you sure you want to approve this service?')) {
       try {
-        await approveService(serviceId);
+        const service = services.find(s => s.id === serviceId);
+        await approveService(serviceId, adminUserProfileId);
+
+        // Log the admin activity
+        logAdminActivity(
+          'approval',
+          'Approved Service',
+          service?.name || `Service #${serviceId}`
+        );
+
         alert('Service approved successfully!');
         fetchServices();
         fetchStatistics();
@@ -126,7 +184,15 @@ const ServiceModeration = ({ onNavigate }) => {
     }
 
     try {
-      await suspendService(serviceToSuspend.id, suspendReason);
+      await suspendService(serviceToSuspend.id, suspendReason, adminUserProfileId);
+
+      // Log the admin activity
+      logAdminActivity(
+        'suspension',
+        'Suspended Service',
+        serviceToSuspend?.name || `Service #${serviceToSuspend.id}`
+      );
+
       alert('Service suspended successfully!');
       setShowSuspendModal(false);
       setServiceToSuspend(null);
@@ -146,7 +212,16 @@ const ServiceModeration = ({ onNavigate }) => {
   const handleDelete = async (serviceId) => {
     if (window.confirm('Are you sure you want to DELETE this service? This action cannot be undone!')) {
       try {
+        const service = services.find(s => s.id === serviceId);
         await deleteService(serviceId);
+
+        // Log the admin activity
+        logAdminActivity(
+          'moderation',
+          'Deleted Service',
+          service?.name || `Service #${serviceId}`
+        );
+
         alert('Service deleted successfully!');
         fetchServices();
         fetchStatistics();
@@ -174,48 +249,17 @@ const ServiceModeration = ({ onNavigate }) => {
 
   if (loading && services.length === 0) {
     return (
-      <div className="flex min-h-screen bg-cream-50">
-        <AdminSidebar currentPage="service-moderation" onNavigate={onNavigate} />
-
-        <div className="flex-1 ml-[250px] flex flex-col">
-          <PageHeader
-            title="Service Moderation"
-            notificationCount={notificationCount}
-            userName="Admin User"
-            userRole="Super Admin"
-          />
-          <main className="flex-1 p-8 overflow-y-auto">
-            <div className="flex items-center justify-center h-64">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sage-500"></div>
-            </div>
-          </main>
-        </div>
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sage-500"></div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-cream-50">
-      <AdminSidebar currentPage="service-moderation" onNavigate={onNavigate} />
-
-      {/* Main Content */}
-      <div className="flex-1 ml-[250px] flex flex-col">
-        {/* Header with Search */}
-        <PageHeader
-          title="Service Moderation"
-          withSearch
-          searchPlaceholder="Search services, categories..."
-          onSearch={(value) => setSearchTerm(value)}
-          notificationCount={notificationCount}
-          userName="Admin User"
-          userRole="Super Admin"
-        />
-
-        {/* Main Content Area */}
-        <main className="flex-1 p-8 overflow-y-auto">
-          <div className="max-w-7xl mx-auto space-y-8">
-            {/* Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+    <>
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* Statistics Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <AnalyticsCard
                 title="Total Services"
                 metrics={[
@@ -315,6 +359,18 @@ const ServiceModeration = ({ onNavigate }) => {
                               <div className="text-label-medium text-charcoal-400 truncate max-w-xs">
                                 {service.description || 'No description'}
                               </div>
+                              {service.flaggedKeywords && service.flaggedKeywords.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-1">
+                                  {service.flaggedKeywords.map((keyword, idx) => (
+                                    <span
+                                      key={idx}
+                                      className="inline-flex items-center px-2 py-0.5 rounded-full text-label-medium font-medium bg-danger-btn text-white"
+                                    >
+                                      {keyword}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                             </div>,
                             <div>
                               <div className="text-charcoal-600">{service.category}</div>
@@ -365,11 +421,9 @@ const ServiceModeration = ({ onNavigate }) => {
                     </TableBody>
                   </Table>
                 )}
-              </div>
             </div>
           </div>
-        </main>
-      </div>
+        </div>
 
       {/* Service Details Modal */}
       {showDetailsModal && selectedService && (
@@ -403,6 +457,37 @@ const ServiceModeration = ({ onNavigate }) => {
               <h4 className="text-card-h2 text-charcoal-600 dark:text-white mb-4">Service Details</h4>
 
               <div className="space-y-4">
+                {/* Flagged Keywords Warning */}
+                {selectedService.flaggedKeywords && selectedService.flaggedKeywords.length > 0 && (
+                  <div className="bg-danger-bg border-l-4 border-danger-btn rounded-lg p-4">
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0">
+                        <svg className="h-5 w-5 text-danger-btn" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <h3 className="text-body-medium text-danger-text font-semibold">
+                          Prohibited Content Detected
+                        </h3>
+                        <div className="mt-2 text-body-regular text-danger-text">
+                          <p>This service contains prohibited keywords:</p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {selectedService.flaggedKeywords.map((keyword, idx) => (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-label-medium font-medium bg-danger-btn text-white"
+                              >
+                                {keyword}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Description */}
                 <div className="bg-cream-50 rounded-lg p-4">
                   <h5 className="text-body-medium text-charcoal-600 font-semibold mb-2">
@@ -582,7 +667,7 @@ const ServiceModeration = ({ onNavigate }) => {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 

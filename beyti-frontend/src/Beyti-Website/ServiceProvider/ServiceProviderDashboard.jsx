@@ -1,27 +1,41 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ProviderOverview from './components/ProviderOverview';
 import ServicesManagement from './components/ServicesManagement';
 import ScheduleManagement from './components/ScheduleManagement';
 import BookingsManagement from './components/BookingsManagement';
+import ReviewsManagement from './components/ReviewsManagement';
+import NotificationsPage from './components/NotificationsPage';
 import ProfilePage from '../../components/ProfilePage';
 import ServiceProviderSidebar from './components/ServiceProviderSidebar';
 import PageHeader from '../../components/PageHeader';
 import { getUserProfile, updateUserProfile, updateProviderStatus } from '../../services/api';
+import { logProviderActivity } from '../../utils/providerActivityLogger';
+import { isAuthenticated, getUserId, handleSuspensionError } from '../../utils/authUtils';
 
 export default function ServiceProviderDashboard() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   const [bookingFilter, setBookingFilter] = useState(null);
   const [displayName, setDisplayName] = useState("Service Provider");
   const [userProfile, setUserProfile] = useState(null);
   const [providerStatus, setProviderStatus] = useState('Available');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [reviewSearchQuery, setReviewSearchQuery] = useState('');
+  const [notificationSearchQuery, setNotificationSearchQuery] = useState('');
+  const [serviceSearchQuery, setServiceSearchQuery] = useState('');
+  const [activityRefreshKey, setActivityRefreshKey] = useState(0);
 
-  
-// 1. Get the logged-in user's Profile ID from the browser storage
-const userProfileId = localStorage.getItem('userId'); 
+  // Check authentication on mount
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      navigate('/login');
+    }
+  }, [navigate]);
 
-// 2. Create state to hold the Provider ID (we will get this from the API)
-const [serviceProviderId, setServiceProviderId] = useState(null);
+  // Get user ID from localStorage (will be replaced with context in future)
+  const userProfileId = parseInt(getUserId()) || 1;
+  const serviceProviderId = 1; // TODO: Get from API based on userProfileId
 
   // Fetch user profile details
   const fetchUserProfile = async () => {
@@ -45,7 +59,8 @@ const [serviceProviderId, setServiceProviderId] = useState(null);
           userProfileId: profile.UserProfileId,
           displayName: profile.DisplayName,
           roleType: profile.RoleType,
-          status: profile.Status, 
+          status: profile.Status, // This is ServiceProvider.Status from the API
+          accountStatus: profile.AccountStatus, // UserProfile.Status (Active/Suspended)
           phone: profile.Phone,
           businessName: profile.BusinessName,
           // Address fields from the new controller
@@ -59,9 +74,15 @@ const [serviceProviderId, setServiceProviderId] = useState(null);
           updatedAt: profile.UpdatedAt,
         };
 
-        console.log('[fetchUserProfile] Normalized profile:', normalizedProfile);
-        
-        // 4. Update all necessary states
+        console.log('[fetchUserProfile] Normalized profile status:', normalizedProfile.status);
+        console.log('[fetchUserProfile] Account status:', normalizedProfile.accountStatus);
+
+        // Check if account is suspended
+        if (normalizedProfile.accountStatus === 'Suspended') {
+          navigate('/account-suspended');
+          return;
+        }
+
         setUserProfile(normalizedProfile);
         
         // CRITICAL: Save the ServiceProviderId to state so other widgets can use it
@@ -78,17 +99,28 @@ const [serviceProviderId, setServiceProviderId] = useState(null);
         }
       }
     } catch (error) {
-      console.error('Error fetching service provider profile:', error);
+      console.error('Error fetching user profile:', error);
+      // Check if error is due to suspension
+      if (!handleSuspensionError(error, navigate)) {
+        // Handle other errors
+        console.error('Failed to load profile');
+      }
     }
   };
 
   // Handle profile update
   const handleProfileUpdate = async (updates) => {
     try {
-      // Use the provider-specific update function
-      // This hits: PUT /api/ServiceProviderDashboard/UpdateProfile/{id}
-      await updateProviderProfile(userProfileId, updates);
-      
+      await updateUserProfile(userProfileId, 'ServiceProvider', updates);
+
+      // Log activity
+      logProviderActivity(
+        serviceProviderId,
+        'profile',
+        'Updated Business Profile',
+        updates.displayName ? `Changed display name to ${updates.displayName}` : 'Updated profile information'
+      );
+
       // Refresh the profile after update
       await fetchUserProfile();
     } catch (error) {
@@ -112,6 +144,17 @@ const [serviceProviderId, setServiceProviderId] = useState(null);
       setProviderStatus(newStatus); // Optimistic update
       const response = await updateProviderStatus(serviceProviderId, newStatus);
       console.log('[handleStatusChange] Update response:', response);
+
+      // Log activity for status change
+      logProviderActivity(
+        serviceProviderId,
+        'profile',
+        'Changed Availability Status',
+        `Status updated from ${previousStatus} to ${newStatus}`
+      );
+
+      // Trigger activity refresh by updating the key
+      setActivityRefreshKey(prev => prev + 1);
     } catch (error) {
       console.error('Error updating provider status:', error);
       // Revert on error
@@ -146,6 +189,10 @@ const [serviceProviderId, setServiceProviderId] = useState(null);
         return 'Booking Requests';
       case 'schedule':
         return 'Availability';
+      case 'reviews':
+        return 'Reviews';
+      case 'notifications':
+        return 'Notifications';
       case 'profile':
         return 'My Profile';
       default:
@@ -168,11 +215,27 @@ const [serviceProviderId, setServiceProviderId] = useState(null);
         {/* Header */}
         <PageHeader
           title={getPageTitle()}
+          withSearch={activeTab === 'reviews' || activeTab === 'notifications' || activeTab === 'services'}
+          searchPlaceholder={
+            activeTab === 'notifications'
+              ? 'Search notifications by title, content, or type...'
+              : activeTab === 'services'
+              ? 'Search by service name, category, or description...'
+              : 'Search by customer, service, or comment...'
+          }
+          onSearch={
+            activeTab === 'notifications'
+              ? setNotificationSearchQuery
+              : activeTab === 'services'
+              ? setServiceSearchQuery
+              : setReviewSearchQuery
+          }
           notificationCount={0}
           userName={displayName}
           userRole="Service Provider"
           userProfile={userProfile}
           entityId={serviceProviderId}
+          userId={userProfileId}
           onProfileClick={() => setActiveTab('profile')}
           onProfileUpdate={handleProfileUpdate}
         />
@@ -215,11 +278,12 @@ const [serviceProviderId, setServiceProviderId] = useState(null);
                 <ProviderOverview
                   serviceProviderId={serviceProviderId}
                   onNavigateToBookings={handleNavigateToBookings}
+                  activityRefreshKey={activityRefreshKey}
                 />
               </>
             )}
             {activeTab === 'services' && (
-              <ServicesManagement serviceProviderId={serviceProviderId} />
+              <ServicesManagement serviceProviderId={serviceProviderId} searchTerm={serviceSearchQuery} />
             )}
             {activeTab === 'schedule' && (
               <ScheduleManagement serviceProviderId={serviceProviderId} />
@@ -229,6 +293,15 @@ const [serviceProviderId, setServiceProviderId] = useState(null);
                 serviceProviderId={serviceProviderId}
                 initialFilter={bookingFilter}
               />
+            )}
+            {activeTab === 'reviews' && (
+              <ReviewsManagement
+                serviceProviderId={serviceProviderId}
+                searchQuery={reviewSearchQuery}
+              />
+            )}
+            {activeTab === 'notifications' && (
+              <NotificationsPage userId={userProfileId} searchQuery={notificationSearchQuery} />
             )}
             {activeTab === 'profile' && (
               <ProfilePage

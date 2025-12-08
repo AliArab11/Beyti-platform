@@ -12,7 +12,12 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddDbContext<BeytiContext>();
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+        options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+    });
 
 // Identity Database
 builder.Services.AddDbContext<IdentityContext>(options =>
@@ -70,6 +75,9 @@ builder.Services.AddSignalR();
 
 // Add NotificationService
 builder.Services.AddScoped<INotificationService, NotificationService>();
+
+// Add AuditLogService
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 
 builder.Services.AddCors(options =>
 {

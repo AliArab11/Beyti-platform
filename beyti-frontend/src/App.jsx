@@ -11,11 +11,25 @@ import ServiceProviderRequests from './Pages/Admin/ServiceProviderRequests.jsx';
 import CustomerPage from "./Pages/Customer";
 import SellerPage from "./Pages/Seller";
 import StoresPage from "./Pages/Seller/Store";
+import MainStoreView from "./Beyti-Website/Store/MainStoreView.jsx";
+import StoreTypeSelection from "./Beyti-Website/Store/StoreTypeSelection.jsx";
+import ServiceProviderStoresView from "./Beyti-Website/Store/ServiceProviderStoresView.jsx";
+import ServiceProviderDetailView from "./Beyti-Website/Store/ServiceProviderDetailView.jsx";
+import StoreView from "./Beyti-Website/Store/StoreView.jsx";
 import StoreDetailsPage from "./Pages/Seller/StoreDetails";
-import SellerDashboardPage from "./Beyti-Website/Seller/SellerDashboard.jsx";
+
+import SellerDashboardLayout from "./Beyti-Website/Seller/SellerDashboard.jsx";
+import SellerProductsPage from "./Beyti-Website/Seller/Components/Products.jsx";
+import SellerOrdersPage from "./Beyti-Website/Seller/Components/Orders.jsx";
+import SellerAnalyticsPage from "./Beyti-Website/Seller/Components/Analytics.jsx";
+import SellerReviewsPage from "./Beyti-Website/Seller/Components/Reviews.jsx";
+
 import ProductsPage from "./Pages/Product/Products";
 import CategoryPage from "./Pages/Product/Categories";
+
 import DriverPage from "./Pages/Driver";
+import DriverDashboardPage from "./Beyti-Website/Driver/DriverDashboard.jsx";
+
 import ServiceProviderDashboard from './Beyti-Website/ServiceProvider/ServiceProviderDashboard';
 import DesignSystemDemo from './components/DesignSystemDemo';
 import DashboardTemplate from './Pages/DashboardTemplate';
@@ -29,6 +43,7 @@ import DriverOnboarding from './Beyti-Website/Registration/DriverOnboarding';
 import AdminView from './Beyti-Website/Admin/AdminView.jsx';
 import DashboardRouter from './components/DashboardRouter';
 import DriverDashboardPlaceholder from './Beyti-Website/Driver/DriverDashboardPlaceholder';
+import AccountSuspended from './Beyti-Website/Auth/AccountSuspended';
 
 // Placeholder components for pages that don't exist yet
 const PlaceholderPage = ({ pageName }) => (
@@ -50,10 +65,14 @@ export default function App() {
     { path: '/seller', label: 'Seller' },
     { path: '/seller-dashboard', label: 'Seller Dashboard' },
     { path: '/store', label: 'Store' },
+    { path: '/stores', label: 'All Stores' },
+    { path: '/mainStore', label: 'Seller Stores' },
+    { path: '/serviceProviders', label: 'Service Providers' },
     { path: '/product', label: 'Product' },
     { path: '/category', label: 'Category' },
     { path: '/customer', label: 'Customer' },
     { path: '/driver', label: 'Driver' },
+    { path: '/driver-dashboard', label: 'Driver Dashboard' },
     { path: '/admin', label: 'Admin' },
     { path: '/serviceprovider', label: 'Service Provider' },
     { path: '/serviceprovider-dashboard', label: 'SP Dashboard' },
@@ -152,16 +171,39 @@ export default function App() {
             <Route path="/membership" element={<MembershipPage />} />
             <Route path="/addplan" element={<AddPlanPage />} />
             <Route path="/seller" element={<SellerPage />} />
-            <Route path="/seller-dashboard" element={<SellerDashboardPage />} />
+
+            <Route path="/seller-dashboard" element={<SellerDashboardLayout />}>
+              <Route index element={<SellerAnalyticsPage />} /> 
+              <Route path="dashboard" element={<SellerAnalyticsPage />} />
+              <Route path="orders" element={<SellerOrdersPage />} />
+              <Route path="products" element={<SellerProductsPage />} />
+              <Route path="analytics" element={<SellerAnalyticsPage />} />
+              <Route path="reviews" element={<SellerReviewsPage />} />
+            </Route>
+
             <Route path="/store" element={<StoresPage />} />
+            <Route path="/stores" element={<StoreTypeSelection />} />
+            <Route path="/mainStore" element={<MainStoreView />} />
+            <Route path="/serviceProviders" element={<ServiceProviderStoresView />} />
+            <Route path="/service-provider/:providerId" element={<ServiceProviderDetailView />} />
+            <Route path="/store/:storeId" element={<StoreView />} />
             <Route path="/store/:id" element={<StoreDetailsPage />} />
             <Route path="/product" element={<ProductsPage />} />
             <Route path="/category" element={<CategoryPage />} />
             <Route path="/customer" element={<CustomerPage />} />
+
             <Route path="/driver" element={<DriverPage />} />
+            <Route path="/driver-dashboard" element={<DriverDashboardPage />}>
+              <Route index element={<div />} />
+              <Route path="dashboard" element={<div />} />
+              <Route path="orders" element={<div />} />
+              <Route path="analytics" element={<div />} />
+            </Route>
+
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/serviceprovider" element={<ServiceProviderPage />} />
             <Route path="/serviceprovider-dashboard" element={<ServiceProviderDashboard />} />
+            <Route path="/account-suspended" element={<AccountSuspended />} />
             <Route path="/admin-view" element={<AdminView />} />
             <Route path="/admindashboard" element={<AdminUsersPage />} />
             <Route path="/servicerequest" element={<ServiceProviderRequests />} />

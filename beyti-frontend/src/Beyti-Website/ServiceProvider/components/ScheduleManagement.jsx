@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { getProviderTimeSlots, addTimeSlot, deleteTimeSlot } from '../../../services/api';
 import CRUDButton from '../../../components/CRUDButton';
 import StatusChip from '../../../components/StatusChip';
+import { logProviderActivity } from '../../../utils/providerActivityLogger';
 
 export default function ScheduleManagement({ serviceProviderId }) {
   const [timeSlots, setTimeSlots] = useState([]);
@@ -42,12 +43,22 @@ export default function ScheduleManagement({ serviceProviderId }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      const dayName = daysOfWeek.find(d => d.id === parseInt(formData.dayOfWeek))?.name || 'N/A';
       await addTimeSlot({
         serviceProviderId,
         dayOfWeek: parseInt(formData.dayOfWeek),
         startTime: formData.startTime,
         endTime: formData.endTime
       });
+
+      // Log activity
+      logProviderActivity(
+        serviceProviderId,
+        'schedule',
+        'Added Availability',
+        `${dayName}: ${formData.startTime} - ${formData.endTime}`
+      );
+
       alert('Time slot added successfully!');
       setFormData({ dayOfWeek: '', startTime: '', endTime: '' });
       setShowForm(false);
@@ -61,7 +72,19 @@ export default function ScheduleManagement({ serviceProviderId }) {
   const handleDelete = async (timeSlotId) => {
     if (confirm('Are you sure you want to delete this time slot?')) {
       try {
+        const slot = timeSlots.find(s => s.timeSlotId === timeSlotId);
+        const dayName = daysOfWeek.find(d => d.id === slot?.dayOfWeek)?.name || 'N/A';
+
         await deleteTimeSlot(timeSlotId);
+
+        // Log activity
+        logProviderActivity(
+          serviceProviderId,
+          'schedule',
+          'Removed Availability',
+          `${dayName}: ${slot?.startTime || ''} - ${slot?.endTime || ''}`
+        );
+
         fetchTimeSlots();
       } catch (err) {
         console.error('Error deleting time slot:', err);

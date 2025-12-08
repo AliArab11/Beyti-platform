@@ -24,14 +24,18 @@ namespace Beyti_Backend.Controllers.Api
         [HttpGet]
         public async Task<ActionResult<IEnumerable<ServiceCatalog>>> GetServiceCatalogs()
         {
-            return await _context.ServiceCatalogs.ToListAsync();
+            return await _context.ServiceCatalogs
+                .Include(sc => sc.ServiceCategory)
+                .ToListAsync();
         }
 
         // GET: api/ServiceCatalogs/5
         [HttpGet("{id}")]
         public async Task<ActionResult<ServiceCatalog>> GetServiceCatalog(int id)
         {
-            var serviceCatalog = await _context.ServiceCatalogs.FindAsync(id);
+            var serviceCatalog = await _context.ServiceCatalogs
+                .Include(sc => sc.ServiceCategory)
+                .FirstOrDefaultAsync(sc => sc.Id == id);
 
             if (serviceCatalog == null)
             {

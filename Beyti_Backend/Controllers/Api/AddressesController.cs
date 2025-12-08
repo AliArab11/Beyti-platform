@@ -24,13 +24,13 @@ namespace Beyti_Backend.Controllers.Api
         public class CreateAddressDto
         {
             public string? Label { get; set; }
-            public string Street { get; set; }
-            public string City { get; set; }
+            public required string Street { get; set; }
+            public required string City { get; set; }
             [Column("Governorate")]
             public string? Region { get; set; }        // Changed from Governorate
             [Column("Block")]
             public string? PostalCode { get; set; }    // Changed from Block
-            public string Country { get; set; }
+            public required string Country { get; set; }
             public decimal? Latitude { get; set; }
             public decimal? Longitude { get; set; }
             public bool IsDefault { get; set; }

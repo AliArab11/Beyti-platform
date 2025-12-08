@@ -473,17 +473,7 @@ const confirmVisibilityChange = async (reason) => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
-      {/* Header */}
-      <header className="space-y-2">
-        <h1 className="text-display-h1 text-charcoal-600">Reviews</h1>
-        <p className="text-body-regular text-charcoal-400">
-        Manage customer feedback and review visibility for{" "}
-        <span className="font-semibold text-charcoal-600">
-            {sellerName || "your store"}
-        </span>
-        </p>
-      </header>
+    <div className="max-w-7xl mx-auto space-y-6">
 
       {/* Loading / error */}
       {loading && (
@@ -989,8 +979,8 @@ const ReviewVisibilityModal = ({ show, mode, review, onClose, onConfirm }) => {
   const [reason, setReason] = React.useState("");
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
-      <div className="bg-cream-50 w-full max-w-lg rounded-xl border border-grey-stroke shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 modal-backdrop-enter">
+      <div className="bg-cream-50 w-full max-w-lg rounded-xl border border-grey-stroke shadow-2xl overflow-hidden modal-content-enter">
         
         {/* Header Section */}
         <div className="bg-grey-200 px-6 py-4 border-b border-grey-stroke">
