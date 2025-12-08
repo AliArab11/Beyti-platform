@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Cake, Heart, Star, MagnifyingGlass, ArrowLeft, Bread, ShoppingCartSimple, X } from "@phosphor-icons/react";
 import ProductDetailsSheet from './Components/ProductDetails.jsx';
 import Checkout from './Components/Checkout';
@@ -16,8 +16,7 @@ const getStoreDetails = async (storeId) => {
 };
 
 
-// Header Component
-const StoreHeader = ({ storeName, onBack }) => (
+const StoreHeader = ({ storeName, customerName, onBack }) => (
   <header className="bg-cream-50 py-4 px-8 border-b border-grey-stroke sticky top-0 z-10">
     <div className="max-w-[1440px] mx-auto flex items-center justify-between">
       <div className="flex items-center gap-6">
@@ -48,15 +47,24 @@ const StoreHeader = ({ storeName, onBack }) => (
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
           </svg>
         </button>
-        <div className="flex items-center gap-3 pl-4 border-l border-grey-stroke">
-          <div className="w-8 h-8 bg-sage-500 rounded-full flex items-center justify-center">
-            <span className="text-white text-sm font-semibold">A</span>
+        {customerName ? (
+          <div className="flex items-center gap-3 pl-4 border-l border-grey-stroke">
+            <div className="w-8 h-8 bg-sage-500 rounded-full flex items-center justify-center">
+              <span className="text-white text-sm font-semibold">{customerName[0]}</span>
+            </div>
+            <span className="text-charcoal-600 font-medium text-sm">{customerName}</span>
+            <svg className="w-4 h-4 text-charcoal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
           </div>
-          <span className="text-charcoal-600 font-medium text-sm">Ahmed</span>
-          <svg className="w-4 h-4 text-charcoal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </div>
+        ) : (
+          <div className="flex items-center gap-3 pl-4 border-l border-grey-stroke">
+            <div className="w-8 h-8 bg-grey-300 rounded-full flex items-center justify-center">
+              <span className="text-charcoal-400 text-sm font-semibold">?</span>
+            </div>
+            <span className="text-charcoal-400 font-medium text-sm">No Customer</span>
+          </div>
+        )}
       </div>
     </div>
   </header>
@@ -374,6 +382,15 @@ const ProductCard = ({ product, onClick }) => (
 const StoreView = () => {
   const { storeId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+
+   // Get customer info from navigation state
+  const customerId = location.state?.customerId;
+  const customerName = location.state?.customerName;
+
+  const [customerAddresses, setCustomerAddresses] = useState([]);
+  const [loadingAddresses, setLoadingAddresses] = useState(false);
+
   const [store, setStore] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -385,6 +402,13 @@ const StoreView = () => {
   const [cart, setCart] = useState([]);
   const [showCartModal, setShowCartModal] = useState(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', type: 'success' });
+
+    const showSnackbar = (message, type = 'success') => {
+    setSnackbar({ open: true, message, type });
+    setTimeout(() => setSnackbar({ open: false, message: '', type: 'success' }), 3000);
+    };
 
 const handleProductClick = (product) => {
   setSelectedProduct(product);
@@ -450,6 +474,42 @@ const handleRemoveFromCart = (productId) => {
     }
   }, [storeId]);
 
+  // Fetch full customer details including addresses
+  useEffect(() => {
+    const fetchCustomerDetails = async () => {
+      if (!customerId) {
+        setCustomerAddresses([]);
+        return;
+      }
+
+      try {
+        setLoadingAddresses(true);
+        console.log("🔍 Fetching customer details for ID:", customerId);
+        
+        const response = await fetch(`https://localhost:7062/api/Customers/${customerId}`);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const customerData = await response.json();
+        console.log("✅ Full customer data received:", customerData);
+        
+        // Extract addresses properly
+        const addresses = customerData.customerAddresses || [];
+        console.log("📍 Customer addresses extracted:", addresses);
+        
+        setCustomerAddresses(addresses);
+      } catch (err) {
+        console.error("❌ Error fetching customer details:", err);
+        setCustomerAddresses([]);
+      } finally {
+        setLoadingAddresses(false);
+      }
+    };
+    
+    fetchCustomerDetails();
+  }, [customerId]);
   // Get category title
   const getCategoryTitle = (categoryId) => {
     const titles = {
@@ -502,7 +562,11 @@ const handleRemoveFromCart = (productId) => {
 
   return (
     <div className="min-h-screen bg-cream-50">
-      <StoreHeader storeName={store?.storeName} onBack={() => navigate(-1)} />
+      <StoreHeader 
+        storeName={store?.storeName} 
+        customerName={customerName} 
+        onBack={() => navigate(-1)} 
+        />
       <StoreInfo store={store} />
       
       <div className="max-w-[1440px] mx-auto px-12 py-8">
@@ -678,16 +742,52 @@ const handleRemoveFromCart = (productId) => {
       )}
 
       {/* Checkout Modal */}
-      {showCheckoutModal && (
+        {showCheckoutModal && (
         <Checkout
-          cart={cart}
-          storeName={store?.storeName}
-          onClose={() => setShowCheckoutModal(false)}
-          onUpdateQuantity={handleUpdateQuantity}
-          onRemoveItem={handleRemoveFromCart}
+            cart={cart}
+            storeName={store?.storeName}
+            customerId={customerId}
+            customerName={customerName}
+            customerAddresses={customerAddresses}
+            onClose={() => setShowCheckoutModal(false)}
+            onUpdateQuantity={handleUpdateQuantity}
+            onRemoveItem={handleRemoveFromCart}
+            showSnackbar={showSnackbar}
         />
-      )}
-
+        )}
+        
+{/* Snackbar */}
+{snackbar.open && (
+  <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80]">
+    <div 
+      className={`px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 min-w-[300px] transition-all duration-300 ${
+        snackbar.type === 'success' ? 'bg-green-500 text-white' :
+        snackbar.type === 'error' ? 'bg-red-500 text-white' :
+        'bg-yellow-500 text-white'
+      }`}
+      style={{
+        animation: 'slideUp 0.3s ease-out'
+      }}
+    >
+      <style>{`
+        @keyframes slideUp {
+          from {
+            transform: translateY(20px);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+      `}</style>
+      <span className="text-2xl">
+        {snackbar.type === 'success' ? '✓' : snackbar.type === 'error' ? '✕' : '⚠'}
+      </span>
+      <p className="font-semibold">{snackbar.message}</p>
+    </div>
+  </div>
+)}
 
     </div>
   );

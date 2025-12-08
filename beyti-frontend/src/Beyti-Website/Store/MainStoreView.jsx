@@ -498,11 +498,13 @@ const MainStoreView = () => {
     };
     loadCustomers();
   }, []);
-
 const handleCustomerSelect = (customer) => {
     setCustomerId(customer.id);
     setCustomerName(customer.fullName || customer.name || `Customer #${customer.id}`);
     setCustomerModalOpen(false);
+    
+    // Store the full customer object to access addresses later
+    console.log("Selected customer with addresses:", customer);
   };
 
   const handleCustomerClick = () => {
@@ -526,6 +528,7 @@ const handleCustomerSelect = (customer) => {
     store.storeName?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#FAF7F2' }}>
@@ -560,8 +563,13 @@ const handleCustomerSelect = (customer) => {
           <div className="flex-1">
             <SearchBar value={searchQuery} onChange={setSearchQuery} />
             <FeaturedCarousel 
-              stores={stores} 
-              onStoreClick={(id) => navigate(`/store/${id}`)}
+            stores={stores} 
+            onStoreClick={(id) => navigate(`/store/${id}`, { 
+                state: { 
+                customerId, 
+                customerName 
+                } 
+            })}
             />
 
             {loading ? (
@@ -585,9 +593,14 @@ const handleCustomerSelect = (customer) => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {filteredStores.map(store => (
-                  <div key={store.id} onClick={() => navigate(`/store/${store.id}`)}>
+                 <div key={store.id} onClick={() => navigate(`/store/${store.id}`, { 
+                    state: { 
+                        customerId, 
+                        customerName 
+                    } 
+                    })}>
                     <StoreCard store={store} />
-                  </div>
+                    </div>
                 ))}
               </div>
             )}

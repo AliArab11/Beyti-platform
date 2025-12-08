@@ -116,6 +116,8 @@ namespace Beyti_Backend.Controllers.Api
         {
             var customer = await _context.Customers
                 .Include(c => c.UserProfile)
+                .Include(c => c.CustomerAddresses)
+                    .ThenInclude(ca => ca.Address)
                 .FirstOrDefaultAsync(c => c.Id == id);
 
             if (customer == null)
@@ -126,7 +128,24 @@ namespace Beyti_Backend.Controllers.Api
                 customer.Id,
                 fullName = customer.UserProfile.DisplayName,
                 customer.Phone,
-                customer.CreatedAt
+                customer.CreatedAt,
+                customerAddresses = customer.CustomerAddresses.Select(ca => new
+                {
+                    ca.Id,
+                    addressId = ca.AddressId,
+                    address = new
+                    {
+                        ca.Address.Id,
+                        ca.Address.Label,
+                        ca.Address.Street,
+                        ca.Address.City,
+                        ca.Address.Region,
+                        ca.Address.PostalCode,
+                        ca.Address.Country,
+                        ca.Address.Latitude,
+                        ca.Address.Longitude
+                    }
+                })
             };
         }
 
