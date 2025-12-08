@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Cake, BowlFood, Heart, Bread, Coffee } from "@phosphor-icons/react";
+import { Cake, BowlFood, Heart, Bread, Coffee, Storefront } from "@phosphor-icons/react";
 import StoreView from "./StoreView";
 
 // Get customers function
@@ -575,6 +575,20 @@ const handleCustomerSelect = (customer) => {
             {loading ? (
               <div className="flex items-center justify-center py-16">
                 <div className="w-12 h-12 border-4 border-grey-stroke border-t-sage-500 rounded-full animate-spin"></div>
+              </div>
+            ) : filteredStores.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16">
+                <div className="w-24 h-24 bg-cream-100 rounded-full flex items-center justify-center mb-4">
+                  <Storefront className="w-12 h-12 text-charcoal-400" weight="regular" />
+                </div>
+                <h3 className="text-xl font-bold text-charcoal-600 mb-2" style={{ fontFamily: 'Merriweather, serif' }}>
+                  No Stores Found
+                </h3>
+                <p className="text-charcoal-400 text-center max-w-md" style={{ fontFamily: 'Inter, sans-serif' }}>
+                  {searchQuery
+                    ? `No stores match "${searchQuery}". Try a different search term.`
+                    : 'There are no stores available at the moment. Please check back later.'}
+                </p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">

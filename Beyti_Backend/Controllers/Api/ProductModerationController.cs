@@ -291,7 +291,7 @@ namespace Beyti_Backend.Controllers.Api
 
         // GET: api/ProductModeration/FlaggedKeywords
         [HttpGet("FlaggedKeywords")]
-        public async Task<IActionResult> CheckFlaggedKeywords([FromQuery] string text)
+        public Task<IActionResult> CheckFlaggedKeywords([FromQuery] string text)
         {
             // Define prohibited keywords
             var prohibitedKeywords = new[]
@@ -307,14 +307,14 @@ namespace Beyti_Backend.Controllers.Api
                 .Where(keyword => text.ToLower().Contains(keyword))
                 .ToList();
 
-            return Ok(new
+            return Task.FromResult<IActionResult>(Ok(new
             {
                 isFlagged = foundKeywords.Any(),
                 flaggedKeywords = foundKeywords,
                 message = foundKeywords.Any()
                     ? "This content contains prohibited keywords"
                     : "No prohibited keywords found"
-            });
+            }));
         }
     }
 }

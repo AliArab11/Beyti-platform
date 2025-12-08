@@ -22,6 +22,8 @@ public partial class ServiceBooking
 
     public int ServiceCatalogId { get; set; }
 
+    public int? ServiceId { get; set; }
+
     public int ServiceAddressId { get; set; }
 
     public int? TimeSlotId { get; set; }
@@ -64,22 +66,26 @@ public partial class ServiceBooking
 
     [ForeignKey("CustomerId")]
     [InverseProperty("ServiceBookings")]
-    public virtual Customer Customer { get; set; } = null!;
+    public virtual Customer? Customer { get; set; }
 
     [InverseProperty("ServiceBooking")]
     public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
 
     [ForeignKey("ServiceAddressId")]
     [InverseProperty("ServiceBookings")]
-    public virtual Address ServiceAddress { get; set; } = null!;
+    public virtual Address? ServiceAddress { get; set; }
 
     [ForeignKey("ServiceCatalogId")]
     [InverseProperty("ServiceBookings")]
-    public virtual ServiceCatalog ServiceCatalog { get; set; } = null!;
+    public virtual ServiceCatalog? ServiceCatalog { get; set; }
+
+    [ForeignKey("ServiceId")]
+    [InverseProperty("ServiceBookings")]
+    public virtual Service? Service { get; set; }
 
     [ForeignKey("ServiceProviderId")]
     [InverseProperty("ServiceBookings")]
-    public virtual ServiceProvider ServiceProvider { get; set; } = null!;
+    public virtual ServiceProvider? ServiceProvider { get; set; }
 
     [InverseProperty("ServiceBooking")]
     public virtual ICollection<ServiceReview> ServiceReviews { get; set; } = new List<ServiceReview>();

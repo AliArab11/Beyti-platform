@@ -12,6 +12,9 @@ import CustomerPage from "./Pages/Customer";
 import SellerPage from "./Pages/Seller";
 import StoresPage from "./Pages/Seller/Store";
 import MainStoreView from "./Beyti-Website/Store/MainStoreView.jsx";
+import StoreTypeSelection from "./Beyti-Website/Store/StoreTypeSelection.jsx";
+import ServiceProviderStoresView from "./Beyti-Website/Store/ServiceProviderStoresView.jsx";
+import ServiceProviderDetailView from "./Beyti-Website/Store/ServiceProviderDetailView.jsx";
 import StoreView from "./Beyti-Website/Store/StoreView.jsx";
 import StoreDetailsPage from "./Pages/Seller/StoreDetails";
 
@@ -60,7 +63,9 @@ export default function App() {
     { path: '/seller', label: 'Seller' },
     { path: '/seller-dashboard', label: 'Seller Dashboard' },
     { path: '/store', label: 'Store' },
-    { path: '/mainStore', label: 'Main Store' },
+    { path: '/stores', label: 'All Stores' },
+    { path: '/mainStore', label: 'Seller Stores' },
+    { path: '/serviceProviders', label: 'Service Providers' },
     { path: '/product', label: 'Product' },
     { path: '/category', label: 'Category' },
     { path: '/customer', label: 'Customer' },
@@ -175,7 +180,10 @@ export default function App() {
             </Route>
 
             <Route path="/store" element={<StoresPage />} />
+            <Route path="/stores" element={<StoreTypeSelection />} />
             <Route path="/mainStore" element={<MainStoreView />} />
+            <Route path="/serviceProviders" element={<ServiceProviderStoresView />} />
+            <Route path="/service-provider/:providerId" element={<ServiceProviderDetailView />} />
             <Route path="/store/:storeId" element={<StoreView />} />
             <Route path="/store/:id" element={<StoreDetailsPage />} />
             <Route path="/product" element={<ProductsPage />} />

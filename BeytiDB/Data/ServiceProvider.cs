@@ -53,6 +53,9 @@ public partial class ServiceProvider
     public virtual ICollection<ServiceReview> ServiceReviews { get; set; } = new List<ServiceReview>();
 
     [InverseProperty("ServiceProvider")]
+    public virtual ICollection<Service> Services { get; set; } = new List<Service>();
+
+    [InverseProperty("ServiceProvider")]
     public virtual ICollection<TimeSlot> TimeSlots { get; set; } = new List<TimeSlot>();
 
     [ForeignKey("UserProfileId")]
