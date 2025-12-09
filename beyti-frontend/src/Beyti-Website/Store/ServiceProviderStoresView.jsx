@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Scissors, ListDashes, PushPinSimple } from "@phosphor-icons/react";
-import { getServiceProviders, getServiceCategoryList, getServiceCatalogs, getUserProfile, updateUserProfile, getServiceProviderServices } from "../../services/api";
+import { Scissors } from "@phosphor-icons/react";
+import { getServiceProviders, getServiceCategoryList, getUserProfile, updateUserProfile, getServiceProviderServices } from "../../services/api";
 import { isAuthenticated, getUserId, handleSuspensionError } from "../../utils/authUtils";
 import PageHeader from "../../components/PageHeader";
+import CustomerSidebar from "../../components/CustomerSidebar";
 
 // Main Category Tabs Component
 const CategoryTabs = ({ categories, selected, onSelect }) => (
-  <div className="flex justify-center items-center gap-5 mb-6 ml-32">
+  <div className="flex justify-center items-center gap-5 mb-6">
     {categories.map((category, index) => (
       <button
         key={`category-${index}-${category}`}
@@ -23,67 +24,6 @@ const CategoryTabs = ({ categories, selected, onSelect }) => (
       </button>
     ))}
   </div>
-);
-
-// Subcategory Sidebar Component
-const SubcategorySidebar = ({ categories, selected, onSelect, isOpen, isPinned, onToggle, onPin }) => (
-  <>
-    {/* Toggle Button - Always visible */}
-    <button
-      onClick={onToggle}
-      className="fixed left-4 top-1/2 -translate-y-1/2 z-50 w-12 h-12 bg-sage-500 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-sage-600 transition-all"
-      title={isOpen ? "Close sidebar" : "Open sidebar"}
-    >
-      <ListDashes size={24} weight="bold" />
-    </button>
-
-    {/* Sidebar */}
-    <aside
-      className={`fixed left-0 top-0 h-full bg-cream-50 shadow-xl z-40 transition-transform duration-300 ${
-        isOpen ? 'translate-x-0' : '-translate-x-full'
-      } ${isPinned ? 'w-[280px]' : 'w-[280px]'}`}
-      style={{ paddingTop: '120px' }}
-    >
-      {/* Pin Button */}
-      <div className="absolute top-4 right-4 flex gap-2">
-        <button
-          onClick={onPin}
-          className={`p-2 rounded-lg transition-all ${
-            isPinned ? 'bg-sage-500 text-white' : 'bg-white text-sage-500 hover:bg-sage-100'
-          }`}
-          title={isPinned ? "Unpin sidebar" : "Pin sidebar"}
-        >
-          <PushPinSimple size={20} weight={isPinned ? "fill" : "regular"} />
-        </button>
-      </div>
-
-      {/* Sidebar Content */}
-      <div className="px-4 space-y-3 overflow-y-auto h-full pb-8">
-        {categories.map(cat => (
-          <button
-            key={cat.id}
-            onClick={() => onSelect(cat.id)}
-            className={`w-full flex items-center gap-4 px-6 py-4 rounded-full text-left transition-all font-medium text-[17px] ${
-              selected === cat.id
-                ? 'bg-sage-500 text-white shadow-[0_2px_8px_rgba(85,107,92,0.3)]'
-                : 'bg-white text-sage-500 hover:bg-cream-100'
-            }`}
-            style={{ fontFamily: 'Inter, sans-serif' }}
-          >
-            <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
-              selected === cat.id ? 'bg-sage-700' : 'bg-[#E8F0EA]'
-            }`}>
-              <div className={selected === cat.id ? 'text-white' : 'text-sage-500'}>
-                <Scissors size={24} weight="regular" />
-              </div>
-            </div>
-            <span className="truncate">{cat.name}</span>
-          </button>
-        ))}
-      </div>
-    </aside>
-
-  </>
 );
 
 // Search Bar Component
@@ -277,15 +217,12 @@ const ServiceProviderStoresView = () => {
   const [providers, setProviders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState([]);
-  const [catalogs, setCatalogs] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
-  const [selectedCatalog, setSelectedCatalog] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarPinned, setSidebarPinned] = useState(false);
   const [displayName, setDisplayName] = useState("Customer");
   const [userProfile, setUserProfile] = useState(null);
   const [providerServices, setProviderServices] = useState({}); // Map of providerId -> services array
+  const [activeView, setActiveView] = useState('services'); // Current view: stores, services, notifications, history
 
   // Check authentication on mount
   useEffect(() => {
@@ -295,8 +232,8 @@ const ServiceProviderStoresView = () => {
   }, [navigate]);
 
   // Get user ID from localStorage (Customer: UserProfileId = 2, CustomerId = 1)
-  const userProfileId = parseInt(getUserId()) || 2;
-  const customerId = 1; // TODO: Get from API based on userProfileId
+  const userProfileId = parseInt(getUserId()) || 1002;
+  const customerId = 2; // TODO: Get from API based on userProfileId
 
   // Fetch user profile details
   const fetchUserProfile = async () => {
@@ -365,20 +302,13 @@ const ServiceProviderStoresView = () => {
     fetchInitialData();
   }, []);
 
-  useEffect(() => {
-    if (selectedCategory) {
-      fetchCatalogsByCategory(selectedCategory);
-    }
-  }, [selectedCategory]);
-
   const fetchInitialData = async () => {
     try {
       setLoading(true);
       console.log('[fetchInitialData] ===== STARTING DATA FETCH =====');
-      const [providersData, categoriesData, catalogsData] = await Promise.all([
+      const [providersData, categoriesData] = await Promise.all([
         getServiceProviders(),
-        getServiceCategoryList(),
-        getServiceCatalogs()
+        getServiceCategoryList()
       ]);
 
       console.log('[fetchInitialData] Raw providers data:', providersData);
@@ -390,7 +320,6 @@ const ServiceProviderStoresView = () => {
 
       setProviders(normalizedProviders);
       setCategories(Array.isArray(categoriesData) ? categoriesData : []);
-      setCatalogs(Array.isArray(catalogsData) ? catalogsData : []);
 
       // Fetch services for each provider
       if (normalizedProviders.length > 0) {
@@ -416,57 +345,17 @@ const ServiceProviderStoresView = () => {
       if (categoriesData && categoriesData.length > 0) {
         setSelectedCategory(categoriesData[0].id);
       }
-
-      // Set first catalog as default
-      if (catalogsData && catalogsData.length > 0) {
-        setSelectedCatalog(catalogsData[0].id);
-      }
     } catch (error) {
       console.error("Failed to load initial data:", error);
       setProviders([]);
       setCategories([]);
-      setCatalogs([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchCatalogsByCategory = async (categoryId) => {
-    try {
-      const data = await getServiceCatalogs(categoryId);
-      setCatalogs(Array.isArray(data) ? data : []);
-
-      // Set first catalog as default when category changes
-      if (data && data.length > 0) {
-        setSelectedCatalog(data[0].id);
-      }
-    } catch (error) {
-      console.error("Failed to load catalogs:", error);
-      setCatalogs([]);
-    }
-  };
-
   const handleCategorySelect = (categoryId) => {
     setSelectedCategory(categoryId);
-  };
-
-  const handleCatalogSelect = (catalogId) => {
-    setSelectedCatalog(catalogId);
-    // Close sidebar if not pinned
-    if (!sidebarPinned) {
-      setSidebarOpen(false);
-    }
-  };
-
-  const toggleSidebar = () => {
-    setSidebarOpen(!sidebarOpen);
-  };
-
-  const togglePin = () => {
-    setSidebarPinned(!sidebarPinned);
-    if (!sidebarPinned) {
-      setSidebarOpen(true);
-    }
   };
 
   const filteredProviders = providers.filter(provider => {
@@ -478,11 +367,60 @@ const ServiceProviderStoresView = () => {
            businessName.toLowerCase().includes(searchLower);
   });
 
+  // Handle sidebar navigation
+  const handleNavigate = (view) => {
+    setActiveView(view);
+
+    // Navigate to different routes based on selection
+    switch(view) {
+      case 'stores':
+        navigate('/mainStore');
+        break;
+      case 'services':
+        // Stay on current page (service providers view)
+        break;
+      case 'notifications':
+        navigate('/customer/notifications');
+        break;
+      case 'history':
+        navigate('/customer/history');
+        break;
+      default:
+        break;
+    }
+  };
+
+  // Get page title based on active view
+  const getPageTitle = () => {
+    switch (activeView) {
+      case 'stores':
+        return 'Stores';
+      case 'services':
+        return 'Service Providers';
+      case 'notifications':
+        return 'Notifications';
+      case 'history':
+        return 'Orders & Services History';
+      default:
+        return 'Service Providers';
+    }
+  };
+
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#FAF7F2' }}>
-      <div className={`transition-all duration-300 ${sidebarOpen ? 'ml-[280px]' : ''}`}>
+    <div className="flex min-h-screen bg-cream-50 dark:bg-charcoal-600">
+      {/* Sidebar */}
+      <CustomerSidebar
+        currentPage={activeView}
+        onNavigate={handleNavigate}
+        userName={displayName}
+        userRole="Customer"
+      />
+
+      {/* Main Content */}
+      <div className="flex-1 ml-[250px] flex flex-col">
+        {/* Header */}
         <PageHeader
-          title="Beyti Service Providers"
+          title={getPageTitle()}
           withSearch={false}
           notificationCount={0}
           userName={displayName}
@@ -493,64 +431,56 @@ const ServiceProviderStoresView = () => {
           onProfileUpdate={handleProfileUpdate}
         />
 
-        {/* Sidebar */}
-        <SubcategorySidebar
-          categories={catalogs}
-          selected={selectedCatalog}
-          onSelect={handleCatalogSelect}
-          isOpen={sidebarOpen}
-          isPinned={sidebarPinned}
-          onToggle={toggleSidebar}
-          onPin={togglePin}
-        />
-
-        <div className="max-w-[1440px] mx-auto px-8 py-8">
-        <div className="flex justify-center">
-          <CategoryTabs
-            categories={categories.map(cat => cat.name)}
-            selected={categories.find(cat => cat.id === selectedCategory)?.name || ''}
-            onSelect={(name) => {
-              const category = categories.find(cat => cat.name === name);
-              if (category) handleCategorySelect(category.id);
-            }}
-          />
-        </div>
-
-        <div className="mt-8">
-          <SearchBar value={searchQuery} onChange={setSearchQuery} />
-
-          {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="w-12 h-12 border-4 border-grey-stroke border-t-sage-500 rounded-full animate-spin"></div>
+        {/* Main Content Area */}
+        <main className="flex-1 p-8 overflow-y-auto" style={{ backgroundColor: '#FAF7F2' }}>
+          <div className="max-w-[1440px] mx-auto">
+            <div className="flex justify-center">
+              <CategoryTabs
+                categories={categories.map(cat => cat.name)}
+                selected={categories.find(cat => cat.id === selectedCategory)?.name || ''}
+                onSelect={(name) => {
+                  const category = categories.find(cat => cat.name === name);
+                  if (category) handleCategorySelect(category.id);
+                }}
+              />
             </div>
-          ) : filteredProviders.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16">
-              <div className="w-24 h-24 bg-cream-100 rounded-full flex items-center justify-center mb-4">
-                <Scissors className="w-12 h-12 text-charcoal-400" weight="regular" />
-              </div>
-              <h3 className="text-xl font-bold text-charcoal-600 mb-2" style={{ fontFamily: 'Merriweather, serif' }}>
-                No Service Providers Found
-              </h3>
-              <p className="text-charcoal-400 text-center max-w-md" style={{ fontFamily: 'Inter, sans-serif' }}>
-                {searchQuery
-                  ? `No service providers match "${searchQuery}". Try a different search term.`
-                  : 'There are no service providers available at the moment. Please check back later.'}
-              </p>
+
+            <div className="mt-8">
+              <SearchBar value={searchQuery} onChange={setSearchQuery} />
+
+              {loading ? (
+                <div className="flex items-center justify-center py-16">
+                  <div className="w-12 h-12 border-4 border-grey-stroke border-t-sage-500 rounded-full animate-spin"></div>
+                </div>
+              ) : filteredProviders.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16">
+                  <div className="w-24 h-24 bg-cream-100 rounded-full flex items-center justify-center mb-4">
+                    <Scissors className="w-12 h-12 text-charcoal-400" weight="regular" />
+                  </div>
+                  <h3 className="text-xl font-bold text-charcoal-600 mb-2" style={{ fontFamily: 'Merriweather, serif' }}>
+                    No Service Providers Found
+                  </h3>
+                  <p className="text-charcoal-400 text-center max-w-md" style={{ fontFamily: 'Inter, sans-serif' }}>
+                    {searchQuery
+                      ? `No service providers match "${searchQuery}". Try a different search term.`
+                      : 'There are no service providers available at the moment. Please check back later.'}
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {filteredProviders.map((provider, idx) => (
+                    <ProviderCard
+                      key={provider.id || `provider-${idx}`}
+                      provider={provider}
+                      services={providerServices[provider.id] || []}
+                      onClick={() => navigate(`/service-provider/${provider.id}`)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {filteredProviders.map((provider, idx) => (
-                <ProviderCard
-                  key={provider.id || `provider-${idx}`}
-                  provider={provider}
-                  services={providerServices[provider.id] || []}
-                  onClick={() => navigate(`/service-provider/${provider.id}`)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-        </div>
+          </div>
+        </main>
       </div>
     </div>
   );

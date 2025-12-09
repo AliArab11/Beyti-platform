@@ -48,14 +48,6 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
         quotedPrice: parseFloat(quotePrice)
       });
 
-      // Send notification to customer about the quote
-      await sendNotification(
-        selectedBooking.customerId,
-        selectedBooking.id,
-        'DepositPending',
-        selectedBooking.serviceName
-      );
-
       // Log activity
       logProviderActivity(
         serviceProviderId,
@@ -75,50 +67,10 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
     }
   };
 
-  const sendNotification = async (customerId, bookingId, newStatus, serviceName) => {
-    try {
-      const notificationMessages = {
-        'Confirmed': `Your booking for "${serviceName}" has been confirmed! The service provider will contact you soon.`,
-        'InProgress': `Your service "${serviceName}" is now in progress.`,
-        'Completed': `Your service "${serviceName}" has been completed. Please leave a review!`,
-        'Rejected': `Unfortunately, your booking for "${serviceName}" has been rejected. Please contact us for more information.`,
-        'Canceled': `Your booking for "${serviceName}" has been canceled.`,
-        'DepositPending': `Your quote for "${serviceName}" is ready! Please pay the deposit to confirm your booking.`
-      };
-
-      const notificationPayload = {
-        userProfileId: customerId, // Assuming customerId is the userProfileId
-        type: 'BookingUpdate',
-        title: 'Booking Status Update',
-        message: notificationMessages[newStatus] || `Your booking status has been updated to ${newStatus}`,
-        relatedEntityType: 'ServiceBooking',
-        relatedEntityId: bookingId,
-        isRead: false
-      };
-
-      const response = await fetch('https://localhost:7062/api/Notifications', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(notificationPayload)
-      });
-
-      if (!response.ok) {
-        console.error('Failed to send notification:', await response.text());
-      }
-    } catch (err) {
-      console.error('Error sending notification:', err);
-    }
-  };
-
   const handleStatusChange = async (bookingId, newStatus) => {
     try {
       const booking = bookings.find(b => b.id === bookingId);
       await updateBookingStatus(bookingId, { status: newStatus });
-
-      // Send notification to customer
-      if (booking) {
-        await sendNotification(booking.customerId, bookingId, newStatus, booking.serviceName);
-      }
 
       // Log activity
       const actionMap = {
