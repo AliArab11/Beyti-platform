@@ -11,8 +11,8 @@ import { useNavigate } from 'react-router-dom';
  * - Seller -> /seller-dashboard
  * - ServiceProvider -> /serviceprovider-dashboard
  * - Admin -> /admin-view
- * - Driver -> /driver-placeholder
- * - Customer -> / (home page, for customers without partner profile)
+ * - Driver -> /driver-dashboard
+ * - Customer -> /customer-dashboard
  * - Invalid/Missing -> /login (fallback)
  */
 export default function DashboardRouter() {
@@ -50,13 +50,13 @@ export default function DashboardRouter() {
         break;
 
       case 'Driver':
-        console.log('[DashboardRouter] Redirecting to driver placeholder');
-        navigate('/driver-placeholder', { replace: true });
+        console.log('[DashboardRouter] Driver role detected, redirecting to driver dashboard');
+        navigate('/driver-dashboard', { replace: true });
         break;
 
       case 'Customer':
-        console.log('[DashboardRouter] Customer role detected, redirecting to home');
-        navigate('/', { replace: true });
+        console.log('[DashboardRouter] Customer role detected, redirecting to customer dashboard');
+        navigate('/customer-dashboard', { replace: true });
         break;
 
       default:

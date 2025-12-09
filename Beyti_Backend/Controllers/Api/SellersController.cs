@@ -8,6 +8,7 @@ namespace Beyti_Backend.Controllers.Api
     {
         public string StoreName { get; set; }
         public string Phone { get; set; }
+        public string? UserId { get; set; }  // For onboarding flow
     }
 
     [Route("api/[controller]")]
@@ -219,17 +220,53 @@ namespace Beyti_Backend.Controllers.Api
         {
             try
             {
-                var profile = new UserProfile
-                {
-                    DisplayName = dto.StoreName,
-                    RoleType = "Seller",
-                    Status = "Active",
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
-                };
+                if (string.IsNullOrEmpty(dto.StoreName))
+                    return BadRequest(new { error = "StoreName is required" });
 
-                _context.UserProfiles.Add(profile);
-                await _context.SaveChangesAsync();
+                if (string.IsNullOrEmpty(dto.Phone))
+                    return BadRequest(new { error = "Phone is required" });
+
+                UserProfile profile;
+
+                // Check if onboarding (userId provided) or admin creation
+                if (!string.IsNullOrEmpty(dto.UserId))
+                {
+                    // ONBOARDING FLOW: Update existing UserProfile
+                    profile = await _context.UserProfiles
+                        .FirstOrDefaultAsync(up => up.IdentityUserId == dto.UserId);
+
+                    if (profile == null)
+                        return BadRequest(new { error = "User profile not found" });
+
+                    profile.RoleType = "Seller";
+                    profile.DisplayName = dto.StoreName;
+                    profile.UpdatedAt = DateTime.UtcNow;
+
+                    // Delete orphaned Customer record if exists
+                    var existingCustomer = await _context.Customers
+                        .FirstOrDefaultAsync(c => c.UserProfileId == profile.Id);
+                    if (existingCustomer != null)
+                    {
+                        _context.Customers.Remove(existingCustomer);
+                    }
+
+                    await _context.SaveChangesAsync();
+                }
+                else
+                {
+                    // ADMIN CREATION: Create new UserProfile
+                    profile = new UserProfile
+                    {
+                        DisplayName = dto.StoreName,
+                        RoleType = "Seller",
+                        Status = "Active",
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+
+                    _context.UserProfiles.Add(profile);
+                    await _context.SaveChangesAsync();
+                }
 
                 var seller = new Seller
                 {

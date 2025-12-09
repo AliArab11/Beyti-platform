@@ -9,7 +9,9 @@
       "Bash(find:*)",
       "Bash(netstat:*)",
       "Bash(taskkill:*)",
-      "Bash(cmd /c \"taskkill /F /PID 24248\")"
+      "Bash(cmd /c \"taskkill /F /PID 24248\")",
+      "Bash(npm run dev:*)",
+      "Bash(tasklist:*)"
     ],
     "deny": [],
     "ask": []

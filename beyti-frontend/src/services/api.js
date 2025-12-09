@@ -449,16 +449,26 @@ export const getSeller = async (id) => {
  */
 export const getSellerByUserProfileId = async (userProfileId) => {
   try {
-    // Fetch seller directly using a potential backend endpoint pattern
-    // Similar to ServiceProviderDashboard/Profile/{userProfileId}
-    const response = await fetchAPI(`/Sellers/Profile/${userProfileId}`);
-    return response;
-  } catch (error) {
-    // If endpoint doesn't exist (404), return null
-    if (error.message.includes('404') || error.message.includes('not found')) {
+    // Backend doesn't have /Sellers/Profile/{userProfileId} endpoint
+    // Fetch all sellers and filter by UserProfileId
+    const sellers = await fetchAPI('/Sellers');
+
+    if (!sellers || !Array.isArray(sellers)) {
       return null;
     }
-    throw error;
+
+    // Find seller with matching UserProfileId (check both camelCase and PascalCase)
+    const seller = sellers.find(s =>
+      s.UserProfileId === userProfileId ||
+      s.userProfileId === userProfileId ||
+      s.UserProfileId === parseInt(userProfileId) ||
+      s.userProfileId === parseInt(userProfileId)
+    );
+
+    return seller || null;
+  } catch (error) {
+    console.warn('[API] Error fetching sellers:', error);
+    return null;
   }
 };
 
@@ -811,8 +821,8 @@ export const getOrders = async (customerId = null, sellerId = null) => {
   return await fetchAPI(url);
 };
 
-export const getOrderWithDetails = async (id) => {
-  const res = await fetch(`https://localhost:7062/api/Orders?customerId=${activeCustomerId}`);
+export const getOrderWithDetails = async (id, customerId) => {
+  const res = await fetch(`https://localhost:7062/api/Orders?customerId=${customerId}`);
   return (await res.json()).find(o => o.id === id);
 };
 
@@ -1319,16 +1329,26 @@ export const getDriver = async (id) => {
  */
 export const getDriverByUserProfileId = async (userProfileId) => {
   try {
-    // Fetch driver directly using a potential backend endpoint pattern
-    // Similar to ServiceProviderDashboard/Profile/{userProfileId}
-    const response = await fetchAPI(`/Drivers/Profile/${userProfileId}`);
-    return response;
-  } catch (error) {
-    // If endpoint doesn't exist (404), return null
-    if (error.message.includes('404') || error.message.includes('not found')) {
+    // Backend doesn't have /Drivers/Profile/{userProfileId} endpoint
+    // Fetch all drivers and filter by UserProfileId
+    const drivers = await fetchAPI('/Drivers');
+
+    if (!drivers || !Array.isArray(drivers)) {
       return null;
     }
-    throw error;
+
+    // Find driver with matching UserProfileId (check both camelCase and PascalCase)
+    const driver = drivers.find(d =>
+      d.UserProfileId === userProfileId ||
+      d.userProfileId === userProfileId ||
+      d.UserProfileId === parseInt(userProfileId) ||
+      d.userProfileId === parseInt(userProfileId)
+    );
+
+    return driver || null;
+  } catch (error) {
+    console.warn('[API] Error fetching drivers:', error);
+    return null;
   }
 };
 
@@ -1373,7 +1393,32 @@ export const deleteDriver = async (id) => {
 
 // Profile
 export const getProviderProfile = async (userProfileId) => {
-  return await fetchAPI(`/ServiceProviderDashboard/Profile/${userProfileId}`);
+  try {
+    // First try the dashboard endpoint (for logged-in service provider)
+    return await fetchAPI(`/ServiceProviderDashboard/Profile/${userProfileId}`);
+  } catch (error) {
+    // If dashboard endpoint fails, fallback to fetching all providers and filtering
+    try {
+      const providers = await fetchAPI('/ServiceProviders');
+
+      if (!providers || !Array.isArray(providers)) {
+        return null;
+      }
+
+      // Find provider with matching UserProfileId (check both camelCase and PascalCase)
+      const provider = providers.find(p =>
+        p.UserProfileId === userProfileId ||
+        p.userProfileId === userProfileId ||
+        p.UserProfileId === parseInt(userProfileId) ||
+        p.userProfileId === parseInt(userProfileId)
+      );
+
+      return provider || null;
+    } catch (fallbackError) {
+      console.warn('[API] Error fetching service providers:', fallbackError);
+      return null;
+    }
+  }
 };
 
 export const updateProviderProfile = async (userProfileId, data) => {

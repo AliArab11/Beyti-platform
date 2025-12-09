@@ -232,7 +232,7 @@ const hideToast = () => {
       showToast('Customer added successfully!', 'success'); // ADD THIS
     } catch (err) {
       setAddError(err.message || "Failed to add customer");
-      showToast(errorMsg, 'error'); 
+      showToast(err.message || 'Failed to add customer', 'error'); 
     } finally {
       setAdding(false);
     }
@@ -277,7 +277,7 @@ const hideToast = () => {
     } catch (err) {
       console.error("Full error:", err);
       setAddAddressError(err.message || "Failed to add address");
-      showToast(errorMsg, 'error');
+      showToast(err.message || 'Failed to add address', 'error');
     } finally {
       setAdding(false);
     }
@@ -391,7 +391,7 @@ const handleDeleteAddress = async () => {
       showToast('Customer updated successfully!', 'success');
     } catch (err) {
       setEditError(err.message || "Failed to edit customer");
-      showToast(errorMsg, 'error');
+      showToast(err.message || 'Failed to edit customer', 'error');
     }
   };
 
@@ -411,7 +411,7 @@ const handleDeleteAddress = async () => {
       showToast('Customer deleted successfully!', 'success');
     } catch (err) {
       alert(err.message || "Failed to delete customer");
-      showToast(errorMsg, 'error');
+      showToast(err.message || 'Failed to delete customer', 'error');
     }
   };
 

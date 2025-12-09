@@ -126,10 +126,15 @@ export default function Register() {
         Password: formData.password
       });
 
-      // Step 3: Store auth data
-      localStorage.setItem('authToken', loginResponse.Token);
-      localStorage.setItem('userId', loginResponse.UserId);
-      localStorage.setItem('userRole', loginResponse.Role);
+      console.log('[Register] Login response:', loginResponse);
+      console.log('[Register] token:', loginResponse.token);
+      console.log('[Register] userId:', loginResponse.userId);
+      console.log('[Register] role:', loginResponse.role);
+
+      // Step 3: Store auth data (backend returns camelCase fields)
+      localStorage.setItem('authToken', loginResponse.token);
+      localStorage.setItem('userId', loginResponse.userId);
+      localStorage.setItem('userRole', loginResponse.role);
       localStorage.setItem('userEmail', formData.email);
       localStorage.setItem('userPhone', formData.phoneNumber);
       localStorage.setItem('userName', `${formData.firstName} ${formData.lastName}`);

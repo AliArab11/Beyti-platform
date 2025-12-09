@@ -149,37 +149,49 @@ export default function Login() {
                 // Check ServiceProvider
                 try {
                   const providerProfile = await getProviderProfile(userId);
-                  if (providerProfile && (providerProfile.Id || providerProfile.ServiceProviderId)) {
-                    console.log('[Login] Service Provider profile found, updating role');
+                  console.log('[Login] ServiceProvider check result:', providerProfile);
+                  if (providerProfile && (providerProfile.Id || providerProfile.ServiceProviderId || providerProfile.id || providerProfile.serviceProviderId)) {
+                    console.log('[Login] ✅ Service Provider profile found! Updating role to ServiceProvider');
                     localStorage.setItem('userRole', 'ServiceProvider');
+                    // Store the provider ID for dashboard use
+                    const providerId = providerProfile.Id || providerProfile.ServiceProviderId || providerProfile.id || providerProfile.serviceProviderId;
+                    localStorage.setItem('serviceProviderId', providerId);
                     return; // Exit early
                   }
                 } catch (e) {
-                  console.log('[Login] Not a Service Provider');
+                  console.log('[Login] ❌ ServiceProvider check failed:', e.message);
                 }
 
                 // Check Seller
                 try {
                   const sellerProfile = await getSellerByUserProfileId(userId);
-                  if (sellerProfile && (sellerProfile.Id || sellerProfile.SellerId)) {
-                    console.log('[Login] Seller profile found, updating role');
+                  console.log('[Login] Seller check result:', sellerProfile);
+                  if (sellerProfile && (sellerProfile.Id || sellerProfile.SellerId || sellerProfile.id || sellerProfile.sellerId)) {
+                    console.log('[Login] ✅ Seller profile found! Updating role to Seller');
                     localStorage.setItem('userRole', 'Seller');
+                    // Store the seller ID for dashboard use
+                    const sellerId = sellerProfile.Id || sellerProfile.SellerId || sellerProfile.id || sellerProfile.sellerId;
+                    localStorage.setItem('sellerId', sellerId);
                     return; // Exit early
                   }
                 } catch (e) {
-                  console.log('[Login] Not a Seller');
+                  console.log('[Login] ❌ Seller check failed:', e.message);
                 }
 
                 // Check Driver
                 try {
                   const driverProfile = await getDriverByUserProfileId(userId);
-                  if (driverProfile && (driverProfile.Id || driverProfile.DriverId)) {
-                    console.log('[Login] Driver profile found, updating role');
+                  console.log('[Login] Driver check result:', driverProfile);
+                  if (driverProfile && (driverProfile.Id || driverProfile.DriverId || driverProfile.id || driverProfile.driverId)) {
+                    console.log('[Login] ✅ Driver profile found! Updating role to Driver');
                     localStorage.setItem('userRole', 'Driver');
+                    // Store the driver ID for dashboard use
+                    const driverId = driverProfile.Id || driverProfile.DriverId || driverProfile.id || driverProfile.driverId;
+                    localStorage.setItem('driverId', driverId);
                     return; // Exit early
                   }
                 } catch (e) {
-                  console.log('[Login] Not a Driver');
+                  console.log('[Login] ❌ Driver check failed:', e.message);
                 }
 
                 console.log('[Login] No partner profile found, user remains as Customer');

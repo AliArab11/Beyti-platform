@@ -23,9 +23,6 @@ import { MagnifyingGlass, Bell, CaretDown, User } from '@phosphor-icons/react';
 import SettingsModal from './SettingsModal';
 import ProfileModal from './ProfileModal';
 import { logout } from '../utils/auth';
-import { MagnifyingGlass, CaretDown, User } from '@phosphor-icons/react';
-import SettingsModal from './SettingsModal';
-import ProfileModal from './ProfileModal';
 import NotificationDropdown from './NotificationDropdown';
 
 const PageHeader = ({
