@@ -97,5 +97,34 @@ namespace Beyti_Backend.Controllers.Api
 
             return NoContent();
         }
+
+        // GET: api/Notifications/user/5/sent
+        [HttpGet("user/{userId}/sent")]
+        public async Task<ActionResult<IEnumerable<object>>> GetSentNotifications(int userId)
+        {
+            var notifications = await _context.Notifications
+                .AsNoTracking()
+                .Include(n => n.RecipientUser)
+                .Where(n => n.SenderUserId == userId && !n.IsDeleted)
+                .OrderByDescending(n => n.CreatedAt)
+                .Select(n => new
+                {
+                    n.Id,
+                    n.RecipientUserId,
+                    RecipientName = n.RecipientUser.DisplayName,
+                    n.SenderUserId,
+                    n.Type,
+                    n.Title,
+                    n.Body,
+                    n.RelatedEntityType,
+                    n.RelatedEntityId,
+                    n.IsRead,
+                    n.IsDeleted,
+                    n.CreatedAt
+                })
+                .ToListAsync();
+
+            return Ok(notifications);
+        }
     }
 }

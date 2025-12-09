@@ -34,8 +34,8 @@ export default function ServiceProviderDashboard() {
   }, [navigate]);
 
   // Get user ID from localStorage (will be replaced with context in future)
-  const userProfileId = parseInt(getUserId()) || 1031;
-  const serviceProviderId = 6; // TODO: Get from API based on userProfileId
+  const userProfileId = parseInt(getUserId()) || 1;
+  const serviceProviderId = 1; // TODO: Get from API based on userProfileId
 
   // Fetch user profile details
   const fetchUserProfile = async () => {

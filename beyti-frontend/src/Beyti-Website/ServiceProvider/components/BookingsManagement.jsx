@@ -96,6 +96,8 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
 
   const getStatusVariant = (status) => {
     switch (status) {
+      case 'Pending':
+        return 'warning';
       case 'Confirmed':
         return 'success';
       case 'PendingQuote':
@@ -114,7 +116,7 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
   };
 
   const upcomingBookings = bookings.filter(b =>
-    ['PendingQuote', 'Confirmed', 'InProgress'].includes(b.status)
+    ['Pending', 'PendingQuote', 'DepositPending', 'Confirmed', 'InProgress'].includes(b.status)
   );
 
   const displayedBookings = viewMode === 'upcoming'
@@ -183,6 +185,7 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
                   className="border border-grey-stroke rounded-lg px-4 py-2 text-body-regular focus:ring-2 focus:ring-sage-500 focus:border-sage-500"
                 >
                   <option value="">All Statuses</option>
+                  <option value="Pending">Pending</option>
                   <option value="PendingQuote">Pending Quote</option>
                   <option value="DepositPending">Deposit Pending</option>
                   <option value="Confirmed">Confirmed</option>
@@ -198,7 +201,13 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
 
         {/* Quick Stats */}
         {viewMode === 'upcoming' && upcomingBookings.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 pt-6 border-t border-grey-stroke">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-6 pt-6 border-t border-grey-stroke">
+            <div className="text-center">
+              <div className="text-metric-h3 text-blue-500">
+                {upcomingBookings.filter(b => b.status === 'Pending').length}
+              </div>
+              <div className="text-body-regular text-charcoal-400 dark:text-gray-400 mt-1">Pending</div>
+            </div>
             <div className="text-center">
               <div className="text-metric-h3 text-yellow-500">
                 {upcomingBookings.filter(b => b.status === 'PendingQuote').length}
@@ -308,6 +317,35 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
 
               {/* Actions */}
               <div className="flex gap-2 mt-4">
+                {/* Pending Status - Simple Confirm/Reject Flow */}
+                {booking.status === 'Pending' && (
+                  <>
+                    <CRUDButton
+                      variant="success"
+                      onClick={() => {
+                        if (confirm('Confirm this booking?')) {
+                          handleStatusChange(booking.id, 'Confirmed');
+                        }
+                      }}
+                      className="flex-1"
+                    >
+                      Confirm Booking
+                    </CRUDButton>
+                    <CRUDButton
+                      variant="error"
+                      onClick={() => {
+                        if (confirm('Are you sure you want to reject this booking?')) {
+                          handleStatusChange(booking.id, 'Rejected');
+                        }
+                      }}
+                      className="flex-1"
+                    >
+                      Reject
+                    </CRUDButton>
+                  </>
+                )}
+
+                {/* PendingQuote Status - Send Quote Flow */}
                 {booking.status === 'PendingQuote' && (
                   <>
                     <CRUDButton
@@ -362,13 +400,13 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
 
                 {booking.status === 'Completed' && (
                   <div className="w-full text-center py-3 bg-success-bg border border-success-btn rounded-lg">
-                    <p className="text-success-text text-body-medium font-medium">Service Completed</p>
+                    <p className="text-success-text text-body-medium font-medium">✓ Service Completed</p>
                   </div>
                 )}
 
                 {booking.status === 'Rejected' && (
                   <div className="w-full text-center py-3 bg-error-bg border border-error-btn rounded-lg">
-                    <p className="text-error-text text-body-medium font-medium">Booking Rejected</p>
+                    <p className="text-error-text text-body-medium font-medium">✗ Booking Rejected</p>
                   </div>
                 )}
 

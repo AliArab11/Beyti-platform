@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from '../../components/Button';
 import PasswordInput from '../../components/PasswordInput';
-import { login } from '../../services/api';
+import { login, getCustomerByUserProfileId } from '../../services/api';
 
 /**
  * Login Page Component
@@ -59,6 +59,27 @@ export default function Login() {
       localStorage.setItem('authToken', response.Token);
       localStorage.setItem('userId', response.UserId);
       localStorage.setItem('userRole', response.Role);
+
+      // Fetch customer information if user is a customer
+      if (response.Role === 'Customer') {
+        try {
+          const customerData = await getCustomerByUserProfileId(response.UserId);
+          if (customerData && customerData.id) {
+            // Store complete user profile with customerId
+            const userProfile = {
+              userId: response.UserId,
+              customerId: customerData.id,
+              role: response.Role,
+              fullName: customerData.fullName,
+              phone: customerData.phone
+            };
+            localStorage.setItem('userProfile', JSON.stringify(userProfile));
+          }
+        } catch (customerErr) {
+          console.error('Failed to fetch customer data:', customerErr);
+          // Continue with login even if customer fetch fails
+        }
+      }
 
       // Redirect to home page
       navigate('/');

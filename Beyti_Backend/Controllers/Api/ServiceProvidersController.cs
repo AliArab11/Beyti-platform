@@ -26,6 +26,8 @@ namespace Beyti_Backend.Controllers.Api
         {
             var providers = await _context.ServiceProviders
                 .Include(sp => sp.UserProfile)
+                .Include(sp => sp.ServiceReviews)
+                .Where(sp => sp.UserProfile.Status == "Active" && sp.UserProfile.RoleType == "ServiceProvider")
                 .Select(sp => new
                 {
                     sp.Id,
@@ -38,7 +40,13 @@ namespace Beyti_Backend.Controllers.Api
                     sp.CreatedAt,
                     sp.UpdatedAt,
                     sp.VerifiedAt,
-                    DisplayName = sp.UserProfile.DisplayName
+                    DisplayName = sp.UserProfile != null && !string.IsNullOrEmpty(sp.UserProfile.DisplayName)
+                        ? sp.UserProfile.DisplayName
+                        : sp.BusinessName,
+                    AverageRating = sp.ServiceReviews.Any(r => !r.IsHidden)
+                        ? sp.ServiceReviews.Where(r => !r.IsHidden).Average(r => (double)r.OverallRating)
+                        : 0,
+                    ReviewCount = sp.ServiceReviews.Count(r => !r.IsHidden)
                 })
                 .ToListAsync();
 
@@ -53,6 +61,61 @@ namespace Beyti_Backend.Controllers.Api
             if (provider == null)
                 return NotFound();
             return provider;
+        }
+
+        // GET: api/ServiceProviders/5/services
+        [HttpGet("{id}/services")]
+        public async Task<ActionResult<IEnumerable<object>>> GetServiceProviderServices(int id)
+        {
+            var provider = await _context.ServiceProviders.FindAsync(id);
+            if (provider == null)
+                return NotFound("Service provider not found");
+
+            Console.WriteLine($"[GetServiceProviderServices] Fetching services for provider ID: {id}");
+
+            // First check if Service table has any data at all
+            var totalServices = await _context.Services.CountAsync();
+            Console.WriteLine($"[GetServiceProviderServices] Total services in database: {totalServices}");
+
+            // Check services for this specific provider
+            var providerServiceCount = await _context.Services
+                .Where(s => s.ServiceProviderId == id)
+                .CountAsync();
+            Console.WriteLine($"[GetServiceProviderServices] Services for provider {id}: {providerServiceCount}");
+
+            var services = await _context.Services
+                .Include(s => s.ServiceCatalog)
+                    .ThenInclude(sc => sc.ServiceCategory)
+                .Include(s => s.ServiceBookings)
+                    .ThenInclude(sb => sb.ServiceReviews)
+                .Where(s => s.ServiceProviderId == id)
+                .Select(s => new
+                {
+                    s.Id,
+                    s.Name,
+                    s.Description,
+                    s.MinPrice,
+                    s.MaxPrice,
+                    s.EstimatedDuration,
+                    s.IsActive,
+                    ServiceCatalogId = s.ServiceCatalogId,
+                    ServiceCatalogName = s.ServiceCatalog.Name,
+                    ServiceCategoryId = s.ServiceCatalog.ServiceCategoryId,
+                    ServiceCategoryName = s.ServiceCatalog.ServiceCategory.Name,
+                    // Calculate average rating from service reviews
+                    AverageRating = s.ServiceBookings
+                        .SelectMany(sb => sb.ServiceReviews)
+                        .Where(sr => !sr.IsHidden)
+                        .Average(sr => (double?)sr.OverallRating) ?? 0,
+                    ReviewCount = s.ServiceBookings
+                        .SelectMany(sb => sb.ServiceReviews)
+                        .Count(sr => !sr.IsHidden),
+                    s.CreatedAt
+                })
+                .ToListAsync();
+
+            Console.WriteLine($"[GetServiceProviderServices] Returning {services.Count} services");
+            return Ok(services);
         }
 
         // PUT: api/ServiceProviders/5

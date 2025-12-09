@@ -73,6 +73,18 @@ namespace Beyti_Backend.Controllers
                 _businessContext.UserProfiles.Add(userProfile);
                 await _businessContext.SaveChangesAsync();
 
+                // C. Create Customer record (since default role is Customer)
+                var customer = new Customer
+                {
+                    UserProfileId = userProfile.Id,
+                    Phone = model.PhoneNumber,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                _businessContext.Customers.Add(customer);
+                await _businessContext.SaveChangesAsync();
+
                 return Ok(new { Message = "User registered successfully", UserId = identityUser.Id });
             }
             catch (Exception)

@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using BeytiDB.Data;
 using System.Text.Json;
 using Beyti_Backend.Authorization;
+using Beyti_Backend.Services;
 
 namespace Beyti_Backend.Controllers.Api
 {
@@ -15,10 +16,12 @@ namespace Beyti_Backend.Controllers.Api
     public class ServiceProviderDashboardController : ControllerBase
     {
         private readonly BeytiContext _context;
+        private readonly INotificationService _notificationService;
 
-        public ServiceProviderDashboardController(BeytiContext context)
+        public ServiceProviderDashboardController(BeytiContext context, INotificationService notificationService)
         {
             _context = context;
+            _notificationService = notificationService;
         }
 
         // ==================== PROFILE MANAGEMENT ====================
@@ -114,11 +117,28 @@ namespace Beyti_Backend.Controllers.Api
                 if (body.TryGetProperty("DisplayName", out var displayName) && displayName.ValueKind != JsonValueKind.Null)
                     userProfile.DisplayName = displayName.GetString();
 
-                // Update phone (stored in ServiceProvider table)
+                // Update phone and business name (stored in ServiceProvider table)
                 var provider = await _context.ServiceProviders.FirstOrDefaultAsync(sp => sp.UserProfileId == userProfileId);
-                if (provider != null && body.TryGetProperty("Phone", out var phone) && phone.ValueKind != JsonValueKind.Null)
+                if (provider != null)
                 {
-                    provider.Phone = phone.GetString();
+                    if (body.TryGetProperty("Phone", out var phone) && phone.ValueKind != JsonValueKind.Null)
+                    {
+                        provider.Phone = phone.GetString();
+                    }
+
+                    if (body.TryGetProperty("BusinessName", out var businessName) && businessName.ValueKind != JsonValueKind.Null)
+                    {
+                        var businessNameValue = businessName.GetString();
+                        if (!string.IsNullOrWhiteSpace(businessNameValue))
+                        {
+                            provider.BusinessName = businessNameValue;
+                            provider.UpdatedAt = DateTime.UtcNow;
+                        }
+                        else
+                        {
+                            return BadRequest("Business name cannot be empty");
+                        }
+                    }
                 }
 
                 // Note: Email and Address updates would require schema changes
@@ -264,16 +284,17 @@ namespace Beyti_Backend.Controllers.Api
         {
             try
             {
-                var categories = await _context.Categories
-                    .Include(c => c.SubCategories)
+                var categories = await _context.ServiceCategories
+                    .Include(c => c.ServiceCatalogs)
                     .Where(c => c.IsActive)
                     .Select(c => new
                     {
                         c.Id,
                         c.Name,
-                        SubCategories = c.SubCategories
+                        c.Description,
+                        ServiceCatalogs = c.ServiceCatalogs
                             .Where(sc => sc.IsActive)
-                            .Select(sc => new { sc.Id, sc.Name })
+                            .Select(sc => new { sc.Id, sc.Name, sc.Description })
                     })
                     .ToListAsync();
 
@@ -291,26 +312,40 @@ namespace Beyti_Backend.Controllers.Api
         {
             try
             {
-                // Get services through ProviderApplication
-                var services = await _context.ProviderApplicationServices
-                    .Include(pas => pas.ProviderApplication)
-                    .Include(pas => pas.ServiceCatalog)
-                        .ThenInclude(sc => sc.SubCategory)
-                            .ThenInclude(sub => sub.Category)
-                    .Where(pas => pas.ProviderApplication.ServiceProviderId == serviceProviderId)
-                    .Select(pas => new
+                // Prohibited keywords for content moderation
+                var prohibitedKeywords = new[]
+                {
+                    "drug", "drugs", "cocaine", "heroin", "marijuana", "weed", "cannabis", "meth",
+                    "cigarette", "cigar", "tobacco", "vape", "e-cigarette", "smoking",
+                    "weapon", "gun", "rifle", "pistol", "ammunition", "firearm", "knife",
+                    "alcohol", "beer", "wine", "vodka", "whiskey", "liquor",
+                    "porn", "adult", "xxx", "explicit", "sex"
+                };
+
+                // Get services from Service table
+                var services = await _context.Services
+                    .Include(s => s.ServiceCatalog)
+                        .ThenInclude(sc => sc.ServiceCategory)
+                    .Where(s => s.ServiceProviderId == serviceProviderId)
+                    .Select(s => new
                     {
-                        ServiceCatalogId = pas.ServiceCatalog.Id,
-                        pas.ServiceCatalog.Name,
-                        pas.ServiceCatalog.Description,
-                        pas.ServiceCatalog.MinPrice,
-                        pas.ServiceCatalog.MaxPrice,
-                        pas.ServiceCatalog.EstimatedDuration,
-                        pas.ServiceCatalog.IsActive,
-                        Category = pas.ServiceCatalog.SubCategory.Category.Name,
-                        SubCategory = pas.ServiceCatalog.SubCategory.Name,
-                        SubCategoryId = pas.ServiceCatalog.SubCategoryId,
-                        ApplicationStatus = pas.ProviderApplication.Status
+                        ServiceId = s.Id,
+                        s.Name,
+                        s.Description,
+                        s.MinPrice,
+                        s.MaxPrice,
+                        s.EstimatedDuration,
+                        s.IsActive,
+                        Category = s.ServiceCatalog.ServiceCategory.Name,
+                        SubCategory = s.ServiceCatalog.Name,
+                        CategoryId = s.ServiceCatalog.ServiceCategoryId,
+                        ServiceCatalogId = s.ServiceCatalogId,
+                        FlaggedKeywords = prohibitedKeywords
+                            .Where(keyword =>
+                                s.Name.ToLower().Contains(keyword) ||
+                                (s.Description != null && s.Description.ToLower().Contains(keyword))
+                            )
+                            .ToList()
                     })
                     .ToListAsync();
 
@@ -329,7 +364,7 @@ namespace Beyti_Backend.Controllers.Api
             try
             {
                 int serviceProviderId = body.GetProperty("serviceProviderId").GetInt32();
-                int subCategoryId = body.GetProperty("subCategoryId").GetInt32();
+                int serviceCatalogId = body.GetProperty("serviceCategoryId").GetInt32(); // Frontend sends serviceCategoryId but it's actually serviceCatalogId
                 string name = body.GetProperty("name").GetString()!;
 
                 string? description = null;
@@ -390,12 +425,13 @@ namespace Beyti_Backend.Controllers.Api
                     }
                 }
 
-                var now = DateTime.UtcNow;
+                var now = DateTime.Now;
 
-                // Create service in catalog
-                var serviceCatalog = new ServiceCatalog
+                // Create service in Service table
+                var service = new Service
                 {
-                    SubCategoryId = subCategoryId,
+                    ServiceProviderId = serviceProviderId,
+                    ServiceCatalogId = serviceCatalogId,
                     Name = name,
                     Description = description,
                     MinPrice = minPrice,
@@ -405,40 +441,13 @@ namespace Beyti_Backend.Controllers.Api
                     CreatedAt = now
                 };
 
-                _context.ServiceCatalogs.Add(serviceCatalog);
-                await _context.SaveChangesAsync();
-
-                // Find or create provider application
-                var application = await _context.ProviderApplications
-                    .FirstOrDefaultAsync(pa => pa.ServiceProviderId == serviceProviderId);
-
-                if (application == null)
-                {
-                    application = new ProviderApplication
-                    {
-                        ServiceProviderId = serviceProviderId,
-                        Status = "Approved", // Auto-approve for existing providers
-                        CreatedAt = now,
-                        UpdatedAt = now
-                    };
-                    _context.ProviderApplications.Add(application);
-                    await _context.SaveChangesAsync();
-                }
-
-                // Link service to provider
-                var providerApplicationService = new ProviderApplicationService
-                {
-                    ProviderApplicationId = application.Id,
-                    ServiceCatalogId = serviceCatalog.Id
-                };
-
-                _context.ProviderApplicationServices.Add(providerApplicationService);
+                _context.Services.Add(service);
                 await _context.SaveChangesAsync();
 
                 return Ok(new
                 {
                     message = "Service added successfully",
-                    serviceId = serviceCatalog.Id
+                    serviceId = service.Id
                 });
             }
             catch (Exception ex)
@@ -448,30 +457,30 @@ namespace Beyti_Backend.Controllers.Api
         }
 
         // PUT: api/ServiceProviderDashboard/UpdateService/5
-        [HttpPut("UpdateService/{serviceCatalogId}")]
-        public async Task<IActionResult> UpdateService(int serviceCatalogId, JsonElement body)
+        [HttpPut("UpdateService/{serviceId}")]
+        public async Task<IActionResult> UpdateService(int serviceId, JsonElement body)
         {
             try
             {
-                var service = await _context.ServiceCatalogs.FindAsync(serviceCatalogId);
+                var service = await _context.Services.FindAsync(serviceId);
                 if (service == null)
                     return NotFound("Service not found");
 
-                // Update SubCategoryId if provided
-                if (body.TryGetProperty("subCategoryId", out var subCatProp))
+                // Update ServiceCatalogId if provided (frontend sends this as serviceCategoryId)
+                if (body.TryGetProperty("serviceCategoryId", out var catProp))
                 {
-                    if (subCatProp.ValueKind == JsonValueKind.Number)
+                    if (catProp.ValueKind == JsonValueKind.Number)
                     {
-                        service.SubCategoryId = subCatProp.GetInt32();
+                        service.ServiceCatalogId = catProp.GetInt32();
                     }
-                    else if (subCatProp.ValueKind == JsonValueKind.String)
+                    else if (catProp.ValueKind == JsonValueKind.String)
                     {
-                        service.SubCategoryId = int.Parse(subCatProp.GetString()!);
+                        service.ServiceCatalogId = int.Parse(catProp.GetString()!);
                     }
                 }
 
                 if (body.TryGetProperty("name", out var name))
-                    service.Name = name.GetString();
+                    service.Name = name.GetString()!;
 
                 if (body.TryGetProperty("description", out var desc))
                     service.Description = desc.GetString();
@@ -541,12 +550,12 @@ namespace Beyti_Backend.Controllers.Api
         }
 
         // PUT: api/ServiceProviderDashboard/ToggleService/5
-        [HttpPut("ToggleService/{serviceCatalogId}")]
-        public async Task<IActionResult> ToggleServiceStatus(int serviceCatalogId)
+        [HttpPut("ToggleService/{serviceId}")]
+        public async Task<IActionResult> ToggleServiceStatus(int serviceId)
         {
             try
             {
-                var service = await _context.ServiceCatalogs.FindAsync(serviceCatalogId);
+                var service = await _context.Services.FindAsync(serviceId);
                 if (service == null)
                     return NotFound("Service not found");
 
@@ -656,15 +665,56 @@ namespace Beyti_Backend.Controllers.Api
             }
         }
 
-        // DELETE: api/ServiceProviderDashboard/DeleteTimeSlot/5
-        [HttpDelete("DeleteTimeSlot/{timeSlotId}")]
-        public async Task<IActionResult> DeleteTimeSlot(int timeSlotId)
+        // PUT: api/ServiceProviderDashboard/ToggleTimeSlot/5
+        [HttpPut("ToggleTimeSlot/{timeSlotId}")]
+        public async Task<IActionResult> ToggleTimeSlot(int timeSlotId)
         {
             try
             {
                 var timeSlot = await _context.TimeSlots.FindAsync(timeSlotId);
                 if (timeSlot == null)
                     return NotFound("Time slot not found");
+
+                timeSlot.IsActive = !timeSlot.IsActive;
+                await _context.SaveChangesAsync();
+
+                return Ok(new
+                {
+                    message = $"Time slot {(timeSlot.IsActive ? "activated" : "deactivated")} successfully",
+                    isActive = timeSlot.IsActive
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
+
+        // DELETE: api/ServiceProviderDashboard/DeleteTimeSlot/5
+        [HttpDelete("DeleteTimeSlot/{timeSlotId}")]
+        public async Task<IActionResult> DeleteTimeSlot(int timeSlotId)
+        {
+            try
+            {
+                var timeSlot = await _context.TimeSlots
+                    .Include(ts => ts.ServiceBookings)
+                    .FirstOrDefaultAsync(ts => ts.Id == timeSlotId);
+
+                if (timeSlot == null)
+                    return NotFound("Time slot not found");
+
+                // Check if there are any active/pending bookings (exclude completed/canceled)
+                var activeBookings = timeSlot.ServiceBookings
+                    .Where(sb => sb.Status != "Completed" && sb.Status != "Canceled")
+                    .ToList();
+
+                if (activeBookings.Any())
+                {
+                    return BadRequest(new {
+                        error = "Cannot delete time slot with active bookings",
+                        message = "This time slot has active bookings and cannot be deleted. Please cancel or complete the bookings first."
+                    });
+                }
 
                 _context.TimeSlots.Remove(timeSlot);
                 await _context.SaveChangesAsync();
@@ -689,7 +739,7 @@ namespace Beyti_Backend.Controllers.Api
                     .Include(sb => sb.Customer)
                         .ThenInclude(c => c.UserProfile)
                     .Include(sb => sb.ServiceCatalog)
-                        .ThenInclude(sc => sc.SubCategory)
+                        .ThenInclude(sc => sc.ServiceCategory)
                     .Include(sb => sb.ServiceAddress)
                     .Where(sb => sb.ServiceProviderId == serviceProviderId);
 
@@ -711,14 +761,14 @@ namespace Beyti_Backend.Controllers.Api
                         CustomerName = sb.Customer.UserProfile.DisplayName,
                         CustomerPhone = sb.Customer.Phone,
                         ServiceName = sb.ServiceCatalog.Name,
-                        Category = sb.ServiceCatalog.SubCategory.Name,
-                        Address = new
+                        Category = sb.ServiceCatalog.ServiceCategory.Name,
+                        Address = sb.ServiceAddress != null ? new
                         {
                             sb.ServiceAddress.Street,
                             sb.ServiceAddress.City,
                             sb.ServiceAddress.Latitude,
                             sb.ServiceAddress.Longitude
-                        },
+                        } : null,
                         sb.CreatedAt
                     })
                     .ToListAsync();
@@ -737,18 +787,53 @@ namespace Beyti_Backend.Controllers.Api
         {
             try
             {
-                var booking = await _context.ServiceBookings.FindAsync(bookingId);
+                var booking = await _context.ServiceBookings
+                    .Include(sb => sb.Customer)
+                        .ThenInclude(c => c.UserProfile)
+                    .Include(sb => sb.ServiceCatalog)
+                    .Include(sb => sb.ServiceProvider)
+                    .FirstOrDefaultAsync(sb => sb.Id == bookingId);
+
                 if (booking == null)
                     return NotFound("Booking not found");
 
+                string? newStatus = null;
                 if (body.TryGetProperty("status", out var statusProp))
-                    booking.Status = statusProp.GetString()!;
+                {
+                    newStatus = statusProp.GetString()!;
+                    booking.Status = newStatus;
+                }
 
                 if (body.TryGetProperty("quotedPrice", out var priceProp))
+                {
                     booking.QuotedPrice = priceProp.GetDecimal();
+                    // Calculate deposit and final amount (50% split)
+                    booking.DepositAmount = booking.QuotedPrice * 0.5m;
+                    booking.FinalAmount = booking.QuotedPrice * 0.5m;
+                }
 
                 booking.UpdatedAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
+
+                // Update TimeSlot IsActive based on booking status
+                await UpdateTimeSlotAvailability(booking.TimeSlotId, booking.Status);
+
+                // Send notification to customer about the status change
+                if (!string.IsNullOrEmpty(newStatus) && booking.Customer?.UserProfile != null)
+                {
+                    var serviceName = booking.ServiceCatalog?.Name ?? "service";
+                    var notificationMessage = GetBookingStatusNotificationMessage(newStatus, serviceName);
+
+                    await _notificationService.SendNotificationAsync(
+                        recipientUserId: booking.Customer.UserProfile.Id,
+                        senderUserId: booking.ServiceProvider?.UserProfileId,
+                        type: "BookingUpdate",
+                        title: "Booking Status Update",
+                        body: notificationMessage,
+                        relatedEntityType: "ServiceBooking",
+                        relatedEntityId: bookingId
+                    );
+                }
 
                 return Ok(new { message = "Booking updated successfully" });
             }
@@ -758,9 +843,56 @@ namespace Beyti_Backend.Controllers.Api
             }
         }
 
+        private string GetBookingStatusNotificationMessage(string status, string serviceName)
+        {
+            return status switch
+            {
+                "Confirmed" => $"Your booking for \"{serviceName}\" has been confirmed! The service provider will contact you soon.",
+                "InProgress" => $"Your service \"{serviceName}\" is now in progress.",
+                "Completed" => $"Your service \"{serviceName}\" has been completed. Please leave a review!",
+                "Rejected" => $"Unfortunately, your booking for \"{serviceName}\" has been rejected. Please contact us for more information.",
+                "Canceled" => $"Your booking for \"{serviceName}\" has been canceled.",
+                "DepositPending" => $"Your quote for \"{serviceName}\" is ready! Please pay the deposit to confirm your booking.",
+                _ => $"Your booking status has been updated to {status}."
+            };
+        }
+
+        /// <summary>
+        /// Updates the TimeSlot IsActive status based on associated ServiceBooking statuses.
+        /// TimeSlot.IsActive = false when there's an active booking (Pending, Confirmed, InProgress)
+        /// TimeSlot.IsActive = true when there are no active bookings
+        /// </summary>
+        private async Task UpdateTimeSlotAvailability(int? timeSlotId, string? currentStatus)
+        {
+            if (!timeSlotId.HasValue)
+            {
+                return;
+            }
+
+            var timeSlot = await _context.TimeSlots.FindAsync(timeSlotId.Value);
+            if (timeSlot == null)
+            {
+                return;
+            }
+
+            // Define active statuses that should block the time slot
+            var activeStatuses = new[] { "Pending", "Confirmed", "InProgress" };
+
+            // Check if there are any active bookings for this time slot
+            var hasActiveBooking = await _context.ServiceBookings
+                .AnyAsync(b => b.TimeSlotId == timeSlotId.Value &&
+                              activeStatuses.Contains(b.Status));
+
+            // Update IsActive: false if there's an active booking, true otherwise
+            timeSlot.IsActive = !hasActiveBooking;
+
+            await _context.SaveChangesAsync();
+        }
+
         // ==================== STATISTICS ====================
 
         // GET: api/ServiceProviderDashboard/Statistics/5
+       
         [HttpGet("Statistics/{serviceProviderId}")]
         public async Task<IActionResult> GetStatistics(int serviceProviderId)
         {
@@ -769,29 +901,46 @@ namespace Beyti_Backend.Controllers.Api
                 var totalBookings = await _context.ServiceBookings
                     .CountAsync(sb => sb.ServiceProviderId == serviceProviderId);
 
+                // Count only Pending bookings (simple flow - no quote needed)
                 var pendingBookings = await _context.ServiceBookings
-                    .CountAsync(sb => sb.ServiceProviderId == serviceProviderId && sb.Status == "PendingQuote");
+                    .CountAsync(sb => sb.ServiceProviderId == serviceProviderId &&
+                                     sb.Status == "Pending");
 
                 var completedBookings = await _context.ServiceBookings
-                    .CountAsync(sb => sb.ServiceProviderId == serviceProviderId && sb.Status == "Completed");
+                    .CountAsync(sb => sb.ServiceProviderId == serviceProviderId &&
+                                     sb.Status == "Completed");
 
-                var totalRevenue = await _context.ServiceBookings
-                    .Where(sb => sb.ServiceProviderId == serviceProviderId && sb.Status == "Completed")
-                    .SumAsync(sb => (decimal?)sb.QuotedPrice) ?? 0;
+                // Get all completed bookings and calculate total earnings
+                var completedBookingsList = await _context.ServiceBookings
+                    .Where(sb => sb.ServiceProviderId == serviceProviderId &&
+                                sb.Status == "Completed")
+                    .Select(sb => new
+                    {
+                        sb.QuotedPrice,
+                        sb.FinalAmount,
+                        sb.DepositAmount
+                    })
+                    .ToListAsync();
 
-                var activeServices = await _context.ProviderApplicationServices
-                    .Include(pas => pas.ProviderApplication)
-                    .Include(pas => pas.ServiceCatalog)
-                    .CountAsync(pas =>
-                        pas.ProviderApplication.ServiceProviderId == serviceProviderId &&
-                        pas.ServiceCatalog.IsActive);
+                // Sum up all the prices from completed bookings
+                decimal totalEarnings = 0;
+                foreach (var booking in completedBookingsList)
+                {
+                    // Use FinalAmount if available, otherwise QuotedPrice, otherwise 0
+                    totalEarnings += booking.FinalAmount ?? booking.QuotedPrice ?? 0;
+                }
+
+                // Query the Services table for active services count
+                var activeServices = await _context.Services
+                    .CountAsync(s => s.ServiceProviderId == serviceProviderId &&
+                                    s.IsActive);
 
                 return Ok(new
                 {
                     totalBookings,
-                    pendingBookings,
+                    pendingBookings,      // Only Pending status (no PendingQuote)
                     completedBookings,
-                    totalRevenue,
+                    totalEarnings,
                     activeServices
                 });
             }
