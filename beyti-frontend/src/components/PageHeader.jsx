@@ -211,6 +211,20 @@ const PageHeader = ({
 
                 {/* Menu Actions */}
                 <div className="py-1">
+                  {/* Return to Home - Only show for Customer role */}
+                  {userRole === 'Customer' && (
+                    <button
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        window.location.href = '/mainStore';
+                      }}
+                      className="w-full px-4 py-2.5 text-left text-body-regular text-charcoal-600 dark:text-cream-50 hover:bg-cream-100 dark:hover:bg-charcoal-400 transition-colors flex items-center gap-2"
+                    >
+                      <span className="text-charcoal-500 dark:text-charcoal-300">🏠</span>
+                      <span>Return to Home</span>
+                    </button>
+                  )}
+                  
                   <button
                     onClick={handleProfileClick}
                     className="w-full px-4 py-2.5 text-left text-body-regular text-charcoal-600 dark:text-cream-50 hover:bg-cream-100 dark:hover:bg-charcoal-400 transition-colors flex items-center gap-2"

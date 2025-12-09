@@ -54,12 +54,28 @@ namespace Beyti_Backend.Controllers.Api
         public async Task<ActionResult<IEnumerable<object>>> GetOrders([FromQuery] int? customerId, [FromQuery] int? sellerId)
         {
             var query = _context.Orders
-                .Include(o => o.Customer)
-                .Include(o => o.Seller)
-                .Include(o => o.OrderItems)
-                    .ThenInclude(oi => oi.ProductVariant)
-                        .ThenInclude(pv => pv.Product)
-                .AsQueryable();
+            .Include(o => o.Customer)
+                .ThenInclude(c => c.UserProfile)
+
+            .Include(o => o.Seller)
+                .ThenInclude(s => s.UserProfile)
+
+            // Include pickup address
+            .Include(o => o.PickupAddress)
+
+            // Include delivery address
+            .Include(o => o.DeliveryAddress)
+
+            // Include seller → sellerAddresses → address
+            .Include(o => o.Seller)
+                .ThenInclude(s => s.SellerAddresses)
+                    .ThenInclude(sa => sa.Address)
+
+            // Include order items → variant → product
+            .Include(o => o.OrderItems)
+                .ThenInclude(oi => oi.ProductVariant)
+                    .ThenInclude(pv => pv.Product)
+            .AsQueryable();
 
             if (customerId.HasValue)
             {
@@ -72,52 +88,134 @@ namespace Beyti_Backend.Controllers.Api
             }
 
             var orders = await query
-                .Select(o => new
-                {
-                    o.Id,
-                    o.CustomerId,
-                    o.SellerId,
-                    o.PaymentMethod,
-                    o.PaymentStatus,
-                    o.FulfillmentType,
-                    o.Status,
-                    o.SubtotalAmount,
-                    o.DeliveryFee,
-                    o.TotalAmount,
-                    o.CreatedAt,
-                    o.UpdatedAt,
-                    customerName = o.Customer.UserProfile.DisplayName,
-                    sellerName = o.Seller.UserProfile.DisplayName,
-                    orderItems = o.OrderItems.Select(oi => new
-                    {
-                        oi.Id,
-                        oi.OrderId,
-                        oi.ProductVariantId,
-                        productId = oi.ProductVariant.Product.Id,
-                        productName = oi.ProductVariant.Product.Name,
-                        productPrice = oi.ProductVariant.Product.BasePrice,
-                        variantSKU = oi.ProductVariant.SKU,
-                        oi.Qty,
-                        oi.UnitPrice,
-                        oi.LineTotal
-                    }).ToList()
-                })
-                .ToListAsync();
+    .Select(o => new
+    {
+        o.Id,
+        o.CustomerId,
+        o.SellerId,
+        o.DeliveryAddressId,
+        o.PickupAddressId,
+        o.PaymentMethod,
+        o.PaymentStatus,
+        o.FulfillmentType,
+        o.Status,
+        o.SubtotalAmount,
+        o.DeliveryFee,
+        o.TotalAmount,
+        o.CreatedAt,
+        o.UpdatedAt,
+        customerName = o.Customer.UserProfile.DisplayName,
+        sellerName = o.Seller.UserProfile.DisplayName,
+        sellerPhone = o.Seller.Phone,
+
+        // ADD THESE LINES - Pickup Address (Seller Location)
+        pickupAddress = o.PickupAddress != null ? new
+        {
+            o.PickupAddress.Id,
+            o.PickupAddress.Street,
+            o.PickupAddress.City,
+            o.PickupAddress.Region,
+            o.PickupAddress.Country,
+            o.PickupAddress.Latitude,
+            o.PickupAddress.Longitude,
+        } : null,
+
+        // Delivery Address (Customer Location)
+        deliveryAddress = o.DeliveryAddress != null ? new
+        {
+            o.DeliveryAddress.Id,
+            o.DeliveryAddress.Street,
+            o.DeliveryAddress.City,
+            o.DeliveryAddress.Region,
+            o.DeliveryAddress.Country,
+            o.DeliveryAddress.Latitude,
+            o.DeliveryAddress.Longitude,
+        } : null,
+
+        orderItems = o.OrderItems.Select(oi => new
+        {
+            oi.Id,
+            oi.OrderId,
+            oi.ProductVariantId,
+            productId = oi.ProductVariant.Product.Id,
+            productName = oi.ProductVariant.Product.Name,
+            productPrice = oi.ProductVariant.Product.BasePrice,
+            variantSKU = oi.ProductVariant.SKU,
+            oi.Qty,
+            oi.UnitPrice,
+            oi.LineTotal
+        }).ToList()
+    })
+    .ToListAsync();
 
             return Ok(orders);
         }
 
         // GET: api/Orders/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<Order>> GetOrder(int id)
+        public async Task<ActionResult<object>> GetOrder(int id)
         {
-            var order = await _context.Orders.FindAsync(id);
-            if (order == null)
-            {
+            var o = await _context.Orders
+                .Include(o => o.Customer)
+                    .ThenInclude(c => c.UserProfile)
+                .Include(o => o.Seller)
+                    .ThenInclude(s => s.UserProfile)
+                .Include(o => o.PickupAddress)
+                .Include(o => o.DeliveryAddress)
+                .Include(o => o.Seller)
+                    .ThenInclude(s => s.SellerAddresses)
+                        .ThenInclude(sa => sa.Address)
+                .Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.ProductVariant)
+                        .ThenInclude(pv => pv.Product)
+                .FirstOrDefaultAsync(o => o.Id == id);
+
+            if (o == null)
                 return NotFound();
-            }
-            return order;
+
+            return Ok(new
+            {
+                o.Id,
+                o.CustomerId,
+                o.SellerId,
+                o.PaymentMethod,
+                o.PaymentStatus,
+                o.FulfillmentType,
+                o.Status,
+                o.SubtotalAmount,
+                o.DeliveryFee,
+                o.TotalAmount,
+                o.CreatedAt,
+                o.UpdatedAt,
+
+                customerName = o.Customer?.UserProfile?.DisplayName,
+                sellerName = o.Seller?.UserProfile?.DisplayName,
+                sellerPhone = o.Seller?.Phone,
+
+                pickupAddress = o.PickupAddress != null ? new
+                {
+                    o.PickupAddress.Id,
+                    o.PickupAddress.Street,
+                    o.PickupAddress.City,
+                    o.PickupAddress.Region,
+                    o.PickupAddress.Country,
+                    o.PickupAddress.Latitude,
+                    o.PickupAddress.Longitude
+                } : null,
+
+                deliveryAddress = o.DeliveryAddress != null ? new
+                {
+                    o.DeliveryAddress.Id,
+                    o.DeliveryAddress.Street,
+                    o.DeliveryAddress.City,
+                    o.DeliveryAddress.Region,
+                    o.DeliveryAddress.Country,
+                    o.DeliveryAddress.Latitude,
+                    o.DeliveryAddress.Longitude
+                } : null
+            });
         }
+
 
         // PUT: api/Orders/5
         [HttpPut("{id}")]

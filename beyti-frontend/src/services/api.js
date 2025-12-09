@@ -811,6 +811,12 @@ export const getOrders = async (customerId = null, sellerId = null) => {
   return await fetchAPI(url);
 };
 
+export const getOrderWithDetails = async (id) => {
+  const res = await fetch(`https://localhost:7062/api/Orders?customerId=${activeCustomerId}`);
+  return (await res.json()).find(o => o.id === id);
+};
+
+
 /**
  * Get a single order by ID
  * @param {number} id - Order ID
@@ -1435,6 +1441,12 @@ export const addTimeSlot = async (data) => {
   });
 };
 
+export const toggleTimeSlot = async (timeSlotId) => {
+  return await fetchAPI(`/ServiceProviderDashboard/ToggleTimeSlot/${timeSlotId}`, {
+    method: 'PUT',
+  });
+};
+
 export const deleteTimeSlot = async (timeSlotId) => {
   return await fetchAPI(`/ServiceProviderDashboard/DeleteTimeSlot/${timeSlotId}`, {
     method: 'DELETE',
@@ -1824,6 +1836,28 @@ export const respondToServiceReview = async (reviewId, response) => {
 export const toggleServiceReviewVisibility = async (reviewId) => {
   return await fetchAPI(`/ServiceReviews/${reviewId}/toggle-visibility`, {
     method: 'PUT',
+  });
+};
+
+/**
+ * Create a new service review
+ * @param {Object} reviewData - Service review data
+ *   Example: {
+ *     serviceBookingId: number,
+ *     serviceProviderId: number,
+ *     customerId: number,
+ *     overallRating: number, // 1-5
+ *     qualityRating: number | null, // 1-5
+ *     professionalismRating: number | null, // 1-5
+ *     timelinessRating: number | null, // 1-5
+ *     comment: string | null
+ *   }
+ * @returns {Promise<Object>} - Created service review object
+ */
+export const createServiceReview = async (reviewData) => {
+  return await fetchAPI('/ServiceReviews', {
+    method: 'POST',
+    body: JSON.stringify(reviewData),
   });
 };
 

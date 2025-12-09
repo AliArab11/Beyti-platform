@@ -132,13 +132,21 @@ namespace Beyti_Backend.Controllers.Api
                     storeName = seller.UserProfile.DisplayName,
                     phone = seller.Phone,
                     createdAt = seller.CreatedAt,
-                    addresses = seller.SellerAddresses.Select(sa => new
+                    sellerAddresses = seller.SellerAddresses.Select(sa => new
                     {
-                        street = sa.Address.Street,
-                        city = sa.Address.City,
-                        region = sa.Address.Region,
-                        postalCode = sa.Address.PostalCode,
-                        country = sa.Address.Country
+                        id = sa.Id,
+                        addressId = sa.AddressId,
+                        address = new
+                        {
+                            id = sa.Address.Id,
+                            street = sa.Address.Street,
+                            city = sa.Address.City,
+                            region = sa.Address.Region,
+                            postalCode = sa.Address.PostalCode,
+                            country = sa.Address.Country,
+                            latitude = sa.Address.Latitude,
+                            longitude = sa.Address.Longitude
+                        }
                     }).ToList(),
                     products = seller.Products.Select(p => new
                     {

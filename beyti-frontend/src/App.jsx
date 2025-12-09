@@ -17,6 +17,9 @@ import ServiceProviderStoresView from "./Beyti-Website/Store/ServiceProviderStor
 import ServiceProviderDetailView from "./Beyti-Website/Store/ServiceProviderDetailView.jsx";
 import StoreView from "./Beyti-Website/Store/StoreView.jsx";
 import StoreDetailsPage from "./Pages/Seller/StoreDetails";
+import CustomerDashboardPage from './Beyti-Website/Customer/CustomerDashboard.jsx';
+import CustomerNotifications from "./Beyti-Website/Customer/CustomerNotifications.jsx";
+import CustomerHistory from "./Beyti-Website/Customer/CustomerHistory.jsx";
 
 import SellerDashboardLayout from "./Beyti-Website/Seller/SellerDashboard.jsx";
 import SellerProductsPage from "./Beyti-Website/Seller/Components/Products.jsx";
@@ -181,6 +184,8 @@ export default function App() {
               <Route path="reviews" element={<SellerReviewsPage />} />
             </Route>
 
+            <Route path="/customer-dashboard" element={<CustomerDashboardPage />} />
+
             <Route path="/store" element={<StoresPage />} />
             <Route path="/stores" element={<StoreTypeSelection />} />
             <Route path="/mainStore" element={<MainStoreView />} />
@@ -191,6 +196,8 @@ export default function App() {
             <Route path="/product" element={<ProductsPage />} />
             <Route path="/category" element={<CategoryPage />} />
             <Route path="/customer" element={<CustomerPage />} />
+            <Route path="/customer/notifications" element={<CustomerNotifications />} />
+            <Route path="/customer/history" element={<CustomerHistory />} />
 
             <Route path="/driver" element={<DriverPage />} />
             <Route path="/driver-dashboard" element={<DriverDashboardPage />}>
