@@ -160,6 +160,18 @@ export default function SellerOnboarding() {
       const userEmail = localStorage.getItem('userEmail');
       const userPhone = localStorage.getItem('userPhone');
 
+      console.log('[SellerOnboarding] userId from localStorage:', userId);
+      console.log('[SellerOnboarding] All localStorage:', {
+        userId,
+        userEmail,
+        userPhone,
+        authToken: localStorage.getItem('authToken')
+      });
+
+      if (!userId) {
+        throw new Error('User ID not found. Please register or login first before completing onboarding.');
+      }
+
       // Step 1: Create Address
       // Combine location fields into proper address format
       const streetParts = [
@@ -209,7 +221,8 @@ export default function SellerOnboarding() {
         },
         body: JSON.stringify({
           StoreName: formData.storeName,
-          Phone: formData.phone
+          Phone: formData.phone,
+          UserId: userId  // Pass userId for onboarding - links to existing UserProfile
         })
       });
 

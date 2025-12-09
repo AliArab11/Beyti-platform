@@ -168,6 +168,7 @@ namespace Beyti_Backend.Controllers.Api
             decimal? maxServicePrice = null;
             string? displayName = null;
             string status = "Available"; // default
+            string? userId = null; // For onboarding flow
 
             if (body.TryGetProperty("phone", out var phoneProp))
                 phone = phoneProp.GetString();
@@ -188,21 +189,54 @@ namespace Beyti_Backend.Controllers.Api
                     status = s;
             }
 
+            // NEW: Extract userId for onboarding flow
+            if (body.TryGetProperty("userId", out var userIdProp))
+                userId = userIdProp.GetString();
+
             var now = DateTime.UtcNow;
+            UserProfile profile;
 
-            // Create UserProfile
-            var profile = new UserProfile
+            // Check if this is onboarding (userId provided) or admin creation
+            if (!string.IsNullOrEmpty(userId))
             {
-                IdentityUserId = Guid.NewGuid().ToString(),
-                DisplayName = displayName ?? businessName,
-                RoleType = "ServiceProvider",
-                Status = "Active",  // UserProfile status is for account activation
-                CreatedAt = now,
-                UpdatedAt = now
-            };
+                // ONBOARDING FLOW: Update existing UserProfile
+                profile = await _context.UserProfiles
+                    .FirstOrDefaultAsync(up => up.IdentityUserId == userId);
 
-            _context.UserProfiles.Add(profile);
-            await _context.SaveChangesAsync();
+                if (profile == null)
+                    return BadRequest(new { error = "User profile not found for userId: " + userId });
+
+                // Update existing profile to ServiceProvider role
+                profile.RoleType = "ServiceProvider";
+                profile.DisplayName = displayName ?? businessName;
+                profile.UpdatedAt = now;
+
+                // Delete orphaned Customer record if exists
+                var existingCustomer = await _context.Customers
+                    .FirstOrDefaultAsync(c => c.UserProfileId == profile.Id);
+                if (existingCustomer != null)
+                {
+                    _context.Customers.Remove(existingCustomer);
+                }
+
+                await _context.SaveChangesAsync();
+            }
+            else
+            {
+                // ADMIN CREATION FLOW: Create new UserProfile (existing behavior)
+                profile = new UserProfile
+                {
+                    IdentityUserId = Guid.NewGuid().ToString(),
+                    DisplayName = displayName ?? businessName,
+                    RoleType = "ServiceProvider",
+                    Status = "Active",  // UserProfile status is for account activation
+                    CreatedAt = now,
+                    UpdatedAt = now
+                };
+
+                _context.UserProfiles.Add(profile);
+                await _context.SaveChangesAsync();
+            }
 
             // Create ServiceProvider - manually added providers are auto-verified
             var provider = new BeytiDB.Data.ServiceProvider

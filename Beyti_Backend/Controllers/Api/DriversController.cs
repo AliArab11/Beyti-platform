@@ -44,6 +44,42 @@ namespace Beyti_Backend.Controllers.Api
                 .ToListAsync();
         }
 
+        // GET: api/Drivers/Profile/{userProfileId} - Get driver by UserProfileId
+        [HttpGet("Profile/{userProfileId}")]
+        public async Task<ActionResult<object>> GetDriverByUserProfileId(int userProfileId)
+        {
+            try
+            {
+                var driver = await _context.Drivers
+                    .Include(d => d.UserProfile)
+                    .FirstOrDefaultAsync(d => d.UserProfileId == userProfileId);
+
+                if (driver == null)
+                    return NotFound("Driver not found");
+
+                return Ok(new
+                {
+                    DriverId = driver.Id,
+                    Id = driver.Id, // For compatibility
+                    UserProfileId = driver.UserProfileId,
+                    FullName = driver.UserProfile.DisplayName,
+                    Phone = driver.Phone,
+                    Status = driver.Status,
+                    CreatedAt = driver.CreatedAt,
+                    DisplayName = driver.UserProfile.DisplayName,
+                    RoleType = driver.UserProfile.RoleType
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Error fetching driver profile",
+                    error = ex.Message
+                });
+            }
+        }
+
         // GET: api/Drivers/5
         [HttpGet("{id}")]
         public async Task<ActionResult<object>> GetDriver(int id)

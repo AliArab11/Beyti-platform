@@ -44,6 +44,8 @@ import SellerOnboarding from './Beyti-Website/Registration/SellerOnboarding';
 import ProviderOnboarding from './Beyti-Website/Registration/ProviderOnboarding';
 import DriverOnboarding from './Beyti-Website/Registration/DriverOnboarding';
 import AdminView from './Beyti-Website/Admin/AdminView.jsx';
+import DashboardRouter from './components/DashboardRouter';
+import DriverDashboardPlaceholder from './Beyti-Website/Driver/DriverDashboardPlaceholder';
 import AccountSuspended from './Beyti-Website/Auth/AccountSuspended';
 
 // Placeholder components for pages that don't exist yet
@@ -216,6 +218,8 @@ export default function App() {
             <Route path="/design-demo" element={<DesignSystemDemo />} />
             <Route path="/dashboard-template" element={<DashboardTemplate />} />
             <Route path="/user-management" element={<AdminUserManagementNew />} />
+            <Route path="/dashboard" element={<DashboardRouter />} />
+            <Route path="/driver-placeholder" element={<DriverDashboardPlaceholder />} />
           </Routes>
         </main>
       </div>
