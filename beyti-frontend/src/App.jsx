@@ -17,6 +17,7 @@ import ServiceProviderStoresView from "./Beyti-Website/Store/ServiceProviderStor
 import ServiceProviderDetailView from "./Beyti-Website/Store/ServiceProviderDetailView.jsx";
 import StoreView from "./Beyti-Website/Store/StoreView.jsx";
 import StoreDetailsPage from "./Pages/Seller/StoreDetails";
+import CustomerDashboardPage from './Beyti-Website/Customer/CustomerDashboard.jsx';
 import CustomerNotifications from "./Beyti-Website/Customer/CustomerNotifications.jsx";
 import CustomerHistory from "./Beyti-Website/Customer/CustomerHistory.jsx";
 
@@ -180,6 +181,8 @@ export default function App() {
               <Route path="analytics" element={<SellerAnalyticsPage />} />
               <Route path="reviews" element={<SellerReviewsPage />} />
             </Route>
+
+            <Route path="/customer-dashboard" element={<CustomerDashboardPage />} />
 
             <Route path="/store" element={<StoresPage />} />
             <Route path="/stores" element={<StoreTypeSelection />} />

@@ -789,6 +789,12 @@ export const getOrders = async (customerId = null, sellerId = null) => {
   return await fetchAPI(url);
 };
 
+export const getOrderWithDetails = async (id) => {
+  const res = await fetch(`https://localhost:7062/api/Orders?customerId=${activeCustomerId}`);
+  return (await res.json()).find(o => o.id === id);
+};
+
+
 /**
  * Get a single order by ID
  * @param {number} id - Order ID
