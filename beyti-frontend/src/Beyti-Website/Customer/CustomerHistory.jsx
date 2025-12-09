@@ -377,7 +377,7 @@ export default function CustomerHistory() {
               </div>
             ) : (
               <div className="space-y-6">
-                {/* Orders List */}
+                {/* Orders Table */}
                 {viewMode === 'orders' && (
                   <div className="bg-cream-50 dark:bg-charcoal-600 border border-grey-stroke dark:border-charcoal-400 rounded-lg overflow-hidden">
                     <div className="p-4 border-b border-grey-stroke dark:border-charcoal-400">
@@ -390,76 +390,90 @@ export default function CustomerHistory() {
                         No orders found
                       </div>
                     ) : (
-                      <div className="divide-y divide-grey-stroke dark:divide-charcoal-400">
-                        {filteredData.orders.map((order) => (
-                          <div key={order.id} className="p-6 hover:bg-cream-100 dark:hover:bg-charcoal-500 transition-colors">
-                            <div className="flex items-start justify-between mb-4">
-                              <div>
-                                <h4 className="text-body-regular font-semibold text-charcoal-600 dark:text-cream-50">
-                                  Order #{order.id}
-                                </h4>
-                                <p className="text-label-small text-charcoal-400 dark:text-charcoal-300 mt-1">
-                                  {formatDate(order.createdAt)} at {formatTime(order.createdAt)}
-                                </p>
-                              </div>
-                              <StatusChip variant={getOrderStatusVariant(order.status)}>
-                                {order.status}
-                              </StatusChip>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 text-body-regular">
-                              <div>
-                                <p className="text-label-small text-charcoal-400 dark:text-charcoal-300">Seller</p>
-                                <p className="text-charcoal-600 dark:text-cream-50">{order.sellerName || 'N/A'}</p>
-                              </div>
-                              <div>
-                                <p className="text-label-small text-charcoal-400 dark:text-charcoal-300">Total Amount</p>
-                                <p className="text-charcoal-600 dark:text-cream-50 font-semibold">
-                                  {formatCurrency(order.totalAmount)}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-label-small text-charcoal-400 dark:text-charcoal-300">Fulfillment</p>
-                                <p className="text-charcoal-600 dark:text-cream-50">{order.fulfillmentType || 'N/A'}</p>
-                              </div>
-                              <div>
-                                <p className="text-label-small text-charcoal-400 dark:text-charcoal-300">Payment</p>
-                                <p className="text-charcoal-600 dark:text-cream-50">
-                                  {order.paymentMethod || 'N/A'} - {order.paymentStatus || 'N/A'}
-                                </p>
-                              </div>
-                            </div>
-                            {/* Order Items */}
-                            {order.orderItems && order.orderItems.length > 0 && (
-                              <div className="mt-4 pt-4 border-t border-grey-stroke dark:border-charcoal-400">
-                                <p className="text-label-small text-charcoal-400 dark:text-charcoal-300 mb-2">Order Items:</p>
-                                <div className="space-y-2">
-                                  {order.orderItems.map((item, idx) => (
-                                    <div key={item.id || idx} className="flex items-center justify-between text-body-small">
-                                      <div className="flex-1">
-                                        <p className="text-charcoal-600 dark:text-cream-50">
-                                          {item.productName || 'Product'}
-                                          {item.variantSKU && <span className="text-charcoal-400 dark:text-charcoal-300"> (SKU: {item.variantSKU})</span>}
-                                        </p>
-                                      </div>
-                                      <div className="flex items-center gap-4">
-                                        <p className="text-charcoal-400 dark:text-charcoal-300">Qty: {item.qty}</p>
-                                        <p className="text-charcoal-600 dark:text-cream-50 font-medium min-w-[80px] text-right">
-                                          {formatCurrency(item.lineTotal)}
-                                        </p>
-                                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="bg-grey-100 dark:bg-charcoal-500 border-b border-grey-stroke dark:border-charcoal-400">
+                              <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Order ID</th>
+                              <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Date & Time</th>
+                              <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Seller</th>
+                              <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Items</th>
+                              <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Fulfillment</th>
+                              <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Payment</th>
+                              <th className="text-right p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Total</th>
+                              <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Status</th>
+                              <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-grey-stroke dark:divide-charcoal-400">
+                            {filteredData.orders.map((order) => (
+                              <tr key={order.id} className="hover:bg-cream-100 dark:hover:bg-charcoal-500 transition-colors">
+                                <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50 font-semibold">
+                                  #{order.id}
+                                </td>
+                                <td className="p-4 text-body-small text-charcoal-600 dark:text-cream-50">
+                                  <div>{formatDate(order.createdAt)}</div>
+                                  <div className="text-charcoal-400 dark:text-charcoal-300">{formatTime(order.createdAt)}</div>
+                                </td>
+                                <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50">
+                                  {order.sellerName || 'N/A'}
+                                </td>
+                                <td className="p-4 text-body-small text-charcoal-600 dark:text-cream-50">
+                                  {order.orderItems && order.orderItems.length > 0 ? (
+                                    <div className="space-y-1">
+                                      {order.orderItems.map((item, idx) => (
+                                        <div key={item.id || idx}>
+                                          {item.productName || 'Product'} (×{item.qty})
+                                        </div>
+                                      ))}
                                     </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                                  ) : (
+                                    'N/A'
+                                  )}
+                                </td>
+                                <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50">
+                                  {order.fulfillmentType || 'N/A'}
+                                </td>
+                                <td className="p-4 text-body-small text-charcoal-600 dark:text-cream-50">
+                                  <div>{order.paymentMethod || 'N/A'}</div>
+                                  <div className="text-charcoal-400 dark:text-charcoal-300">{order.paymentStatus || 'N/A'}</div>
+                                </td>
+                                <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50 font-semibold text-right">
+                                  {formatCurrency(order.totalAmount)}
+                                </td>
+                                <td className="p-4 text-center">
+                                  <StatusChip variant={getOrderStatusVariant(order.status)}>
+                                    {order.status}
+                                  </StatusChip>
+                                </td>
+                                <td className="p-4 text-center">
+                                  <div className="flex items-center justify-center gap-2">
+                                    <button
+                                      onClick={() => handleViewOrder(order)}
+                                      className="px-4 py-2 bg-sage-500 hover:bg-sage-600 dark:bg-sage-700 dark:hover:bg-sage-600 text-cream-50 rounded-md text-body-small transition-colors"
+                                    >
+                                      View
+                                    </button>
+                                    {order.status?.toLowerCase() === 'completed' && (
+                                      <button
+                                        onClick={() => handleOpenReview(order, 'order')}
+                                        className="px-4 py-2 bg-charcoal-600 hover:bg-charcoal-500 dark:bg-charcoal-400 dark:hover:bg-charcoal-300 text-cream-50 dark:text-charcoal-600 rounded-md text-body-small transition-colors"
+                                      >
+                                        Review
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     )}
                   </div>
                 )}
 
-                {/* Service Bookings List */}
+                {/* Service Bookings Table */}
                 {viewMode === 'services' && (
                   <div className="bg-cream-50 dark:bg-charcoal-600 border border-grey-stroke dark:border-charcoal-400 rounded-lg overflow-hidden">
                     <div className="p-4 border-b border-grey-stroke dark:border-charcoal-400">
@@ -472,72 +486,86 @@ export default function CustomerHistory() {
                         No service bookings found
                       </div>
                     ) : (
-                      <div className="divide-y divide-grey-stroke dark:divide-charcoal-400">
-                        {filteredData.bookings.map((booking) => (
-                          <div key={booking.id} className="p-6 hover:bg-cream-100 dark:hover:bg-charcoal-500 transition-colors">
-                            <div className="flex items-start justify-between mb-4">
-                              <div>
-                                <h4 className="text-body-regular font-semibold text-charcoal-600 dark:text-cream-50">
-                                  Booking #{booking.id}
-                                </h4>
-                                <p className="text-label-small text-charcoal-400 dark:text-charcoal-300 mt-1">
-                                  {formatDate(booking.serviceDate)} at {booking.serviceTime || 'Time TBD'}
-                                </p>
-                              </div>
-                              <StatusChip variant={getBookingStatusVariant(booking.status)}>
-                                {booking.status}
-                              </StatusChip>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 text-body-regular">
-                              <div>
-                                <p className="text-label-small text-charcoal-400 dark:text-charcoal-300">Provider</p>
-                                <p className="text-charcoal-600 dark:text-cream-50">
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="bg-grey-100 dark:bg-charcoal-500 border-b border-grey-stroke dark:border-charcoal-400">
+                              <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Booking ID</th>
+                              <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Service Date & Time</th>
+                              <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Provider</th>
+                              <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Service</th>
+                              <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Type</th>
+                              <th className="text-right p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Price</th>
+                              <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Status</th>
+                              <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-grey-stroke dark:divide-charcoal-400">
+                            {filteredData.bookings.map((booking) => (
+                              <tr key={booking.id} className="hover:bg-cream-100 dark:hover:bg-charcoal-500 transition-colors">
+                                <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50 font-semibold">
+                                  #{booking.id}
+                                </td>
+                                <td className="p-4 text-body-small text-charcoal-600 dark:text-cream-50">
+                                  <div>{formatDate(booking.serviceDate)}</div>
+                                  <div className="text-charcoal-400 dark:text-charcoal-300">{booking.serviceTime || 'Time TBD'}</div>
+                                </td>
+                                <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50">
                                   {booking.businessName || booking.providerName || 'N/A'}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-label-small text-charcoal-400 dark:text-charcoal-300">Service</p>
-                                <p className="text-charcoal-600 dark:text-cream-50">{booking.serviceName || 'N/A'}</p>
-                              </div>
-                              <div>
-                                <p className="text-label-small text-charcoal-400 dark:text-charcoal-300">Service Type</p>
-                                <p className="text-charcoal-600 dark:text-cream-50">{booking.serviceType || 'N/A'}</p>
-                              </div>
-                              {booking.quotedPrice != null && (
-                                <div>
-                                  <p className="text-label-small text-charcoal-400 dark:text-charcoal-300">Quoted Price</p>
-                                  <p className="text-charcoal-600 dark:text-cream-50 font-semibold">
-                                    {formatCurrency(booking.quotedPrice)}
-                                  </p>
-                                </div>
-                              )}
-                              {booking.depositAmount != null && (
-                                <div>
-                                  <p className="text-label-small text-charcoal-400 dark:text-charcoal-300">Deposit Paid</p>
-                                  <p className="text-charcoal-600 dark:text-cream-50">
-                                    {formatCurrency(booking.depositAmount)}
-                                  </p>
-                                </div>
-                              )}
-                              {booking.finalAmount != null && (
-                                <div>
-                                  <p className="text-label-small text-charcoal-400 dark:text-charcoal-300">Final Amount</p>
-                                  <p className="text-charcoal-600 dark:text-cream-50 font-semibold">
-                                    {formatCurrency(booking.finalAmount)}
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                            {booking.notes && (
-                              <div className="mt-4 pt-4 border-t border-grey-stroke dark:border-charcoal-400">
-                                <p className="text-label-small text-charcoal-400 dark:text-charcoal-300">Notes</p>
-                                <p className="text-body-regular text-charcoal-600 dark:text-cream-50 mt-1">
-                                  {booking.notes}
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                                </td>
+                                <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50">
+                                  {booking.serviceName || 'N/A'}
+                                </td>
+                                <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50">
+                                  {booking.serviceType || 'N/A'}
+                                </td>
+                                <td className="p-4 text-body-small text-charcoal-600 dark:text-cream-50 text-right">
+                                  {booking.finalAmount != null ? (
+                                    <div>
+                                      <div className="font-semibold">{formatCurrency(booking.finalAmount)}</div>
+                                      <div className="text-charcoal-400 dark:text-charcoal-300">Final</div>
+                                    </div>
+                                  ) : booking.quotedPrice != null ? (
+                                    <div>
+                                      <div className="font-semibold">{formatCurrency(booking.quotedPrice)}</div>
+                                      <div className="text-charcoal-400 dark:text-charcoal-300">Quoted</div>
+                                    </div>
+                                  ) : booking.depositAmount != null ? (
+                                    <div>
+                                      <div className="font-semibold">{formatCurrency(booking.depositAmount)}</div>
+                                      <div className="text-charcoal-400 dark:text-charcoal-300">Deposit</div>
+                                    </div>
+                                  ) : (
+                                    'Pending'
+                                  )}
+                                </td>
+                                <td className="p-4 text-center">
+                                  <StatusChip variant={getBookingStatusVariant(booking.status)}>
+                                    {booking.status}
+                                  </StatusChip>
+                                </td>
+                                <td className="p-4 text-center">
+                                  <div className="flex items-center justify-center gap-2">
+                                    <button
+                                      onClick={() => handleViewBooking(booking)}
+                                      className="px-4 py-2 bg-sage-500 hover:bg-sage-600 dark:bg-sage-700 dark:hover:bg-sage-600 text-cream-50 rounded-md text-body-small transition-colors"
+                                    >
+                                      View
+                                    </button>
+                                    {booking.status === 'Completed' && (
+                                      <button
+                                        onClick={() => handleOpenReview(booking, 'booking')}
+                                        className="px-4 py-2 bg-charcoal-600 hover:bg-charcoal-500 dark:bg-charcoal-400 dark:hover:bg-charcoal-300 text-cream-50 dark:text-charcoal-600 rounded-md text-body-small transition-colors"
+                                      >
+                                        Review
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     )}
                   </div>
