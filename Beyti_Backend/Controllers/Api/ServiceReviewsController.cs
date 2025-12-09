@@ -109,12 +109,72 @@ namespace Beyti_Backend.Controllers.Api
         // POST: api/ServiceReviews
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<ServiceReview>> PostServiceReview(ServiceReview serviceReview)
+        public async Task<ActionResult<ServiceReview>> PostServiceReview(CreateServiceReviewDto dto)
         {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            // Validate that the service booking exists and belongs to the customer
+            var booking = await _context.ServiceBookings
+                .FirstOrDefaultAsync(b => b.Id == dto.ServiceBookingId && b.CustomerId == dto.CustomerId);
+
+            if (booking == null)
+                return BadRequest("Invalid service booking or customer");
+
+            // Check if booking status is "Completed"
+            if (booking.Status != "Completed")
+                return BadRequest("You can only review completed service bookings");
+
+            // Check if review already exists
+            var existingReview = await _context.ServiceReviews
+                .FirstOrDefaultAsync(r => r.ServiceBookingId == dto.ServiceBookingId && r.CustomerId == dto.CustomerId);
+
+            if (existingReview != null)
+                return BadRequest("You have already reviewed this service booking");
+
+            // Validate ratings
+            if (dto.OverallRating < 1 || dto.OverallRating > 5)
+                return BadRequest("Overall rating must be between 1 and 5");
+
+            if (dto.QualityRating.HasValue && (dto.QualityRating < 1 || dto.QualityRating > 5))
+                return BadRequest("Quality rating must be between 1 and 5");
+
+            if (dto.ProfessionalismRating.HasValue && (dto.ProfessionalismRating < 1 || dto.ProfessionalismRating > 5))
+                return BadRequest("Professionalism rating must be between 1 and 5");
+
+            if (dto.TimelinessRating.HasValue && (dto.TimelinessRating < 1 || dto.TimelinessRating > 5))
+                return BadRequest("Timeliness rating must be between 1 and 5");
+
+            var serviceReview = new ServiceReview
+            {
+                ServiceBookingId = dto.ServiceBookingId,
+                ServiceProviderId = dto.ServiceProviderId,
+                CustomerId = dto.CustomerId,
+                OverallRating = dto.OverallRating,
+                QualityRating = dto.QualityRating,
+                ProfessionalismRating = dto.ProfessionalismRating,
+                TimelinessRating = dto.TimelinessRating,
+                Comment = dto.Comment,
+                IsHidden = false,
+                CreatedAt = DateTime.UtcNow
+            };
+
             _context.ServiceReviews.Add(serviceReview);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetServiceReview", new { id = serviceReview.Id }, serviceReview);
+            return CreatedAtAction("GetServiceReview", new { id = serviceReview.Id }, new
+            {
+                id = serviceReview.Id,
+                serviceBookingId = serviceReview.ServiceBookingId,
+                serviceProviderId = serviceReview.ServiceProviderId,
+                customerId = serviceReview.CustomerId,
+                overallRating = serviceReview.OverallRating,
+                qualityRating = serviceReview.QualityRating,
+                professionalismRating = serviceReview.ProfessionalismRating,
+                timelinessRating = serviceReview.TimelinessRating,
+                comment = serviceReview.Comment,
+                createdAt = serviceReview.CreatedAt
+            });
         }
 
         // DELETE: api/ServiceReviews/5
@@ -200,6 +260,19 @@ namespace Beyti_Backend.Controllers.Api
         {
             return _context.ServiceReviews.Any(e => e.Id == id);
         }
+    }
+
+    // DTO for creating service reviews
+    public class CreateServiceReviewDto
+    {
+        public int ServiceBookingId { get; set; }
+        public int ServiceProviderId { get; set; }
+        public int CustomerId { get; set; }
+        public int OverallRating { get; set; }
+        public int? QualityRating { get; set; }
+        public int? ProfessionalismRating { get; set; }
+        public int? TimelinessRating { get; set; }
+        public string? Comment { get; set; }
     }
 
     // DTO for responding to reviews

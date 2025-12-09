@@ -49,6 +49,8 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
         getProviderBookings(serviceProviderId)
       ]);
 
+      console.log('Statistics from backend:', statisticsData);
+
       // Get today's date (start and end of day)
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -57,19 +59,11 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
 
       // Filter today's bookings
       const todaysBookings = allBookings.filter(booking => {
-        const bookingDate = new Date(booking.scheduledDate || booking.createdAt);
+        const bookingDate = new Date(booking.BookingDateTime || booking.CreatedAt);
         return bookingDate >= today && bookingDate < tomorrow;
       });
 
       setTodayBookings(todaysBookings);
-
-      // Calculate pending requests (PendingQuote status)
-      const pendingRequests = allBookings.filter(b => b.status === 'PendingQuote').length;
-
-      // Calculate total earnings from completed bookings
-      const totalEarnings = allBookings
-        .filter(b => b.status === 'Completed' && b.quotedPrice)
-        .reduce((sum, booking) => sum + (booking.quotedPrice || 0), 0);
 
       // Try to fetch reviews filtered by service provider
       let averageRating = 0;
@@ -90,12 +84,15 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
         console.log('Reviews not available:', err);
       }
 
+      // FIXED: Use backend statistics directly instead of recalculating
       setStats({
         todayBookings: todaysBookings.length,
         currentRating: averageRating,
-        pendingRequests,
-        totalEarnings,
-        ...statisticsData
+        pendingRequests: statisticsData.pendingBookings || 0,  // Use pendingBookings from backend
+        totalEarnings: statisticsData.totalEarnings || 0,      // Use totalEarnings from backend
+        totalBookings: statisticsData.totalBookings || 0,
+        completedBookings: statisticsData.completedBookings || 0,
+        activeServices: statisticsData.activeServices || 0
       });
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
@@ -106,6 +103,8 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
 
   const getStatusVariant = (status) => {
     switch (status) {
+      case 'Pending':
+        return 'warning';
       case 'Confirmed':
         return 'success';
       case 'PendingQuote':
@@ -120,6 +119,14 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
         return 'error';
       default:
         return 'danger';
+    }
+  };
+
+  // Navigate to bookings management with specific booking filter
+  const handleViewBookingDetails = (bookingId) => {
+    // Navigate to bookings tab and show all bookings so user can see the full details
+    if (onNavigateToBookings) {
+      onNavigateToBookings(null);
     }
   };
 
@@ -204,7 +211,7 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
           metrics={[
             {
               value: loading ? '...' : stats.pendingRequests.toString(),
-              label: 'Awaiting Quote'
+              label: 'Awaiting Confirmation'
             }
           ]}
         />
@@ -213,7 +220,7 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
           title="Total Earnings"
           metrics={[
             {
-              value: loading ? '...' : `${stats.totalEarnings.toFixed(2)} BHD`,
+              value: loading ? '...' : `${stats.totalEarnings.toFixed(3)} BD`,
               label: 'From Completed Bookings'
             }
           ]}
@@ -255,21 +262,21 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
             ) : (
               todayBookings.map((booking) => (
                 <TableRow
-                  key={booking.id}
+                  key={booking.Id}
                   data={[
-                    booking.serviceName || 'N/A',
-                    booking.customerName || 'N/A',
-                    formatTime(booking.scheduledDate || booking.createdAt),
-                    <StatusChip variant={getStatusVariant(booking.status)}>
-                      {booking.status}
+                    booking.ServiceName || 'N/A',
+                    booking.CustomerName || 'N/A',
+                    formatTime(booking.BookingDateTime || booking.CreatedAt),
+                    <StatusChip variant={getStatusVariant(booking.Status)}>
+                      {booking.Status}
                     </StatusChip>,
-                    booking.quotedPrice ? `${booking.quotedPrice.toFixed(2)} BHD` : 'Pending'
+                    booking.QuotedPrice ? `${booking.QuotedPrice.toFixed(3)} BD` : 'Pending'
                   ]}
                   actions={
                     <>
                       <CRUDButton
                         variant="success"
-                        onClick={() => {/* TODO: Implement view details */}}
+                        onClick={() => handleViewBookingDetails(booking.Id)}
                       >
                         View
                       </CRUDButton>

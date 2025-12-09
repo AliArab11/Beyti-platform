@@ -549,6 +549,18 @@ export const getServiceProvider = async (id) => {
   return await fetchAPI(`/ServiceProviders/${id}`);
 };
 
+// Alias for consistency with other API naming conventions
+export const getServiceProviderById = getServiceProvider;
+
+/**
+ * Get all services for a specific service provider
+ * @param {number} serviceProviderId - Service Provider ID
+ * @returns {Promise<Array>} - Array of service objects
+ */
+export const getServiceProviderServices = async (serviceProviderId) => {
+  return await fetchAPI(`/ServiceProviders/${serviceProviderId}/services`);
+};
+
 export const createServiceProvider = async (data) => {
   return await fetchAPI('/ServiceProviders', {
     method: 'POST',
@@ -1126,6 +1138,15 @@ export const getCustomer = async (id) => {
 };
 
 /**
+ * Get customer by UserProfileId
+ * @param {number} userProfileId - UserProfile ID
+ * @returns {Promise<object>} - Customer object
+ */
+export const getCustomerByUserProfileId = async (userProfileId) => {
+  return await fetchAPI(`/Customers?userProfileId=${userProfileId}`);
+};
+
+/**
  * Create a new customer
  * @param {object} data - Customer data (PascalCase: UserProfileId, FullName, Phone)
  * @returns {Promise<object>} - Created customer object
@@ -1377,6 +1398,12 @@ export const addTimeSlot = async (data) => {
   });
 };
 
+export const toggleTimeSlot = async (timeSlotId) => {
+  return await fetchAPI(`/ServiceProviderDashboard/ToggleTimeSlot/${timeSlotId}`, {
+    method: 'PUT',
+  });
+};
+
 export const deleteTimeSlot = async (timeSlotId) => {
   return await fetchAPI(`/ServiceProviderDashboard/DeleteTimeSlot/${timeSlotId}`, {
     method: 'DELETE',
@@ -1424,19 +1451,31 @@ export const getUserProfile = async (userId) => {
  * @returns {Promise<object>} - Updated profile data
  */
 export const updateUserProfile = async (userId, userRole, updates) => {
-  // For now, use ServiceProviderDashboard endpoint for all profile updates
-  // This can be extended to route based on role if needed
+  // Route profile updates based on role
   const profileUpdates = {
     DisplayName: updates.displayName,
     Phone: updates.phone,
   };
 
-  await fetchAPI(`/ServiceProviderDashboard/UpdateProfile/${userId}`, {
-    method: 'PUT',
-    body: JSON.stringify(profileUpdates),
-  });
+  // Add BusinessName for Service Providers
+  if (userRole === 'ServiceProvider' && updates.businessName) {
+    profileUpdates.BusinessName = updates.businessName;
+  }
 
-  // If address updates are provided and user has associated provider/seller/driver ID
+  // Route to appropriate endpoint based on role
+  if (userRole === 'Customer') {
+    await fetchAPI(`/Customers/UpdateProfile/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(profileUpdates),
+    });
+  } else if (userRole === 'ServiceProvider') {
+    await fetchAPI(`/ServiceProviderDashboard/UpdateProfile/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(profileUpdates),
+    });
+  }
+
+  // If address updates are provided and user has associated entity ID
   if (updates.address && updates.entityId) {
     const addressUpdates = {
       Street: updates.address.street,
@@ -1447,7 +1486,12 @@ export const updateUserProfile = async (userId, userRole, updates) => {
     };
 
     // Route address update based on role
-    if (userRole === 'ServiceProvider') {
+    if (userRole === 'Customer') {
+      await fetchAPI(`/Customers/UpdateAddress/${updates.entityId}`, {
+        method: 'PUT',
+        body: JSON.stringify(addressUpdates),
+      });
+    } else if (userRole === 'ServiceProvider') {
       await fetchAPI(`/ServiceProviderDashboard/UpdateAddress/${updates.entityId}`, {
         method: 'PUT',
         body: JSON.stringify(addressUpdates),
@@ -1752,6 +1796,28 @@ export const toggleServiceReviewVisibility = async (reviewId) => {
   });
 };
 
+/**
+ * Create a new service review
+ * @param {Object} reviewData - Service review data
+ *   Example: {
+ *     serviceBookingId: number,
+ *     serviceProviderId: number,
+ *     customerId: number,
+ *     overallRating: number, // 1-5
+ *     qualityRating: number | null, // 1-5
+ *     professionalismRating: number | null, // 1-5
+ *     timelinessRating: number | null, // 1-5
+ *     comment: string | null
+ *   }
+ * @returns {Promise<Object>} - Created service review object
+ */
+export const createServiceReview = async (reviewData) => {
+  return await fetchAPI('/ServiceReviews', {
+    method: 'POST',
+    body: JSON.stringify(reviewData),
+  });
+};
+
 // Fetch all notifications for user
 export const getUserNotifications = async (userId) => {
   return await fetchAPI(`/Notifications/user/${userId}`);
@@ -1780,6 +1846,190 @@ export const markNotificationRead = async (id) => {
 export const deleteNotification = async (id) => {
   return await fetchAPI(`/Notifications/${id}`, {
     method: 'DELETE',
+  });
+};
+
+// Fetch sent notifications for user
+export const getSentNotifications = async (userId) => {
+  return await fetchAPI(`/Notifications/user/${userId}/sent`);
+};
+
+// --- Service Category APIs ---
+
+/**
+ * Get all service categories
+ * @returns {Promise<Array>} - Array of service categories
+ */
+export const getServiceCategoryList = async () => {
+  return await fetchAPI('/ServiceCategories');
+};
+
+/**
+ * Get a single service category by ID
+ * @param {number} id - Service Category ID
+ * @returns {Promise<object>} - Service Category object
+ */
+export const getServiceCategoryById = async (id) => {
+  return await fetchAPI(`/ServiceCategories/${id}`);
+};
+
+/**
+ * Create a new service category
+ * @param {object} data - Service category data (Name, Description, IsActive)
+ * @returns {Promise<object>} - Created service category
+ */
+export const createServiceCategory = async (data) => {
+  return await fetchAPI('/ServiceCategories', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Update an existing service category
+ * @param {number} id - Service Category ID
+ * @param {object} data - Updated service category data
+ * @returns {Promise<void>}
+ */
+export const updateServiceCategory = async (id, data) => {
+  return await fetchAPI(`/ServiceCategories/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ ...data, Id: id }),
+  });
+};
+
+// --- Service Catalog APIs ---
+
+/**
+ * Get all service catalogs
+ * @param {number} [categoryId] - Optional: Filter by category ID
+ * @returns {Promise<Array>} - Array of service catalogs
+ */
+export const getServiceCatalogs = async (categoryId = null) => {
+  let url = '/ServiceCatalogs';
+  if (categoryId) {
+    url += `?categoryId=${categoryId}`;
+  }
+  return await fetchAPI(url);
+};
+
+/**
+ * Get a single service catalog by ID
+ * @param {number} id - Service Catalog ID
+ * @returns {Promise<object>} - Service Catalog object
+ */
+export const getServiceCatalogById = async (id) => {
+  return await fetchAPI(`/ServiceCatalogs/${id}`);
+};
+
+/**
+ * Create a new service catalog
+ * @param {object} data - Service catalog data (Name, Description, ServiceCategoryId, IsActive, etc.)
+ * @returns {Promise<object>} - Created service catalog
+ */
+export const createServiceCatalog = async (data) => {
+  return await fetchAPI('/ServiceCatalogs', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Update an existing service catalog
+ * @param {number} id - Service Catalog ID
+ * @param {object} data - Updated service catalog data
+ * @returns {Promise<void>}
+ */
+export const updateServiceCatalog = async (id, data) => {
+  return await fetchAPI(`/ServiceCatalogs/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ ...data, Id: id }),
+  });
+};
+
+// ================== SERVICE BOOKING & TIME SLOTS API ==================
+
+/**
+ * Get time slots for a service provider
+ * @param {number} serviceProviderId - Service provider ID
+ * @returns {Promise<Array>} - Array of time slot objects
+ */
+export const getTimeSlots = async (serviceProviderId) => {
+  return await fetchAPI(`/TimeSlots?serviceProviderId=${serviceProviderId}`);
+};
+
+/**
+ * Get a single time slot by ID
+ * @param {number} id - Time slot ID
+ * @returns {Promise<Object>} - Time slot object
+ */
+export const getTimeSlot = async (id) => {
+  return await fetchAPI(`/TimeSlots/${id}`);
+};
+
+/**
+ * Create a new time slot
+ * @param {object} data - Time slot payload
+ * @returns {Promise<Object>} - Created time slot object
+ */
+export const createTimeSlot = async (data) => {
+  return await fetchAPI('/TimeSlots', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Get service bookings
+ * @param {number} serviceProviderId - Optional service provider ID
+ * @param {number} customerId - Optional customer ID
+ * @returns {Promise<Array>} - Array of service booking objects
+ */
+export const getServiceBookings = async (serviceProviderId = null, customerId = null) => {
+  let url = '/ServiceBookings';
+  const params = [];
+
+  if (serviceProviderId) params.push(`serviceProviderId=${serviceProviderId}`);
+  if (customerId) params.push(`customerId=${customerId}`);
+
+  if (params.length > 0) {
+    url += '?' + params.join('&');
+  }
+
+  return await fetchAPI(url);
+};
+
+/**
+ * Get a single service booking by ID
+ * @param {number} id - Service booking ID
+ * @returns {Promise<Object>} - Service booking object
+ */
+export const getServiceBooking = async (id) => {
+  return await fetchAPI(`/ServiceBookings/${id}`);
+};
+
+/**
+ * Create a new service booking
+ * @param {object} data - Service booking payload
+ * @returns {Promise<Object>} - Created service booking object
+ */
+export const createServiceBooking = async (data) => {
+  return await fetchAPI('/ServiceBookings', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Update an existing service booking
+ * @param {number} id - Service booking ID
+ * @param {object} data - Updated booking data
+ * @returns {Promise<Object>} - Updated service booking object
+ */
+export const updateServiceBooking = async (id, data) => {
+  return await fetchAPI(`/ServiceBookings/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
   });
 };
 

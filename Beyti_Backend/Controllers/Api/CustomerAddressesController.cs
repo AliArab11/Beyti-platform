@@ -26,10 +26,21 @@ namespace Beyti_Backend.Controllers.Api
         }
 
         // GET: api/CustomerAddresses
+        // GET: api/CustomerAddresses?customerId=1
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<CustomerAddress>>> GetCustomerAddresses()
+        public async Task<ActionResult<IEnumerable<CustomerAddress>>> GetCustomerAddresses([FromQuery] int? customerId)
         {
-            return await _context.CustomerAddresses.ToListAsync();
+            if (customerId.HasValue)
+            {
+                return await _context.CustomerAddresses
+                    .Include(ca => ca.Address)
+                    .Where(ca => ca.CustomerId == customerId.Value)
+                    .ToListAsync();
+            }
+
+            return await _context.CustomerAddresses
+                .Include(ca => ca.Address)
+                .ToListAsync();
         }
 
         // GET: api/CustomerAddresses/5

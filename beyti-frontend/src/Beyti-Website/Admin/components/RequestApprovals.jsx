@@ -82,6 +82,11 @@ const RequestApprovals = ({ onNavigate, adminUserProfileId, renderContentOnly = 
 
   // Fetch user profile details
   const fetchUserProfile = async () => {
+    if (!adminUserProfileId) {
+      console.warn('No adminUserProfileId provided, skipping user profile fetch');
+      return;
+    }
+
     try {
       const profile = await getUserProfile(adminUserProfileId);
       if (profile) {
@@ -106,6 +111,11 @@ const RequestApprovals = ({ onNavigate, adminUserProfileId, renderContentOnly = 
 
   // Handle profile update
   const handleProfileUpdate = async (updates) => {
+    if (!adminUserProfileId) {
+      console.warn('No adminUserProfileId provided, cannot update profile');
+      return;
+    }
+
     try {
       await updateUserProfile(adminUserProfileId, 'Admin', updates);
       await fetchUserProfile();

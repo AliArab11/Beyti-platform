@@ -74,15 +74,33 @@ const AdminView = () => {
   const [userProfile, setUserProfile] = useState(null);
   const [displayName, setDisplayName] = useState("Admin User");
 
-  // Hardcoded login credentials - TODO: Replace with actual authentication/context
-  const userProfileId = 4037; // Logged-in admin's UserProfile ID
-  const adminProfileId = 1006; // Logged-in admin's ID in AdminProfile table
-  const userRole = 'Admin'; // Admin role type
+  // ========================================
+  // ADMIN CREDENTIALS - CONFIGURED HERE
+  // ========================================
+  // Set the admin credentials directly
+  const userProfileId = 4;  // Admin UserProfileId
+  const adminProfileId = 1;  // Admin Id
+  const userRole = 'Admin';  // User role type
+
+  console.log('Admin View Initialized with:', {
+    userProfileId,
+    adminProfileId,
+    userRole
+  });
+  // ========================================
 
   // Fetch user profile details
   const fetchUserProfile = async () => {
+    if (!userProfileId) {
+      console.warn('User profile ID not available.');
+      return;
+    }
+
     try {
+      console.log('Fetching user profile for UserProfileId:', userProfileId);
       const profile = await getUserProfile(userProfileId);
+      console.log('User profile response:', profile);
+      
       if (profile) {
         // API returns PascalCase, convert to camelCase for frontend use
         const normalizedProfile = {
@@ -95,7 +113,9 @@ const AdminView = () => {
           updatedAt: profile.UpdatedAt,
         };
 
+        console.log('Normalized profile:', normalizedProfile);
         setUserProfile(normalizedProfile);
+        
         if (normalizedProfile.displayName) {
           setDisplayName(normalizedProfile.displayName);
         }
@@ -107,7 +127,13 @@ const AdminView = () => {
 
   // Handle profile update
   const handleProfileUpdate = async (updates) => {
+    if (!userProfileId) {
+      console.warn('User profile ID not available. Cannot update profile.');
+      return;
+    }
+
     try {
+      console.log('Updating profile with:', updates);
       await updateUserProfile(userProfileId, userRole, updates);
       // Refresh the profile after update
       await fetchUserProfile();
@@ -132,6 +158,7 @@ const AdminView = () => {
 
   // Fetch user profile on mount
   useEffect(() => {
+    console.log('Component mounted, fetching user profile...');
     fetchUserProfile();
   }, [userProfileId]);
 
@@ -150,18 +177,23 @@ const AdminView = () => {
 
       try {
         setLoading(true);
+        console.log('Fetching dashboard data...');
 
         // Fetch dashboard statistics
         const statistics = await getDashboardStatistics();
+        console.log('Dashboard statistics:', statistics);
         
         // Fetch all users to calculate growth by role
         const allUsers = await getUsers();
+        console.log('All users:', allUsers?.length || 0, 'users');
         
         // Fetch pending service provider requests
         const pendingRequests = await getServiceProviderRequests();
+        console.log('Pending requests:', pendingRequests?.length || 0);
 
         // Fetch flagged users
         const flaggedUsers = await getFlaggedUsers();
+        console.log('Flagged users response:', flaggedUsers);
 
         // Calculate statistics
         const totalUsers = allUsers.length;
@@ -175,6 +207,7 @@ const AdminView = () => {
 
         // Count flagged users - use totalFlagged from API response
         const flaggedUsersCount = flaggedUsers?.totalFlagged || 0;
+        console.log('Flagged users count:', flaggedUsersCount);
 
         // Set statistics
         setStats({
@@ -202,6 +235,7 @@ const AdminView = () => {
         // Calculate notification count (pending approvals + flagged users)
         setNotificationCount(pendingApprovals + flaggedUsersCount);
 
+        console.log('Dashboard data loaded successfully');
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -227,6 +261,7 @@ const AdminView = () => {
 
   // Navigation handlers
   const handleNavigate = (path) => {
+    console.log('Navigating to:', path);
     // Map paths to view states
     const viewMap = {
       '/admin': 'dashboard',

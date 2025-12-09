@@ -95,8 +95,10 @@ const UsersFlagged = ({ onNavigate, adminUserProfileId, renderContentOnly = fals
 
   useEffect(() => {
     fetchFlaggedUsers();
-    fetchUserProfile();
-  }, []);
+    if (adminUserProfileId) {
+      fetchUserProfile();
+    }
+  }, [adminUserProfileId]);
 
   const handleViewDetails = async (user) => {
     try {
