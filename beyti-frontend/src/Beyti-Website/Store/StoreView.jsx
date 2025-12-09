@@ -3,6 +3,9 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Cake, Heart, Star, MagnifyingGlass, ArrowLeft, Bread, ShoppingCartSimple, X } from "@phosphor-icons/react";
 import ProductDetailsSheet from './Components/ProductDetails.jsx';
 import Checkout from './Components/Checkout';
+
+import OrderDetails from './Components/OrderDetails';
+import { createOrder, createOrderItem, getProductVariants, getOrder, getOrders } from '../../services/api';
 // Mock API call - replace with your actual API
 const getStoreDetails = async (storeId) => {
   try {
@@ -16,59 +19,176 @@ const getStoreDetails = async (storeId) => {
 };
 
 
-const StoreHeader = ({ storeName, customerName, onBack }) => (
-  <header className="bg-cream-50 py-4 px-8 border-b border-grey-stroke sticky top-0 z-10">
-    <div className="max-w-[1440px] mx-auto flex items-center justify-between">
-      <div className="flex items-center gap-6">
-        <button 
-          onClick={onBack}
-          className="p-2 hover:bg-grey-200 rounded-lg transition-all"
-        >
-          <ArrowLeft className="w-6 h-6 text-charcoal-600" weight="bold" />
-        </button>
-        <h1 className="text-[32px] font-bold text-charcoal-600" style={{ fontFamily: 'Merriweather, serif' }}>
-          Beyti
-        </h1>
-      </div>
-      
-      <div className="flex items-center gap-4">
-        <button className="p-2 hover:bg-grey-200 rounded-lg transition-all">
-          <svg className="w-5 h-5 text-charcoal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-          </svg>
-        </button>
-        <button className="p-2 hover:bg-grey-200 rounded-lg transition-all">
-          <svg className="w-5 h-5 text-charcoal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-          </svg>
-        </button>
-        <button className="p-2 hover:bg-grey-200 rounded-lg transition-all">
-          <svg className="w-5 h-5 text-charcoal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-          </svg>
-        </button>
-        {customerName ? (
-          <div className="flex items-center gap-3 pl-4 border-l border-grey-stroke">
-            <div className="w-8 h-8 bg-sage-500 rounded-full flex items-center justify-center">
-              <span className="text-white text-sm font-semibold">{customerName[0]}</span>
-            </div>
-            <span className="text-charcoal-600 font-medium text-sm">{customerName}</span>
-            <svg className="w-4 h-4 text-charcoal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+const StoreHeader = ({ storeName, customerName, onBack, onLogout }) => {
+  const navigate = useNavigate();
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  return (
+    <header className="bg-cream-50 py-4 px-8 border-b border-grey-stroke sticky top-0 z-10">
+      <div className="max-w-[1440px] mx-auto flex items-center justify-between">
+        <div className="flex items-center gap-6">
+          <button 
+            onClick={onBack}
+            className="p-2 hover:bg-grey-200 rounded-lg transition-all"
+          >
+            <ArrowLeft className="w-6 h-6 text-charcoal-600" weight="bold" />
+          </button>
+          <h1 className="text-[32px] font-bold text-charcoal-600" style={{ fontFamily: 'Merriweather, serif' }}>
+            Beyti
+          </h1>
+        </div>
+        
+        <div className="flex items-center gap-4">
+          <button className="p-2 hover:bg-grey-200 rounded-lg transition-all">
+            <svg className="w-5 h-5 text-charcoal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
-          </div>
-        ) : (
-          <div className="flex items-center gap-3 pl-4 border-l border-grey-stroke">
-            <div className="w-8 h-8 bg-grey-300 rounded-full flex items-center justify-center">
-              <span className="text-charcoal-400 text-sm font-semibold">?</span>
+          </button>
+
+          {customerName ? (
+            <div className="relative">
+              {/* Customer Profile Section */}
+              <div className="flex items-center border-l border-grey-stroke pl-4">
+                {/* Name Button - Shows profile */}
+                <button
+                onClick={() => {
+                    navigate('/customer-dashboard'); // Navigate to dashboard
+                }}
+                className="flex items-center gap-3 hover:bg-grey-200 rounded-lg px-3 py-2 transition-all"
+                >
+                <div className="w-8 h-8 bg-sage-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-sm font-semibold">{customerName[0]}</span>
+                </div>
+                <span className="text-charcoal-600 font-medium text-sm" style={{ fontFamily: 'Inter, sans-serif' }}>
+                    {customerName}
+                </span>
+                </button>
+
+                {/* Dropdown Arrow Button */}
+                <button
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  className="p-2 hover:bg-grey-200 rounded-lg transition-all ml-1"
+                >
+                  <svg className="w-4 h-4 text-charcoal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Dropdown Menu */}
+              {isDropdownOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setIsDropdownOpen(false)}
+                  />
+                  <div className="absolute right-0 mt-2 w-80 bg-grey-200 dark:bg-charcoal-500 border border-grey-stroke dark:border-charcoal-400 rounded-md shadow-[0_4px_20px_rgba(0,0,0,0.15)] z-20 overflow-hidden">
+                    {/* Profile Details Section */}
+                    <div className="px-4 py-4 border-b border-grey-stroke dark:border-charcoal-400 bg-cream-50 dark:bg-charcoal-600">
+                      <div className="flex items-start gap-3">
+                        <div className="w-12 h-12 rounded-full bg-sage-500 dark:bg-sage-700 flex items-center justify-center flex-shrink-0">
+                          <span className="text-white text-lg font-semibold">{customerName[0]}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-body-regular text-charcoal-600 dark:text-cream-50 font-semibold truncate" style={{ fontFamily: 'Inter, sans-serif' }}>
+                            {customerName}
+                          </p>
+                          <p className="text-label-medium text-charcoal-400 dark:text-charcoal-300 mt-0.5" style={{ fontFamily: 'Inter, sans-serif' }}>
+                            Customer
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Menu Actions */}
+                    <div className="py-1">
+                      <button
+                        onClick={() => {
+                            setIsDropdownOpen(false);
+                            navigate('/customer-dashboard'); // Add this navigation
+                        }}
+                        className="w-full px-4 py-2.5 text-left text-body-regular text-charcoal-600 dark:text-cream-50 hover:bg-cream-100 dark:hover:bg-charcoal-400 transition-colors flex items-center gap-3"
+                        >
+                        <svg className="w-5 h-5 text-charcoal-500 dark:text-charcoal-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                        </svg>
+                        <span style={{ fontFamily: 'Inter, sans-serif' }}>Dashboard</span>
+                        </button>
+
+                      <button
+                        onClick={() => {
+                          setIsDropdownOpen(false);
+                          // Navigate to My Orders (placeholder)
+                        }}
+                        className="w-full px-4 py-2.5 text-left text-body-regular text-charcoal-600 dark:text-cream-50 hover:bg-cream-100 dark:hover:bg-charcoal-400 transition-colors flex items-center gap-3"
+                      >
+                        <svg className="w-5 h-5 text-charcoal-500 dark:text-charcoal-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                        <span style={{ fontFamily: 'Inter, sans-serif' }}>My Orders</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setIsDropdownOpen(false);
+                          // Navigate to Addresses (placeholder)
+                        }}
+                        className="w-full px-4 py-2.5 text-left text-body-regular text-charcoal-600 dark:text-cream-50 hover:bg-cream-100 dark:hover:bg-charcoal-400 transition-colors flex items-center gap-3"
+                      >
+                        <svg className="w-5 h-5 text-charcoal-500 dark:text-charcoal-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span style={{ fontFamily: 'Inter, sans-serif' }}>Addresses</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setIsDropdownOpen(false);
+                          // Navigate to Settings (placeholder)
+                        }}
+                        className="w-full px-4 py-2.5 text-left text-body-regular text-charcoal-600 dark:text-cream-50 hover:bg-cream-100 dark:hover:bg-charcoal-400 transition-colors flex items-center gap-3"
+                      >
+                        <svg className="w-5 h-5 text-charcoal-500 dark:text-charcoal-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span style={{ fontFamily: 'Inter, sans-serif' }}>Settings</span>
+                      </button>
+                    </div>
+
+                    {/* Logout Section */}
+                    <div className="border-t border-grey-stroke dark:border-charcoal-400">
+                      <button
+                        onClick={() => {
+                          setIsDropdownOpen(false);
+                          onLogout();
+                        }}
+                        className="w-full px-4 py-2.5 text-left text-body-regular text-error-text dark:text-red-400 hover:bg-error-bg dark:hover:bg-red-900/20 transition-colors flex items-center gap-3"
+                      >
+                        <svg className="w-5 h-5 text-error-text dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        <span style={{ fontFamily: 'Inter, sans-serif' }}>Logout</span>
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
-            <span className="text-charcoal-400 font-medium text-sm">No Customer</span>
-          </div>
-        )}
+          ) : (
+            <div className="flex items-center gap-3 pl-4 border-l border-grey-stroke">
+              <div className="w-8 h-8 bg-grey-300 rounded-full flex items-center justify-center">
+                <span className="text-charcoal-400 text-sm font-semibold">?</span>
+              </div>
+              <span className="text-charcoal-400 font-medium text-sm">No Customer</span>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-  </header>
-);
+    </header>
+  );
+};
 
 // Store Info Section
 const StoreInfo = ({ store }) => (
@@ -403,6 +523,119 @@ const StoreView = () => {
   const [showCartModal, setShowCartModal] = useState(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
 
+// Load active order from localStorage on mount
+const [activeOrder, setActiveOrder] = useState(null);
+
+// Load active order for the selected customer
+useEffect(() => {
+  if (!customerId) {
+    setActiveOrder(null);
+    return;
+  }
+
+  try {
+    const savedOrder = localStorage.getItem(`beyti_activeOrder_${customerId}`);
+    if (savedOrder) {
+      const parsedOrder = JSON.parse(savedOrder);
+      console.log('📦 Loaded active order for customer', customerId, ':', parsedOrder);
+      setActiveOrder(parsedOrder);
+    } else {
+      setActiveOrder(null);
+    }
+  } catch (err) {
+    console.error('Error loading active order:', err);
+    setActiveOrder(null);
+  }
+}, [customerId]);
+
+
+const fetchSingleOrder = async (orderId) => {
+  try {
+    const res = await fetch(`https://localhost:7062/api/Orders/${orderId}`);
+    if (!res.ok) throw new Error("Failed to fetch order");
+    return await res.json();
+  } catch (err) {
+    console.error("❌ Error fetching single order:", err);
+    return null;
+  }
+};
+
+const handleCustomerLogout = () => {
+  // Clear customer session
+  sessionStorage.removeItem('beyti_customerId');
+  sessionStorage.removeItem('beyti_customerName');
+  
+  // Clear active order
+  if (customerId) {
+    localStorage.removeItem(`beyti_activeOrder_${customerId}`);
+  }
+  
+  // Navigate back to main store view
+  navigate('/', { replace: true });
+  
+  console.log("Customer logged out from store view");
+};
+
+
+
+useEffect(() => {
+  if (!activeOrder || !customerId) return;
+
+  console.log("📡 POLLING STARTED for Order:", activeOrder.id);
+
+  const interval = setInterval(async () => {
+    console.log("⏳ Polling tick...");
+
+    try {
+    const updatedList = await getOrders(
+        Number(activeOrder.customerId)
+    );
+
+
+     const updated = await fetchSingleOrder(activeOrder.id);
+      console.log("📥 Backend responded with:", updated);
+
+      if (updated.status !== activeOrder.status) {
+        console.log("🎉 STATUS CHANGED → updating!");
+        
+        // Preserve all fields when updating
+        const completeUpdatedOrder = {
+        ...activeOrder, // Keep all existing fields
+        ...updated, // Apply updates from backend
+        customerId: activeOrder.customerId,  
+        sellerId: activeOrder.sellerId,  
+        // Ensure critical fields are preserved
+        storeName: updated.sellerName || activeOrder.storeName,
+        storePhone: activeOrder.storePhone || updated.sellerPhone,
+        pickupAddress: updated.pickupAddress || activeOrder.pickupAddress, // Use backend data first
+        deliveryAddress: updated.deliveryAddress || activeOrder.deliveryAddress,
+        };
+        
+        setActiveOrder(completeUpdatedOrder);
+        localStorage.setItem("beyti_activeOrder", JSON.stringify(completeUpdatedOrder));
+      }
+    } catch (err) {
+      console.error("🔥 POLLING ERROR:", err);
+    }
+  }, 5000);
+
+  return () => clearInterval(interval);
+}, [activeOrder]);
+
+
+
+
+// Sync active order with localStorage
+useEffect(() => {
+  if (!customerId) return;
+
+  if (activeOrder) {
+    localStorage.setItem(`beyti_activeOrder_${customerId}`, JSON.stringify(activeOrder));
+  } else {
+    localStorage.removeItem(`beyti_activeOrder_${customerId}`);
+  }
+}, [activeOrder, customerId]);
+
   const [snackbar, setSnackbar] = useState({ open: false, message: '', type: 'success' });
 
     const showSnackbar = (message, type = 'success') => {
@@ -416,6 +649,12 @@ const handleProductClick = (product) => {
 };
 
 const handleAddToCart = (item) => {
+  // Add sellerId to the item
+  const itemWithSeller = {
+    ...item,
+    sellerId: store.id  // ← ADD THIS LINE
+  };
+  
   // Check if item already exists in cart
   const existingItem = cart.find(cartItem => cartItem.id === item.id);
   
@@ -426,13 +665,12 @@ const handleAddToCart = (item) => {
         ? { ...cartItem, quantity: cartItem.quantity + item.quantity }
         : cartItem
     ));
+    showSnackbar(`Updated ${item.name} quantity in cart! 🛒`, 'success');
   } else {
-    // Add new item to cart
-    setCart([...cart, item]);
+    // Add new item to cart WITH sellerId
+    setCart([...cart, itemWithSeller]);  // ← CHANGE THIS LINE
+    showSnackbar(`Added ${item.quantity}x ${item.name} to cart! ✓`, 'success');
   }
-  
-  // Show success message (optional)
-  alert(`Added ${item.quantity}x ${item.name} to cart!`);
 };
 
 const handleUpdateQuantity = (productId, newQuantity) => {
@@ -503,7 +741,8 @@ const handleRemoveFromCart = (productId) => {
       } catch (err) {
         console.error("❌ Error fetching customer details:", err);
         setCustomerAddresses([]);
-      } finally {
+        showSnackbar('Could not load customer addresses', 'error');
+        } finally {
         setLoadingAddresses(false);
       }
     };
@@ -565,7 +804,8 @@ const handleRemoveFromCart = (productId) => {
       <StoreHeader 
         storeName={store?.storeName} 
         customerName={customerName} 
-        onBack={() => navigate(-1)} 
+        onBack={() => navigate(-1)}
+        onLogout={handleCustomerLogout}
         />
       <StoreInfo store={store} />
       
@@ -691,11 +931,14 @@ const handleRemoveFromCart = (productId) => {
                         {item.totalPrice.toFixed(3)} BD
                       </p>
                       <button
-                        onClick={() => setCart(cart.filter(c => c.id !== item.id))}
+                        onClick={() => {
+                            setCart(cart.filter(c => c.id !== item.id));
+                            showSnackbar(`Removed ${item.name} from cart`, 'success');
+                        }}
                         className="mt-2 text-red-500 hover:text-red-700 font-semibold text-sm"
-                      >
+                        >
                         Remove
-                      </button>
+                        </button>
                     </div>
                   </div>
                 </div>
@@ -722,6 +965,7 @@ const handleRemoveFromCart = (productId) => {
                 onClick={() => {
                     setShowCartModal(false);
                     setShowCheckoutModal(true);
+                    showSnackbar('Proceeding to checkout...', 'success');
                 }}
                 className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-bold py-3 rounded-xl transition-all"
                 >
@@ -742,20 +986,38 @@ const handleRemoveFromCart = (productId) => {
       )}
 
       {/* Checkout Modal */}
-        {showCheckoutModal && (
-        <Checkout
-            cart={cart}
-            storeName={store?.storeName}
-            customerId={customerId}
-            customerName={customerName}
-            customerAddresses={customerAddresses}
-            onClose={() => setShowCheckoutModal(false)}
-            onUpdateQuantity={handleUpdateQuantity}
-            onRemoveItem={handleRemoveFromCart}
-            showSnackbar={showSnackbar}
-        />
-        )}
-        
+        {showCheckoutModal && (() => {
+  // 🐛 DEBUG - Check store data
+  console.log('🏪 Store object:', store);
+  console.log('📍 Seller addresses array:', store?.sellerAddresses);
+  console.log('🗺️ First address:', store?.sellerAddresses?.[0]);
+  console.log('📌 Nested address:', store?.sellerAddresses?.[0]?.address);
+  
+  return (
+    <Checkout
+      cart={cart}
+      storeName={store?.storeName}
+      customerId={customerId}
+      customerName={customerName}
+      customerAddresses={customerAddresses}
+      onClose={() => setShowCheckoutModal(false)}
+      onUpdateQuantity={handleUpdateQuantity}
+      onRemoveItem={handleRemoveFromCart}
+      showSnackbar={showSnackbar}
+      setActiveOrder={setActiveOrder} 
+      activeOrder={activeOrder} 
+      selectedStore={{
+          id: store?.id,
+          storeName: store?.storeName,
+          phone: store?.phone,
+          sellerAddresses: store?.sellerAddresses || [],
+          address: store?.sellerAddresses?.[0]?.address || null
+      }}
+      setCart={setCart}  
+    />
+  );
+})()}
+
 {/* Snackbar */}
 {snackbar.open && (
   <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80]">

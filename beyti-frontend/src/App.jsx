@@ -14,6 +14,7 @@ import StoresPage from "./Pages/Seller/Store";
 import MainStoreView from "./Beyti-Website/Store/MainStoreView.jsx";
 import StoreView from "./Beyti-Website/Store/StoreView.jsx";
 import StoreDetailsPage from "./Pages/Seller/StoreDetails";
+import CustomerDashboardPage from './Beyti-Website/Customer/CustomerDashboard.jsx';
 
 import SellerDashboardLayout from "./Beyti-Website/Seller/SellerDashboard.jsx";
 import SellerProductsPage from "./Beyti-Website/Seller/Components/Products.jsx";
@@ -173,6 +174,8 @@ export default function App() {
               <Route path="analytics" element={<SellerAnalyticsPage />} />
               <Route path="reviews" element={<SellerReviewsPage />} />
             </Route>
+
+            <Route path="/customer-dashboard" element={<CustomerDashboardPage />} />
 
             <Route path="/store" element={<StoresPage />} />
             <Route path="/mainStore" element={<MainStoreView />} />
