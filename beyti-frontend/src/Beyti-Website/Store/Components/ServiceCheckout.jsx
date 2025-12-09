@@ -9,6 +9,7 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
   const [selectedTimeSlot, setSelectedTimeSlot] = useState(null);
   const [availableTimeSlots, setAvailableTimeSlots] = useState([]);
   const [loadingTimeSlots, setLoadingTimeSlots] = useState(false);
+  const [dateAvailability, setDateAvailability] = useState({});
   const [selectedAddress, setSelectedAddress] = useState(null);
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
@@ -27,11 +28,11 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
     postalCode: ''
   });
 
-  // Generate next 14 days for date selection
+  // Generate next 7 days for date selection
   const generateDates = () => {
     const dates = [];
     const today = new Date();
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < 7; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() + i);
       dates.push(date);
@@ -46,6 +47,13 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
     fetchCustomerAddresses();
   }, []);
 
+  // Check availability for all dates on mount
+  useEffect(() => {
+    if (bookingData?.serviceProviderId) {
+      checkDateAvailability();
+    }
+  }, [bookingData]);
+
   // Fetch available time slots when date is selected
   useEffect(() => {
     if (selectedDate && bookingData?.serviceProviderId) {
@@ -53,11 +61,75 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
     }
   }, [selectedDate, bookingData]);
 
+  const checkDateAvailability = async () => {
+    try {
+      const availability = {};
+
+      // Fetch all time slots for this provider
+      const slotsResponse = await fetch(
+        `https://localhost:7062/api/TimeSlots?serviceProviderId=${bookingData.serviceProviderId}`
+      );
+
+      if (!slotsResponse.ok) return;
+
+      const allSlots = await slotsResponse.json();
+      const activeSlots = allSlots.filter(slot => slot.isActive);
+
+      // Check each date
+      for (const date of availableDates) {
+        const dayOfWeek = date.getDay();
+        const daySlots = activeSlots.filter(slot => slot.dayOfWeek === dayOfWeek);
+
+        if (daySlots.length === 0) {
+          availability[date.toDateString()] = false;
+          continue;
+        }
+
+        // Check if any slot is available on this date
+        // A TimeSlot is UNAVAILABLE if it has a booking with ANY active status
+        // Active statuses: Pending, PendingQuote, DepositPending, Confirmed, InProgress
+        // Final statuses (don't block): Completed, Canceled, Rejected
+        const availabilityChecks = await Promise.all(
+          daySlots.map(async (slot) => {
+            const bookingsResponse = await fetch(
+              `https://localhost:7062/api/ServiceBookings?serviceProviderId=${bookingData.serviceProviderId}&date=${date.toISOString()}&timeSlotId=${slot.id}`
+            );
+
+            if (bookingsResponse.ok) {
+              const bookings = await bookingsResponse.json();
+              console.log(`[Date Check] Slot ${slot.id} on ${date.toDateString()} has ${bookings.length} bookings:`, bookings);
+
+              // Check if there's any active booking that blocks this time slot
+              const activeStatuses = ['Pending', 'PendingQuote', 'DepositPending', 'Confirmed', 'InProgress'];
+              const hasActiveBooking = bookings.some(
+                booking => {
+                  const isActive = activeStatuses.includes(booking.status);
+                  console.log(`[Date Check] Booking ${booking.id} - Status: "${booking.status}", Blocks: ${isActive}`);
+                  return isActive;
+                }
+              );
+              console.log(`[Date Check] Slot ${slot.id} available: ${!hasActiveBooking}`);
+              return !hasActiveBooking; // Return true if available (no active bookings)
+            }
+            return true;
+          })
+        );
+
+        // Date has availability if at least one slot is available
+        availability[date.toDateString()] = availabilityChecks.some(isAvailable => isAvailable);
+      }
+
+      setDateAvailability(availability);
+    } catch (err) {
+      console.error('Error checking date availability:', err);
+    }
+  };
+
   const fetchCustomerAddresses = async () => {
     try {
       setLoadingAddresses(true);
       // Hardcoded values for now - will be replaced with context/API in future
-      const customerId = 1; // TODO: Get from API based on userProfileId
+      const customerId = 2; // TODO: Get from API based on userProfileId
 
       if (customerId) {
         const response = await fetch(`https://localhost:7062/api/CustomerAddresses?customerId=${customerId}`);
@@ -139,6 +211,7 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
         );
 
         // Check which slots are already booked
+        // TimeSlots with ANY active booking status must NOT be shown as available
         const availabilityPromises = daySlots.map(async (slot) => {
           const bookingsResponse = await fetch(
             `https://localhost:7062/api/ServiceBookings?serviceProviderId=${bookingData.serviceProviderId}&date=${selectedDate.toISOString()}&timeSlotId=${slot.id}`
@@ -146,10 +219,21 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
 
           if (bookingsResponse.ok) {
             const bookings = await bookingsResponse.json();
-            const isBooked = bookings.some(
-              booking => booking.status === 'Confirmed' || booking.status === 'Pending'
+            console.log(`[Time Selection] Slot ${slot.id} (${slot.startTime}-${slot.endTime}) has ${bookings.length} bookings:`, bookings);
+
+            // Check if there's any active booking that blocks this time slot
+            // Active statuses (block availability): Pending, PendingQuote, DepositPending, Confirmed, InProgress
+            // Final statuses (don't block): Completed, Canceled, Rejected
+            const activeStatuses = ['Pending', 'PendingQuote', 'DepositPending', 'Confirmed', 'InProgress'];
+            const hasActiveBooking = bookings.some(
+              booking => {
+                const isActive = activeStatuses.includes(booking.status);
+                console.log(`[Time Selection] Booking ${booking.id} - Status: ${booking.status}, Blocks: ${isActive}`);
+                return isActive;
+              }
             );
-            return { ...slot, isAvailable: !isBooked };
+            console.log(`[Time Selection] Slot ${slot.id} final availability: ${!hasActiveBooking}`);
+            return { ...slot, isAvailable: !hasActiveBooking };
           }
           return { ...slot, isAvailable: true };
         });
@@ -220,7 +304,7 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
 
         // Link address to customer
         // Hardcoded customerId - will be replaced with context/API in future
-        const customerId = 1; // TODO: Get from API based on userProfileId
+        const customerId = 2; // TODO: Get from API based on userProfileId
 
         if (customerId) {
           await fetch('https://localhost:7062/api/CustomerAddresses', {
@@ -275,7 +359,7 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
   const handlePlaceBooking = async () => {
     try {
       // Hardcoded customerId - will be replaced with context/API in future
-      const customerId = 1; // TODO: Get from API based on userProfileId
+      const customerId = 2; // TODO: Get from API based on userProfileId
 
       if (!customerId) {
         alert('Please log in to book a service');
@@ -381,20 +465,29 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
               <div>
                 <p className="text-sm font-semibold text-charcoal-600 mb-2">Choose a Date</p>
                 <div className="grid grid-cols-7 gap-2">
-                  {availableDates.map((date, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setSelectedDate(date)}
-                      className={`p-3 rounded-xl border-2 transition-all text-center ${
-                        selectedDate?.toDateString() === date.toDateString()
-                          ? 'bg-sage-500 border-sage-500 text-white'
-                          : 'bg-white border-grey-stroke text-charcoal-600 hover:border-sage-500'
-                      }`}
-                    >
-                      <div className="text-xs font-bold">{date.toLocaleDateString('en-US', { weekday: 'short' })}</div>
-                      <div className="text-lg font-black">{date.getDate()}</div>
-                    </button>
-                  ))}
+                  {availableDates.map((date, idx) => {
+                    const hasAvailability = dateAvailability[date.toDateString()] !== false;
+                    const isSelected = selectedDate?.toDateString() === date.toDateString();
+
+                    return (
+                      <button
+                        key={idx}
+                        onClick={() => hasAvailability && setSelectedDate(date)}
+                        disabled={!hasAvailability}
+                        className={`p-3 rounded-xl border-2 transition-all text-center ${
+                          isSelected
+                            ? 'bg-sage-500 border-sage-500 text-white'
+                            : hasAvailability
+                            ? 'bg-white border-grey-stroke text-charcoal-600 hover:border-sage-500'
+                            : 'bg-grey-100 border-grey-stroke text-charcoal-300 cursor-not-allowed opacity-50'
+                        }`}
+                      >
+                        <div className="text-xs font-bold">{date.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                        <div className="text-lg font-black">{date.getDate()}</div>
+                        {!hasAvailability && <div className="text-xs mt-1">Full</div>}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -406,26 +499,24 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
                     <div className="flex justify-center py-8">
                       <div className="w-8 h-8 border-4 border-sage-200 border-t-sage-500 rounded-full animate-spin" />
                     </div>
-                  ) : availableTimeSlots.length > 0 ? (
+                  ) : availableTimeSlots.filter(slot => slot.isAvailable).length > 0 ? (
                     <div className="grid grid-cols-3 gap-2">
-                      {availableTimeSlots.map((slot) => (
-                        <button
-                          key={slot.id}
-                          onClick={() => slot.isAvailable && setSelectedTimeSlot(slot)}
-                          disabled={!slot.isAvailable}
-                          className={`p-3 rounded-xl border-2 transition-all text-center ${
-                            selectedTimeSlot?.id === slot.id
-                              ? 'bg-sage-500 border-sage-500 text-white'
-                              : slot.isAvailable
-                              ? 'bg-white border-grey-stroke text-charcoal-600 hover:border-sage-500'
-                              : 'bg-grey-100 border-grey-stroke text-charcoal-400 cursor-not-allowed'
-                          }`}
-                        >
-                          <Clock size={16} weight="bold" className="mx-auto mb-1" />
-                          <div className="text-xs font-bold">{formatTimeSlot(slot)}</div>
-                          {!slot.isAvailable && <div className="text-xs mt-1">Booked</div>}
-                        </button>
-                      ))}
+                      {availableTimeSlots
+                        .filter(slot => slot.isAvailable)
+                        .map((slot) => (
+                          <button
+                            key={slot.id}
+                            onClick={() => setSelectedTimeSlot(slot)}
+                            className={`p-3 rounded-xl border-2 transition-all text-center ${
+                              selectedTimeSlot?.id === slot.id
+                                ? 'bg-sage-500 border-sage-500 text-white'
+                                : 'bg-white border-grey-stroke text-charcoal-600 hover:border-sage-500'
+                            }`}
+                          >
+                            <Clock size={16} weight="bold" className="mx-auto mb-1" />
+                            <div className="text-xs font-bold">{formatTimeSlot(slot)}</div>
+                          </button>
+                        ))}
                     </div>
                   ) : (
                     <div className="text-center py-8 bg-cream-100 rounded-xl">

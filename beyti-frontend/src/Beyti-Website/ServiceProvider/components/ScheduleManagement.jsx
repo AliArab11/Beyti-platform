@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getProviderTimeSlots, addTimeSlot, deleteTimeSlot } from '../../../services/api';
+import { getProviderTimeSlots, addTimeSlot, toggleTimeSlot, deleteTimeSlot } from '../../../services/api';
 import CRUDButton from '../../../components/CRUDButton';
 import StatusChip from '../../../components/StatusChip';
 import { logProviderActivity } from '../../../utils/providerActivityLogger';
@@ -69,10 +69,32 @@ export default function ScheduleManagement({ serviceProviderId }) {
     }
   };
 
+  const handleToggle = async (timeSlotId) => {
+    try {
+      const slot = timeSlots.find(s => s.id === timeSlotId);
+      const dayName = daysOfWeek.find(d => d.id === slot?.dayOfWeek)?.name || 'N/A';
+
+      await toggleTimeSlot(timeSlotId);
+
+      // Log activity
+      logProviderActivity(
+        serviceProviderId,
+        'schedule',
+        slot?.isActive ? 'Deactivated Availability' : 'Activated Availability',
+        `${dayName}: ${slot?.startTime || ''} - ${slot?.endTime || ''}`
+      );
+
+      fetchTimeSlots();
+    } catch (err) {
+      console.error('Error toggling time slot:', err);
+      alert(err.message || 'Error toggling time slot');
+    }
+  };
+
   const handleDelete = async (timeSlotId) => {
     if (confirm('Are you sure you want to delete this time slot?')) {
       try {
-        const slot = timeSlots.find(s => s.timeSlotId === timeSlotId);
+        const slot = timeSlots.find(s => s.id === timeSlotId);
         const dayName = daysOfWeek.find(d => d.id === slot?.dayOfWeek)?.name || 'N/A';
 
         await deleteTimeSlot(timeSlotId);
@@ -88,7 +110,7 @@ export default function ScheduleManagement({ serviceProviderId }) {
         fetchTimeSlots();
       } catch (err) {
         console.error('Error deleting time slot:', err);
-        alert('Error deleting time slot');
+        alert(err.message || 'Error deleting time slot');
       }
     }
   };
@@ -222,12 +244,20 @@ export default function ScheduleManagement({ serviceProviderId }) {
                                 {slot.startTime} - {slot.endTime}
                               </span>
                             </div>
-                            <CRUDButton
-                              variant="error"
-                              onClick={() => handleDelete(slot.id)}
-                            >
-                              Delete
-                            </CRUDButton>
+                            <div className="flex items-center gap-2">
+                              <CRUDButton
+                                variant={slot.isActive ? 'warning' : 'success'}
+                                onClick={() => handleToggle(slot.id)}
+                              >
+                                {slot.isActive ? 'Deactivate' : 'Activate'}
+                              </CRUDButton>
+                              <CRUDButton
+                                variant="error"
+                                onClick={() => handleDelete(slot.id)}
+                              >
+                                Delete
+                              </CRUDButton>
+                            </div>
                           </div>
                         ))}
                       </div>

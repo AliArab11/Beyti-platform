@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using BeytiDB.Data;
 using System.Text.Json;
 using Beyti_Backend.Authorization;
+using Beyti_Backend.Services;
 
 namespace Beyti_Backend.Controllers.Api
 {
@@ -15,10 +16,12 @@ namespace Beyti_Backend.Controllers.Api
     public class ServiceProviderDashboardController : ControllerBase
     {
         private readonly BeytiContext _context;
+        private readonly INotificationService _notificationService;
 
-        public ServiceProviderDashboardController(BeytiContext context)
+        public ServiceProviderDashboardController(BeytiContext context, INotificationService notificationService)
         {
             _context = context;
+            _notificationService = notificationService;
         }
 
         // ==================== PROFILE MANAGEMENT ====================
@@ -662,15 +665,56 @@ namespace Beyti_Backend.Controllers.Api
             }
         }
 
-        // DELETE: api/ServiceProviderDashboard/DeleteTimeSlot/5
-        [HttpDelete("DeleteTimeSlot/{timeSlotId}")]
-        public async Task<IActionResult> DeleteTimeSlot(int timeSlotId)
+        // PUT: api/ServiceProviderDashboard/ToggleTimeSlot/5
+        [HttpPut("ToggleTimeSlot/{timeSlotId}")]
+        public async Task<IActionResult> ToggleTimeSlot(int timeSlotId)
         {
             try
             {
                 var timeSlot = await _context.TimeSlots.FindAsync(timeSlotId);
                 if (timeSlot == null)
                     return NotFound("Time slot not found");
+
+                timeSlot.IsActive = !timeSlot.IsActive;
+                await _context.SaveChangesAsync();
+
+                return Ok(new
+                {
+                    message = $"Time slot {(timeSlot.IsActive ? "activated" : "deactivated")} successfully",
+                    isActive = timeSlot.IsActive
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
+
+        // DELETE: api/ServiceProviderDashboard/DeleteTimeSlot/5
+        [HttpDelete("DeleteTimeSlot/{timeSlotId}")]
+        public async Task<IActionResult> DeleteTimeSlot(int timeSlotId)
+        {
+            try
+            {
+                var timeSlot = await _context.TimeSlots
+                    .Include(ts => ts.ServiceBookings)
+                    .FirstOrDefaultAsync(ts => ts.Id == timeSlotId);
+
+                if (timeSlot == null)
+                    return NotFound("Time slot not found");
+
+                // Check if there are any active/pending bookings (exclude completed/canceled)
+                var activeBookings = timeSlot.ServiceBookings
+                    .Where(sb => sb.Status != "Completed" && sb.Status != "Canceled")
+                    .ToList();
+
+                if (activeBookings.Any())
+                {
+                    return BadRequest(new {
+                        error = "Cannot delete time slot with active bookings",
+                        message = "This time slot has active bookings and cannot be deleted. Please cancel or complete the bookings first."
+                    });
+                }
 
                 _context.TimeSlots.Remove(timeSlot);
                 await _context.SaveChangesAsync();
@@ -743,18 +787,53 @@ namespace Beyti_Backend.Controllers.Api
         {
             try
             {
-                var booking = await _context.ServiceBookings.FindAsync(bookingId);
+                var booking = await _context.ServiceBookings
+                    .Include(sb => sb.Customer)
+                        .ThenInclude(c => c.UserProfile)
+                    .Include(sb => sb.ServiceCatalog)
+                    .Include(sb => sb.ServiceProvider)
+                    .FirstOrDefaultAsync(sb => sb.Id == bookingId);
+
                 if (booking == null)
                     return NotFound("Booking not found");
 
+                string? newStatus = null;
                 if (body.TryGetProperty("status", out var statusProp))
-                    booking.Status = statusProp.GetString()!;
+                {
+                    newStatus = statusProp.GetString()!;
+                    booking.Status = newStatus;
+                }
 
                 if (body.TryGetProperty("quotedPrice", out var priceProp))
+                {
                     booking.QuotedPrice = priceProp.GetDecimal();
+                    // Calculate deposit and final amount (50% split)
+                    booking.DepositAmount = booking.QuotedPrice * 0.5m;
+                    booking.FinalAmount = booking.QuotedPrice * 0.5m;
+                }
 
                 booking.UpdatedAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
+
+                // Update TimeSlot IsActive based on booking status
+                await UpdateTimeSlotAvailability(booking.TimeSlotId, booking.Status);
+
+                // Send notification to customer about the status change
+                if (!string.IsNullOrEmpty(newStatus) && booking.Customer?.UserProfile != null)
+                {
+                    var serviceName = booking.ServiceCatalog?.Name ?? "service";
+                    var notificationMessage = GetBookingStatusNotificationMessage(newStatus, serviceName);
+
+                    await _notificationService.SendNotificationAsync(
+                        recipientUserId: booking.Customer.UserProfile.Id,
+                        senderUserId: booking.ServiceProvider?.UserProfileId,
+                        type: "BookingUpdate",
+                        title: "Booking Status Update",
+                        body: notificationMessage,
+                        relatedEntityType: "ServiceBooking",
+                        relatedEntityId: bookingId
+                    );
+                }
 
                 return Ok(new { message = "Booking updated successfully" });
             }
@@ -762,6 +841,52 @@ namespace Beyti_Backend.Controllers.Api
             {
                 return StatusCode(500, new { error = ex.Message });
             }
+        }
+
+        private string GetBookingStatusNotificationMessage(string status, string serviceName)
+        {
+            return status switch
+            {
+                "Confirmed" => $"Your booking for \"{serviceName}\" has been confirmed! The service provider will contact you soon.",
+                "InProgress" => $"Your service \"{serviceName}\" is now in progress.",
+                "Completed" => $"Your service \"{serviceName}\" has been completed. Please leave a review!",
+                "Rejected" => $"Unfortunately, your booking for \"{serviceName}\" has been rejected. Please contact us for more information.",
+                "Canceled" => $"Your booking for \"{serviceName}\" has been canceled.",
+                "DepositPending" => $"Your quote for \"{serviceName}\" is ready! Please pay the deposit to confirm your booking.",
+                _ => $"Your booking status has been updated to {status}."
+            };
+        }
+
+        /// <summary>
+        /// Updates the TimeSlot IsActive status based on associated ServiceBooking statuses.
+        /// TimeSlot.IsActive = false when there's an active booking (Pending, Confirmed, InProgress)
+        /// TimeSlot.IsActive = true when there are no active bookings
+        /// </summary>
+        private async Task UpdateTimeSlotAvailability(int? timeSlotId, string? currentStatus)
+        {
+            if (!timeSlotId.HasValue)
+            {
+                return;
+            }
+
+            var timeSlot = await _context.TimeSlots.FindAsync(timeSlotId.Value);
+            if (timeSlot == null)
+            {
+                return;
+            }
+
+            // Define active statuses that should block the time slot
+            var activeStatuses = new[] { "Pending", "Confirmed", "InProgress" };
+
+            // Check if there are any active bookings for this time slot
+            var hasActiveBooking = await _context.ServiceBookings
+                .AnyAsync(b => b.TimeSlotId == timeSlotId.Value &&
+                              activeStatuses.Contains(b.Status));
+
+            // Update IsActive: false if there's an active booking, true otherwise
+            timeSlot.IsActive = !hasActiveBooking;
+
+            await _context.SaveChangesAsync();
         }
 
         // ==================== STATISTICS ====================

@@ -21,10 +21,51 @@ namespace Beyti_Backend.Controllers.Api
         }
 
         // GET: api/TimeSlots
+        // TimeSlots with bookings in status: Pending, Confirmed, or InProgress will be excluded from available times
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<TimeSlot>>> GetTimeSlots()
+        public async Task<ActionResult<IEnumerable<TimeSlot>>> GetTimeSlots(
+            [FromQuery] int? serviceProviderId = null,
+            [FromQuery] DateTime? date = null,
+            [FromQuery] bool? availableOnly = null)
         {
-            return await _context.TimeSlots.ToListAsync();
+            var query = _context.TimeSlots.AsQueryable();
+
+            // Filter by service provider if specified
+            if (serviceProviderId.HasValue)
+            {
+                query = query.Where(ts => ts.ServiceProviderId == serviceProviderId.Value);
+            }
+
+            var timeSlots = await query.ToListAsync();
+
+            // If availableOnly is true and date is provided, filter out slots with active bookings
+            if (availableOnly == true && date.HasValue)
+            {
+                var dateOnly = date.Value.Date;
+                var dayOfWeek = (byte)date.Value.DayOfWeek;
+
+                // Filter by day of week
+                timeSlots = timeSlots.Where(ts => ts.DayOfWeek == dayOfWeek).ToList();
+
+                // Get all time slot IDs that have active bookings
+                // Active statuses (time slot is occupied): Pending, PendingQuote, DepositPending, Confirmed, InProgress
+                // Final statuses (time slot is free): Completed, Canceled, Rejected
+                var activeStatuses = new[] { "Pending", "PendingQuote", "DepositPending", "Confirmed", "InProgress" };
+                var occupiedTimeSlotIds = await _context.ServiceBookings
+                    .Where(b => b.ServiceProviderId == serviceProviderId &&
+                               b.BookingDateTime.Date == dateOnly &&
+                               activeStatuses.Contains(b.Status))
+                    .Select(b => b.TimeSlotId)
+                    .Distinct()
+                    .ToListAsync();
+
+                // Filter out time slots that have active bookings
+                timeSlots = timeSlots
+                    .Where(ts => !occupiedTimeSlotIds.Contains(ts.Id))
+                    .ToList();
+            }
+
+            return timeSlots;
         }
 
         // GET: api/TimeSlots/5
