@@ -64,7 +64,7 @@ namespace Beyti_Backend.Controllers
                 {
                     IdentityUserId = identityUser.Id, // Link the two DBs
                     DisplayName = $"{model.FirstName} {model.LastName}".Trim(),
-                    RoleType = "Customer", // Default role
+                    RoleType = "Pending", // ✅ FIX: Pending until user selects role
                     Status = "Active",
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
@@ -73,19 +73,16 @@ namespace Beyti_Backend.Controllers
                 _businessContext.UserProfiles.Add(userProfile);
                 await _businessContext.SaveChangesAsync();
 
-                // C. Create Customer record (since default role is Customer)
-                var customer = new Customer
+                // ✅ FIX: DO NOT create Customer record here!
+                // Customer record will be created when user selects "I want to Shop" in role selection
+                // Partner records (Seller/Provider/Driver) created during their onboarding flows
+
+                return Ok(new
                 {
-                    UserProfileId = userProfile.Id,
-                    Phone = model.PhoneNumber,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
-                };
-
-                _businessContext.Customers.Add(customer);
-                await _businessContext.SaveChangesAsync();
-
-                return Ok(new { Message = "User registered successfully", UserId = identityUser.Id });
+                    Message = "User registered successfully",
+                    UserId = identityUser.Id,
+                    UserProfileId = userProfile.Id
+                });
             }
             catch (Exception)
             {
@@ -121,7 +118,8 @@ namespace Beyti_Backend.Controllers
             return Ok(new
             {
                 Token = token,
-                UserId = userProfile.Id,
+                UserId = identityUser.Id,  // ✅ FIX: Return IdentityUserId for partner onboarding
+                UserProfileId = userProfile.Id,
                 Role = userProfile.RoleType
             });
         }
