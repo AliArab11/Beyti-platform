@@ -2,7 +2,10 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Cake, Heart, Star, MagnifyingGlass, ArrowLeft, Bread, ShoppingCartSimple, X, Package, Storefront, Minus, Plus } from "@phosphor-icons/react";
 
-const ProductPage = ({ onAddToCart, showSnackbar }) => {
+import ActiveOrderBanner from './ActiveOrderBanner';
+import Snackbar from './../../../components/Snackbar';
+
+const ProductPage = ({ onAddToCart }) => {
  const { productId, storeId } = useParams();
 const location = useLocation();
 const navigate = useNavigate();
@@ -68,6 +71,59 @@ useEffect(() => {
   
   return () => clearInterval(interval);
 }, [customerId])
+
+// Load and poll active order for the selected customer (like cart polling)
+useEffect(() => {
+  if (!customerId) {
+    setActiveOrder(null);
+    return;
+  }
+
+  const updateActiveOrder = () => {
+    try {
+      const savedOrder = localStorage.getItem(`beyti_activeOrder_${customerId}`);
+      if (savedOrder) {
+        const parsedOrder = JSON.parse(savedOrder);
+        setActiveOrder(parsedOrder);
+      } else {
+        setActiveOrder(null);
+      }
+    } catch (err) {
+      console.error('Error loading active order:', err);
+    }
+  };
+
+  // Load immediately
+  updateActiveOrder();
+  
+  // Poll every 1 second to catch changes
+  const interval = setInterval(updateActiveOrder, 1000);
+  
+  return () => clearInterval(interval);
+}, [customerId]);
+
+// Fetch customer orders
+useEffect(() => {
+  if (!customerId) {
+    setOrders([]);
+    return;
+  }
+
+  const fetchOrders = async () => {
+    try {
+      const response = await fetch(`https://localhost:7062/api/Orders?customerId=${customerId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setOrders(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Error fetching orders:', err);
+      setOrders([]);
+    }
+  };
+
+  fetchOrders();
+}, [customerId]);
   
   const [product, setProduct] = useState(null);
   const [variants, setVariants] = useState([]);
@@ -81,7 +137,21 @@ useEffect(() => {
   const [showDifferentStoreModal, setShowDifferentStoreModal] = useState(false);
   const [pendingCartItem, setPendingCartItem] = useState(null);
 
+  const [bannerDismissed, setBannerDismissed] = useState(() => {
+  return localStorage.getItem(`beyti_bannerDismissed_${customerId}`) === 'true';
+  });
 
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', type: 'success' });
+
+const showSnackbar = (message, type = 'success') => {
+  console.log('🎯 ProductPage showSnackbar called:', message, type);
+  console.log('🎯 Current snackbar state:', snackbar);
+  setSnackbar({ open: true, message, type });
+  console.log('🎯 After setState - should show now');
+};
+const [activeOrder, setActiveOrder] = useState(null);
+
+const [orders, setOrders] = useState([]);
 
 
   useEffect(() => {
@@ -89,6 +159,14 @@ useEffect(() => {
       fetchProductDetails();
     }
   }, [productId]);
+
+  // Reset banner dismissed state when customer changes
+useEffect(() => {
+  if (customerId) {
+    const dismissed = localStorage.getItem(`beyti_bannerDismissed_${customerId}`) === 'true';
+    setBannerDismissed(dismissed);
+  }
+}, [customerId]);
 
   const fetchProductDetails = async () => {
     try {
@@ -120,7 +198,7 @@ useEffect(() => {
       }
     } catch (err) {
       console.error('Error loading product:', err);
-      showSnackbar?.('Failed to load product details', 'error');
+      showSnackbar('Failed to load product details', 'error');
     } finally {
       setLoading(false);
     }
@@ -243,19 +321,27 @@ useEffect(() => {
     localStorage.setItem(cartKey, JSON.stringify(existingCart));
     console.log('💾 Saved updated cart to localStorage:', existingCart);
     
-    showSnackbar?.(`Added ${item.quantity}x ${product.name} to cart!`, 'success');
     
     // Navigate back
     navigate(`/store/${storeId}`, {
         state: {
         customerId,
-        customerName
+        customerName,
+        itemAdded: true,  // ⬅️ ADD THIS
+        itemName: item.name,  // ⬅️ ADD THIS
+        itemQuantity: item.quantity 
         }
     });
     };
 
-    const handleClearAndAdd = () => {
-  if (!pendingCartItem) return;
+const handleClearAndAdd = () => {
+  console.log('🔄 handleClearAndAdd called');
+  if (!pendingCartItem) {
+    console.log('❌ No pending cart item');
+    return;
+  }
+  
+  console.log('🔄 Pending item:', pendingCartItem);
   
   // Find and clear old store's cart
   try {
@@ -270,6 +356,9 @@ useEffect(() => {
     console.error('Error clearing old cart:', err);
   }
   
+  const itemName = pendingCartItem.name;
+  console.log('📝 Item name stored:', itemName);
+  
   // Add the new item
   addItemToCart(pendingCartItem);
   
@@ -277,13 +366,24 @@ useEffect(() => {
   setShowDifferentStoreModal(false);
   setPendingCartItem(null);
   
-  showSnackbar?.(`Cleared previous cart and added ${pendingCartItem.name}!`, 'success');
+  console.log('🎉 About to show snackbar for:', itemName);
+  showSnackbar(`Cleared previous cart and added ${itemName}!`, 'success');
+  console.log('🎉 Snackbar function called');
 };
 
 const handleCancelAdd = () => {
   setShowDifferentStoreModal(false);
   setPendingCartItem(null);
-  showSnackbar?.('Item not added to cart', 'warning');
+  showSnackbar('Item not added to cart', 'warning');
+};
+
+const handleDismissBanner = () => {
+  setBannerDismissed(true);
+  localStorage.setItem(`beyti_bannerDismissed_${customerId}`, 'true');
+};
+
+const handleTrackOrder = () => {
+  navigate('/customer-dashboard');
 };
 
   const averageRating = calculateAverageRating();
@@ -386,6 +486,17 @@ const handleCancelAdd = () => {
           </div>
         </div>
       </header>
+
+      {/* Active Order Banner */}
+      {activeOrder && !bannerDismissed && (
+      <ActiveOrderBanner 
+        activeOrderCount={orders.filter(o => 
+          !['completed', 'cancelled', 'delivered'].includes(o.status?.toLowerCase())
+        ).length}
+        onTrack={handleTrackOrder}
+        onDismiss={handleDismissBanner}
+      />
+    )}
 
       {/* Main Content */}
 <main className="max-w-[1400px] mx-auto px-8 py-12">
@@ -785,7 +896,11 @@ const handleCancelAdd = () => {
     </div>
   </div>
 )}
+
+    
+
     </div>
+    
   );
 };
 

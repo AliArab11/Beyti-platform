@@ -1,8 +1,10 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect , useRef} from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Cake, BowlFood, Heart, Bread, Coffee, Storefront, ShoppingCartSimple } from "@phosphor-icons/react";
 import StoreView from "./StoreView";
 import OrderDetails from './Components/OrderDetails';
+import ActiveOrderBanner from './Components/ActiveOrderBanner';
+import Snackbar from './../../components/Snackbar';
 
 
 // Get customers function
@@ -637,6 +639,8 @@ const CustomerSelectModal = ({ isOpen, customers, onSelect, onClose }) => {
 // Main Component
 const MainStoreView = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+
   const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("Food & Drink");
@@ -649,6 +653,15 @@ const MainStoreView = () => {
   const [customerId, setCustomerId] = useState(null);
   const [customerName, setCustomerName] = useState(null);
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
+
+  // Add Snackbar state
+const [snackbar, setSnackbar] = useState({ open: false, message: '', type: 'success' });
+const orderPlacedShown = useRef(false);
+
+const showSnackbar = (message, type = 'success') => {
+  setSnackbar({ open: true, message, type });
+  setTimeout(() => setSnackbar({ open: false, message: '', type: 'success' }), 5000);
+};
 
   // Cart state - load from localStorage
   const [cart, setCart] = useState(() => {
@@ -722,44 +735,70 @@ const MainStoreView = () => {
 // Add active order state
 const [activeOrder, setActiveOrder] = useState(null);
 
-// Load active order for the selected customer
+const [orders, setOrders] = useState([]);
+
+// Load and poll active order for the selected customer (like cart polling)
 useEffect(() => {
   if (!customerId) {
     setActiveOrder(null);
     return;
   }
 
-  try {
-    const savedOrder = localStorage.getItem(`beyti_activeOrder_${customerId}`);
-    if (savedOrder) {
-      const parsedOrder = JSON.parse(savedOrder);
-      console.log('📦 Loaded active order for customer', customerId, ':', parsedOrder);
-      setActiveOrder(parsedOrder);
-    } else {
-      console.log('ℹ️ No active order found for customer', customerId);
-      setActiveOrder(null);
+  const updateActiveOrder = () => {
+    try {
+      const savedOrder = localStorage.getItem(`beyti_activeOrder_${customerId}`);
+      if (savedOrder) {
+        const parsedOrder = JSON.parse(savedOrder);
+        setActiveOrder(parsedOrder);
+      } else {
+        setActiveOrder(null);
+      }
+    } catch (err) {
+      console.error('Error loading active order:', err);
     }
-  } catch (err) {
-    console.error('Error loading active order:', err);
-    setActiveOrder(null);
-  }
+  };
+
+  // Load immediately
+  updateActiveOrder();
+  
+  // Poll every 1 second to catch changes
+  const interval = setInterval(updateActiveOrder, 1000);
+  
+  return () => clearInterval(interval);
 }, [customerId]);
 
 
-// Sync active order with localStorage
-useEffect(() => {
-  if (!customerId) return;
 
-  if (activeOrder) {
-    localStorage.setItem(`beyti_activeOrder_${customerId}`, JSON.stringify(activeOrder));
-  } else {
-    localStorage.removeItem(`beyti_activeOrder_${customerId}`);
+
+// Fetch customer orders
+useEffect(() => {
+  if (!customerId) {
+    setOrders([]);
+    return;
   }
-}, [activeOrder, customerId]);
+
+  const fetchOrders = async () => {
+    try {
+      const response = await fetch(`https://localhost:7062/api/Orders?customerId=${customerId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setOrders(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Error fetching orders:', err);
+      setOrders([]);
+    }
+  };
+
+  fetchOrders();
+}, [customerId]);
 
 // Poll for order updates
 useEffect(() => {
   if (!activeOrder || !customerId) return;
+
+ 
+
 
   const interval = setInterval(async () => {
     try {
@@ -785,6 +824,11 @@ useEffect(() => {
 
   return () => clearInterval(interval);
 }, [activeOrder]);
+
+const [bannerDismissed, setBannerDismissed] = useState(() => {
+  if (!customerId) return false;
+  return localStorage.getItem(`beyti_bannerDismissed_${customerId}`) === 'true';
+});
 
 
   const categories = ["Food & Drink", "Clothing & Accessories", "Self-Care & Beauty"];
@@ -830,6 +874,35 @@ useEffect(() => {
   }
 }, []);
 
+useEffect(() => {
+  console.log('🔥 MainStore orderPlaced effect triggered');
+  console.log('📦 location.state:', location.state);
+  console.log('📦 orderPlacedShown.current:', orderPlacedShown.current);
+  
+  if (location.state?.orderPlaced && !orderPlacedShown.current) {
+    console.log('✅ SHOWING ORDER PLACED SNACKBAR');
+    orderPlacedShown.current = true;
+    
+    showSnackbar(`Order #${location.state.orderId} placed successfully! 🎉`, 'success');
+    
+    setTimeout(() => {
+      navigate(location.pathname, { 
+        replace: true, 
+        state: { customerId, customerName } 
+      });
+      orderPlacedShown.current = false;
+    }, 3500);
+  }
+}, [location.state, customerId, customerName]);
+
+// Reset banner dismissed state when customer changes
+useEffect(() => {
+  if (customerId) {
+    const dismissed = localStorage.getItem(`beyti_bannerDismissed_${customerId}`) === 'true';
+    setBannerDismissed(dismissed);
+  }
+}, [customerId]);
+
 const handleCustomerSelect = (customer) => {
   const name = customer.fullName || customer.name || `Customer #${customer.id}`;
   setCustomerId(customer.id);
@@ -857,6 +930,15 @@ const handleCustomerLogout = () => {
   }
   
   console.log("Customer logged out");
+};
+
+const handleDismissBanner = () => {
+  setBannerDismissed(true);
+  localStorage.setItem(`beyti_bannerDismissed_${customerId}`, 'true');
+};
+
+const handleTrackOrder = () => {
+  navigate('/customer-dashboard');
 };
 
   const handleCustomerClick = () => {
@@ -911,6 +993,18 @@ const handleStoreNavigation = (targetStoreId) => {
         onLogout={handleCustomerLogout}
     />
 
+    {/* Active Order Banner */}
+    {activeOrder && !bannerDismissed && (
+      <ActiveOrderBanner 
+        activeOrderCount={orders.filter(o => 
+          !['completed', 'cancelled', 'delivered'].includes(o.status?.toLowerCase())
+        ).length}
+        onTrack={handleTrackOrder}
+        onDismiss={handleDismissBanner}
+      />
+    )}
+
+
       <div className="max-w-[1440px] mx-auto px-8 py-8">
         <div className="flex justify-center">
           <CategoryTabs 
@@ -964,6 +1058,13 @@ const handleStoreNavigation = (targetStoreId) => {
           </div>
         </div>
       </div>
+      {/* Snackbar */}
+      <Snackbar 
+        open={snackbar.open}
+        message={snackbar.message}
+        type={snackbar.type}
+        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+      />
     </div>
   );
 };

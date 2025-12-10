@@ -4,6 +4,8 @@ import { Cake, Heart, Star, MagnifyingGlass, ArrowLeft, Bread, ShoppingCartSimpl
 import ProductPage from './Components/ProductPage';
 import ProductList from './Components/ProductDetails';  
 import Checkout from './Components/Checkout';
+import ActiveOrderBanner from './Components/ActiveOrderBanner';
+import Snackbar from './../../components/Snackbar';
 
 import OrderDetails from './Components/OrderDetails';
 import { createOrder, createOrderItem, getProductVariants, getOrder, getOrders } from '../../services/api';
@@ -562,6 +564,10 @@ const StoreView = () => {
   const customerId = location.state?.customerId;
   const customerName = location.state?.customerName;
 
+  const itemAdded = location.state?.itemAdded;
+  const itemName = location.state?.itemName;
+  const itemQuantity = location.state?.itemQuantity;
+
   const [customerAddresses, setCustomerAddresses] = useState([]);
   const [loadingAddresses, setLoadingAddresses] = useState(false);
 
@@ -574,6 +580,18 @@ const StoreView = () => {
   const [selectedCategory, setSelectedCategory] = useState("popular");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("popular");
+
+  const [bannerDismissed, setBannerDismissed] = useState(() => {
+  if (!customerId) return false;
+  return localStorage.getItem(`beyti_bannerDismissed_${customerId}`) === 'true';
+  });
+
+const [snackbar, setSnackbar] = useState({ open: false, message: '', type: 'success' });
+
+const showSnackbar = (message, type = 'success') => {
+  setSnackbar({ open: true, message, type });
+  setTimeout(() => setSnackbar({ open: false, message: '', type: 'success' }), 5000);
+};
 
     const [cart, setCart] = useState(() => {
     // Initialize cart from localStorage - CHECK ALL STORES
@@ -660,25 +678,66 @@ const StoreView = () => {
 // Load active order from localStorage on mount
 const [activeOrder, setActiveOrder] = useState(null);
 
-// Load active order for the selected customer
+const [orders, setOrders] = useState([]);
+
+// Load and poll active order for the selected customer (like cart polling)
 useEffect(() => {
   if (!customerId) {
     setActiveOrder(null);
     return;
   }
 
-  try {
-    const savedOrder = localStorage.getItem(`beyti_activeOrder_${customerId}`);
-    if (savedOrder) {
-      const parsedOrder = JSON.parse(savedOrder);
-      console.log('📦 Loaded active order for customer', customerId, ':', parsedOrder);
-      setActiveOrder(parsedOrder);
-    } else {
-      setActiveOrder(null);
+  const updateActiveOrder = () => {
+    try {
+      const savedOrder = localStorage.getItem(`beyti_activeOrder_${customerId}`);
+      if (savedOrder) {
+        const parsedOrder = JSON.parse(savedOrder);
+        setActiveOrder(parsedOrder);
+      } else {
+        setActiveOrder(null);
+      }
+    } catch (err) {
+      console.error('Error loading active order:', err);
     }
-  } catch (err) {
-    console.error('Error loading active order:', err);
-    setActiveOrder(null);
+  };
+
+  // Load immediately
+  updateActiveOrder();
+  
+  // Poll every 1 second to catch changes
+  const interval = setInterval(updateActiveOrder, 1000);
+  
+  return () => clearInterval(interval);
+}, [customerId]);
+
+// Fetch customer orders
+useEffect(() => {
+  if (!customerId) {
+    setOrders([]);
+    return;
+  }
+
+  const fetchOrders = async () => {
+    try {
+      const response = await fetch(`https://localhost:7062/api/Orders?customerId=${customerId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setOrders(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Error fetching orders:', err);
+      setOrders([]);
+    }
+  };
+
+  fetchOrders();
+}, [customerId]);
+
+// Reset banner dismissed state when customer changes
+useEffect(() => {
+  if (customerId) {
+    const dismissed = localStorage.getItem(`beyti_bannerDismissed_${customerId}`) === 'true';
+    setBannerDismissed(dismissed);
   }
 }, [customerId]);
 
@@ -703,6 +762,7 @@ const handleCustomerLogout = () => {
   if (customerId) {
     localStorage.removeItem(`beyti_activeOrder_${customerId}`);
     localStorage.removeItem(`beyti_cart_${storeId}_${customerId}`); // ← ADD THIS
+    localStorage.removeItem(`beyti_bannerDismissed_${customerId}`);
   }
   
   // Clear cart state
@@ -712,6 +772,15 @@ const handleCustomerLogout = () => {
   navigate('/', { replace: true });
   
   console.log("Customer logged out from store view");
+};
+
+const handleDismissBanner = () => {
+  setBannerDismissed(true);
+  localStorage.setItem(`beyti_bannerDismissed_${customerId}`, 'true');
+};
+
+const handleTrackOrder = () => {
+  navigate('/customer-dashboard');
 };
 
 
@@ -750,7 +819,7 @@ useEffect(() => {
         };
         
         setActiveOrder(completeUpdatedOrder);
-        localStorage.setItem("beyti_activeOrder", JSON.stringify(completeUpdatedOrder));
+        localStorage.setItem(`beyti_activeOrder_${customerId}`, JSON.stringify(completeUpdatedOrder));
       }
     } catch (err) {
       console.error("🔥 POLLING ERROR:", err);
@@ -763,25 +832,10 @@ useEffect(() => {
 
 
 
-// Sync active order with localStorage
-useEffect(() => {
-  if (!customerId) return;
 
-  if (activeOrder) {
-    localStorage.setItem(`beyti_activeOrder_${customerId}`, JSON.stringify(activeOrder));
-  } else {
-    localStorage.removeItem(`beyti_activeOrder_${customerId}`);
-  }
-}, [activeOrder, customerId]);
 
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', type: 'success' });
 
-  
 
-    const showSnackbar = (message, type = 'success') => {
-    setSnackbar({ open: true, message, type });
-    setTimeout(() => setSnackbar({ open: false, message: '', type: 'success' }), 3000);
-    };
 
 const handleProductClick = (product) => {
   navigate(`/store/${storeId}/product/${product.id}`, {
@@ -925,6 +979,29 @@ useEffect(() => {
   }
 }, [storeId]);
 
+// Show snackbar when item is added
+useEffect(() => {
+  if (itemAdded && itemName && itemQuantity) {
+    // Small delay to ensure component is mounted and ready
+    const timer = setTimeout(() => {
+      showSnackbar(`Added ${itemQuantity}x ${itemName} to cart!`, 'success');
+    }, 100);
+    
+    // Clear the flags after showing
+    const clearTimer = setTimeout(() => {
+      navigate(location.pathname, { 
+        replace: true, 
+        state: { customerId, customerName } 
+      });
+    }, 500);
+    
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(clearTimer);
+    };
+  }
+}, [itemAdded, itemName, itemQuantity, customerId, customerName, navigate, location.pathname]);
+
 
   // Fetch full customer details including addresses
   useEffect(() => {
@@ -1027,6 +1104,17 @@ useEffect(() => {
         onLogout={handleCustomerLogout}
     />
 
+    {/* Active Order Banner */}
+    {activeOrder && !bannerDismissed && (
+      <ActiveOrderBanner 
+        activeOrderCount={orders.filter(o => 
+          !['completed', 'cancelled', 'delivered'].includes(o.status?.toLowerCase())
+        ).length}
+        onTrack={handleTrackOrder}
+        onDismiss={handleDismissBanner}
+      />
+    )}
+
 
       <StoreInfo store={store} />
       
@@ -1100,38 +1188,15 @@ useEffect(() => {
 
 
 
-{/* Snackbar */}
-{snackbar.open && (
-  <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80]">
-    <div 
-      className={`px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 min-w-[300px] transition-all duration-300 ${
-        snackbar.type === 'success' ? 'bg-green-500 text-white' :
-        snackbar.type === 'error' ? 'bg-red-500 text-white' :
-        'bg-yellow-500 text-white'
-      }`}
-      style={{
-        animation: 'slideUp 0.3s ease-out'
-      }}
-    >
-      <style>{`
-        @keyframes slideUp {
-          from {
-            transform: translateY(20px);
-            opacity: 0;
-          }
-          to {
-            transform: translateY(0);
-            opacity: 1;
-          }
-        }
-      `}</style>
-      <span className="text-2xl">
-        {snackbar.type === 'success' ? '✓' : snackbar.type === 'error' ? '✕' : '⚠'}
-      </span>
-      <p className="font-semibold">{snackbar.message}</p>
-    </div>
-  </div>
-)}
+      {/* Snackbar */}
+      <Snackbar 
+        open={snackbar.open}
+        message={snackbar.message}
+        type={snackbar.type}
+        onClose={() => setSnackbar({ open: false, message: '', type: 'success' })}
+      />
+
+
 {/* Different Store Modal */}
 {showDifferentStoreModal && (
   <div className="fixed inset-0 bg-charcoal-600/40 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
@@ -1256,6 +1321,14 @@ useEffect(() => {
     </div>
   </div>
 )}
+
+    {/* Snackbar */}
+      <Snackbar 
+        open={snackbar.open}
+        message={snackbar.message}
+        type={snackbar.type}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+      />
 
     </div>
   );

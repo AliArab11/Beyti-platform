@@ -3,6 +3,7 @@ import { X, MapPin, Plus, Minus, ShoppingCart, CreditCard, Wallet, Storefront, U
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useNavigate, useLocation } from 'react-router-dom';
+import Snackbar from './../../../components/Snackbar';
 import { 
   createAddress, 
   updateAddress, 
@@ -37,7 +38,7 @@ const Checkout = () => {
   const [deletingAddress, setDeletingAddress] = useState(null);
 
 
-  
+  const [activeOrder ] = useState(null);
 
   const navigate = useNavigate();
     const location = useLocation();
@@ -132,9 +133,8 @@ const [snackbar, setSnackbar] = useState({ open: false, message: '', type: 'succ
 
 const showSnackbar = (message, type = 'success') => {
   setSnackbar({ open: true, message, type });
-  setTimeout(() => setSnackbar({ open: false, message: '', type: 'success' }), 3000);
+  setTimeout(() => setSnackbar({ open: false, message: '', type: 'success' }), 5000);
 };
-
 
     useEffect(() => {
   // Load cart from ANY store for this customer
@@ -584,6 +584,8 @@ const showSnackbar = (message, type = 'success') => {
       // Save to localStorage for the current customer
       localStorage.setItem(`beyti_activeOrder_${customerId}`, JSON.stringify(completeOrder));
       console.log('✅ setActiveOrder called successfully');
+
+      localStorage.removeItem(`beyti_bannerDismissed_${customerId}`);
       
       setTimeout(() => {
         const stored = localStorage.getItem('beyti_activeOrder');
@@ -593,8 +595,28 @@ const showSnackbar = (message, type = 'success') => {
     localStorage.setItem(`beyti_cart_${storeId}_${customerId}`, JSON.stringify([]));
     setLocalCart([]);
 
-      showSnackbar(`✅ Order #${createdOrder.id} placed successfully!`, 'success');
-      navigate('/customer-dashboard');
+      // Clear any lingering snackbars before navigating
+      setSnackbar({ open: false, message: '', type: 'success' });
+      
+      // Navigate after a small delay
+      setTimeout(() => {
+      console.log('🚀 NAVIGATING TO MAINSTORE WITH ORDER:', createdOrder.id);
+      console.log('📦 Navigation state:', { 
+        customerId, 
+        customerName,
+        orderPlaced: true,
+        orderId: createdOrder.id
+      });
+      
+      navigate('/mainStore', { 
+        state: { 
+          customerId, 
+          customerName,
+          orderPlaced: true,
+          orderId: createdOrder.id
+        } 
+      });
+      }, 100);
 
     } catch (err) {
       console.error('Error placing order:', err);
@@ -646,13 +668,7 @@ const showSnackbar = (message, type = 'success') => {
                 {/* Back Button + Your Cart Title */}
                 <div className="flex items-center gap-4 mb-8">
                     <button
-                    onClick={() => {
-                        if (storeId) {
-                        navigate(`/store/${storeId}`, { state: { customerId, customerName } });
-                        } else {
-                        navigate('/mainStore', { state: { customerId, customerName } });
-                        }
-                    }}
+                    onClick={() => navigate(-1)}
                     className="p-2 hover:bg-grey-200 rounded-lg transition-all"
                     >
                     <svg className="w-6 h-6 text-charcoal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1287,25 +1303,18 @@ const showSnackbar = (message, type = 'success') => {
               </div>
             </div>
           </div>
-          {/* Snackbar */}
-            {snackbar.open && (
-            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80]">
-                <div 
-                className={`px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 min-w-[300px] ${
-                    snackbar.type === 'success' ? 'bg-green-500 text-white' :
-                    snackbar.type === 'error' ? 'bg-red-500 text-white' :
-                    'bg-yellow-500 text-white'
-                }`}
-                >
-                <span className="text-2xl">
-                    {snackbar.type === 'success' ? '✓' : snackbar.type === 'error' ? '✕' : '⚠'}
-                </span>
-                <p className="font-semibold">{snackbar.message}</p>
-                </div>
-            </div>
-            )}
+                
         </div>
       )}
+
+      {/* Snackbar */}
+          <Snackbar 
+            open={snackbar.open}
+            message={snackbar.message}
+            type={snackbar.type}
+            onClose={() => setSnackbar({ open: false, message: '', type: 'success' })}
+          />
+                
     </>
   );
 };
