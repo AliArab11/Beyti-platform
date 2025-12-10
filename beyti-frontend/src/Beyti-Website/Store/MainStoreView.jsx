@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Cake, BowlFood, Heart, Bread, Coffee, Storefront } from "@phosphor-icons/react";
+import { Cake, BowlFood, Heart, Bread, Coffee, Storefront, ShoppingCartSimple } from "@phosphor-icons/react";
 import StoreView from "./StoreView";
 import OrderDetails from './Components/OrderDetails';
 
@@ -87,7 +87,7 @@ const getStoreColors = (storeName) => {
 };
 
 // Header Component
-const Header = ({ customerName = null, onCustomerClick, onLogout }) => {
+const Header = ({ customerName = null, customerId, cart = [], onCustomerClick, onLogout }) => {
   const navigate = useNavigate();  
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
@@ -106,6 +106,70 @@ const Header = ({ customerName = null, onCustomerClick, onLogout }) => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
           </button>
+
+           {/* Cart Button with Badge */}
+            <button
+                onClick={() => {
+                    let targetStoreId = null;
+                    let targetStoreName = null;
+                    let targetStore = null;
+                    let cartItems = [];
+                    
+                    // Find the storeId and store details from cart
+                    if (customerId) {
+                        for (let i = 0; i < localStorage.length; i++) {
+                            const key = localStorage.key(i);
+                            if (key && key.startsWith(`beyti_cart_`) && key.endsWith(`_${customerId}`)) {
+                                try {
+                                    const savedCart = localStorage.getItem(key);
+                                    if (savedCart) {
+                                        const parsedCart = JSON.parse(savedCart);
+                                        if (parsedCart.length > 0) {
+                                            cartItems = parsedCart;
+                                            // Extract storeId from key: beyti_cart_{storeId}_{customerId}
+                                            const parts = key.split('_');
+                                            targetStoreId = parts[2];
+                                            
+                                            // Get store name from cart items
+                                            targetStoreName = parsedCart[0]?.storeName;
+                                            
+                                            // Find the full store object
+                                            targetStore = stores.find(s => s.id.toString() === targetStoreId);
+                                            
+                                            break;
+                                        }
+                                    }
+                                } catch (err) {
+                                    console.error('Error parsing cart:', err);
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Navigate to checkout with full store details
+                    navigate("/checkout", { 
+                        state: { 
+                            customerId, 
+                            customerName,
+                            customerAddresses: [], // We don't have addresses in MainStoreView
+                            selectedStore: targetStore,
+                            storeName: targetStoreName || targetStore?.storeName,
+                            storeId: targetStoreId
+                        } 
+                    });
+                }}
+                className="p-2 hover:bg-grey-200 rounded-lg transition-all relative"
+            >
+                <ShoppingCartSimple 
+                    className="w-5 h-5 text-charcoal-400"
+                    weight="regular"
+                />
+                {cart.length > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-sage-500 text-white min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center text-xs font-bold">
+                        {cart.reduce((total, item) => total + item.quantity, 0)}
+                    </span>
+                )}
+            </button>
           
           {customerName ? (
             <div className="relative">
@@ -580,11 +644,80 @@ const MainStoreView = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStoreId, setSelectedStoreId] = useState(null);
 
-    // Customer state
+ // Customer state
   const [customers, setCustomers] = useState([]);
   const [customerId, setCustomerId] = useState(null);
   const [customerName, setCustomerName] = useState(null);
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
+
+  // Cart state - load from localStorage
+  const [cart, setCart] = useState(() => {
+    try {
+      if (customerId) {
+        // Check all cart keys for this customer
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith(`beyti_cart_`) && key.endsWith(`_${customerId}`)) {
+            try {
+              const savedCart = localStorage.getItem(key);
+              if (savedCart) {
+                const parsedCart = JSON.parse(savedCart);
+                if (parsedCart.length > 0) {
+                  return parsedCart;
+                }
+              }
+            } catch (err) {
+              console.error('Error parsing cart from key:', key, err);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error loading cart:', err);
+    }
+    return [];
+  });
+
+  // Update cart when customer changes or on mount
+  useEffect(() => {
+    if (!customerId) {
+      setCart([]);
+      return;
+    }
+
+    // Poll localStorage for cart updates - check ALL stores
+    const updateCart = () => {
+      try {
+        let allItems = [];
+        
+        // Check all localStorage keys for this customer
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith(`beyti_cart_`) && key.endsWith(`_${customerId}`)) {
+            const savedCart = localStorage.getItem(key);
+            if (savedCart) {
+              const parsedCart = JSON.parse(savedCart);
+              if (parsedCart.length > 0) {
+                allItems = parsedCart; // Take the first non-empty cart we find
+                break;
+              }
+            }
+          }
+        }
+        
+        setCart(allItems);
+      } catch (err) {
+        console.error('Error updating cart:', err);
+      }
+    };
+
+    updateCart();
+    
+    // Update cart every 500ms to catch changes
+    const interval = setInterval(updateCart, 500);
+    
+    return () => clearInterval(interval);
+  }, [customerId]);
 
 // Add active order state
 const [activeOrder, setActiveOrder] = useState(null);
@@ -743,9 +876,21 @@ const handleCustomerLogout = () => {
     }
   };
 
+  
+// Function to handle store navigation - ALWAYS allow browsing
+const handleStoreNavigation = (targetStoreId) => {
+  // Always allow navigation to browse stores
+  navigate(`/store/${targetStoreId}`, { 
+    state: { customerId, customerName } 
+  });
+};
+
+
+
   const filteredStores = stores.filter(store => 
     store.storeName?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
 
   
 
@@ -760,9 +905,11 @@ const handleCustomerLogout = () => {
       
       <Header 
         customerName={customerName}
+        customerId={customerId}
+        cart={cart}
         onCustomerClick={handleCustomerClick}
         onLogout={handleCustomerLogout}
-        />
+    />
 
       <div className="max-w-[1440px] mx-auto px-8 py-8">
         <div className="flex justify-center">
@@ -784,12 +931,7 @@ const handleCustomerLogout = () => {
             <SearchBar value={searchQuery} onChange={setSearchQuery} />
             <FeaturedCarousel 
             stores={stores} 
-            onStoreClick={(id) => navigate(`/store/${id}`, { 
-                state: { 
-                customerId, 
-                customerName 
-                } 
-            })}
+            onStoreClick={handleStoreNavigation}
             />
 
             {loading ? (
@@ -813,15 +955,10 @@ const handleCustomerLogout = () => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {filteredStores.map(store => (
-                 <div key={store.id} onClick={() => navigate(`/store/${store.id}`, { 
-                    state: { 
-                        customerId, 
-                        customerName 
-                    } 
-                    })}>
-                    <StoreCard store={store} />
+                    <div key={store.id} onClick={() => handleStoreNavigation(store.id)}>
+                        <StoreCard store={store} />
                     </div>
-                ))}
+                    ))}
               </div>
             )}
           </div>
