@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { Cake, Heart, Star, MagnifyingGlass, ArrowLeft, Bread, ShoppingCartSimple, X } from "@phosphor-icons/react";
-import ProductDetailsSheet from './Components/ProductDetails.jsx';
+import { Cake, Heart, Star, MagnifyingGlass, ArrowLeft, Bread, ShoppingCartSimple, X, Package } from "@phosphor-icons/react";
+import ProductPage from './Components/ProductPage';
+import ProductList from './Components/ProductDetails';  
 import Checkout from './Components/Checkout';
 
 import OrderDetails from './Components/OrderDetails';
@@ -19,7 +20,7 @@ const getStoreDetails = async (storeId) => {
 };
 
 
-const StoreHeader = ({ storeName, customerName, onBack, onLogout }) => {
+const StoreHeader = ({ storeName, customerName, customerId, storeId, cart, store, customerAddresses, onBack, onLogout }) => {
   const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
@@ -44,6 +45,59 @@ const StoreHeader = ({ storeName, customerName, onBack, onLogout }) => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
           </button>
+
+            {/* Cart Button with Badge */}
+                <button
+                    onClick={() => {
+                        // Check if cart has items from THIS store or another store
+                        let actualStoreId = storeId;
+                        let actualStoreName = storeName;
+                        let actualStore = store;
+                        
+                        if (customerId) {
+                            // Check all carts to find which store has items
+                            for (let i = 0; i < localStorage.length; i++) {
+                                const key = localStorage.key(i);
+                                if (key && key.startsWith(`beyti_cart_`) && key.endsWith(`_${customerId}`)) {
+                                    const savedCart = localStorage.getItem(key);
+                                    if (savedCart) {
+                                        const parsedCart = JSON.parse(savedCart);
+                                        if (parsedCart.length > 0) {
+                                            // Extract actual storeId from the cart that has items
+                                            const parts = key.split('_');
+                                            actualStoreId = parts[2];
+                                            actualStoreName = parsedCart[0]?.storeName || storeName;
+                                            // If it's a different store, we still navigate to checkout
+                                            // but with the correct store info
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        navigate("/checkout", {
+                            state: {
+                                customerId,
+                                customerName,
+                                customerAddresses,
+                                selectedStore: actualStoreId === storeId ? store : null,
+                                storeName: actualStoreName,
+                                storeId: actualStoreId,
+                            }
+                        });
+                    }}
+                    className="p-2 hover:bg-grey-200 rounded-lg transition-all relative"
+                >
+                    <ShoppingCartSimple className="w-5 h-5 text-charcoal-400" weight="regular" />
+
+                    {cart.length > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-sage-500 text-white min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center text-xs font-bold">
+                        {cart.reduce((total, item) => total + item.quantity, 0)}
+                        </span>
+                    )}
+                    </button>
+
 
           {customerName ? (
             <div className="relative">
@@ -511,15 +565,95 @@ const StoreView = () => {
   const [customerAddresses, setCustomerAddresses] = useState([]);
   const [loadingAddresses, setLoadingAddresses] = useState(false);
 
+  const [showDifferentStoreModal, setShowDifferentStoreModal] = useState(false);
+  const [pendingCartItem, setPendingCartItem] = useState(null);
+
   const [store, setStore] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState("popular");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("popular");
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [showProductSheet, setShowProductSheet] = useState(false);
-  const [cart, setCart] = useState([]);
+
+    const [cart, setCart] = useState(() => {
+    // Initialize cart from localStorage - CHECK ALL STORES
+    try {
+        if (customerId) {
+        // Check all cart keys for this customer
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith(`beyti_cart_`) && key.endsWith(`_${customerId}`)) {
+            const savedCart = localStorage.getItem(key);
+            if (savedCart) {
+                const parsedCart = JSON.parse(savedCart);
+                if (parsedCart.length > 0) {
+                console.log('📦 Loaded cart from:', key, parsedCart);
+                return parsedCart;
+                }
+            }
+            }
+        }
+        }
+    } catch (err) {
+        console.error('Error loading cart from localStorage:', err);
+    }
+    return [];
+    });
+
+       // Sync cart state with localStorage changes
+            useEffect(() => {
+            console.log('🛒 CART STATE CHANGED:', cart);
+            console.log('📊 Total items:', cart.length);
+            console.log('📦 Total quantity:', cart.reduce((sum, item) => sum + item.quantity, 0));
+            
+            // Save to localStorage whenever cart changes
+            if (customerId && cart.length > 0) {
+                // Get the store ID from the cart items
+                const cartStoreId = cart[0]?.sellerId;
+                if (cartStoreId) {
+                localStorage.setItem(`beyti_cart_${cartStoreId}_${customerId}`, JSON.stringify(cart));
+                console.log('💾 Saved cart to localStorage for store:', cartStoreId);
+                }
+            }
+            }, [cart, customerId]);
+
+            // Poll localStorage for cart updates from other pages
+            useEffect(() => {
+            if (!customerId) {
+                setCart([]);
+                return;
+            }
+
+            const updateCart = () => {
+                try {
+                // Check all cart keys for this customer
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith(`beyti_cart_`) && key.endsWith(`_${customerId}`)) {
+                    const savedCart = localStorage.getItem(key);
+                    if (savedCart) {
+                        const parsedCart = JSON.parse(savedCart);
+                        if (parsedCart.length > 0) {
+                        setCart(parsedCart);
+                        return;
+                        }
+                    }
+                    }
+                }
+                setCart([]);
+                } catch (err) {
+                console.error('Error updating cart:', err);
+                }
+            };
+
+            updateCart();
+            
+            // Update cart every 500ms to catch changes
+            const interval = setInterval(updateCart, 500);
+            
+            return () => clearInterval(interval);
+            }, [customerId]);
+
   const [showCartModal, setShowCartModal] = useState(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
 
@@ -568,7 +702,11 @@ const handleCustomerLogout = () => {
   // Clear active order
   if (customerId) {
     localStorage.removeItem(`beyti_activeOrder_${customerId}`);
+    localStorage.removeItem(`beyti_cart_${storeId}_${customerId}`); // ← ADD THIS
   }
+  
+  // Clear cart state
+  setCart([]); // ← ADD THIS
   
   // Navigate back to main store view
   navigate('/', { replace: true });
@@ -638,39 +776,115 @@ useEffect(() => {
 
   const [snackbar, setSnackbar] = useState({ open: false, message: '', type: 'success' });
 
+  
+
     const showSnackbar = (message, type = 'success') => {
     setSnackbar({ open: true, message, type });
     setTimeout(() => setSnackbar({ open: false, message: '', type: 'success' }), 3000);
     };
 
 const handleProductClick = (product) => {
-  setSelectedProduct(product);
-  setShowProductSheet(true);
+  navigate(`/store/${storeId}/product/${product.id}`, {
+    state: {
+      customerId,
+      customerName,
+      storeName: store?.storeName,
+      storeId,
+      customerAddresses,   // ⬅ PASS
+    selectedStore: store  // ⬅ PASS
+    }
+  });
 };
 
-const handleAddToCart = (item) => {
-  // Add sellerId to the item
-  const itemWithSeller = {
-    ...item,
-    sellerId: store.id  // ← ADD THIS LINE
-  };
+    const handleAddToCart = (item) => {
+    console.log('🎯 handleAddToCart called with:', item);
+    console.log('📊 Current cart state:', cart);
+    
+    // Ensure sellerId is present
+    const itemWithSeller = {
+        ...item,
+        sellerId: item.sellerId || store?.id
+    };
+    
+    console.log('✅ Item with seller:', itemWithSeller);
+    
+    // Check if cart has items from a different store
+    if (cart.length > 0 && cart[0].sellerId !== itemWithSeller.sellerId) {
+        // Show modal asking user what to do
+        setPendingCartItem(itemWithSeller);
+        setShowDifferentStoreModal(true);
+        return;
+    }
+    
+    // Find if this exact product + variant combo exists
+    const existingItemIndex = cart.findIndex(cartItem => {
+        const sameProduct = cartItem.id === itemWithSeller.id;
+        const sameVariant = (!cartItem.selectedVariant && !itemWithSeller.selectedVariant) ||
+                            (cartItem.selectedVariant?.id === itemWithSeller.selectedVariant?.id);
+        return sameProduct && sameVariant;
+    });
+    
+    console.log('🔍 Existing item index:', existingItemIndex);
+    
+    if (existingItemIndex !== -1) {
+        // Item exists - ADD to existing quantity
+        const updatedCart = [...cart];
+        const existingItem = updatedCart[existingItemIndex];
+        const newQuantity = existingItem.quantity + itemWithSeller.quantity;
+        const newTotalPrice = existingItem.basePrice * newQuantity;
+        
+        console.log('📈 Updating existing item:');
+        console.log('   Old quantity:', existingItem.quantity);
+        console.log('   Adding:', itemWithSeller.quantity);
+        console.log('   New quantity:', newQuantity);
+        
+        updatedCart[existingItemIndex] = {
+        ...existingItem,
+        quantity: newQuantity,
+        totalPrice: newTotalPrice
+        };
+        
+        setCart(updatedCart);
+        console.log('✨ Cart updated (existing item):', updatedCart);
+        showSnackbar(`Added ${itemWithSeller.quantity}x ${itemWithSeller.name} to cart!`, 'success');
+    } else {
+        // New item - add to cart
+        console.log('🆕 Adding new item to cart');
+        const newCart = [...cart, itemWithSeller];
+        setCart(newCart);
+        console.log('✨ Cart updated (new item):', newCart);
+        showSnackbar(`Added ${itemWithSeller.quantity}x ${itemWithSeller.name} to cart!`, 'success');
+    }
+    };
+    
+
+const handleClearAndAdd = () => {
+  if (!pendingCartItem) return;
   
-  // Check if item already exists in cart
-  const existingItem = cart.find(cartItem => cartItem.id === item.id);
+  // Clear cart and add new item
+  const newCart = [pendingCartItem];
+  setCart(newCart);
   
-  if (existingItem) {
-    // Update quantity if item exists
-    setCart(cart.map(cartItem => 
-      cartItem.id === item.id 
-        ? { ...cartItem, quantity: cartItem.quantity + item.quantity }
-        : cartItem
-    ));
-    showSnackbar(`Updated ${item.name} quantity in cart! 🛒`, 'success');
-  } else {
-    // Add new item to cart WITH sellerId
-    setCart([...cart, itemWithSeller]);  // ← CHANGE THIS LINE
-    showSnackbar(`Added ${item.quantity}x ${item.name} to cart! ✓`, 'success');
+  // Update localStorage - remove old store's cart
+  const oldStoreId = cart[0]?.sellerId;
+  if (oldStoreId && customerId) {
+    localStorage.removeItem(`beyti_cart_${oldStoreId}_${customerId}`);
   }
+  
+  // Save new cart
+  if (customerId && storeId) {
+    localStorage.setItem(`beyti_cart_${storeId}_${customerId}`, JSON.stringify(newCart));
+  }
+  
+  setShowDifferentStoreModal(false);
+  setPendingCartItem(null);
+  showSnackbar(`Cleared previous cart and added ${pendingCartItem.name}!`, 'success');
+};
+
+const handleCancelAdd = () => {
+  setShowDifferentStoreModal(false);
+  setPendingCartItem(null);
+  showSnackbar('Item not added to cart', 'warning');
 };
 
 const handleUpdateQuantity = (productId, newQuantity) => {
@@ -689,28 +903,28 @@ const handleRemoveFromCart = (productId) => {
   setCart(cart.filter(item => item.id !== productId));
 };
 
-  useEffect(() => {
+// Effect 1: Load store data
+useEffect(() => {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    // Scroll to top when component mounts or storeId changes
-    window.scrollTo({ top: 70, behavior: 'smooth' });
-
-    const loadStore = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await getStoreDetails(storeId);
-        setStore(data);
-      } catch (err) {
-        setError(err.message || "Failed to load store");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (storeId) {
-      loadStore();
+  const loadStore = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await getStoreDetails(storeId);
+      setStore(data);
+    } catch (err) {
+      setError(err.message || "Failed to load store");
+    } finally {
+      setLoading(false);
     }
-  }, [storeId]);
+  };
+
+  if (storeId) {
+    loadStore();
+  }
+}, [storeId]);
+
 
   // Fetch full customer details including addresses
   useEffect(() => {
@@ -802,11 +1016,18 @@ const handleRemoveFromCart = (productId) => {
   return (
     <div className="min-h-screen bg-cream-50">
       <StoreHeader 
-        storeName={store?.storeName} 
-        customerName={customerName} 
-        onBack={() => navigate(-1)}
+        storeName={store?.storeName}
+        customerName={customerName}
+        customerId={customerId}
+        storeId={storeId}
+        store={store}
+        cart={cart}
+        customerAddresses={customerAddresses}
+        onBack={() => navigate('/mainStore', { state: { customerId, customerName }, replace: true })}
         onLogout={handleCustomerLogout}
-        />
+    />
+
+
       <StoreInfo store={store} />
       
       <div className="max-w-[1440px] mx-auto px-12 py-8">
@@ -875,148 +1096,9 @@ const handleRemoveFromCart = (productId) => {
         </div>
       </div>
 
-      {/* Product Details Bottom Sheet */}
-      <ProductDetailsSheet
-        product={selectedProduct}
-        isOpen={showProductSheet}
-        onClose={() => setShowProductSheet(false)}
-        onAddToCart={handleAddToCart}
-        storeName={store?.storeName}
-        />
-        {/* Floating Cart Button */}
-        {cart.length > 0 && (
-        <button
-            onClick={() => setShowCheckoutModal(true)}
-            className="fixed bottom-8 right-8 z-50 bg-sage-500 hover:bg-sage-600 text-white w-16 h-16 rounded-full shadow-[0_8px_30px_rgba(85,107,92,0.4)] hover:shadow-[0_12px_40px_rgba(85,107,92,0.5)] transition-all transform hover:scale-110 flex items-center justify-center"
-        >
-            <ShoppingCartSimple className="w-9 h-9 drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]" weight="regular" />
-            
-            {/* Item Count Badge */}
-            <span className="absolute -top-1 -right-1 bg-red-800 text-white min-w-[24px] h-6 px-1.5 rounded-full flex items-center justify-center text-xs font-bold shadow-[0_4px_12px_rgba(153,27,27,0.6)]">
-            {cart.reduce((total, item) => total + item.quantity, 0)}
-            </span>
-        </button>
-        )}
+      
 
-      {/* Cart Modal */}
-      {showCartModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-6 text-center">
-              <h2 className="text-3xl font-black text-white mb-2">Your Cart</h2>
-              <p className="text-white/90 font-medium">
-                {cart.length} item{cart.length !== 1 ? 's' : ''} • {cart.reduce((total, item) => total + item.quantity, 0)} total
-              </p>
-            </div>
 
-            {/* Cart Items */}
-            <div className="p-6 overflow-y-auto max-h-[50vh]">
-              {cart.map((item) => (
-                <div key={item.id} className="bg-cream-50 p-5 rounded-xl mb-4 border border-grey-stroke">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <h3 className="text-lg font-bold text-charcoal-600 mb-2">{item.name}</h3>
-                      <p className="text-sage-600 font-semibold">
-                        {item.basePrice.toFixed(3)} BD × {item.quantity}
-                      </p>
-                      {item.selectedVariant && (
-                        <p className="text-sm text-charcoal-400 mt-1">
-                          Variant: {item.selectedVariant.colorValue || ''} {item.selectedVariant.sizeValue || ''}
-                        </p>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-black text-sage-700">
-                        {item.totalPrice.toFixed(3)} BD
-                      </p>
-                      <button
-                        onClick={() => {
-                            setCart(cart.filter(c => c.id !== item.id));
-                            showSnackbar(`Removed ${item.name} from cart`, 'success');
-                        }}
-                        className="mt-2 text-red-500 hover:text-red-700 font-semibold text-sm"
-                        >
-                        Remove
-                        </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Total */}
-            <div className="border-t border-grey-stroke p-6 bg-cream-50">
-              <div className="flex justify-between items-center mb-4">
-                <span className="text-xl font-bold text-charcoal-600">Total:</span>
-                <span className="text-3xl font-black text-sage-700">
-                  {cart.reduce((total, item) => total + item.totalPrice, 0).toFixed(3)} BD
-                </span>
-              </div>
-              
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowCartModal(false)}
-                  className="flex-1 bg-grey-200 hover:bg-grey-300 text-charcoal-600 font-bold py-3 rounded-xl transition-all"
-                >
-                  Continue Shopping
-                </button>
-                <button
-                onClick={() => {
-                    setShowCartModal(false);
-                    setShowCheckoutModal(true);
-                    showSnackbar('Proceeding to checkout...', 'success');
-                }}
-                className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-bold py-3 rounded-xl transition-all"
-                >
-                Checkout
-                </button>
-              </div>
-            </div>
-
-            {/* Close Button */}
-            <button
-              onClick={() => setShowCartModal(false)}
-              className="absolute top-4 right-4 bg-white/90 p-2 rounded-full shadow-lg hover:bg-white transition-all"
-            >
-              <X size={20} className="text-charcoal-600" weight="bold" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Checkout Modal */}
-        {showCheckoutModal && (() => {
-  // 🐛 DEBUG - Check store data
-  console.log('🏪 Store object:', store);
-  console.log('📍 Seller addresses array:', store?.sellerAddresses);
-  console.log('🗺️ First address:', store?.sellerAddresses?.[0]);
-  console.log('📌 Nested address:', store?.sellerAddresses?.[0]?.address);
-  
-  return (
-    <Checkout
-      cart={cart}
-      storeName={store?.storeName}
-      customerId={customerId}
-      customerName={customerName}
-      customerAddresses={customerAddresses}
-      onClose={() => setShowCheckoutModal(false)}
-      onUpdateQuantity={handleUpdateQuantity}
-      onRemoveItem={handleRemoveFromCart}
-      showSnackbar={showSnackbar}
-      setActiveOrder={setActiveOrder} 
-      activeOrder={activeOrder} 
-      selectedStore={{
-          id: store?.id,
-          storeName: store?.storeName,
-          phone: store?.phone,
-          sellerAddresses: store?.sellerAddresses || [],
-          address: store?.sellerAddresses?.[0]?.address || null
-      }}
-      setCart={setCart}  
-    />
-  );
-})()}
 
 {/* Snackbar */}
 {snackbar.open && (
@@ -1047,6 +1129,130 @@ const handleRemoveFromCart = (productId) => {
         {snackbar.type === 'success' ? '✓' : snackbar.type === 'error' ? '✕' : '⚠'}
       </span>
       <p className="font-semibold">{snackbar.message}</p>
+    </div>
+  </div>
+)}
+{/* Different Store Modal */}
+{showDifferentStoreModal && (
+  <div className="fixed inset-0 bg-charcoal-600/40 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
+    <div className="relative bg-white rounded-3xl shadow-[0_8px_40px_rgba(0,0,0,0.12)] w-full max-w-lg overflow-hidden border-2 border-grey-stroke">
+      
+      {/* Header with Sage Green Brand Colors */}
+      <div className="relative bg-gradient-to-br from-sage-500 to-sage-700 px-8 py-8">
+        {/* Decorative circles */}
+        <div className="absolute top-4 right-4 w-24 h-24 bg-white/10 rounded-full" />
+        <div className="absolute -bottom-6 left-8 w-16 h-16 bg-white/10 rounded-full" />
+        
+        <div className="relative flex items-start gap-4">
+          <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg">
+            <ShoppingCartSimple size={32} weight="bold" className="text-sage-600" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-display-h2 text-white mb-2" style={{ fontFamily: 'Merriweather, serif' }}>
+              Different Store Detected
+            </h3>
+            <p className="text-body-regular text-sage-100" style={{ fontFamily: 'Inter, sans-serif' }}>
+              Your cart contains items from another store
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="p-8">
+        {/* Warning Box */}
+        <div className="bg-danger-bg border-2 border-danger-btn rounded-2xl p-5 mb-6">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 bg-danger-btn rounded-xl flex items-center justify-center flex-shrink-0">
+              <span className="text-2xl">⚠️</span>
+            </div>
+            <div className="flex-1">
+              <p className="text-body-medium text-charcoal-600 font-semibold mb-2" style={{ fontFamily: 'Inter, sans-serif' }}>
+                Important: One store at a time
+              </p>
+              <p className="text-body-regular text-danger-text leading-relaxed" style={{ fontFamily: 'Inter, sans-serif' }}>
+                You can only order from one store per transaction. Choose how you'd like to proceed.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Current Cart Store */}
+        <div className="bg-cream-50 border-2 border-grey-stroke rounded-2xl p-5 mb-4">
+          <p className="text-label-medium text-sage-700 uppercase tracking-wider mb-3" style={{ fontFamily: 'Inter, sans-serif' }}>
+            Current Cart
+          </p>
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-gradient-to-br from-sage-500 to-sage-700 rounded-xl flex items-center justify-center shadow-md">
+              <Storefront size={28} weight="fill" className="text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-card-h2 text-charcoal-600 truncate" style={{ fontFamily: 'Merriweather, serif' }}>
+                {cart[0]?.storeName || 'Another Store'}
+              </p>
+              <p className="text-body-regular text-charcoal-400" style={{ fontFamily: 'Inter, sans-serif' }}>
+                {cart.length} item{cart.length !== 1 ? 's' : ''} • {cart.reduce((sum, item) => sum + item.totalPrice, 0).toFixed(3)} BD
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* New Item to Add */}
+        {pendingCartItem && (
+          <div className="bg-sage-100 border-2 border-sage-500 rounded-2xl p-5 mb-6">
+            <p className="text-label-medium text-sage-700 uppercase tracking-wider mb-3" style={{ fontFamily: 'Inter, sans-serif' }}>
+              New Item
+            </p>
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-gradient-to-br from-sage-100 to-cream-100 rounded-xl flex items-center justify-center shadow-md border-2 border-sage-500">
+                <Package size={28} className="text-sage-700" weight="fill" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-body-medium text-charcoal-600 font-bold truncate" style={{ fontFamily: 'Inter, sans-serif' }}>
+                  {pendingCartItem.name}
+                </p>
+                <p className="text-body-regular text-sage-700 font-semibold" style={{ fontFamily: 'Inter, sans-serif' }}>
+                  {pendingCartItem.basePrice.toFixed(3)} BD
+                </p>
+                <p className="text-label-medium text-charcoal-400 mt-1" style={{ fontFamily: 'Inter, sans-serif' }}>
+                  From: {pendingCartItem.storeName || storeName}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="space-y-3">
+          <button
+            onClick={handleClearAndAdd}
+            className="w-full bg-sage-500 hover:bg-sage-700 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-soft-lift hover:shadow-[0_6px_20px_rgba(85,107,92,0.3)] flex items-center justify-center gap-3 group text-button"
+            style={{ fontFamily: 'Inter, sans-serif' }}
+          >
+            <ShoppingCartSimple size={22} weight="bold" />
+            <span>Clear Cart & Add This Item</span>
+            <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+            </svg>
+          </button>
+          
+          <button
+            onClick={handleCancelAdd}
+            className="w-full bg-grey-200 border-2 border-grey-stroke hover:bg-cream-100 text-charcoal-600 font-bold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2 text-button"
+            style={{ fontFamily: 'Inter, sans-serif' }}
+          >
+            <X size={20} weight="bold" />
+            <span>Keep Current Cart</span>
+          </button>
+        </div>
+
+        {/* Help Text */}
+        <div className="mt-6 bg-cream-100 rounded-xl p-4 border border-grey-stroke">
+          <p className="text-label-medium text-charcoal-500 text-center leading-relaxed" style={{ fontFamily: 'Inter, sans-serif' }}>
+            💡 <span className="font-semibold">Tip:</span> Complete your current order first, then you can shop from other stores
+          </p>
+        </div>
+      </div>
     </div>
   </div>
 )}
