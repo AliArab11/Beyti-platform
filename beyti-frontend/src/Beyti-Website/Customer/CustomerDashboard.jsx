@@ -9,6 +9,12 @@ import CRUDButton from "../../components/CRUDButton";
 import { Table, TableHeader, TableBody, TableRow } from "../../components/Table";
 import '../Seller/Components/modalAnimations.css';
 import OrderDetails from '../Store/Components/OrderDetails';
+import Snackbar from '../../components/Snackbar';
+
+import {
+  createReview,
+  deleteReview,
+} from "../../services/api";
 
 // API helpers
 const BASE_URL = "https://localhost:7062/api";
@@ -67,8 +73,9 @@ const getStatusVariant = (status) => {
 };
 
 // Order Details Modal
-const OrderDetailsModal = ({ order, onClose }) => {
+const OrderDetailsModal = ({ order, onClose, onReorder, openReviewModal, onDeleteReview }) => {
   if (!order) return null;
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm modal-backdrop-enter">
@@ -142,21 +149,56 @@ const OrderDetailsModal = ({ order, onClose }) => {
             {order.orderItems && order.orderItems.length > 0 ? (
               <div className="space-y-2">
                 {order.orderItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="bg-cream-50 border border-grey-stroke rounded-lg px-3 py-2 flex items-center justify-between"
-                  >
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-charcoal-700">
-                        {item.productName || "Product"}
-                      </p>
-                      <p className="text-xs text-charcoal-400">
-                        Qty: {item.qty}
+                  <div key={item.id} className="bg-cream-50 border border-grey-stroke rounded-lg px-3 py-2">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-charcoal-700">
+                          {item.productName || "Product"}
+                        </p>
+                        <p className="text-xs text-charcoal-400">
+                          Qty: {item.qty}
+                        </p>
+                      </div>
+                      <p className="text-sm font-semibold text-charcoal-800">
+                        {formatCurrency(item.lineTotal || 0)}
                       </p>
                     </div>
-                    <p className="text-sm font-semibold text-charcoal-800">
-                      {formatCurrency(item.lineTotal || 0)}
-                    </p>
+                    
+                    {/* Review Section */}
+                    {['completed', 'delivered'].includes(order.status?.toLowerCase()) && (
+                      <div className="pt-2 border-t border-grey-stroke">
+                        {!item.review ? (
+                          <button
+                            onClick={() => openReviewModal(order.id, item.productId, item.productName)}
+                            className="text-xs bg-sage-500 hover:bg-sage-600 text-white px-3 py-1 rounded-lg font-medium transition-colors"
+                          >
+                            ⭐ Write Review
+                          </button>
+                        ) : (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1">
+                                {[1, 2, 3, 4, 5].map(star => (
+                                  <span key={star} className={`text-sm ${star <= item.review.rating ? 'text-yellow-400' : 'text-grey-stroke'}`}>
+                                    ★
+                                  </span>
+                                ))}
+                              </div>
+                              <button
+                                onClick={() => onDeleteReview(item.review.id)}
+                                className="text-xs text-error-btn hover:text-error-text font-medium"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                            <p className="text-xs text-charcoal-600 italic">"{item.review.comment}"</p>
+                            <p className="text-xs text-charcoal-400">
+                              {new Date(item.review.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -167,15 +209,23 @@ const OrderDetailsModal = ({ order, onClose }) => {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-grey-stroke bg-grey-100">
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-full bg-grey-300 hover:bg-grey-400 text-charcoal-700 py-2.5 rounded-lg font-semibold"
-          >
-            Close
-          </button>
-        </div>
+        <div className="px-6 py-4 border-t border-grey-stroke bg-grey-100 flex gap-3">
+        <button
+          type="button"
+          onClick={() => onReorder(order)}
+          className="flex-1 bg-sage-500 hover:bg-sage-600 text-white py-2.5 rounded-lg font-semibold flex items-center justify-center gap-2"
+        >
+          <Icon.ShoppingCart size={20} weight="bold" />
+          Reorder
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex-1 bg-grey-300 hover:bg-grey-400 text-charcoal-700 py-2.5 rounded-lg font-semibold"
+        >
+          Close
+        </button>
+      </div>
       </div>
     </div>
   );
@@ -209,6 +259,88 @@ const CustomerDashboard = () => {
   
   const [activeOrderIndex, setActiveOrderIndex] = useState(0);
 
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', type: 'success' });
+
+  const showSnackbar = (message, type = 'success') => {
+    setSnackbar({ open: true, message, type });
+    setTimeout(() => setSnackbar({ open: false, message: '', type: 'success' }), 5000);
+  };
+
+  const [showReorderModal, setShowReorderModal] = useState(false);
+  const [pendingReorderItems, setPendingReorderItems] = useState(null);
+  const [showClearCartModal, setShowClearCartModal] = useState(false);
+
+  const [activeTab, setActiveTab] = useState('all');
+
+  // Review modal state
+const [reviewModal, setReviewModal] = useState({ 
+  show: false, 
+  orderId: null, 
+  productId: null,
+  productName: "",
+  rating: 5, 
+  comment: "", 
+  loading: false, 
+  error: null 
+});
+
+  // Cart state - load from localStorage
+const [cart, setCart] = useState(() => {
+  try {
+    if (customerId) {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(`beyti_cart_`) && key.endsWith(`_${customerId}`)) {
+          const savedCart = localStorage.getItem(key);
+          if (savedCart) {
+            const parsedCart = JSON.parse(savedCart);
+            if (parsedCart.length > 0) {
+              return parsedCart;
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error loading cart:', err);
+  }
+  return [];
+});
+
+// Poll cart updates
+useEffect(() => {
+  if (!customerId) {
+    setCart([]);
+    return;
+  }
+
+  const updateCart = () => {
+    try {
+      let allItems = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(`beyti_cart_`) && key.endsWith(`_${customerId}`)) {
+          const savedCart = localStorage.getItem(key);
+          if (savedCart) {
+            const parsedCart = JSON.parse(savedCart);
+            if (parsedCart.length > 0) {
+              allItems = parsedCart;
+              break;
+            }
+          }
+        }
+      }
+      setCart(allItems);
+    } catch (err) {
+      console.error('Error updating cart:', err);
+    }
+  };
+
+  updateCart();
+  const interval = setInterval(updateCart, 500);
+  return () => clearInterval(interval);
+}, [customerId]);
+
   // Disable body scroll when modals are open
   useEffect(() => {
     if (selectModalOpen || orderModalOpen) {
@@ -235,39 +367,81 @@ const CustomerDashboard = () => {
   }, []);
 
   // Load orders
-  useEffect(() => {
-    if (!customerId) return;
-    const loadOrders = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await getCustomerOrders(customerId);
-        setOrders(Array.isArray(data) ? data : []);
-      } catch (err) {
-        setError(err.message || "Failed to load orders");
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadOrders();
-  }, [customerId]);
+ // Load orders with reviews
+useEffect(() => {
+  if (!customerId) return;
+  const loadOrders = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await getCustomerOrders(customerId);
+      
+      // Fetch reviews for all products in all orders
+      const ordersWithReviews = await Promise.all(
+        (data || []).map(async (order) => {
+          const itemsWithReviews = await Promise.all(
+            (order.orderItems || []).map(async (item) => {
+              try {
+                const response = await fetch(`https://localhost:7062/api/Reviews?productId=${item.productId}&customerId=${customerId}`);
+                const reviewData = await response.json();
+                const orderReview = reviewData.find(r => r.orderId === order.id && r.productId === item.productId);
+                return { ...item, review: orderReview || null };
+              } catch {
+                return { ...item, review: null };
+              }
+            })
+          );
+          return { ...order, orderItems: itemsWithReviews };
+        })
+      );
+      
+      setOrders(ordersWithReviews);
+    } catch (err) {
+      setError(err.message || "Failed to load orders");
+    } finally {
+      setLoading(false);
+    }
+  };
+  loadOrders();
+}, [customerId]);
 
 
 
-const activeOrders = useMemo(() => {
-  if (!orders || orders.length === 0) return [];
-  
-  return orders.filter(o => 
-    !['completed', 'cancelled', 'delivered'].includes(o.status?.toLowerCase())
-  );
-}, [orders]);
+  // REPLACE the entire activeOrders useMemo with:
+  const activeOrders = useMemo(() => {
+    if (!orders || orders.length === 0) return [];
+    return orders.filter(o => 
+      !['completed', 'cancelled', 'delivered'].includes(o.status?.toLowerCase())
+    );
+  }, [orders]);
+
+  const completedOrders = useMemo(() => {
+    if (!orders || orders.length === 0) return [];
+    return orders.filter(o => 
+      ['completed', 'delivered'].includes(o.status?.toLowerCase())
+    );
+  }, [orders]);
+
+  const cancelledOrders = useMemo(() => {
+    if (!orders || orders.length === 0) return [];
+    return orders.filter(o => o.status?.toLowerCase() === 'cancelled');
+  }, [orders]);
+
+  const displayedOrders = useMemo(() => {
+    switch(activeTab) {
+      case 'active': return activeOrders;
+      case 'completed': return completedOrders;
+      case 'cancelled': return cancelledOrders;
+      default: return orders; // 'all'
+    }
+  }, [activeTab, orders, activeOrders, completedOrders, cancelledOrders]);
 
 // Set the currently displayed active order based on index
 const currentActiveOrder = activeOrders.length > 0 ? activeOrders[activeOrderIndex] : null;
 
   const getPageTitle = () => {
-    if (location.pathname.includes("/customer-dashboard/orders")) {
-      return "My Orders";
+  if (location.pathname === "/customer-dashboard" || location.pathname.includes("/customer-dashboard/orders")) {
+    return "My Orders";
     } else if (location.pathname.includes("/customer-dashboard/addresses")) {
       return "My Addresses";
     } else if (location.pathname.includes("/customer-dashboard/favorites")) {
@@ -287,8 +461,266 @@ const currentActiveOrder = activeOrders.length > 0 ? activeOrders[activeOrderInd
     setSelectedOrder(null);
   };
 
-  // Metrics
-  const { metrics, recentOrders } = useMemo(() => {
+    const handleReorder = async (order) => {
+  if (!order || !order.orderItems || order.orderItems.length === 0) {
+    showSnackbar('No items to reorder', 'error');
+    return;
+  }
+
+  try {
+    // Check if there's any existing cart
+    let hasExistingCart = false;
+    
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(`beyti_cart_`) && key.endsWith(`_${customerId}`)) {
+        const savedCart = localStorage.getItem(key);
+        if (savedCart) {
+          const parsedCart = JSON.parse(savedCart);
+          if (parsedCart.length > 0) {
+            hasExistingCart = true;
+            break;
+          }
+        }
+      }
+    }
+
+    // Create cart items from order
+    const cartItems = order.orderItems.map(item => ({
+      id: item.productId || item.id,
+      name: item.productName,
+      basePrice: item.unitPrice,
+      quantity: item.qty,
+      totalPrice: item.lineTotal,
+      selectedVariant: item.productVariantId ? { id: item.productVariantId } : null,
+      storeName: order.sellerName,
+      sellerId: order.sellerId
+    }));
+
+    // Store pending reorder
+    setPendingReorderItems({ items: cartItems, order });
+
+    // ALWAYS show the clear cart modal, regardless of cart state
+    setShowClearCartModal(true);
+
+  } catch (err) {
+    console.error('Error reordering:', err);
+    showSnackbar('Failed to process reorder', 'error');
+  }
+};
+
+  const confirmReorder = () => {
+    if (!pendingReorderItems) return;
+
+    const { items, order } = pendingReorderItems;
+    const cartKey = `beyti_cart_${order.sellerId}_${customerId}`;
+    
+    // Check if there's an existing cart from the SAME store
+    let existingCart = [];
+    try {
+      const savedCart = localStorage.getItem(cartKey);
+      if (savedCart) {
+        existingCart = JSON.parse(savedCart);
+      }
+    } catch (err) {
+      console.error('Error reading cart:', err);
+    }
+    
+    // If cart has items from same store, merge them
+    if (existingCart.length > 0) {
+      // Merge items: add quantities for matching items, add new items
+      const mergedCart = [...existingCart];
+      
+      items.forEach(newItem => {
+        const existingIndex = mergedCart.findIndex(cartItem => {
+          const sameProduct = cartItem.id === newItem.id;
+          const sameVariant = (!cartItem.selectedVariant && !newItem.selectedVariant) ||
+                              (cartItem.selectedVariant?.id === newItem.selectedVariant?.id);
+          return sameProduct && sameVariant;
+        });
+        
+        if (existingIndex !== -1) {
+          // Update quantity
+          mergedCart[existingIndex].quantity += newItem.quantity;
+          mergedCart[existingIndex].totalPrice = 
+            mergedCart[existingIndex].basePrice * mergedCart[existingIndex].quantity;
+        } else {
+          // Add new item
+          mergedCart.push(newItem);
+        }
+      });
+      
+      localStorage.setItem(cartKey, JSON.stringify(mergedCart));
+    } else {
+      // Empty cart - just add items
+      localStorage.setItem(cartKey, JSON.stringify(items));
+    }
+    
+    showSnackbar(`${items.length} item${items.length !== 1 ? 's' : ''} added to cart!`, 'success');
+    setShowReorderModal(false);
+    setPendingReorderItems(null);
+    setOrderModalOpen(false);
+  };
+
+const confirmClearAndReorder = () => {
+  if (!pendingReorderItems) {
+    console.error('No pending items to reorder');
+    return;
+  }
+
+  const { items, order } = pendingReorderItems;
+  
+  // Clear ALL existing carts for this customer
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith(`beyti_cart_`) && key.endsWith(`_${customerId}`)) {
+      localStorage.removeItem(key);
+      console.log('Cleared cart:', key);
+    }
+  }
+  
+  // Add new cart with reordered items
+  const cartKey = `beyti_cart_${order.sellerId}_${customerId}`;
+  localStorage.setItem(cartKey, JSON.stringify(items));
+  console.log('Added reorder to cart:', cartKey, items);
+  
+  showSnackbar(`Order #${order.id} items added to cart!`, 'success');
+  setShowClearCartModal(false);
+  setPendingReorderItems(null);
+  setOrderModalOpen(false);
+};
+
+const cancelReorder = () => {
+  setShowClearCartModal(false);
+  setPendingReorderItems(null);
+  showSnackbar('Reorder cancelled', 'warning');
+};
+
+// Review modal functions
+const openReviewModal = (orderId, productId, productName) => {
+  setReviewModal({ 
+    show: true, 
+    orderId, 
+    productId,
+    productName,
+    rating: 5, 
+    comment: "", 
+    loading: false, 
+    error: null 
+  });
+};
+
+const closeReviewModal = () => {
+  setReviewModal({ 
+    show: false, 
+    orderId: null, 
+    productId: null,
+    productName: "",
+    rating: 5, 
+    comment: "", 
+    loading: false, 
+    error: null 
+  });
+};
+
+const handleSubmitReview = async () => {
+  if (!reviewModal.comment.trim()) {
+    setReviewModal(prev => ({ ...prev, error: "Please write a comment" }));
+    showSnackbar("Please write a comment", 'error');
+    return;
+  }
+
+  setReviewModal(prev => ({ ...prev, loading: true, error: null }));
+  try {
+    const newReview = await createReview({
+      OrderId: reviewModal.orderId,
+      ProductId: reviewModal.productId,
+      CustomerId: customerId,
+      Rating: reviewModal.rating,
+      Comment: reviewModal.comment
+    });
+
+    // Optimistically update the UI immediately
+    const updatedOrders = orders.map(order => {
+      if (order.id === reviewModal.orderId) {
+        return {
+          ...order,
+          orderItems: order.orderItems.map(item => {
+            if (item.productId === reviewModal.productId) {
+              return {
+                ...item,
+                review: {
+                  id: newReview.id || Date.now(), // Use returned ID or temp ID
+                  orderId: reviewModal.orderId,
+                  productId: reviewModal.productId,
+                  customerId: customerId,
+                  rating: reviewModal.rating,
+                  comment: reviewModal.comment,
+                  createdAt: new Date().toISOString()
+                }
+              };
+            }
+            return item;
+          })
+        };
+      }
+      return order;
+    });
+
+    setOrders(updatedOrders);
+
+    // Update selected order if modal is open
+    if (orderModalOpen && selectedOrder && selectedOrder.id === reviewModal.orderId) {
+      const updatedOrder = updatedOrders.find(o => o.id === selectedOrder.id);
+      if (updatedOrder) {
+        setSelectedOrder(updatedOrder);
+      }
+    }
+
+    showSnackbar('Review submitted successfully! ⭐', 'success');
+    closeReviewModal();
+    
+
+  } catch (err) {
+    const errorMsg = err.message || "Failed to submit review";
+    setReviewModal(prev => ({ ...prev, error: errorMsg, loading: false }));
+    showSnackbar(errorMsg, 'error');
+  }
+};
+
+const handleDeleteReview = async (reviewId) => {
+  try {
+    await deleteReview(reviewId);
+    
+    // Optimistically update the UI immediately
+    const updatedOrders = orders.map(order => ({
+      ...order,
+      orderItems: order.orderItems.map(item => {
+        if (item.review && item.review.id === reviewId) {
+          return { ...item, review: null };
+        }
+        return item;
+      })
+    }));
+    
+    setOrders(updatedOrders);
+    
+    // Update selected order if modal is open
+    if (orderModalOpen && selectedOrder) {
+      const updatedOrder = updatedOrders.find(o => o.id === selectedOrder.id);
+      if (updatedOrder) {
+        setSelectedOrder(updatedOrder);
+      }
+    }
+    
+    showSnackbar('Review deleted successfully', 'success');
+  } catch (err) {
+    showSnackbar(err.message || 'Failed to delete review', 'error');
+  }
+};
+
+// Metrics (next section starts here)
+const { metrics, recentOrders } = useMemo(() => {
     if (!orders || orders.length === 0) {
       return {
         metrics: {
@@ -390,8 +822,14 @@ const pastOrders = useMemo(() => {
     <div className="min-h-screen bg-cream-50 flex">
       <CustomerSelectModal />
       {orderModalOpen && selectedOrder && (
-        <OrderDetailsModal order={selectedOrder} onClose={closeOrderModal} />
-      )}
+      <OrderDetailsModal 
+        order={orders.find(o => o.id === selectedOrder.id) || selectedOrder}
+        onClose={closeOrderModal}
+        onReorder={handleReorder}
+        openReviewModal={openReviewModal}
+        onDeleteReview={handleDeleteReview}
+      />
+    )}
 
       {/* Sidebar */}
       <aside className="w-64 bg-sage-500 flex flex-col fixed h-screen border-r border-sage-700">
@@ -402,11 +840,11 @@ const pastOrders = useMemo(() => {
 
         <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
           <NavigationButton
-            selected={location.pathname === "/customer-dashboard" || location.pathname.includes("/customer-dashboard/dashboard")}
-            onClick={() => navigate("dashboard")}
-            icon={<Icon.House size={20} weight={location.pathname.includes("/dashboard") ? "fill" : "regular"} />}
+            selected={location.pathname === "/customer-dashboard" || location.pathname.includes("/customer-dashboard")}
+            onClick={() => navigate("/customer-dashboard")}
+            icon={<Icon.Package size={20} weight={location.pathname === "/customer-dashboard" ? "fill" : "regular"} />}
           >
-            Dashboard
+            My Orders
           </NavigationButton>
 
           <NavigationButton
@@ -414,7 +852,7 @@ const pastOrders = useMemo(() => {
             onClick={() => navigate("orders")}
             icon={<Icon.Package size={20} weight={location.pathname.includes("/orders") ? "fill" : "regular"} />}
           >
-            My Orders
+            Order History
           </NavigationButton>
 
           <NavigationButton
@@ -439,23 +877,101 @@ const pastOrders = useMemo(() => {
       {/* Main content */}
       <div className="flex-1 ml-64 flex flex-col">
         <div className="border-b border-grey-stroke bg-grey-200">
-          <PageHeader
-            title={getPageTitle()}
-            notificationCount={metrics.activeOrders || 0}
-            userName={customerName}
-            userRole="Customer"
-            userProfile={{
-              userProfileId: customerId,
-              displayName: customerName,
-              roleType: 'Customer',
-              status: 'Active',
-              phone: customerList.find(c => c.id === customerId)?.phone || '',
-              createdAt: customerList.find(c => c.id === customerId)?.createdAt,
-              updatedAt: new Date().toISOString()
-            }}
-            entityId={customerId}
-            userId={customerId}
-          />
+        
+      
+          <div className="border-b border-grey-stroke bg-grey-200">
+            <PageHeader
+              title="My Orders"
+              notificationCount={metrics.activeOrders || 0}
+              userName={customerName}
+              userRole="Customer"
+              userProfile={{
+                userProfileId: customerId,
+                displayName: customerName,
+                roleType: 'Customer',
+                status: 'Active',
+                phone: customerList.find(c => c.id === customerId)?.phone || '',
+                createdAt: customerList.find(c => c.id === customerId)?.createdAt,
+                updatedAt: new Date().toISOString()
+              }}
+              entityId={customerId}
+              userId={customerId}
+              additionalActions={
+                <button
+                  onClick={() => {
+                    // Find the store ID from the cart
+                    let targetStoreId = null;
+                    for (let i = 0; i < localStorage.length; i++) {
+                      const key = localStorage.key(i);
+                      if (key && key.startsWith(`beyti_cart_`) && key.endsWith(`_${customerId}`)) {
+                        const savedCart = localStorage.getItem(key);
+                        if (savedCart) {
+                          const parsedCart = JSON.parse(savedCart);
+                          if (parsedCart.length > 0) {
+                            const parts = key.split('_');
+                            targetStoreId = parts[2];
+                            break;
+                          }
+                        }
+                      }
+                    }
+                    
+                    // If we found a store with items, fetch store data and go to checkout
+                    if (targetStoreId) {
+                      const fetchStoreAndNavigate = async () => {
+                        try {
+                          const response = await fetch(`https://localhost:7062/api/Sellers/${targetStoreId}/products`);
+                          if (response.ok) {
+                            const storeData = await response.json();
+                            
+                            navigate('/checkout', {
+                              state: {
+                                customerId,
+                                customerName,
+                                customerAddresses: customerList.find(c => c.id === customerId)?.customerAddresses || [],
+                                selectedStore: storeData,
+                                storeName: cart[0]?.storeName,
+                                storeId: targetStoreId
+                              }
+                            });
+                          } else {
+                            showSnackbar('Could not load store details', 'error');
+                          }
+                        } catch (err) {
+                          console.error('Error fetching store:', err);
+                          showSnackbar('Error loading checkout', 'error');
+                        }
+                      };
+                      
+                      fetchStoreAndNavigate();
+                    } else {
+                      // Empty cart - still go to checkout with no store
+                      navigate('/checkout', {
+                        state: {
+                          customerId,
+                          customerName,
+                          customerAddresses: customerList.find(c => c.id === customerId)?.customerAddresses || [],
+                          selectedStore: null,
+                          storeName: null,
+                          storeId: null
+                        }
+                      });
+                    }
+                  }}
+                  className="p-2 hover:bg-grey-200 rounded-lg transition-all relative"
+                >
+                  <Icon.ShoppingCartSimple className="w-6 h-6 text-charcoal-400" weight="regular" />
+                  {cart.length > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-sage-500 text-white min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center text-xs font-bold">
+                      {cart.reduce((total, item) => total + item.quantity, 0)}
+                    </span>
+                  )}
+                </button>
+              }
+                          
+            />
+          
+        </div>
         </div>
 
         <main className="flex-1 p-6 lg:p-8">
@@ -584,166 +1100,91 @@ const pastOrders = useMemo(() => {
                     )}
                     </section>
                     )}
-                {/* Quick Actions */}
-                <section className="mb-8">
-                <div className="grid grid-cols-2 gap-4">
-                    <button
-                    onClick={() => window.location.href = '/mainStore'}
-                    className="bg-white hover:bg-grey-100 border-2 border-grey-stroke rounded-xl p-6 transition-all flex items-center gap-4 group"
-                    >
-                    <div className="w-12 h-12 bg-sage-100 rounded-full flex items-center justify-center group-hover:bg-sage-200 transition-colors">
-                        <Icon.Storefront size={24} className="text-sage-600" />
-                    </div>
-                    <div className="text-left">
-                        <p className="font-bold text-charcoal-700 text-lg">Browse Stores</p>
-                        <p className="text-sm text-charcoal-500">Discover new favorites</p>
-                    </div>
-                    </button>
-                    
-                    <button
-                    onClick={() => navigate('orders')}
-                    className="bg-white hover:bg-grey-100 border-2 border-grey-stroke rounded-xl p-6 transition-all flex items-center gap-4 group"
-                    >
-                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-                        <Icon.ClockCounterClockwise size={24} className="text-blue-600" />
-                    </div>
-                    <div className="text-left">
-                        <p className="font-bold text-charcoal-700 text-lg">Order History</p>
-                        <p className="text-sm text-charcoal-500">View all past orders</p>
-                    </div>
-                    </button>
-                </div>
-                </section>
 
-                {/* Overview Cards */}
-                <section className="space-y-4 mb-8">
-                <h2 className="text-card-h2 text-charcoal-600">Your Overview</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <AnalyticsCard
-                    title="Total Orders"
-                    metrics={[{ value: metrics.totalOrders, label: "All time" }]}
-                    />
-                    <AnalyticsCard
-                    title="Active Orders"
-                    metrics={[{ value: metrics.activeOrders, label: "In progress" }]}
-                    />
-                    <AnalyticsCard
-                    title="Total Spent"
-                    metrics={[{ value: formatCurrency(metrics.totalSpent), label: "All time" }]}
-                    />
-                </div>
-                </section>
-
-                {/* Favorite Stores */}
-                {favoriteStores.length > 0 && (
-                <section className="mb-8">
-                    <h2 className="text-card-h2 text-charcoal-600 mb-4">Your Favorite Stores</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {favoriteStores.map((store, index) => (
-                        <div key={store.name} className="bg-white rounded-lg p-4 border-2 border-grey-stroke hover:border-sage-500 transition-all">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-sage-100 rounded-full flex items-center justify-center">
-                            <span className="text-2xl">{index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}</span>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                            <p className="font-bold text-charcoal-700 truncate">{store.name}</p>
-                            <p className="text-sm text-charcoal-500">{store.count} order{store.count !== 1 ? 's' : ''}</p>
-                            </div>
+                    {/* Order Tabs */}
+                      <section className="mb-8">
+                        <div className="flex gap-2 mb-6 border-b border-grey-stroke">
+                          {[
+                            { id: 'all', label: 'All Orders', count: orders.length },
+                            { id: 'active', label: 'Active', count: activeOrders.length },
+                            { id: 'completed', label: 'Completed', count: completedOrders.length },
+                            { id: 'cancelled', label: 'Cancelled', count: cancelledOrders.length }
+                          ].map(tab => (
+                            <button
+                              key={tab.id}
+                              onClick={() => setActiveTab(tab.id)}
+                              className={`px-6 py-3 font-semibold transition-all relative ${
+                                activeTab === tab.id
+                                  ? 'text-sage-600'
+                                  : 'text-charcoal-400 hover:text-charcoal-600'
+                              }`}
+                            >
+                              {tab.label}
+                              {tab.count > 0 && (
+                                <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
+                                  activeTab === tab.id
+                                    ? 'bg-sage-500 text-white'
+                                    : 'bg-grey-200 text-charcoal-600'
+                                }`}>
+                                  {tab.count}
+                                </span>
+                              )}
+                              {activeTab === tab.id && (
+                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-sage-500" />
+                              )}
+                            </button>
+                          ))}
                         </div>
-                        </div>
-                    ))}
-                    </div>
-                </section>
-                )}
 
-                {/* Past Orders */}
-                {pastOrders.length > 0 && (
-                <section className="bg-grey-200 rounded-lg p-6 shadow-soft-lift border border-grey-stroke space-y-4 mb-8">
-                    <div className="flex items-center justify-between">
-                    <h2 className="text-card-h2 text-charcoal-600">Past Orders</h2>
-                    <button
-                        type="button"
-                        className="text-sm font-medium text-sage-600 hover:text-sage-700 underline"
-                        onClick={() => navigate("orders")}
-                    >
-                        View all
-                    </button>
-                    </div>
-
-                    <Table>
-                    <TableHeader columns={["Order #", "Store", "Status", "Total", "Date"]} />
-                    <TableBody>
-                        {pastOrders.map((order) => (
-                        <TableRow
-                            key={order.id}
-                            data={[
-                            `#${order.id}`,
-                            order.sellerName || "—",
-                            <StatusChip variant={getStatusVariant(order.status)}>
-                                {order.status || "Unknown"}
-                            </StatusChip>,
-                            formatCurrency(order.totalAmount || 0),
-                            formatDate(order.createdAt),
-                            ]}
-                        />
-                        ))}
-                    </TableBody>
-                    </Table>
-                </section>
-                )}
-
-                {/* Recent Orders */}
-                <section className="bg-grey-200 rounded-lg p-6 shadow-soft-lift border border-grey-stroke space-y-4">
-                <div className="flex items-center justify-between">
-                    <h2 className="text-card-h2 text-charcoal-600">Recent Activity</h2>
-                    <button
-                    type="button"
-                    className="text-sm font-medium text-sage-600 hover:text-sage-700 underline"
-                    onClick={() => navigate("orders")}
-                    >
-                    View all
-                    </button>
-                </div>
-
-                {recentOrders.length === 0 ? (
-                    <div className="text-center py-8">
-                    <Icon.Package size={48} className="mx-auto text-charcoal-300 mb-3" />
-                    <p className="text-body-regular text-charcoal-400 mb-4">No orders yet</p>
-                    <button
-                        onClick={() => window.location.href = '/mainStore'}
-                        className="bg-sage-500 hover:bg-sage-600 text-white px-6 py-2 rounded-lg font-semibold transition-all"
-                    >
-                        Start Shopping
-                    </button>
-                    </div>
-                ) : (
-                    <Table>
-                    <TableHeader columns={["Order #", "Store", "Status", "Total", "Date", "Action"]} />
-                    <TableBody>
-                        {recentOrders.map((order) => (
-                        <TableRow
-                            key={order.id}
-                            data={[
-                            `#${order.id}`,
-                            order.sellerName || "—",
-                            <StatusChip variant={getStatusVariant(order.status)}>
-                                {order.status || "Unknown"}
-                            </StatusChip>,
-                            formatCurrency(order.totalAmount || 0),
-                            formatDate(order.createdAt),
-                            ]}
-                            actions={
-                            <CRUDButton variant="neutral" onClick={() => openOrderModal(order)}>
-                                View Details
-                            </CRUDButton>
-                            }
-                        />
-                        ))}
-                    </TableBody>
-                    </Table>
-                )}
-                </section>
+                        {/* Orders Display */}
+                      <div className="mt-6"> 
+                        {displayedOrders.length === 0 ? (
+                         <div className="text-center py-12 bg-white rounded-xl border border-grey-stroke shadow-sm">
+                            <Icon.Package size={48} className="mx-auto text-charcoal-300 mb-3" />
+                            <p className="text-body-regular text-charcoal-400 mb-4">
+                              No {activeTab !== 'all' ? activeTab : ''} orders yet
+                            </p>
+                            <button
+                              onClick={() => navigate('/mainStore', { state: { customerId, customerName } })}
+                              className="bg-sage-500 hover:bg-sage-600 text-white px-6 py-2 rounded-lg font-semibold transition-all"
+                            >
+                              Start Shopping
+                            </button>
+                          </div>
+                          
+                        ) : (
+                          <div className="bg-white rounded-xl border border-grey-stroke shadow-sm overflow-hidden">
+                           <Table>
+                            <TableHeader columns={["Order #", "Store", "Status", "Total", "Date", "Action"]} />
+                            <TableBody>
+                              {displayedOrders.map((order) => (
+                                <TableRow
+                                  key={order.id}
+                                  data={[
+                                    `#${order.id}`,
+                                    order.sellerName || "—",
+                                    <StatusChip variant={getStatusVariant(order.status)}>
+                                      {order.status || "Unknown"}
+                                    </StatusChip>,
+                                    formatCurrency(order.totalAmount || 0),
+                                    formatDate(order.createdAt),
+                                  ]}
+                                  actions={
+                                    <CRUDButton variant="neutral" onClick={() => openOrderModal(order)}>
+                                      View Details
+                                    </CRUDButton>
+                                  }
+                                />
+                              ))}
+                            </TableBody>
+                          </Table>
+                          </div>
+                        )}
+                      </div>
+                      </section>
+                   
             </>
+            
             )}
           </div>
         </main>
@@ -757,8 +1198,117 @@ const pastOrders = useMemo(() => {
             }} 
         />
         )}
+
+          {/* Clear Cart Modal */}
+          {showClearCartModal && pendingReorderItems && (
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-grey-stroke">
+                <h3 className="text-xl font-bold text-charcoal-600 mb-4">Different Store Detected</h3>
+                <p className="text-body-regular text-charcoal-500 mb-6">
+                  {cart.length > 0 
+                    ? "You have items in your cart. Would you like to clear your current cart and reorder these items instead?"
+                    : `Would you like to add ${pendingReorderItems?.items.length} item${pendingReorderItems?.items.length !== 1 ? 's' : ''} from this order to your cart?`
+                  }
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={confirmClearAndReorder}
+                    className="flex-1 bg-sage-500 hover:bg-sage-600 text-white py-2.5 rounded-lg font-semibold"
+                  >
+                    {cart.length > 0 ? 'Clear Cart & Reorder' : 'Add to Cart'}
+                  </button>
+                  <button
+                    onClick={cancelReorder}
+                    className="flex-1 bg-grey-300 hover:bg-grey-400 text-charcoal-700 py-2.5 rounded-lg font-semibold"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Review Modal */}
+            {reviewModal.show && (
+              <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 modal-backdrop-enter">
+                <div className="bg-cream-50 rounded-2xl shadow-2xl max-w-md w-full p-6 border border-grey-stroke modal-content-enter">
+                  <div className="flex items-center mb-4">
+                    <div className="bg-yellow-100 p-3 rounded-full">
+                      <Icon.Star size={24} weight="fill" className="text-yellow-600" />
+                    </div>
+                    <h3 className="ml-3 text-xl font-bold text-charcoal-700">Write a Review</h3>
+                  </div>
+                  
+                  <p className="text-charcoal-600 mb-4">
+                    Product: <strong className="text-charcoal-700">{reviewModal.productName}</strong>
+                  </p>
+
+                  {reviewModal.error && (
+                    <div className="mb-4 p-3 rounded-lg bg-error-bg border-l-4 border-error-btn">
+                      <p className="text-sm text-error-text">{reviewModal.error}</p>
+                    </div>
+                  )}
+
+                  <div className="space-y-4 mb-6">
+                    <div>
+                      <label className="block text-sm font-medium text-charcoal-600 mb-2">Rating</label>
+                      <div className="flex gap-2">
+                        {[1, 2, 3, 4, 5].map(star => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => setReviewModal(prev => ({ ...prev, rating: star }))}
+                            className={`text-3xl transition-colors ${
+                              star <= reviewModal.rating ? 'text-yellow-400' : 'text-grey-stroke'
+                            } hover:text-yellow-400`}
+                          >
+                            ★
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-charcoal-600 mb-2">Comment</label>
+                      <textarea
+                        value={reviewModal.comment}
+                        onChange={(e) => setReviewModal(prev => ({ ...prev, comment: e.target.value }))}
+                        rows="4"
+                        className="w-full border-2 border-grey-stroke rounded-lg p-3 text-charcoal-700 bg-white focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-sage-500"
+                        placeholder="Share your experience with this product..."
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={handleSubmitReview} 
+                      disabled={reviewModal.loading}
+                      className="flex-1 bg-sage-500 hover:bg-sage-600 text-white py-3 px-4 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {reviewModal.loading ? "Submitting..." : "Submit Review"}
+                    </button>
+                    <button 
+                      onClick={closeReviewModal} 
+                      disabled={reviewModal.loading}
+                      className="flex-1 bg-grey-300 hover:bg-grey-400 text-charcoal-700 py-3 px-4 rounded-lg font-semibold disabled:opacity-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+          {/* Snackbar */}
+          <Snackbar 
+            open={snackbar.open}
+            message={snackbar.message}
+            type={snackbar.type}
+            onClose={() => setSnackbar({ open: false, message: '', type: 'success' })}
+          />
     </div>
   );
-};
 
+};
 export default CustomerDashboard;

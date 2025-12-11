@@ -109,17 +109,32 @@ useEffect(() => {
 
 
 
-    const handleUpdateQuantity = (productId, newQuantity) => {
-  const cartKey = `beyti_cart_${storeId}_${customerId}`;
-  const updatedCart = localCart.map(item => 
-    item.id === productId 
-      ? { ...item, quantity: newQuantity, totalPrice: item.basePrice * newQuantity }
-      : item
-  ).filter(item => item.quantity > 0);
-  
-  setLocalCart(updatedCart);
-  localStorage.setItem(cartKey, JSON.stringify(updatedCart));
-};
+  const handleUpdateQuantity = (productId, newQuantity) => {
+    const cartKey = `beyti_cart_${storeId}_${customerId}`;
+    const updatedCart = localCart.map(item => 
+      item.id === productId 
+        ? { ...item, quantity: newQuantity, totalPrice: item.basePrice * newQuantity }
+        : item
+    ).filter(item => item.quantity > 0);
+    
+    setLocalCart(updatedCart);
+    localStorage.setItem(cartKey, JSON.stringify(updatedCart));
+    
+    // If cart is now empty, clear the store name
+    if (updatedCart.length === 0) {
+      navigate('/checkout', {
+        replace: true,
+        state: {
+          customerId,
+          customerName,
+          customerAddresses,
+          selectedStore: null,
+          storeName: null,
+          storeId: null
+        }
+      });
+    }
+  };
 
 const handleRemoveItem = (productId) => {
   const cartKey = `beyti_cart_${storeId}_${customerId}`;
@@ -127,6 +142,21 @@ const handleRemoveItem = (productId) => {
   
   setLocalCart(updatedCart);
   localStorage.setItem(cartKey, JSON.stringify(updatedCart));
+  
+  // If cart is now empty, clear the store name by navigating back with no store
+  if (updatedCart.length === 0) {
+    navigate('/checkout', {
+      replace: true,
+      state: {
+        customerId,
+        customerName,
+        customerAddresses,
+        selectedStore: null,
+        storeName: null,
+        storeId: null
+      }
+    });
+  }
 };
 
 const [snackbar, setSnackbar] = useState({ open: false, message: '', type: 'success' });
@@ -682,57 +712,55 @@ const showSnackbar = (message, type = 'success') => {
                 
                 {/* Store Name with Green Underline + Stepper on Same Line */}
                 <div className="flex items-center justify-between mb-6">
-                    {/* Store Name */}
-                    {storeName && (
-                    <div>
-                        <p className="text-[18px] text-charcoal-600 inline-block border-b-4 border-sage-500 pb-1" style={{ fontFamily: 'Inter, sans-serif' }}>
-                        Items from: <span className="font-semibold">{storeName}</span>
-                        </p>
-                    </div>
-                    )}
-                    
-                    {/* Stepper - Moved 50% to the right (25% more than before) with smaller gaps */}
-                    <div className="flex items-center gap-2 max-w-xl ml-[25%]">
-                    {['Cart', 'Fulfillment', 'Address', 'Payment'].map((label, idx) => (
+                  {/* Store Name - Always show "Items from:" */}
+                  <div className="flex-shrink-0" style={{ minWidth: '200px' }}>
+                    <p className="text-[18px] text-charcoal-600 inline-block border-b-4 border-sage-500 pb-1" style={{ fontFamily: 'Inter, sans-serif' }}>
+                      Items from: <span className="font-semibold">{storeName || '—'}</span>
+                    </p>
+                  </div>
+                  
+                  {/* Stepper - Moved 50% to the right (25% more than before) with smaller gaps */}
+                  <div className="flex items-center gap-2 max-w-xl ml-[25%]">
+                      {['Cart', 'Fulfillment', 'Address', 'Payment'].map((label, idx) => (
                         <div key={idx} className="flex items-center flex-1">
-                        <div className="flex items-center gap-2 flex-1">
+                          <div className="flex items-center gap-2 flex-1">
                             {/* Step Circle */}
                             <div
-                            className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all shadow-md ${
+                              className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all shadow-md ${
                                 step > idx + 1
-                                ? 'bg-sage-600 text-white ring-4 ring-sage-200'
-                                : step === idx + 1
-                                ? 'bg-sage-500 text-white ring-4 ring-sage-200 scale-110'
-                                : 'bg-grey-200 text-charcoal-400'
-                            }`}
-                            style={{ fontFamily: 'Inter, sans-serif' }}
+                                  ? 'bg-sage-600 text-white ring-4 ring-sage-200'
+                                  : step === idx + 1
+                                  ? 'bg-sage-500 text-white ring-4 ring-sage-200 scale-110'
+                                  : 'bg-grey-200 text-charcoal-400'
+                              }`}
+                              style={{ fontFamily: 'Inter, sans-serif' }}
                             >
-                            {step > idx + 1 ? '✓' : idx + 1}
+                              {step > idx + 1 ? '✓' : idx + 1}
                             </div>
                             
                             {/* Step Label */}
                             <span
-                            className={`text-sm font-semibold transition-all ${
+                              className={`text-sm font-semibold transition-all ${
                                 step === idx + 1 ? 'text-sage-600' : step > idx + 1 ? 'text-sage-500' : 'text-charcoal-400'
-                            }`}
-                            style={{ fontFamily: 'Inter, sans-serif' }}
+                              }`}
+                              style={{ fontFamily: 'Inter, sans-serif' }}
                             >
-                            {label}
+                              {label}
                             </span>
-                        </div>
-                        
-                        {/* Connector Line */}
-                        {idx < 3 && (
+                          </div>
+                          
+                          {/* Connector Line */}
+                          {idx < 3 && (
                             <div
-                            className={`h-1 flex-1 mx-1.5 rounded-full transition-all ${
+                              className={`h-1 flex-1 mx-1.5 rounded-full transition-all ${
                                 step > idx + 1 ? 'bg-sage-500' : 'bg-grey-300'
-                            }`}
+                              }`}
                             />
-                        )}
+                          )}
                         </div>
-                    ))}
+                      ))}
                     </div>
-                </div>
+                  </div>
                 </div>
 
             {/* STEP 1: CART PAGE - TWO COLUMN LAYOUT */}
