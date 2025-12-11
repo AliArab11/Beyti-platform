@@ -40,6 +40,7 @@ const PageHeader = ({
   onProfileClick,
   onProfileUpdate, // Callback when profile is updated
   onLogout,
+  additionalActions = null, 
   className = '',
   ...props
 }) => {
@@ -136,6 +137,9 @@ const PageHeader = ({
       <div className="flex items-center gap-4">
         {/* Notification Bell */}
         <NotificationDropdown userId={userId} />
+
+        {/* Additional Actions (like Cart Button) */}
+        {additionalActions}
 
         {/* User Dropdown */}
         <div className="relative">

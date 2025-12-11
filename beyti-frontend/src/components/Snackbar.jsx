@@ -19,19 +19,20 @@ const Snackbar = ({ open, message, type = 'success', onClose }) => {
     <div 
       className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999]"
       style={{
-        animation: 'slideUp 0.3s ease-out forwards'
+        animation: 'slideUp 0.3s ease-out forwards',
+         left: '50%'
       }}
     >
       <style>{`
-        @keyframes slideUp {
-          from {
-            transform: translate(-50%, 100px);
+         @keyframes slideUp {
+            from {
+            transform: translateX(-50%) translateY(100px);
             opacity: 0;
-          }
-          to {
-            transform: translate(-50%, 0);
+            }
+            to {
+            transform: translateX(-50%) translateY(0);
             opacity: 1;
-          }
+            }
         }
       `}</style>
       <div 
