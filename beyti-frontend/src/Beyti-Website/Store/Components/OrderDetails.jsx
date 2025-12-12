@@ -17,37 +17,48 @@ const OrderDetails = ({ order, onClose }) => {
 
   const mapRef = useRef(null);
 
+  // ADD THIS:
+  console.log('🎯 OrderDetails received order:', {
+    id: order?.id,
+    status: order?.status,
+    fulfillmentType: order?.fulfillmentType,
+    fullOrder: JSON.stringify(order, null, 2)
+  });
 
-useEffect(() => {
-  if (order) {
-    console.log('📦 OrderDetails received order:', order);
-    
-    // No auto-dismiss - user closes manually
-  }
-}, [order]);
+  useEffect(() => {
+    if (order) {
+      console.log('📦 OrderDetails useEffect - order:', order);
+    }
+  }, [order]);
 
   if (!order) {
     console.log('⚠️ No order provided to OrderDetails');
     return null;
   }
 
-  // Order status progression
+
+        // Order status progression
         const statuses = [
-        { key: 'Placed', label: 'Order Placed', icon: Package },
-        { key: 'Accepted', label: 'Restaurant Accepted', icon: CheckCircle },
-        { key: 'Preparing', label: 'Preparing', icon: Clock },
-        { key: 'Ready for Pickup', label: order.fulfillmentType === 'Delivery' ? 'Ready for Pickup' : 'Ready for Pickup', icon: CheckCircle },
+          { key: "Placed", label: "Order Placed", icon: Package },
+          { key: "Accepted", label: "Store Accepted", icon: CheckCircle },
+          { key: "Preparing", label: "Preparing", icon: Clock },
         ];
 
-        if (order.fulfillmentType === 'Delivery') {
-        statuses.push(
-            { key: 'Picked Up', label: 'Out for Delivery', icon: Package },
-            { key: 'Delivered', label: 'Delivered', icon: CheckCircle }
-        );
-        } else {
-        statuses.push(
-            { key: 'Completed', label: 'Completed', icon: CheckCircle }
-        );
+        if (order.fulfillmentType === "Pickup") {
+          statuses.push(
+            { key: "Ready for Pickup", label: "Ready for Pickup", icon: CheckCircle },
+            { key: "Completed", label: "Completed", icon: CheckCircle }
+          );
+        } else if (order.fulfillmentType === "Delivery") {
+          statuses.push(
+            { key: "Picked Up", label: "Out for Delivery", icon: Package },
+            { key: "Delivered", label: "Delivered", icon: CheckCircle }
+          );
+        }
+                // Remove "Ready for Pickup" if delivery
+        if (order.fulfillmentType === "Delivery") {
+          const index = statuses.findIndex(s => s.key === "Ready for Pickup");
+          if (index !== -1) statuses.splice(index, 1);
         }
 
   const currentStatusIndex = statuses.findIndex(s => s.key === order.status);
@@ -159,20 +170,20 @@ return (
             <div className="mb-6 p-4 bg-sage-50 rounded-xl">
               <p className="text-lg font-bold text-sage-700 mb-1">
                 {currentStatusIndex === 0 && "Order Placed Successfully! 🎉"}
-                {currentStatusIndex === 1 && "Restaurant is preparing your order 👨‍🍳"}
+                {currentStatusIndex === 1 && "Store is preparing your order 👨‍🍳"}
                 {currentStatusIndex === 2 && "Your order is being prepared 🔥"}
                 {currentStatusIndex === 3 && (order.fulfillmentType === 'Delivery' ? "Order is ready for pickup by driver 📦" : "Your order is ready for pickup! 🎊")}
-                {currentStatusIndex === 4 && order.fulfillmentType === 'Delivery' && "Driver is on the way to you 🚗"}
-                {currentStatusIndex === 5 && "Order delivered! Enjoy your meal 🎉"}
+                {currentStatusIndex === 4 && order.fulfillmentType === 'Delivery' && "🚗 Driver is on the way to you!"}
+                {currentStatusIndex === 5 && order.fulfillmentType === 'Delivery' && "Order delivered! Enjoy your meal 🎉"}
                 {order.status === 'Completed' && order.fulfillmentType === 'Pickup' && "Order completed! Thank you 🎉"}
               </p>
               <p className="text-sm text-charcoal-600">
-                {currentStatusIndex === 0 && "We've received your order and notified the restaurant."}
-                {currentStatusIndex === 1 && "The restaurant has accepted your order and started preparation."}
+                {currentStatusIndex === 0 && "We've received your order and notified the store."}
+                {currentStatusIndex === 1 && "The store has accepted your order and started preparation."}
                 {currentStatusIndex === 2 && "Your delicious food is being cooked with care."}
-                {currentStatusIndex === 3 && (order.fulfillmentType === 'Delivery' ? "Your order is packed and waiting for a driver." : "Head to the restaurant to collect your order!")}
+                {currentStatusIndex === 3 && (order.fulfillmentType === 'Delivery' ? "Your order is packed and waiting for a driver." : "Head to the store to collect your order!")}
                 {currentStatusIndex === 4 && order.fulfillmentType === 'Delivery' && "Your order is out for delivery and will arrive soon."}
-                {currentStatusIndex === 5 && "Your order has been delivered. Bon appétit!"}
+                {currentStatusIndex === 5 && order.fulfillmentType === 'Delivery' && "Your order has been delivered. Bon appétit!"}
                 {order.status === 'Completed' && order.fulfillmentType === 'Pickup' && "We hope you enjoyed your meal!"}
               </p>
             </div>
@@ -257,7 +268,7 @@ return (
                   </div>
                   <div className="flex-1">
                     <p className="font-black text-charcoal-700 text-xl mb-2">
-                      {order.storeName || order.sellerName || "Restaurant"}
+                      {order.storeName || order.sellerName || "Store"}
                     </p>
 
                     <div className="space-y-2 text-sm">
@@ -285,7 +296,7 @@ return (
                 order.status === "Completed") && (
                 <div className="mt-3 p-3 bg-sage-600 rounded-lg">
                   <p className="text-sm font-bold text-white">
-                    ✓ Your order is ready! Head to the restaurant to collect it.
+                    ✓ Your order is ready! Head to the Store to collect it.
                   </p>
                 </div>
               )}

@@ -224,8 +224,11 @@ useEffect(() => {
     return `${Math.floor(diffDays / 365)} years ago`;
   };
 
-    const handleAddToCart = () => {
+const handleAddToCart = () => {
     if (!product) return;
+    
+    // Check available stock
+    const maxStock = selectedVariant?.stockQty || 0;
     
     const item = {
         id: product.id,
@@ -248,20 +251,20 @@ useEffect(() => {
     try {
         // Check all cart keys for this customer
         for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith(`beyti_cart_`) && key.endsWith(`_${customerId}`)) {
-            const savedCart = localStorage.getItem(key);
-            if (savedCart) {
-            const parsedCart = JSON.parse(savedCart);
-            if (parsedCart.length > 0) {
-                existingCart = parsedCart;
-                // Extract storeId from key: beyti_cart_{storeId}_{customerId}
-                const parts = key.split('_');
-                existingStoreId = parts[2];
-                break;
+            const key = localStorage.key(i);
+            if (key && key.startsWith(`beyti_cart_`) && key.endsWith(`_${customerId}`)) {
+                const savedCart = localStorage.getItem(key);
+                if (savedCart) {
+                    const parsedCart = JSON.parse(savedCart);
+                    if (parsedCart.length > 0) {
+                        existingCart = parsedCart;
+                        // Extract storeId from key: beyti_cart_{storeId}_{customerId}
+                        const parts = key.split('_');
+                        existingStoreId = parts[2];
+                        break;
+                    }
+                }
             }
-            }
-        }
         }
     } catch (err) {
         console.error('Error reading cart:', err);
@@ -279,9 +282,28 @@ useEffect(() => {
         return;
     }
     
+    // ✅ NEW: Check if adding this quantity would exceed stock
+    const existingItem = existingCart.find(cartItem => {
+        const sameProduct = cartItem.id === item.id;
+        const sameVariant = (!cartItem.selectedVariant && !item.selectedVariant) ||
+                            (cartItem.selectedVariant?.id === item.selectedVariant?.id);
+        return sameProduct && sameVariant;
+    });
+    
+    const currentCartQuantity = existingItem ? existingItem.quantity : 0;
+    const totalQuantity = currentCartQuantity + quantity;
+    
+    if (totalQuantity > maxStock) {
+        showSnackbar(
+            `Cannot add ${quantity} more. You already have ${currentCartQuantity} in cart. Only ${maxStock} available in stock.`,
+            'warning'
+        );
+        return;
+    }
+    
     // Same store or empty cart - proceed with adding
     addItemToCart(item);
-    };
+};
 
     // Helper function to actually add the item
     const addItemToCart = (item) => {
@@ -447,6 +469,7 @@ const handleTrackOrder = () => {
                                 customerId,
                                 customerName,
                                 storeId,
+                                storeName
                             }
                         });
                     }}
@@ -488,15 +511,18 @@ const handleTrackOrder = () => {
       </header>
 
       {/* Active Order Banner */}
-      {activeOrder && !bannerDismissed && (
-      <ActiveOrderBanner 
-        activeOrderCount={orders.filter(o => 
+      {(() => {
+        const count = orders.filter(o => 
           !['completed', 'cancelled', 'delivered'].includes(o.status?.toLowerCase())
-        ).length}
-        onTrack={handleTrackOrder}
-        onDismiss={handleDismissBanner}
-      />
-    )}
+        ).length;
+        return count > 0 && !bannerDismissed && (
+          <ActiveOrderBanner 
+            activeOrderCount={count}
+            onTrack={handleTrackOrder}
+            onDismiss={handleDismissBanner}
+          />
+        );
+      })()}
 
       {/* Main Content */}
 <main className="max-w-[1400px] mx-auto px-8 py-12">
@@ -634,7 +660,7 @@ const handleTrackOrder = () => {
         </div>
       )}
 
-      {/* Quantity & Add to Cart */}
+     {/* Quantity & Add to Cart */}
       <div className="bg-white rounded-2xl p-6 shadow-[0_2px_12px_rgba(0,0,0,0.08)] mb-8">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-4 bg-cream-100 rounded-xl p-3 border-2 border-grey-stroke">
@@ -649,8 +675,13 @@ const handleTrackOrder = () => {
               {quantity}
             </span>
             <button
-              onClick={() => setQuantity(quantity + 1)}
-              disabled={selectedVariant && selectedVariant.stockQty > 0 && quantity >= selectedVariant.stockQty}
+              onClick={() => {
+                const maxStock = selectedVariant?.stockQty || 0;
+                if (quantity < maxStock) {
+                  setQuantity(quantity + 1);
+                }
+              }}
+              disabled={!selectedVariant || selectedVariant.stockQty === 0 || quantity >= (selectedVariant?.stockQty || 0)}
               className="w-12 h-12 flex items-center justify-center bg-white rounded-lg shadow-sm hover:shadow-md transition-all disabled:opacity-50"
             >
               <Plus size={20} weight="bold" className="text-charcoal-600" />
@@ -659,16 +690,16 @@ const handleTrackOrder = () => {
 
           <button
             onClick={handleAddToCart}
-            disabled={selectedVariant && selectedVariant.stockQty === 0}
+            disabled={!selectedVariant || selectedVariant.stockQty === 0}
             className="flex-1 bg-sage-500 hover:bg-sage-600 text-white font-bold py-5 px-8 rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed text-lg"
           >
             <ShoppingCartSimple size={26} weight="bold" />
-            <span>{selectedVariant && selectedVariant.stockQty === 0 ? 'Out of Stock' : 'Add to Cart'}</span>
+            <span>{(!selectedVariant || selectedVariant.stockQty === 0) ? 'Out of Stock' : 'Add to Cart'}</span>
           </button>
         </div>
       </div>
-    </div>
-  </div>
+      </div>
+        </div>
 
         {/* Tabs Section */}
         <div className="bg-white rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.08)] overflow-hidden">
@@ -896,6 +927,14 @@ const handleTrackOrder = () => {
     </div>
   </div>
 )}
+
+{/* Snackbar */}
+<Snackbar
+  open={snackbar.open}
+  message={snackbar.message}
+  type={snackbar.type}
+  onClose={() => setSnackbar({ ...snackbar, open: false })}
+/>
 
     
 

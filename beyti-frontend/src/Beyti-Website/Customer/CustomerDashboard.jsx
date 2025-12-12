@@ -371,37 +371,42 @@ useEffect(() => {
 useEffect(() => {
   if (!customerId) return;
   const loadOrders = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await getCustomerOrders(customerId);
-      
-      // Fetch reviews for all products in all orders
-      const ordersWithReviews = await Promise.all(
-        (data || []).map(async (order) => {
-          const itemsWithReviews = await Promise.all(
-            (order.orderItems || []).map(async (item) => {
-              try {
-                const response = await fetch(`https://localhost:7062/api/Reviews?productId=${item.productId}&customerId=${customerId}`);
-                const reviewData = await response.json();
-                const orderReview = reviewData.find(r => r.orderId === order.id && r.productId === item.productId);
-                return { ...item, review: orderReview || null };
-              } catch {
-                return { ...item, review: null };
-              }
-            })
-          );
-          return { ...order, orderItems: itemsWithReviews };
-        })
-      );
-      
-      setOrders(ordersWithReviews);
-    } catch (err) {
-      setError(err.message || "Failed to load orders");
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    setLoading(true);
+    setError(null);
+    const data = await getCustomerOrders(customerId);
+    
+    console.log('🔍 RAW ORDER DATA FROM BACKEND:', JSON.stringify(data, null, 2));
+    
+    // Fetch reviews for all products in all orders
+    const ordersWithReviews = await Promise.all(
+      (data || []).map(async (order) => {
+        console.log(`📦 Processing order #${order.id} - Status: ${order.status}`);
+        
+        const itemsWithReviews = await Promise.all(
+          (order.orderItems || []).map(async (item) => {
+            try {
+              const response = await fetch(`https://localhost:7062/api/Reviews?productId=${item.productId}&customerId=${customerId}`);
+              const reviewData = await response.json();
+              const orderReview = reviewData.find(r => r.orderId === order.id && r.productId === item.productId);
+              return { ...item, review: orderReview || null };
+            } catch {
+              return { ...item, review: null };
+            }
+          })
+        );
+        return { ...order, orderItems: itemsWithReviews };
+      })
+    );
+    
+    console.log('✅ FINAL ORDERS WITH REVIEWS:', JSON.stringify(ordersWithReviews, null, 2));
+    setOrders(ordersWithReviews);
+  } catch (err) {
+    setError(err.message || "Failed to load orders");
+  } finally {
+    setLoading(false);
+  }
+};
   loadOrders();
 }, [customerId]);
 
@@ -428,13 +433,19 @@ useEffect(() => {
   }, [orders]);
 
   const displayedOrders = useMemo(() => {
-    switch(activeTab) {
-      case 'active': return activeOrders;
-      case 'completed': return completedOrders;
-      case 'cancelled': return cancelledOrders;
-      default: return orders; // 'all'
-    }
-  }, [activeTab, orders, activeOrders, completedOrders, cancelledOrders]);
+  let ordersToDisplay = [];
+  switch(activeTab) {
+    case 'active': ordersToDisplay = activeOrders; break;
+    case 'completed': ordersToDisplay = completedOrders; break;
+    case 'cancelled': ordersToDisplay = cancelledOrders; break;
+    default: ordersToDisplay = orders; // 'all'
+  }
+  
+  // Sort by most recent first
+  return [...ordersToDisplay].sort((a, b) => 
+    new Date(b.createdAt) - new Date(a.createdAt)
+  );
+}, [activeTab, orders, activeOrders, completedOrders, cancelledOrders]);
 
 // Set the currently displayed active order based on index
 const currentActiveOrder = activeOrders.length > 0 ? activeOrders[activeOrderIndex] : null;
@@ -1058,8 +1069,12 @@ const pastOrders = useMemo(() => {
                                         <p className="font-semibold text-sm truncate">{order.sellerName}</p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-white/70">Status</p>
-                                        <p className="font-semibold text-sm">{order.status}</p>
+                                      <p className="text-xs text-white/70">Status</p>
+                                      <p className="font-semibold text-sm">
+                                        {order.status?.toLowerCase() === 'picked up' 
+                                          ? 'Out for Delivery' 
+                                          : order.status}
+                                      </p>
                                     </div>
                                     <div>
                                         <p className="text-xs text-white/70">Total</p>

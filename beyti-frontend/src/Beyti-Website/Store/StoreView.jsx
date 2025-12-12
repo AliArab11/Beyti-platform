@@ -1105,15 +1105,18 @@ useEffect(() => {
     />
 
     {/* Active Order Banner */}
-    {activeOrder && !bannerDismissed && (
-      <ActiveOrderBanner 
-        activeOrderCount={orders.filter(o => 
+      {(() => {
+        const count = orders.filter(o => 
           !['completed', 'cancelled', 'delivered'].includes(o.status?.toLowerCase())
-        ).length}
-        onTrack={handleTrackOrder}
-        onDismiss={handleDismissBanner}
-      />
-    )}
+        ).length;
+        return count > 0 && !bannerDismissed && (
+          <ActiveOrderBanner 
+            activeOrderCount={count}
+            onTrack={handleTrackOrder}
+            onDismiss={handleDismissBanner}
+          />
+        );
+      })()}
 
 
       <StoreInfo store={store} />

@@ -891,6 +891,41 @@ export const deleteOrder = async (id) => {
   });
 };
 
+/**
+ * Validate stock availability before placing order
+ * @param {Array} items - Array of {ProductId, VariantId, Quantity}
+ * @returns {Promise<object>} - Validation result
+ */
+export const validateStock = async (items) => {
+  return await fetchAPI('/Orders/validate-stock', {
+    method: 'POST',
+    body: JSON.stringify(items),
+  });
+};
+
+/**
+ * Reserve stock for order items
+ * @param {Array} items - Array of {ProductId, VariantId, Quantity}
+ * @returns {Promise<void>}
+ */
+export const reserveStock = async (items) => {
+  return await fetchAPI('/Orders/reserve-stock', {
+    method: 'POST',
+    body: JSON.stringify(items),
+  });
+};
+
+/**
+ * Restore stock when order is cancelled
+ * @param {number} orderId - Order ID
+ * @returns {Promise<void>}
+ */
+export const restoreStock = async (orderId) => {
+  return await fetchAPI(`/Orders/${orderId}/restore-stock`, {
+    method: 'POST',
+  });
+};
+
 // --- Order Item APIs ---
 
 /**

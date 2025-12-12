@@ -375,32 +375,25 @@ if (!tickets || tickets.length === 0) {
   );
 
   const historyJobs = tickets.filter(
-    (t) => t.driverId === driverId && t.status === "Delivered"
-  );
+  (t) => t.driverId === driverId && t.status === "Delivered"
+);
 
-  const completed = historyJobs.length;
-  const earnings = historyJobs.reduce(
-    (sum, t) => sum + (t.order?.deliveryFee || 0),
-    0
-  );
+const completed = historyJobs.length;
 
-  // Calculate daily metrics
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+const earnings = historyJobs.reduce((sum, t) => sum + (t.order?.deliveryFee || 0), 0);
 
-  const deliveriesToday = historyJobs.filter(t => {
-    const deliveryDate = new Date(t.updatedAt);
-    deliveryDate.setHours(0, 0, 0, 0);
-    return deliveryDate.getTime() === today.getTime();
-  }).length;
+// Calculate daily metrics
+const today = new Date();
+today.setHours(0, 0, 0, 0);
 
-  const earningsToday = historyJobs
-    .filter(t => {
-      const deliveryDate = new Date(t.updatedAt);
-      deliveryDate.setHours(0, 0, 0, 0);
-      return deliveryDate.getTime() === today.getTime();
-    })
-    .reduce((sum, t) => sum + (t.order?.deliveryFee || 0), 0);
+const todaysDeliveredJobs = historyJobs.filter(t => {
+  const deliveryDate = new Date(t.updatedAt);
+  deliveryDate.setHours(0, 0, 0, 0);
+  return deliveryDate.getTime() === today.getTime();
+});
+
+const deliveriesToday = todaysDeliveredJobs.length;
+const earningsToday = todaysDeliveredJobs.reduce((sum, t) => sum + (t.order?.deliveryFee || 0), 0);
 
   // Calculate acceptance rate (accepted / total available shown to driver)
   const totalOffered = tickets.filter(t => 
@@ -417,15 +410,15 @@ if (!tickets || tickets.length === 0) {
     : null;
 
   // Weekly performance summary
-  const last7DaysJobs = historyJobs.filter(job => {
-    const jobDate = new Date(job.updatedAt);
-    const daysDiff = (today - jobDate) / (1000 * 60 * 60 * 24);
-    return daysDiff <= 7;
-  });
-  
-  const weeklyDeliveries = last7DaysJobs.length;
-  const weeklyEarnings = last7DaysJobs.reduce((sum, job) => sum + (job.order?.deliveryFee || 0), 0);
-  const avgDeliveryValue = weeklyDeliveries > 0 ? weeklyEarnings / weeklyDeliveries : 0;
+const last7DaysJobs = historyJobs.filter(job => {
+  const jobDate = new Date(job.updatedAt);
+  const daysDiff = (today - jobDate) / (1000 * 60 * 60 * 24);
+  return daysDiff <= 7;
+});
+
+const weeklyDeliveries = last7DaysJobs.length;
+const weeklyEarnings = last7DaysJobs.reduce((sum, job) => sum + (job.order?.deliveryFee || 0), 0);
+const avgDeliveryValue = weeklyDeliveries > 0 ? weeklyEarnings / weeklyDeliveries : 0;
 
   // Calculate top 3 restaurants
   const restaurantCount = {};

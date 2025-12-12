@@ -7,7 +7,7 @@ import StatusChip from "../../components/StatusChip";
 import CRUDButton from "../../components/CRUDButton";
 import { Table, TableHeader, TableBody, TableRow } from "../../components/Table";
 
-import { getSellerOrders, getSellers } from "../../services/api";
+import { getSellerOrders, getSellers, restoreStock } from "../../services/api";
 import Orders from "./Components/Orders"; 
 import Analytics from "./Components/Analytics";
 import Products from "./Components/Products";
@@ -140,6 +140,15 @@ const OrderDetailsModal = ({ order, onClose, onOrderUpdated }) => {
       }
 
       applyUpdate(nextStatus);
+      // Restore stock if order was cancelled
+      if (nextStatus === 'Cancelled') {
+        try {
+          await restoreStock(localOrder.id);
+          console.log('✅ Stock restored for cancelled order');
+        } catch (err) {
+          console.error('❌ Failed to restore stock:', err);
+        }
+      }
     } catch (err) {
       console.error(err);
       setActionError(err.message || "Failed to update order status");
@@ -295,14 +304,16 @@ const OrderDetailsModal = ({ order, onClose, onOrderUpdated }) => {
                 {formatCurrency(localOrder.totalAmount || 0)}
               </p>
             </div>
-            <div>
-              <p className="text-xs text-charcoal-400 mb-1 uppercase tracking-wide">
-                Delivery Fee
-              </p>
-              <p className="text-sm font-semibold text-charcoal-700">
-                {formatCurrency(localOrder.deliveryFee || 0)}
-              </p>
-            </div>
+            {localOrder.fulfillmentType === "Delivery" && (
+              <div>
+                <p className="text-xs text-charcoal-400 mb-1 uppercase tracking-wide">
+                  Delivery Fee
+                </p>
+                <p className="text-sm font-semibold text-charcoal-700">
+                  {formatCurrency(localOrder.deliveryFee || 0)}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Items */}
@@ -494,26 +505,33 @@ useEffect(() => {
     sevenDaysAgo.setDate(now.getDate() - 7);
 
     let totalRevenue = 0;
-    let pendingOrders = 0;
-    let last7DaysRevenue = 0;
-    let last7DaysOrders = 0;
+let pendingOrders = 0;
+let last7DaysRevenue = 0;
+let last7DaysOrders = 0;
 
-    const productMap = new Map();
+const productMap = new Map();
 
-    orders.forEach((order) => {
-      const amount = order.totalAmount || 0;
-      totalRevenue += amount;
+orders.forEach((order) => {
+  const amount = order.totalAmount || 0;
+  const status = order.status?.toLowerCase();
+  
+  // Only count revenue for completed orders
+  if (status === "completed" || status === "delivered") {
+    totalRevenue += amount;
+  }
 
-      const status = order.status?.toLowerCase();
-      if (status === "placed" || status === "pending") {
-        pendingOrders += 1;
-      }
+  if (status === "placed" || status === "pending") {
+    pendingOrders += 1;
+  }
 
-      const created = new Date(order.createdAt);
-      if (!Number.isNaN(created.getTime()) && created >= sevenDaysAgo) {
-        last7DaysRevenue += amount;
-        last7DaysOrders += 1;
-      }
+  const created = new Date(order.createdAt);
+  if (!Number.isNaN(created.getTime()) && created >= sevenDaysAgo) {
+    // Only count last 7 days revenue for completed orders
+    if (status === "completed" || status === "delivered") {
+      last7DaysRevenue += amount;
+    }
+    last7DaysOrders += 1;
+  }
 
       (order.orderItems || []).forEach((item) => {
         const key = item.productId || item.productName || "unknown";

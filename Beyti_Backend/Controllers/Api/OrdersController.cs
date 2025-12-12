@@ -48,6 +48,13 @@ namespace Beyti_Backend.Controllers.Api
             public string? SellerNote { get; set; }
         }
 
+        public class StockValidationItem
+        {
+            public int ProductId { get; set; }
+            public int VariantId { get; set; }
+            public int Quantity { get; set; }
+        }
+
 
         // GET: api/Orders
         [HttpGet]
@@ -300,6 +307,144 @@ namespace Beyti_Backend.Controllers.Api
             return CreatedAtAction("GetOrder", new { id = order.Id }, order);
         }
 
+        // POST: api/Orders/validate-stock
+        [HttpPost("validate-stock")]
+        public async Task<ActionResult<object>> ValidateStock([FromBody] List<StockValidationItem> items)
+        {
+            var unavailableItems = new List<object>();
+            var adjustedItems = new List<object>();
+
+            foreach (var item in items)
+            {
+                var variant = await _context.ProductVariants
+                    .Include(pv => pv.Product)
+                    .FirstOrDefaultAsync(pv => pv.Id == item.VariantId);
+
+                if (variant == null)
+                {
+                    unavailableItems.Add(new
+                    {
+                        productId = item.ProductId,
+                        productName = "Unknown Product",
+                        requested = item.Quantity,
+                        available = 0
+                    });
+                    continue;
+                }
+
+                if (variant.StockQty == 0)
+                {
+                    unavailableItems.Add(new
+                    {
+                        productId = item.ProductId,
+                        productName = variant.Product.Name,
+                        requested = item.Quantity,
+                        available = 0
+                    });
+                }
+                else if (variant.StockQty < item.Quantity)
+                {
+                    adjustedItems.Add(new
+                    {
+                        productId = item.ProductId,
+                        productName = variant.Product.Name,
+                        variantId = item.VariantId,
+                        requested = item.Quantity,
+                        available = variant.StockQty
+                    });
+                }
+            }
+
+            if (unavailableItems.Count > 0 || adjustedItems.Count > 0)
+            {
+                return Ok(new
+                {
+                    valid = false,
+                    unavailableItems,
+                    adjustedItems
+                });
+            }
+
+            return Ok(new { valid = true });
+        }
+
+        // POST: api/Orders/reserve-stock
+        [HttpPost("reserve-stock")]
+        public async Task<ActionResult> ReserveStock([FromBody] List<StockValidationItem> items)
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync();
+
+            try
+            {
+                foreach (var item in items)
+                {
+                    // Load normally (EF tracking)
+                    var variant = await _context.ProductVariants
+                        .Include(v => v.Product)
+                        .FirstOrDefaultAsync(v => v.Id == item.VariantId);
+
+                    if (variant == null)
+                    {
+                        await transaction.RollbackAsync();
+                        return BadRequest(new { success = false, message = $"Variant {item.VariantId} not found" });
+                    }
+
+                    // Apply row-level update lock
+                    await _context.Database.ExecuteSqlRawAsync(
+                        "SELECT 1 FROM ProductVariant WITH (UPDLOCK, ROWLOCK) WHERE Id = {0}",
+                        item.VariantId
+                    );
+
+
+                    if (variant.StockQty < item.Quantity)
+                    {
+                        await transaction.RollbackAsync();
+                        return BadRequest(new
+                        {
+                            success = false,
+                            message = $"Insufficient stock for {variant.Product?.Name ?? "product"}. Requested: {item.Quantity}, Available: {variant.StockQty}"
+                        });
+                    }
+
+                    variant.StockQty -= item.Quantity;
+                    variant.UpdatedAt = DateTime.UtcNow;
+                }
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return Ok(new { success = true, message = "Stock reserved successfully" });  // ✅ NOW RETURNS JSON
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                return StatusCode(500, new { success = false, message = "Error reserving stock", error = ex.Message });
+            }
+        }
+
+
+        // POST: api/Orders/{orderId}/restore-stock
+        [HttpPost("{orderId}/restore-stock")]
+        public async Task<ActionResult> RestoreStock(int orderId)
+        {
+            var orderItems = await _context.OrderItems
+                .Where(oi => oi.OrderId == orderId)
+                .ToListAsync();
+
+            foreach (var item in orderItems)
+            {
+                var variant = await _context.ProductVariants.FindAsync(item.ProductVariantId);
+                if (variant != null)
+                {
+                    variant.StockQty += item.Qty;
+                    variant.UpdatedAt = DateTime.UtcNow;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok();
+        }
+
         // PUT: api/Orders/{id}/seller-response
         [HttpPut("{id}/seller-response")]
         public async Task<IActionResult> SellerResponseToOrder(int id, [FromBody] SellerOrderResponseDto dto)
@@ -308,6 +453,7 @@ namespace Beyti_Backend.Controllers.Api
             {
                 var order = await _context.Orders
                     .Include(o => o.DeliveryTicket)
+                    .Include(o => o.OrderItems)  // ADD THIS LINE
                     .FirstOrDefaultAsync(o => o.Id == id);
 
                 if (order == null)
@@ -315,6 +461,20 @@ namespace Beyti_Backend.Controllers.Api
 
                 order.Status = dto.Status;
                 order.UpdatedAt = DateTime.UtcNow;
+
+                // ADD THIS BLOCK - Restore stock if order is cancelled
+                if (dto.Status == "Cancelled")
+                {
+                    foreach (var item in order.OrderItems)
+                    {
+                        var variant = await _context.ProductVariants.FindAsync(item.ProductVariantId);
+                        if (variant != null)
+                        {
+                            variant.StockQty += item.Qty;
+                            variant.UpdatedAt = DateTime.UtcNow;
+                        }
+                    }
+                }
 
                 // If order is accepted and it's a delivery, create a delivery ticket
                 if (dto.Status == "Accepted" && order.FulfillmentType == "Delivery")
@@ -353,17 +513,31 @@ namespace Beyti_Backend.Controllers.Api
                 if (order == null)
                     return NotFound();
 
-                order.Status = dto.Status;
-                order.UpdatedAt = DateTime.UtcNow;
-
-                // If status is "Ready for Pickup" and it's a delivery, update delivery ticket
-                if (dto.Status == "Ready for Pickup" && order.FulfillmentType == "Delivery" && order.DeliveryTicket != null)
+                // SPECIAL HANDLING FOR DELIVERY ORDERS
+                if (order.FulfillmentType == "Delivery" && dto.Status == "Ready for Pickup")
                 {
-                    order.DeliveryTicket.Status = "Available";
-                    order.DeliveryTicket.UpdatedAt = DateTime.UtcNow;
+                    // Customer should NOT see "Ready for Pickup"
+                    // So DO NOT update order.Status to "Ready for Pickup"
+
+                    // Keep customer status at "Preparing"
+                    order.Status = "Preparing";
+
+                    // Update delivery ticket so drivers see it
+                    if (order.DeliveryTicket != null)
+                    {
+                        order.DeliveryTicket.Status = "Available";
+                        order.DeliveryTicket.UpdatedAt = DateTime.UtcNow;
+                    }
+                }
+                else
+                {
+                    // Normal flow for pickup orders
+                    order.Status = dto.Status;
                 }
 
+                order.UpdatedAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
+
                 return NoContent();
             }
             catch (Exception ex)
@@ -371,6 +545,7 @@ namespace Beyti_Backend.Controllers.Api
                 return StatusCode(500, new { message = "Error updating status", error = ex.Message });
             }
         }
+
 
         // DELETE: api/Orders/5
         [HttpDelete("{id}")]

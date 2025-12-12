@@ -1,6 +1,6 @@
 import { useState, useEffect , useRef} from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Cake, BowlFood, Heart, Bread, Coffee, Storefront, ShoppingCartSimple } from "@phosphor-icons/react";
+import { Cake, BowlFood, Heart, Bread, Coffee, Storefront, ShoppingCartSimple, Package } from "@phosphor-icons/react";
 import StoreView from "./StoreView";
 import OrderDetails from './Components/OrderDetails';
 import ActiveOrderBanner from './Components/ActiveOrderBanner';
@@ -231,29 +231,19 @@ const Header = ({ customerName = null, customerId, cart = [], onCustomerClick, o
                     {/* Menu Actions */}
                     <div className="py-1">
                         <button
-                        onClick={() => {
+                          onClick={() => {
                             setIsDropdownOpen(false);
-                            navigate('/customer-dashboard'); // Add this navigation
-                        }}
-                        className="w-full px-4 py-2.5 text-left text-body-regular text-charcoal-600 dark:text-cream-50 hover:bg-cream-100 dark:hover:bg-charcoal-400 transition-colors flex items-center gap-3"
+                            navigate('/customer-dashboard');
+                          }}
+                          className="w-full px-4 py-2.5 text-left text-body-regular text-charcoal-600 dark:text-cream-50 hover:bg-cream-100 dark:hover:bg-charcoal-400 transition-colors flex items-center gap-3"
                         >
-                        <svg className="w-5 h-5 text-charcoal-500 dark:text-charcoal-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                        </svg>
-                        <span style={{ fontFamily: 'Inter, sans-serif' }}>Dashboard</span>
-                        </button>
+                          <Package 
+                            size={20}
+                            weight="regular"
+                            className="text-charcoal-500 dark:text-charcoal-300"
+                          />
 
-                        <button
-                        onClick={() => {
-                            setIsDropdownOpen(false);
-                            // Navigate to My Orders (placeholder)
-                        }}
-                        className="w-full px-4 py-2.5 text-left text-body-regular text-charcoal-600 dark:text-cream-50 hover:bg-cream-100 dark:hover:bg-charcoal-400 transition-colors flex items-center gap-3"
-                        >
-                        <svg className="w-5 h-5 text-charcoal-500 dark:text-charcoal-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                        </svg>
-                        <span style={{ fontFamily: 'Inter, sans-serif' }}>My Orders</span>
+                          <span style={{ fontFamily: 'Inter, sans-serif' }}>My Orders</span>
                         </button>
 
                         <button
@@ -879,21 +869,25 @@ useEffect(() => {
   console.log('📦 location.state:', location.state);
   console.log('📦 orderPlacedShown.current:', orderPlacedShown.current);
   
-  if (location.state?.orderPlaced && !orderPlacedShown.current) {
+  // Only run this if we're actually on the main store page (not navigating away)
+  if (location.state?.orderPlaced && !orderPlacedShown.current && location.pathname === '/mainStore') {
     console.log('✅ SHOWING ORDER PLACED SNACKBAR');
     orderPlacedShown.current = true;
     
     showSnackbar(`Order #${location.state.orderId} placed successfully! 🎉`, 'success');
     
     setTimeout(() => {
-      navigate(location.pathname, { 
-        replace: true, 
-        state: { customerId, customerName } 
-      });
+      // Only navigate if still on mainStore page
+      if (window.location.pathname === '/mainStore') {
+        navigate(location.pathname, { 
+          replace: true, 
+          state: { customerId, customerName } 
+        });
+      }
       orderPlacedShown.current = false;
     }, 3500);
   }
-}, [location.state, customerId, customerName]);
+}, [location.state, location.pathname, customerId, customerName, navigate]);
 
 // Reset banner dismissed state when customer changes
 useEffect(() => {
@@ -994,15 +988,18 @@ const handleStoreNavigation = (targetStoreId) => {
     />
 
     {/* Active Order Banner */}
-    {activeOrder && !bannerDismissed && (
-      <ActiveOrderBanner 
-        activeOrderCount={orders.filter(o => 
+      {(() => {
+        const count = orders.filter(o => 
           !['completed', 'cancelled', 'delivered'].includes(o.status?.toLowerCase())
-        ).length}
-        onTrack={handleTrackOrder}
-        onDismiss={handleDismissBanner}
-      />
-    )}
+        ).length;
+        return count > 0 && !bannerDismissed && (
+          <ActiveOrderBanner 
+            activeOrderCount={count}
+            onTrack={handleTrackOrder}
+            onDismiss={handleDismissBanner}
+          />
+        );
+      })()}
 
 
       <div className="max-w-[1440px] mx-auto px-8 py-8">
