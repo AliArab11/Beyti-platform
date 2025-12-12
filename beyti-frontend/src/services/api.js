@@ -921,10 +921,33 @@ export const reserveStock = async (items) => {
  * @returns {Promise<void>}
  */
 export const restoreStock = async (orderId) => {
-  return await fetchAPI(`/Orders/${orderId}/restore-stock`, {
-    method: 'POST',
-  });
+  try {
+    const response = await fetch(`https://localhost:7062/api/Orders/${orderId}/restore-stock`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    // If response is 204 No Content or empty, that's OK
+    if (response.status === 204 || response.status === 200) {
+      console.log('✅ Stock restored successfully');
+      return { success: true };
+    }
+
+    // Try to parse JSON only if there's content
+    const text = await response.text();
+    if (text) {
+      return JSON.parse(text);
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('❌ Failed to restore stock:', error);
+    throw error;
+  }
 };
+
 
 // --- Order Item APIs ---
 

@@ -442,7 +442,7 @@ namespace Beyti_Backend.Controllers.Api
             }
 
             await _context.SaveChangesAsync();
-            return Ok();
+            return Ok(new { success = true, message = "Stock restored successfully" });
         }
 
         // PUT: api/Orders/{id}/seller-response

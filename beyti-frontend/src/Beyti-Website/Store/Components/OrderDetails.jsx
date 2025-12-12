@@ -52,7 +52,7 @@ const OrderDetails = ({ order, onClose }) => {
         } else if (order.fulfillmentType === "Delivery") {
           statuses.push(
             { key: "Picked Up", label: "Out for Delivery", icon: Package },
-            { key: "Delivered", label: "Delivered", icon: CheckCircle }
+            { key: "Delivered", label: "Completed", icon: CheckCircle }
           );
         }
                 // Remove "Ready for Pickup" if delivery
@@ -166,27 +166,37 @@ return (
               </div>
             </div>
                             
+         
             {/* Dynamic Status Message */}
-            <div className="mb-6 p-4 bg-sage-50 rounded-xl">
-              <p className="text-lg font-bold text-sage-700 mb-1">
-                {currentStatusIndex === 0 && "Order Placed Successfully! 🎉"}
-                {currentStatusIndex === 1 && "Store is preparing your order 👨‍🍳"}
-                {currentStatusIndex === 2 && "Your order is being prepared 🔥"}
-                {currentStatusIndex === 3 && (order.fulfillmentType === 'Delivery' ? "Order is ready for pickup by driver 📦" : "Your order is ready for pickup! 🎊")}
-                {currentStatusIndex === 4 && order.fulfillmentType === 'Delivery' && "🚗 Driver is on the way to you!"}
-                {currentStatusIndex === 5 && order.fulfillmentType === 'Delivery' && "Order delivered! Enjoy your meal 🎉"}
-                {order.status === 'Completed' && order.fulfillmentType === 'Pickup' && "Order completed! Thank you 🎉"}
-              </p>
-              <p className="text-sm text-charcoal-600">
-                {currentStatusIndex === 0 && "We've received your order and notified the store."}
-                {currentStatusIndex === 1 && "The store has accepted your order and started preparation."}
-                {currentStatusIndex === 2 && "Your delicious food is being cooked with care."}
-                {currentStatusIndex === 3 && (order.fulfillmentType === 'Delivery' ? "Your order is packed and waiting for a driver." : "Head to the store to collect your order!")}
-                {currentStatusIndex === 4 && order.fulfillmentType === 'Delivery' && "Your order is out for delivery and will arrive soon."}
-                {currentStatusIndex === 5 && order.fulfillmentType === 'Delivery' && "Your order has been delivered. Bon appétit!"}
-                {order.status === 'Completed' && order.fulfillmentType === 'Pickup' && "We hope you enjoyed your meal!"}
-              </p>
-            </div>
+              <div className="mb-6 p-4 bg-sage-50 rounded-xl">
+                <p className="text-lg font-bold text-sage-700 mb-1">
+                  {currentStatusIndex === 0 && "Order Placed Successfully! 🎉"}
+                  {currentStatusIndex === 1 && "Store is preparing your order 👨‍🍳"}
+                  {currentStatusIndex === 2 && "Your order is being prepared 🔥"}
+                  {currentStatusIndex === 3 && (order.fulfillmentType === 'Delivery' ? "Order is ready for pickup by driver 📦" : "Your order is ready for pickup! 🎊")}
+                  {currentStatusIndex === 4 && order.fulfillmentType === 'Delivery' && "🚗 Driver is on the way to you!"}
+                  {currentStatusIndex === 5 && order.fulfillmentType === 'Delivery' && "Order delivered! Enjoy your meal 🎉"}
+                  {order.status === 'Completed' && order.fulfillmentType === 'Pickup' && "Order completed! Thank you 🎉"}
+                  {order.status === 'Cancelled' && "Order Cancelled"}
+                </p>
+                <p className="text-sm text-charcoal-600">
+                  {currentStatusIndex === 0 && (
+                    <>
+                      We've received your order and notified the store. 
+                      <span className="block mt-1 text-sage-600 font-medium">
+                        The store typically responds within a few minutes.
+                      </span>
+                    </>
+                  )}
+                  {currentStatusIndex === 1 && "The store has accepted your order and started preparation."}
+                  {currentStatusIndex === 2 && "Your delicious food is being cooked with care."}
+                  {currentStatusIndex === 3 && (order.fulfillmentType === 'Delivery' ? "Your order is packed and waiting for a driver." : "Head to the store to collect your order!")}
+                  {currentStatusIndex === 4 && order.fulfillmentType === 'Delivery' && "Your order is out for delivery and will arrive soon."}
+                  {currentStatusIndex === 5 && order.fulfillmentType === 'Delivery' && "Your order has been delivered. Bon appétit!"}
+                  {order.status === 'Completed' && order.fulfillmentType === 'Pickup' && "We hope you enjoyed your meal!"}
+                  {order.status === 'Cancelled' && "This order has been cancelled. If you have questions, please contact support."}
+                </p>
+              </div>
           </div>
 
           {/* Order Details */}

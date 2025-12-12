@@ -1194,12 +1194,7 @@ const handlePlaceOrder = async () => {
                 <div className="bg-gradient-to-br from-sage-100 to-sage-200 p-5 rounded-xl border-2 border-sage-300">
                   <h4 className="text-card-h2 text-charcoal-600 mb-3">Order Summary</h4>
                   <div className="space-y-1.5 text-body-regular text-charcoal-600">
-                    {customerName && (
-                      <div className="flex justify-between pb-2 mb-2 border-b border-sage-300">
-                        <span className="font-semibold">Customer:</span>
-                        <span className="font-bold">{customerName}</span>
-                      </div>
-                    )}
+                  
                     <div className="flex justify-between">
                       <span>Subtotal:</span>
                       <span className="font-bold">{subtotal.toFixed(3)} BD</span>
