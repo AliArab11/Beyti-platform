@@ -12,7 +12,10 @@ import {
   deleteCustomerAddress, 
   createOrder, 
   createOrderItem, 
-  getProductVariants 
+  getProductVariants,
+  validateStock,
+  reserveStock,
+  restoreStock
 } from '../../../services/api';
 import OrderDetails from './OrderDetails';
 
@@ -109,32 +112,49 @@ useEffect(() => {
 
 
 
-  const handleUpdateQuantity = (productId, newQuantity) => {
-    const cartKey = `beyti_cart_${storeId}_${customerId}`;
-    const updatedCart = localCart.map(item => 
-      item.id === productId 
-        ? { ...item, quantity: newQuantity, totalPrice: item.basePrice * newQuantity }
-        : item
-    ).filter(item => item.quantity > 0);
-    
-    setLocalCart(updatedCart);
-    localStorage.setItem(cartKey, JSON.stringify(updatedCart));
-    
-    // If cart is now empty, clear the store name
-    if (updatedCart.length === 0) {
-      navigate('/checkout', {
-        replace: true,
-        state: {
-          customerId,
-          customerName,
-          customerAddresses,
-          selectedStore: null,
-          storeName: null,
-          storeId: null
-        }
-      });
-    }
-  };
+const handleUpdateQuantity = (productId, newQuantity) => {
+  const cartKey = `beyti_cart_${storeId}_${customerId}`;
+  
+  // Find the item to check stock
+  const item = localCart.find(i => i.id === productId);
+  if (!item) return;
+  
+  // Don't allow quantity to exceed stock
+  const maxStock = item.selectedVariant?.stockQty || 0;
+  if (newQuantity > maxStock) {
+    showSnackbar(`Only ${maxStock} items available in stock`, 'warning');
+    return;
+  }
+  
+  // Don't allow quantity below 1
+  if (newQuantity < 1) {
+    return;
+  }
+  
+  const updatedCart = localCart.map(i => 
+    i.id === productId 
+      ? { ...i, quantity: newQuantity, totalPrice: i.basePrice * newQuantity }
+      : i
+  ).filter(i => i.quantity > 0);
+  
+  setLocalCart(updatedCart);
+  localStorage.setItem(cartKey, JSON.stringify(updatedCart));
+  
+  // If cart is now empty, clear the store name
+  if (updatedCart.length === 0) {
+    navigate('/checkout', {
+      replace: true,
+      state: {
+        customerId,
+        customerName,
+        customerAddresses,
+        selectedStore: null,
+        storeName: null,
+        storeId: null
+      }
+    });
+  }
+};
 
 const handleRemoveItem = (productId) => {
   const cartKey = `beyti_cart_${storeId}_${customerId}`;
@@ -476,167 +496,257 @@ const showSnackbar = (message, type = 'success') => {
     }
   };
 
-  const handlePlaceOrder = async () => {
-    try {
-      setPlacingOrder(true);
-      setOrderError(null);
+const handlePlaceOrder = async () => {
+  try {
+    setPlacingOrder(true);
+    setOrderError(null);
 
-      const sellerId = localCart[0]?.sellerId;
-      if (!sellerId) {
-        throw new Error('Missing seller information');
-      }
+    const sellerId = localCart[0]?.sellerId;
+    if (!sellerId) {
+      throw new Error('Missing seller information');
+    }
 
-      const pickupAddressId =
-        selectedStore?.sellerAddresses?.[0]?.addressId ||
-        selectedStore?.sellerAddresses?.[0]?.address?.id ||
-        null;
-
-      const pickupAddressData = 
-        selectedStore?.sellerAddresses?.[0]?.address ||
-        selectedStore?.address ||
-        (selectedStore?.sellerAddresses?.[0] ? {         
-          street: selectedStore.sellerAddresses[0].address?.street,
-          city: selectedStore.sellerAddresses[0].address?.city,
-          country: selectedStore.sellerAddresses[0].address?.country,
-          region: selectedStore.sellerAddresses[0].address?.region,
-          latitude: selectedStore.sellerAddresses[0].address?.latitude,
-          longitude: selectedStore.sellerAddresses[0].address?.longitude,
-        } : null);
-
-      console.log('🏪 Selected Store:', selectedStore);
-      console.log('📍 Pickup Address Data:', pickupAddressData);
-      console.log('🆔 Pickup Address ID:', pickupAddressId);
-
-      const subtotalAmount = subtotal;
-      const deliveryFee = fulfillmentType === 'Delivery' ? DELIVERY_FEE : 0;
-      const totalAmount = subtotalAmount + deliveryFee;
-
-      const orderData = {
-        CustomerId: customerId,
-        SellerId: sellerId,
-        DeliveryAddressId: fulfillmentType === 'Delivery' ? parseInt(selectedAddress.id) : null,
-        PickupAddressId: pickupAddressId,
-        PaymentMethod: paymentMethod,
-        PaymentStatus: 'Pending',
-        FulfillmentType: fulfillmentType,
-        Status: 'Placed',
-        SubtotalAmount: subtotalAmount,
-        DeliveryFee: deliveryFee,
-        TotalAmount: totalAmount,
-        CreatedAt: new Date().toISOString(),
-        UpdatedAt: new Date().toISOString()
-      };
-
-      console.log('Creating order:', orderData);
-
-      const createdOrder = await createOrder(orderData);
-      console.log('Order created:', createdOrder);
-
-      for (const cartItem of localCart) {
-        let variantId = null;
-        
-        try {
+    // Step 1: Get all variant IDs and prepare stock validation items
+    const stockValidationItems = [];
+    for (const cartItem of localCart) {
+      let variantId = null;
+      
+      try {
+        // If cart item already has variant ID, use it
+        if (cartItem.selectedVariant?.id) {
+          variantId = cartItem.selectedVariant.id;
+        } else {
+          // Otherwise fetch variants
           const variantsResponse = await getProductVariants(cartItem.id);
           
           if (variantsResponse && variantsResponse.length > 0) {
             variantId = variantsResponse[0].id;
           } else {
-            const createVariantResponse = await fetch('https://localhost:7062/api/ProductVariants', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                ProductId: cartItem.id,
-                ColorValue: null,
-                SizeValue: null,
-                SKU: `DEFAULT-${cartItem.id}`,
-                Price: cartItem.basePrice,
-                StockQty: 999
-              }),
-            });
-
-            if (createVariantResponse.ok) {
-              const newVariant = await createVariantResponse.json();
-              variantId = newVariant.id;
-            }
+            throw new Error(`No variant found for product ${cartItem.name}`);
           }
+        }
 
-          if (variantId) {
-            await createOrderItem({
-              OrderId: createdOrder.id,
-              ProductVariantId: variantId,
-              Qty: cartItem.quantity,
-              UnitPrice: cartItem.basePrice
-            });
+        stockValidationItems.push({
+        ProductId: cartItem.id,
+        VariantId: cartItem.selectedVariant?.id,   // ← CORRECT ONE
+        Quantity: cartItem.quantity
+      });
+      } catch (err) {
+        throw new Error(`Failed to validate product ${cartItem.name}: ${err.message}`);
+      }
+    }
+
+    console.log('🔍 Validating stock for items:', stockValidationItems);
+
+    // Step 2: Validate stock availability (READ-ONLY check, doesn't reserve yet)
+    const stockValidation = await validateStock(stockValidationItems);
+    
+    console.log('📊 Stock validation result:', stockValidation);
+
+    if (!stockValidation.valid) {
+      const cartKey = `beyti_cart_${storeId}_${customerId}`;
+      let updatedCart = [...localCart];
+      let hasChanges = false;
+      let removalMessages = [];
+      let adjustmentMessages = [];
+
+      // Handle unavailable items (0 stock)
+      if (stockValidation.unavailableItems && stockValidation.unavailableItems.length > 0) {
+        const unavailableIds = stockValidation.unavailableItems.map(item => item.productId);
+        updatedCart = updatedCart.filter(item => !unavailableIds.includes(item.id));
+        hasChanges = true;
+
+        const unavailableNames = stockValidation.unavailableItems
+          .map(item => item.productName)
+          .join(', ');
+        
+        removalMessages.push(`Out of stock: ${unavailableNames}`);
+      }
+
+      // Handle items that need quantity adjustment
+      if (stockValidation.adjustedItems && stockValidation.adjustedItems.length > 0) {
+        for (const adjusted of stockValidation.adjustedItems) {
+          const cartItemIndex = updatedCart.findIndex(item => item.id === adjusted.productId);
+          if (cartItemIndex !== -1) {
+            const oldQty = updatedCart[cartItemIndex].quantity;
+            updatedCart[cartItemIndex].quantity = adjusted.available;
+            updatedCart[cartItemIndex].totalPrice = 
+              updatedCart[cartItemIndex].basePrice * adjusted.available;
+            hasChanges = true;
+            
+            adjustmentMessages.push(
+              `${adjusted.productName}: Reduced from ${oldQty} to ${adjusted.available} (only ${adjusted.available} available)`
+            );
           }
-        } catch (err) {
-          console.error(`Error adding item ${cartItem.name}:`, err);
         }
       }
 
-      const completeOrder = {
-        id: createdOrder.id,
-        customerId: createdOrder.customerId,
-        sellerId: createdOrder.sellerId,
-        status: createdOrder.status || 'Placed',
-        fulfillmentType: createdOrder.fulfillmentType,
-        paymentMethod: createdOrder.paymentMethod,
-        paymentStatus: createdOrder.paymentStatus,
-        subtotalAmount: createdOrder.subtotalAmount,
-        deliveryFee: createdOrder.deliveryFee,
-        totalAmount: createdOrder.totalAmount,
-        createdAt: createdOrder.createdAt,
-        updatedAt: createdOrder.updatedAt,
-        storeName: selectedStore?.storeName || 'Store',
-        storePhone: selectedStore?.phone || null,
-        pickupAddress: fulfillmentType === "Pickup" ? (
-          pickupAddressData ? {
-            street: pickupAddressData.street || '',
-            city: pickupAddressData.city || '',
-            country: pickupAddressData.country || '',
-            region: pickupAddressData.region || null,
-            latitude: pickupAddressData.latitude || null,
-            longitude: pickupAddressData.longitude || null,
-          } : {
-            street: selectedStore?.sellerAddresses?.[0]?.address?.street || '',
-            city: selectedStore?.sellerAddresses?.[0]?.address?.city || '',
-            country: selectedStore?.sellerAddresses?.[0]?.address?.country || '',
-            region: selectedStore?.sellerAddresses?.[0]?.address?.region || null,
-            latitude: selectedStore?.sellerAddresses?.[0]?.address?.latitude || null,
-            longitude: selectedStore?.sellerAddresses?.[0]?.address?.longitude || null,
-          }
-        ) : null,
-      };
+      // Save updated cart
+      if (hasChanges) {
+        setLocalCart(updatedCart);
+        localStorage.setItem(cartKey, JSON.stringify(updatedCart));
+      }
 
-      console.log('✅ Complete order prepared:', completeOrder);
-      console.log('🗺️ Pickup address in order:', completeOrder.pickupAddress);
-
-      console.log('🎯 About to call setActiveOrder with:', completeOrder);
-      // Save to localStorage for the current customer
-      localStorage.setItem(`beyti_activeOrder_${customerId}`, JSON.stringify(completeOrder));
-      console.log('✅ setActiveOrder called successfully');
-
-      localStorage.removeItem(`beyti_bannerDismissed_${customerId}`);
+      // Show combined error message
+      const allMessages = [...removalMessages, ...adjustmentMessages];
+      showSnackbar(allMessages.join(' | '), 'error');
       
-      setTimeout(() => {
-        const stored = localStorage.getItem('beyti_activeOrder');
-        console.log('🔍 Checking storage after 1 second:', stored ? 'Found!' : 'Not found');
-      }, 1000);
+      setPlacingOrder(false);
+      return;
+    }
+
+    console.log('✅ Stock validation passed, proceeding to reserve stock...');
+
+    // Step 3: Reserve stock (this should lock the inventory temporarily)
+    try {
+      await reserveStock(stockValidationItems);
+      console.log('🔒 Stock reserved successfully');
+    } catch (reserveError) {
+      console.error('❌ Failed to reserve stock:', reserveError);
       
+      // If reservation fails, it might be due to concurrent orders
+      // Re-validate to get updated stock info
+      const revalidation = await validateStock(stockValidationItems);
+      
+      if (!revalidation.valid) {
+        // Stock changed between validation and reservation
+        showSnackbar(
+          'Stock levels changed. Please review your cart and try again.',
+          'warning'
+        );
+        setPlacingOrder(false);
+        return;
+      }
+      
+      // If revalidation passes but reservation still fails, throw error
+      throw new Error('Failed to reserve stock. Please try again.');
+    }
+
+    // Step 4: Prepare order data
+    const pickupAddressId =
+      selectedStore?.sellerAddresses?.[0]?.addressId ||
+      selectedStore?.sellerAddresses?.[0]?.address?.id ||
+      null;
+
+    const pickupAddressData = 
+      selectedStore?.sellerAddresses?.[0]?.address ||
+      selectedStore?.address ||
+      (selectedStore?.sellerAddresses?.[0] ? {         
+        street: selectedStore.sellerAddresses[0].address?.street,
+        city: selectedStore.sellerAddresses[0].address?.city,
+        country: selectedStore.sellerAddresses[0].address?.country,
+        region: selectedStore.sellerAddresses[0].address?.region,
+        latitude: selectedStore.sellerAddresses[0].address?.latitude,
+        longitude: selectedStore.sellerAddresses[0].address?.longitude,
+      } : null);
+
+    const subtotalAmount = subtotal;
+    const deliveryFee = fulfillmentType === 'Delivery' ? DELIVERY_FEE : 0;
+    const totalAmount = subtotalAmount + deliveryFee;
+
+    const orderData = {
+      CustomerId: customerId,
+      SellerId: sellerId,
+      DeliveryAddressId: fulfillmentType === 'Delivery' ? parseInt(selectedAddress.id) : null,
+      PickupAddressId: pickupAddressId,
+      PaymentMethod: paymentMethod,
+      PaymentStatus: 'Pending',
+      FulfillmentType: fulfillmentType,
+      Status: 'Placed',
+      SubtotalAmount: subtotalAmount,
+      DeliveryFee: deliveryFee,
+      TotalAmount: totalAmount,
+      CreatedAt: new Date().toISOString(),
+      UpdatedAt: new Date().toISOString()
+    };
+
+    // Step 5: Create order
+    console.log('📝 Creating order:', orderData);
+    let createdOrder;
+    try {
+      createdOrder = await createOrder(orderData);
+      console.log('✅ Order created:', createdOrder);
+    } catch (orderError) {
+      console.error('❌ Order creation failed, restoring stock:', orderError);
+      // Restore stock if order creation fails
+      try {
+        await restoreStock(stockValidationItems);
+        console.log('♻️ Stock restored after order creation failure');
+      } catch (restoreError) {
+        console.error('⚠️ Failed to restore stock:', restoreError);
+      }
+      throw new Error('Failed to create order. Please try again.');
+    }
+
+    // Step 6: Create order items
+    try {
+      for (let i = 0; i < localCart.length; i++) {
+        const cartItem = localCart[i];
+        const variantId = stockValidationItems[i].VariantId;
+
+        await createOrderItem({
+          OrderId: createdOrder.id,
+          ProductVariantId: variantId,
+          Qty: cartItem.quantity,
+          UnitPrice: cartItem.basePrice
+        });
+      }
+      console.log('✅ Order items created');
+    } catch (itemError) {
+      console.error('❌ Order item creation failed:', itemError);
+      // Note: At this point, order exists but items failed
+      // You might want to handle this case specially
+      throw new Error('Order created but failed to add items. Please contact support.');
+    }
+
+    // Step 7: Prepare complete order object
+    const completeOrder = {
+      id: createdOrder.id,
+      customerId: createdOrder.customerId,
+      sellerId: createdOrder.sellerId,
+      status: createdOrder.status || 'Placed',
+      fulfillmentType: createdOrder.fulfillmentType,
+      paymentMethod: createdOrder.paymentMethod,
+      paymentStatus: createdOrder.paymentStatus,
+      subtotalAmount: createdOrder.subtotalAmount,
+      deliveryFee: createdOrder.deliveryFee,
+      totalAmount: createdOrder.totalAmount,
+      createdAt: createdOrder.createdAt,
+      updatedAt: createdOrder.updatedAt,
+      storeName: selectedStore?.storeName || 'Store',
+      storePhone: selectedStore?.phone || null,
+      pickupAddress: fulfillmentType === "Pickup" ? (
+        pickupAddressData ? {
+          street: pickupAddressData.street || '',
+          city: pickupAddressData.city || '',
+          country: pickupAddressData.country || '',
+          region: pickupAddressData.region || null,
+          latitude: pickupAddressData.latitude || null,
+          longitude: pickupAddressData.longitude || null,
+        } : {
+          street: selectedStore?.sellerAddresses?.[0]?.address?.street || '',
+          city: selectedStore?.sellerAddresses?.[0]?.address?.city || '',
+          country: selectedStore?.sellerAddresses?.[0]?.address?.country || '',
+          region: selectedStore?.sellerAddresses?.[0]?.address?.region || null,
+          latitude: selectedStore?.sellerAddresses?.[0]?.address?.latitude || null,
+          longitude: selectedStore?.sellerAddresses?.[0]?.address?.longitude || null,
+        }
+      ) : null,
+    };
+
+    console.log('✅ Order completed successfully:', completeOrder);
+
+    // Step 8: Update local storage
+    localStorage.setItem(`beyti_activeOrder_${customerId}`, JSON.stringify(completeOrder));
+    localStorage.removeItem(`beyti_bannerDismissed_${customerId}`);
     localStorage.setItem(`beyti_cart_${storeId}_${customerId}`, JSON.stringify([]));
     setLocalCart([]);
 
-      // Clear any lingering snackbars before navigating
-      setSnackbar({ open: false, message: '', type: 'success' });
-      
-      // Navigate after a small delay
-      setTimeout(() => {
-      console.log('🚀 NAVIGATING TO MAINSTORE WITH ORDER:', createdOrder.id);
-      console.log('📦 Navigation state:', { 
-        customerId, 
-        customerName,
-        orderPlaced: true,
-        orderId: createdOrder.id
-      });
+    // Step 9: Navigate to success page
+    setSnackbar({ open: false, message: '', type: 'success' });
+    
+    setTimeout(() => {
+      console.log('🚀 Navigating to mainStore with order:', createdOrder.id);
       
       navigate('/mainStore', { 
         state: { 
@@ -646,16 +756,16 @@ const showSnackbar = (message, type = 'success') => {
           orderId: createdOrder.id
         } 
       });
-      }, 100);
+    }, 100);
 
-    } catch (err) {
-      console.error('Error placing order:', err);
-      setOrderError(err.message || 'Failed to place order');
-      showSnackbar(err.message || 'Failed to place order', 'error');
-    } finally {
-      setPlacingOrder(false);
-    }
-  };
+  } catch (err) {
+    console.error('❌ Error placing order:', err);
+    setOrderError(err.message || 'Failed to place order');
+    showSnackbar(err.message || 'Failed to place order', 'error');
+  } finally {
+    setPlacingOrder(false);
+  }
+};
 
   // ---------- UI RETURN: FULL PAGE LAYOUT ----------
   return (
@@ -726,17 +836,17 @@ const showSnackbar = (message, type = 'success') => {
                           <div className="flex items-center gap-2 flex-1">
                             {/* Step Circle */}
                             <div
-                              className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all shadow-md ${
-                                step > idx + 1
-                                  ? 'bg-sage-600 text-white ring-4 ring-sage-200'
-                                  : step === idx + 1
-                                  ? 'bg-sage-500 text-white ring-4 ring-sage-200 scale-110'
-                                  : 'bg-grey-200 text-charcoal-400'
-                              }`}
-                              style={{ fontFamily: 'Inter, sans-serif' }}
-                            >
-                              {step > idx + 1 ? '✓' : idx + 1}
-                            </div>
+                            className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all shadow-md ${
+                              step > idx + 1
+                                ? '!bg-sage-500 !text-white ring-4 ring-sage-200'
+                                : step === idx + 1
+                                ? '!bg-sage-500 !text-white ring-4 ring-sage-200 scale-110'
+                                : '!bg-grey-200 !text-charcoal-400'
+                            }`}
+                            style={{ fontFamily: 'Inter, sans-serif' }}
+                          >
+                            {step > idx + 1 ? '✓' : idx + 1}
+                          </div>
                             
                             {/* Step Label */}
                             <span
@@ -813,23 +923,25 @@ const showSnackbar = (message, type = 'success') => {
                             </div>
 
                             <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-2 bg-cream-100 rounded-lg px-2 py-1.5 border border-grey-stroke">
+                              <div className="flex items-center gap-2 bg-cream-100 rounded-lg px-2 py-1.5 border border-grey-stroke">
                                 <button
-                                onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
-                                className="w-8 h-8 flex items-center justify-center rounded-lg bg-white hover:bg-grey-100 transition-all"
+                                  onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
+                                  disabled={item.quantity <= 1}
+                                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-white hover:bg-grey-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                <Minus size={16} weight="bold" className="text-charcoal-600" />
+                                  <Minus size={16} weight="bold" className="text-charcoal-600" />
                                 </button>
                                 <span className="w-10 text-center text-[16px] font-bold text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>
-                                {item.quantity}
+                                  {item.quantity}
                                 </span>
                                 <button
-                                onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
-                                className="w-8 h-8 flex items-center justify-center rounded-lg bg-white hover:bg-grey-100 transition-all"
+                                  onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
+                                  disabled={!item.selectedVariant || item.selectedVariant.stockQty === 0 || item.quantity >= (item.selectedVariant?.stockQty || 0)}
+                                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-white hover:bg-grey-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                <Plus size={16} weight="bold" className="text-charcoal-600" />
+                                  <Plus size={16} weight="bold" className="text-charcoal-600" />
                                 </button>
-                            </div>
+                              </div>
 
                             <button
                                 onClick={() => handleRemoveItem(item.id)}
@@ -1120,13 +1232,21 @@ const showSnackbar = (message, type = 'success') => {
           <footer className="sticky bottom-0 bg-cream-50 py-4">
             <div className="max-w-6xl mx-auto px-4 lg:px-8 flex gap-3 justify-end items-center">
                 {step > 1 && (
-                <button
-                    onClick={() => setStep(step - 1)}
+                  <button
+                    onClick={() => {
+                      // If we're on step 4 and fulfillment is Pickup, go back to step 2
+                      if (step === 4 && fulfillmentType === 'Pickup') {
+                        setStep(2);
+                      } else {
+                        setStep(step - 1);
+                      }
+                    }}
                     className="px-6 py-2.5 bg-grey-200 text-charcoal-600 text-button font-semibold rounded-xl hover:bg-grey-300 border border-grey-stroke"
-                >
+                  >
                     ← Back
-                </button>
+                  </button>
                 )}
+              
                 <button
                 onClick={handleContinue}
                 disabled={placingOrder}
