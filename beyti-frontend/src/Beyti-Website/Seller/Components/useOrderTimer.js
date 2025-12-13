@@ -7,31 +7,26 @@ export const useOrderTimer = (order, onExpire) => {
   const initialCheckRef = useRef(true);
 
   const calculateTimeLeft = useCallback(() => {
-  if (!order || !order.createdAt) return null;
-  
-  const status = order.status?.toLowerCase();
-  if (!['placed', 'pending'].includes(status)) return null;
+    if (!order || !order.createdAt) return null;
+    
+    const status = order.status?.toLowerCase();
+    if (!['placed', 'pending'].includes(status)) return null;
 
-  // Parse the date string correctly - handle both formats
-  // Parse the date string correctly
+    // Parse the date string correctly
     const dateStr = order.createdAt;
     let orderTime;
 
     if (dateStr.endsWith('Z')) {
-    // Already in UTC format with Z suffix
-    orderTime = new Date(dateStr);
+      orderTime = new Date(dateStr);
     } else if (dateStr.includes('T') && !dateStr.includes('+') && !dateStr.endsWith('Z')) {
-    // ISO format without timezone (backend sends UTC but without Z)
-    // Add 'Z' to treat it as UTC
-    orderTime = new Date(dateStr + 'Z');
+      orderTime = new Date(dateStr + 'Z');
     } else {
-    // Other format - try parsing as-is
-    orderTime = new Date(dateStr);
+      orderTime = new Date(dateStr);
     }
-  
-  const expiryTime = new Date(orderTime.getTime() + 1 * 60 * 1000);
-  const now = new Date();
-  const diff = expiryTime - now;
+    
+    const expiryTime = new Date(orderTime.getTime() + 1 * 60 * 1000);
+    const now = new Date();
+    const diff = expiryTime - now;
 
     // On initial load, if already expired, don't trigger cancellation
     if (initialCheckRef.current) {
@@ -44,11 +39,13 @@ export const useOrderTimer = (order, onExpire) => {
       }
     }
 
-    // Only trigger onExpire if we've been actively counting down
+    // Timer just hit zero - trigger cancellation
     if (diff <= 0 && !hasExpiredRef.current) {
-      console.log('⏰ Timer reached zero, triggering auto-cancel for order:', order.id);
+      console.log('⏰ Timer reached zero, triggering cancellation for order:', order.id);
       setIsExpired(true);
       hasExpiredRef.current = true;
+      
+      // Call the onExpire callback
       if (onExpire) {
         onExpire(order.id);
       }
@@ -89,9 +86,9 @@ export const useOrderTimer = (order, onExpire) => {
 
   const getColorClass = (seconds) => {
     if (seconds === null) return '';
-    if (seconds <= 60) return 'text-red-600 font-bold'; // Under 1 minute
-    if (seconds <= 300) return 'text-orange-500 font-semibold'; // Under 5 minutes
-    return 'text-charcoal-600'; // Normal
+    if (seconds <= 60) return 'text-red-600 font-bold';
+    if (seconds <= 300) return 'text-orange-500 font-semibold';
+    return 'text-charcoal-600';
   };
 
   return {

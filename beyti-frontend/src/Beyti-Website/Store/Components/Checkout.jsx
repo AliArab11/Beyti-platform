@@ -4,6 +4,10 @@ import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Snackbar from './../../../components/Snackbar';
+
+import PageHeader from './../../../components/PageHeader'
+
+
 import { 
   createAddress, 
   updateAddress, 
@@ -789,16 +793,28 @@ const handlePlaceOrder = async () => {
                     </svg>
                 </button>
                 
-                {customerName && (
-                    <div className="flex items-center gap-3 pl-4 border-l border-grey-stroke">
-                    <div className="w-8 h-8 bg-sage-500 rounded-full flex items-center justify-center">
-                        <span className="text-white text-sm font-semibold">{customerName[0]}</span>
-                    </div>
-                    <span className="text-charcoal-600 font-medium text-sm" style={{ fontFamily: 'Inter, sans-serif' }}>
-                        {customerName}
-                    </span>
-                    </div>
-                )}
+                {customerName ? (
+                  <div className="flex items-center gap-3 pl-4 border-l border-grey-stroke">
+                  <div className="w-8 h-8 bg-sage-500 rounded-full flex items-center justify-center">
+                      <span className="text-white text-sm font-semibold">{customerName[0]}</span>
+                  </div>
+                  <span className="text-charcoal-600 font-medium text-sm" style={{ fontFamily: 'Inter, sans-serif' }}>
+                      {customerName}
+                  </span>
+                  </div>
+              ) : (
+                <button
+                  onClick={() => navigate('/mainStore')}
+                  className="flex items-center gap-2 pl-4 border-l border-grey-stroke bg-sage-500 hover:bg-sage-600 text-white px-4 py-2 rounded-lg transition-all"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                  </svg>
+                  <span className="text-sm font-semibold" style={{ fontFamily: 'Inter, sans-serif' }}>
+                    Login
+                  </span>
+                </button>
+              )}
                 </div>
             </div>
             </header>
@@ -821,13 +837,13 @@ const handlePlaceOrder = async () => {
                 </div>
                 
                 {/* Store Name with Green Underline + Stepper on Same Line */}
-                <div className="flex items-center justify-between mb-6">
-                  {/* Store Name - Always show "Items from:" */}
-                  <div className="flex-shrink-0" style={{ minWidth: '200px' }}>
-                    <p className="text-[18px] text-charcoal-600 inline-block border-b-4 border-sage-500 pb-1" style={{ fontFamily: 'Inter, sans-serif' }}>
-                      Items from: <span className="font-semibold">{storeName || '—'}</span>
-                    </p>
-                  </div>
+                  <div className="flex items-center justify-between mb-6">
+                    {/* Store Name - Only show when cart has items */}
+                    <div className="flex-shrink-0" style={{ minWidth: '200px' }}>
+                      <p className="text-[18px] text-charcoal-600 inline-block border-b-4 border-sage-500 pb-1" style={{ fontFamily: 'Inter, sans-serif' }}>
+                        Items from: <span className="font-semibold">{localCart.length > 0 ? (storeName || '—') : '—'}</span>
+                      </p>
+                    </div>
                   
                   {/* Stepper - Moved 50% to the right (25% more than before) with smaller gaps */}
                   <div className="flex items-center gap-2 max-w-xl ml-[25%]">
@@ -993,234 +1009,322 @@ const handlePlaceOrder = async () => {
               </div>
             )}
 
-            {/* STEP 2: FULFILLMENT TYPE (full-width) */}
-            {step === 2 && (
-              <section className="bg-white rounded-2xl border border-grey-stroke shadow-soft-lift p-5">
-                <h3 className="text-card-h2 text-charcoal-600 mb-2">
-                  How would you like to receive your order?
-                </h3>
-                <p className="text-body-regular text-charcoal-400 mb-4">
-                  Choose delivery to your address or pickup directly from the store.
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <button
-                    onClick={() => setFulfillmentType('Delivery')}
-                    className={`p-6 rounded-xl border-2 transition-all text-left ${
-                      fulfillmentType === 'Delivery'
-                        ? 'bg-sage-500 border-sage-500 text-white shadow-soft-lift'
-                        : 'bg-cream-50 border-grey-stroke text-charcoal-600 hover:border-sage-500'
-                    }`}
-                  >
-                    <MapPin size={40} weight="fill" className="mb-3" />
-                    <p className="text-body-medium font-bold mb-1">Delivery</p>
-                    <p className="text-body-regular text-inherit opacity-80 text-sm">
-                      We’ll bring your order to your saved address.
-                    </p>
-                  </button>
-                  <button
-                    onClick={() => setFulfillmentType('Pickup')}
-                    className={`p-6 rounded-xl border-2 transition-all text-left ${
-                      fulfillmentType === 'Pickup'
-                        ? 'bg-sage-500 border-sage-500 text-white shadow-soft-lift'
-                        : 'bg-cream-50 border-grey-stroke text-charcoal-600 hover:border-sage-500'
-                    }`}
-                  >
-                    <Storefront size={40} weight="fill" className="mb-3" />
-                    <p className="text-body-medium font-bold mb-1">Pickup</p>
-                    <p className="text-body-regular text-inherit opacity-80 text-sm">
-                      Collect your order directly from the store.
-                    </p>
-                  </button>
-                </div>
-              </section>
-            )}
-
-            {/* STEP 3: ADDRESS SELECTION (full-width) */}
-            {step === 3 && (
-              <section className="bg-white rounded-2xl border border-grey-stroke shadow-soft-lift p-5">
-                <h3 className="text-card-h2 text-charcoal-600 mb-2">Select Delivery Address</h3>
-                <p className="text-body-regular text-charcoal-400 mb-4">
-                  Choose one of your saved addresses or add a new one.
-                </p>
-
-                {addresses.length === 0 ? (
-                  <div className="text-center py-10">
-                    <MapPin size={48} className="mx-auto text-grey-stroke mb-3" />
+            {/* STEP 2: FULFILLMENT TYPE */}
+              {step === 2 && (
+                <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.8fr)_minmax(380px,1.2fr)] gap-6">
+                  {/* LEFT: Fulfillment Type Selection */}
+                  <section className="bg-white rounded-2xl border border-grey-stroke shadow-soft-lift p-5">
+                    <h3 className="text-card-h2 text-charcoal-600 mb-2">
+                      How would you like to receive your order?
+                    </h3>
                     <p className="text-body-regular text-charcoal-400 mb-4">
-                      You don’t have any saved addresses yet.
+                      Choose delivery to your address or pickup directly from the store.
                     </p>
-                    <button
-                      onClick={() => {
-                        setEditingAddress(null);
-                        setShowAddressModal(true);
-                      }}
-                      className="bg-sage-500 text-white px-5 py-2.5 rounded-xl text-button font-semibold hover:bg-sage-600 shadow-soft-lift"
-                    >
-                      + Add Location
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <div className="space-y-3 mb-3">
-                      {addresses.map(addr => (
-                        <div
-                          key={addr.id}
-                          className={`relative p-4 rounded-xl border-2 transition-all ${
-                            selectedAddress?.id === addr.id
-                              ? 'bg-sage-500 border-sage-500 text-white'
-                              : 'bg-cream-50 border-grey-stroke'
-                          }`}
-                        >
-                          <button
-                            onClick={() => setSelectedAddress(addr)}
-                            className="w-full text-left"
-                          >
-                            <p className="text-body-medium font-semibold mb-1 pr-24">
-                              {addr.street}
-                            </p>
-                            <p className="text-label-medium opacity-80">
-                              {addr.city}, {addr.region}, {addr.country}
-                            </p>
-                          </button>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <button
+                        onClick={() => setFulfillmentType('Delivery')}
+                        className={`p-6 rounded-xl border-2 transition-all text-left ${
+                          fulfillmentType === 'Delivery'
+                            ? 'bg-sage-500 border-sage-500 text-white shadow-soft-lift'
+                            : 'bg-cream-50 border-grey-stroke text-charcoal-600 hover:border-sage-500'
+                        }`}
+                      >
+                        <MapPin size={40} weight="fill" className="mb-3" />
+                        <p className="text-body-medium font-bold mb-1">Delivery</p>
+                        <p className="text-body-regular text-inherit opacity-80 text-sm">
+                          We'll bring your order to your saved address.
+                        </p>
+                      </button>
+                      <button
+                        onClick={() => setFulfillmentType('Pickup')}
+                        className={`p-6 rounded-xl border-2 transition-all text-left ${
+                          fulfillmentType === 'Pickup'
+                            ? 'bg-sage-500 border-sage-500 text-white shadow-soft-lift'
+                            : 'bg-cream-50 border-grey-stroke text-charcoal-600 hover:border-sage-500'
+                        }`}
+                      >
+                        <Storefront size={40} weight="fill" className="mb-3" />
+                        <p className="text-body-medium font-bold mb-1">Pickup</p>
+                        <p className="text-body-regular text-inherit opacity-80 text-sm">
+                          Collect your order directly from the store.
+                        </p>
+                      </button>
+                    </div>
+                  </section>
 
-                          <div className="absolute top-3 right-3 flex gap-2">
-                            <button
-                              onClick={e => {
-                                e.stopPropagation();
-                                handleEditAddress(addr);
-                              }}
-                              className={`p-2 rounded-lg transition-all ${
-                                selectedAddress?.id === addr.id
-                                  ? 'bg-white/20 hover:bg-white/30 text-white'
-                                  : 'bg-grey-100 hover:bg-grey-200 text-charcoal-600'
-                              }`}
-                              title="Edit Address"
-                            >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                />
-                              </svg>
-                            </button>
-                            <button
-                              onClick={e => {
-                                e.stopPropagation();
-                                if (window.confirm('Are you sure you want to delete this address?')) {
-                                  handleDeleteAddress(addr.id);
-                                }
-                              }}
-                              disabled={deletingAddress === addr.id}
-                              className={`p-2 rounded-lg transition-all ${
-                                selectedAddress?.id === addr.id
-                                  ? 'bg-white/20 hover:bg-red-500 text-white'
-                                  : 'bg-grey-100 hover:bg-red-500 hover:text-white text-charcoal-600'
-                              } disabled:opacity-50 disabled:cursor-not-allowed`}
-                              title="Delete Address"
-                            >
-                              {deletingAddress === addr.id ? (
-                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              ) : (
-                                <svg
-                                  className="w-4 h-4"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                  />
-                                </svg>
-                              )}
-                            </button>
+                  {/* RIGHT: Cart Summary */}
+                  <aside className="bg-white rounded-3xl border-2 border-grey-stroke shadow-lg p-6 h-fit lg:sticky lg:top-8">
+                    <h3 className="text-[20px] font-bold text-charcoal-600 mb-4" style={{ fontFamily: 'Merriweather, serif' }}>
+                      Your Items ({totalItems})
+                    </h3>
+                    
+                    <div className="space-y-3 mb-6 max-h-[300px] overflow-y-auto">
+                      {localCart.map(item => (
+                        <div key={item.id} className="flex items-center gap-3 pb-3 border-b border-grey-200">
+                          <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-sage-100 to-sage-200 flex items-center justify-center flex-shrink-0">
+                            <ShoppingCart size={20} className="text-sage-600" />
                           </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-charcoal-600 truncate">{item.name}</p>
+                            <p className="text-xs text-charcoal-400">Qty: {item.quantity}</p>
+                          </div>
+                          <p className="text-sm font-bold text-charcoal-600">{item.totalPrice.toFixed(3)} BD</p>
                         </div>
                       ))}
                     </div>
 
-                    <button
-                      onClick={() => {
-                        setEditingAddress(null);
-                        setShowAddressModal(true);
-                      }}
-                      className="w-full bg-white border-2 border-sage-500 text-sage-500 px-5 py-2.5 rounded-xl text-button font-semibold hover:bg-sage-50"
-                    >
-                      + Add New Address
-                    </button>
-                  </>
-                )}
-              </section>
-            )}
-
-            {/* STEP 4: PAYMENT METHOD (full-width) */}
-            {step === 4 && (
-              <section className="bg-white rounded-2xl border border-grey-stroke shadow-soft-lift p-5">
-                <h3 className="text-card-h2 text-charcoal-600 mb-2">Payment Method</h3>
-                <p className="text-body-regular text-charcoal-400 mb-4">
-                  Choose how you would like to pay for this order.
-                </p>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
-                  {['Cash', 'Card', 'Online'].map(method => (
-                    <button
-                      key={method}
-                      onClick={() => setPaymentMethod(method)}
-                      className={`p-5 rounded-xl border-2 transition-all text-center ${
-                        paymentMethod === method
-                          ? 'bg-sage-500 border-sage-500 text-white shadow-soft-lift'
-                          : 'bg-cream-50 border-grey-stroke hover:border-sage-500 text-charcoal-600'
-                      }`}
-                    >
-                      {method === 'Cash' ? (
-                        <Wallet size={28} weight="fill" className="mx-auto mb-2" />
-                      ) : (
-                        <CreditCard size={28} weight="fill" className="mx-auto mb-2" />
-                      )}
-                      <p className="text-button font-bold">{method}</p>
-                    </button>
-                  ))}
-                </div>
-
-                <div className="bg-gradient-to-br from-sage-100 to-sage-200 p-5 rounded-xl border-2 border-sage-300">
-                  <h4 className="text-card-h2 text-charcoal-600 mb-3">Order Summary</h4>
-                  <div className="space-y-1.5 text-body-regular text-charcoal-600">
-                  
-                    <div className="flex justify-between">
-                      <span>Subtotal:</span>
-                      <span className="font-bold">{subtotal.toFixed(3)} BD</span>
+                    <div className="border-t-2 border-grey-stroke pt-4">
+                      <div className="flex justify-between text-lg font-black text-charcoal-600 mb-2">
+                        <span>Subtotal:</span>
+                        <span>{subtotal.toFixed(3)} BD</span>
+                      </div>
                     </div>
-                    {fulfillmentType === 'Delivery' && (
-                      <div className="flex justify-between">
-                        <span>Delivery Fee:</span>
-                        <span className="font-bold">{DELIVERY_FEE.toFixed(3)} BD</span>
+                  </aside>
+                </div>
+              )}
+            {/* STEP 3: ADDRESS SELECTION */}
+              {step === 3 && (
+                <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.8fr)_minmax(380px,1.2fr)] gap-6">
+                  {/* LEFT: Address Selection */}
+                  <section className="bg-white rounded-2xl border border-grey-stroke shadow-soft-lift p-5">
+                    <h3 className="text-card-h2 text-charcoal-600 mb-2">Select Delivery Address</h3>
+                    <p className="text-body-regular text-charcoal-400 mb-4">
+                      Choose one of your saved addresses or add a new one.
+                    </p>
+
+                    {addresses.length === 0 ? (
+                      <div className="text-center py-10">
+                        <MapPin size={48} className="mx-auto text-grey-stroke mb-3" />
+                        <p className="text-body-regular text-charcoal-400 mb-4">
+                          You don't have any saved addresses yet.
+                        </p>
+                        <button
+                          onClick={() => {
+                            setEditingAddress(null);
+                            setShowAddressModal(true);
+                          }}
+                          className="bg-sage-500 text-white px-5 py-2.5 rounded-xl text-button font-semibold hover:bg-sage-600 shadow-soft-lift"
+                        >
+                          + Add Location
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="space-y-3 mb-3">
+                          {addresses.map(addr => (
+                            <div
+                              key={addr.id}
+                              className={`relative p-4 rounded-xl border-2 transition-all ${
+                                selectedAddress?.id === addr.id
+                                  ? 'bg-sage-500 border-sage-500 text-white'
+                                  : 'bg-cream-50 border-grey-stroke'
+                              }`}
+                            >
+                              <button
+                                onClick={() => setSelectedAddress(addr)}
+                                className="w-full text-left"
+                              >
+                                <p className="text-body-medium font-semibold mb-1 pr-24">
+                                  {addr.street}
+                                </p>
+                                <p className="text-label-medium opacity-80">
+                                  {addr.city}, {addr.region}, {addr.country}
+                                </p>
+                              </button>
+
+                              <div className="absolute top-3 right-3 flex gap-2">
+                                <button
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    handleEditAddress(addr);
+                                  }}
+                                  className={`p-2 rounded-lg transition-all ${
+                                    selectedAddress?.id === addr.id
+                                      ? 'bg-white/20 hover:bg-white/30 text-white'
+                                      : 'bg-grey-100 hover:bg-grey-200 text-charcoal-600'
+                                  }`}
+                                  title="Edit Address"
+                                >
+                                  <svg
+                                    className="w-4 h-4"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                    />
+                                  </svg>
+                                </button>
+                                <button
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    if (window.confirm('Are you sure you want to delete this address?')) {
+                                      handleDeleteAddress(addr.id);
+                                    }
+                                  }}
+                                  disabled={deletingAddress === addr.id}
+                                  className={`p-2 rounded-lg transition-all ${
+                                    selectedAddress?.id === addr.id
+                                      ? 'bg-white/20 hover:bg-red-500 text-white'
+                                      : 'bg-grey-100 hover:bg-red-500 hover:text-white text-charcoal-600'
+                                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                  title="Delete Address"
+                                >
+                                  {deletingAddress === addr.id ? (
+                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                  ) : (
+                                    <svg
+                                      className="w-4 h-4"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                      />
+                                    </svg>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        <button
+                          onClick={() => {
+                            setEditingAddress(null);
+                            setShowAddressModal(true);
+                          }}
+                          className="w-full bg-white border-2 border-sage-500 text-sage-500 px-5 py-2.5 rounded-xl text-button font-semibold hover:bg-sage-50"
+                        >
+                          + Add New Address
+                        </button>
+                      </>
+                    )}
+                  </section>
+
+                  {/* RIGHT: Cart Summary */}
+                  <aside className="bg-white rounded-3xl border-2 border-grey-stroke shadow-lg p-6 h-fit lg:sticky lg:top-8">
+                    <h3 className="text-[20px] font-bold text-charcoal-600 mb-4" style={{ fontFamily: 'Merriweather, serif' }}>
+                      Your Items ({totalItems})
+                    </h3>
+                    
+                    <div className="space-y-3 mb-6 max-h-[300px] overflow-y-auto">
+                      {localCart.map(item => (
+                        <div key={item.id} className="flex items-center gap-3 pb-3 border-b border-grey-200">
+                          <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-sage-100 to-sage-200 flex items-center justify-center flex-shrink-0">
+                            <ShoppingCart size={20} className="text-sage-600" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-charcoal-600 truncate">{item.name}</p>
+                            <p className="text-xs text-charcoal-400">Qty: {item.quantity}</p>
+                          </div>
+                          <p className="text-sm font-bold text-charcoal-600">{item.totalPrice.toFixed(3)} BD</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="border-t-2 border-grey-stroke pt-4">
+                      <div className="flex justify-between text-lg font-black text-charcoal-600 mb-2">
+                        <span>Subtotal:</span>
+                        <span>{subtotal.toFixed(3)} BD</span>
+                      </div>
+                    </div>
+                  </aside>
+                </div>
+              )}
+
+            {/* STEP 4: PAYMENT METHOD */}
+              {step === 4 && (
+                <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.8fr)_minmax(380px,1.2fr)] gap-6">
+                  {/* LEFT: Payment Method Selection */}
+                  <section className="bg-white rounded-2xl border border-grey-stroke shadow-soft-lift p-5">
+                    <h3 className="text-card-h2 text-charcoal-600 mb-2">Payment Method</h3>
+                    <p className="text-body-regular text-charcoal-400 mb-4">
+                      Choose how you would like to pay for this order.
+                    </p>
+
+                    <div className="grid grid-cols-1 gap-3 mb-5">
+                      {['Cash', 'Card', 'Online'].map(method => (
+                        <button
+                          key={method}
+                          onClick={() => setPaymentMethod(method)}
+                          className={`p-5 rounded-xl border-2 transition-all text-center ${
+                            paymentMethod === method
+                              ? 'bg-sage-500 border-sage-500 text-white shadow-soft-lift'
+                              : 'bg-cream-50 border-grey-stroke hover:border-sage-500 text-charcoal-600'
+                          }`}
+                        >
+                          {method === 'Cash' ? (
+                            <Wallet size={28} weight="fill" className="mx-auto mb-2" />
+                          ) : (
+                            <CreditCard size={28} weight="fill" className="mx-auto mb-2" />
+                          )}
+                          <p className="text-button font-bold">{method}</p>
+                        </button>
+                      ))}
+                    </div>
+
+                    {orderError && (
+                      <div className="mt-4 bg-error-bg border-l-4 border-error-btn p-3 rounded">
+                        <p className="text-body-regular text-error-text font-semibold">
+                          {orderError}
+                        </p>
                       </div>
                     )}
-                    <div className="border-t-2 border-sage-300 pt-2 mt-2 flex justify-between text-lg font-black text-sage-700">
-                      <span>Total:</span>
-                      <span>{total.toFixed(3)} BD</span>
-                    </div>
-                  </div>
-                </div>
+                  </section>
 
-                {orderError && (
-                  <div className="mt-4 bg-error-bg border-l-4 border-error-btn p-3 rounded">
-                    <p className="text-body-regular text-error-text font-semibold">
-                      {orderError}
-                    </p>
-                  </div>
-                )}
-              </section>
-            )}
+                  {/* RIGHT: Full Order Summary with Items */}
+                  <aside className="bg-white rounded-3xl border-2 border-grey-stroke shadow-lg p-6 h-fit lg:sticky lg:top-8">
+                    <h3 className="text-[20px] font-bold text-charcoal-600 mb-4" style={{ fontFamily: 'Merriweather, serif' }}>
+                      Your Items ({totalItems})
+                    </h3>
+                    
+                    <div className="space-y-3 mb-6 max-h-[300px] overflow-y-auto">
+                      {localCart.map(item => (
+                        <div key={item.id} className="flex items-center gap-3 pb-3 border-b border-grey-200">
+                          <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-sage-100 to-sage-200 flex items-center justify-center flex-shrink-0">
+                            <ShoppingCart size={20} className="text-sage-600" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-charcoal-600 truncate">{item.name}</p>
+                            <p className="text-xs text-charcoal-400">Qty: {item.quantity}</p>
+                          </div>
+                          <p className="text-sm font-bold text-charcoal-600">{item.totalPrice.toFixed(3)} BD</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="border-t-2 border-grey-stroke pt-4 space-y-3">
+                      <div className="flex justify-between text-base text-charcoal-600">
+                        <span>Subtotal:</span>
+                        <span className="font-bold">{subtotal.toFixed(3)} BD</span>
+                      </div>
+                      
+                      {fulfillmentType === 'Delivery' && (
+                        <div className="flex justify-between text-base text-charcoal-600">
+                          <span>Delivery Fee:</span>
+                          <span className="font-bold">{DELIVERY_FEE.toFixed(3)} BD</span>
+                        </div>
+                      )}
+                      
+                      <div className="border-t-2 border-grey-stroke pt-3">
+                        <div className="flex justify-between text-xl font-black text-sage-600">
+                          <span>Total:</span>
+                          <span>{total.toFixed(3)} BD</span>
+                        </div>
+                      </div>
+                    </div>
+                  </aside>
+                </div>
+              )}
           </div>
 
           {/* FOOTER ACTIONS */}

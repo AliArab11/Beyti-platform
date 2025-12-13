@@ -5,6 +5,8 @@ import NavigationButton from "../../components/NavigationButton";
 import AnalyticsCard from "../../components/AnalyticsCard";
 import StatusChip from "../../components/StatusChip";
 import CRUDButton from "../../components/CRUDButton";
+import Snackbar from "../../components/Snackbar";
+
 import { Table, TableHeader, TableBody, TableRow } from "../../components/Table";
 
 import { getSellerOrders, getSellers, restoreStock } from "../../services/api";
@@ -62,7 +64,7 @@ const getPaymentVariant = (status) => {
 };
 
 // ---------- Order Details Modal (Option A - Centered) ----------
-const OrderDetailsModal = ({ order, onClose, onOrderUpdated, onOrderExpired }) => {
+const OrderDetailsModal = ({ order, onClose, onOrderUpdated, onOrderExpired, onShowSnackbar }) => {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState(null);
   const [localOrder, setLocalOrder] = useState(order);
@@ -72,30 +74,30 @@ const OrderDetailsModal = ({ order, onClose, onOrderUpdated, onOrderExpired }) =
   }, [order]);
 
   // Handle timer expiration - update UI and close modal
-  const handleTimerExpired = (orderId) => {
-    console.log('⏰ Timer expired in modal for order:', orderId);
-    
-    // Check if already cancelled to prevent duplicate calls
-    if (localOrder.status?.toLowerCase() === 'cancelled') {
-      console.log('⚠️ Order already cancelled, skipping');
-      onClose();
-      return;
-    }
-    
-    // Update local state immediately
-    const cancelledOrder = { ...localOrder, status: "Cancelled" };
-    setLocalOrder(cancelledOrder);
-    
-    // Notify parent (parent will handle the API call)
-    if (onOrderExpired) {
-      onOrderExpired(orderId);
-    }
-    
-    // Close modal after a brief delay to show the status change
-    setTimeout(() => {
-      onClose();
-    }, 1500);
-  };
+ const handleTimerExpired = async (orderId) => {
+  console.log('⏰ Timer expired in modal for order:', orderId);
+  
+  // Check if already cancelled to prevent duplicate calls
+  if (localOrder.status?.toLowerCase() === 'cancelled') {
+    console.log('⚠️ Order already cancelled, skipping');
+    onClose();
+    return;
+  }
+  
+  // Update local state immediately for instant UI feedback
+  const cancelledOrder = { ...localOrder, status: "Cancelled" };
+  setLocalOrder(cancelledOrder);
+  
+  // Call parent's handler to trigger the API call
+  if (onOrderExpired) {
+    await onOrderExpired(orderId);
+  }
+  
+  // Close modal after a brief delay
+  setTimeout(() => {
+    onClose();
+  }, 1500);
+};
 
   // derived flags
   const status = (localOrder.status || "").toLowerCase();
@@ -117,76 +119,107 @@ const OrderDetailsModal = ({ order, onClose, onOrderUpdated, onOrderExpired }) =
   };
 
   const handleSellerResponse = async (newStatus) => {
-    setActionLoading(true);
-    setActionError(null);
+  setActionLoading(true);
+  setActionError(null);
+  try {
+    const res = await fetch(`${baseUrl}/${localOrder.id}/seller-response`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        Status: newStatus,
+        SellerNote: null,
+      }),
+    });
+
+    if (!res.ok) {
+  let errorMessage = "Failed to update order";
+  
+  try {
+    const errorData = await res.json();
+    errorMessage = errorData.message || errorData.Message || errorMessage;
+  } catch (e) {
+    // If JSON parsing fails, try text
     try {
-      const res = await fetch(`${baseUrl}/${localOrder.id}/seller-response`, {
+      const errorText = await res.text();
+      if (errorText) errorMessage = errorText;
+    } catch (textError) {
+      // Use default message
+    }
+    
+  }
+  console.log('❌ API Error Response:', errorMessage);
+      
+      // Check if it's an expiry error
+      if ( errorMessage.includes("expired") || errorMessage.includes("cancelled") )  {
+        // Update local state
+        const cancelledOrder = { ...localOrder, status: "Cancelled" };
+        setLocalOrder(cancelledOrder);
+        if (onOrderUpdated) onOrderUpdated(cancelledOrder);
+        
+        // Show snackbar
+        if (onShowSnackbar) {
+          onShowSnackbar({
+            message: errorMessage,
+            type: 'error'
+          });
+        }
+        
+        // Close modal after brief delay
+        setTimeout(() => {
+          onClose();
+        }, 1500);
+        
+        return;
+      }
+      
+      throw new Error(errorMessage);
+    }
+
+    applyUpdate(newStatus);
+  } catch (err) {
+    console.error(err);
+    setActionError(err.message || "Failed to update order");
+  } finally {
+    setActionLoading(false);
+  }
+};
+
+  const handleAdvanceStatus = async () => {
+  let nextStatus = null;
+
+  if (isAccepted) nextStatus = "Preparing";
+  else if (isPreparing) nextStatus = "Ready for Pickup";
+  else if (isReadyForPickup && isPickup) nextStatus = "Completed";
+  else return;
+
+  setActionLoading(true);
+  setActionError(null);
+  try {
+    const res = await fetch(
+      `${baseUrl}/${localOrder.id}/update-seller-status`,
+      {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          Status: newStatus,
-          SellerNote: null,
+          Status: nextStatus,
         }),
-      });
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "Failed to update order");
       }
+    );
 
-      applyUpdate(newStatus);
-    } catch (err) {
-      console.error(err);
-      setActionError(err.message || "Failed to update order");
-    } finally {
-      setActionLoading(false);
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || "Failed to update order status");
     }
-  };
 
-  const handleAdvanceStatus = async () => {
-    let nextStatus = null;
-
-    if (isAccepted) nextStatus = "Preparing";
-    else if (isPreparing) nextStatus = "Ready for Pickup";
-    else if (isReadyForPickup && isPickup) nextStatus = "Completed";
-    else return;
-
-    setActionLoading(true);
-    setActionError(null);
-    try {
-      const res = await fetch(
-        `${baseUrl}/${localOrder.id}/update-seller-status`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            Status: nextStatus,
-          }),
-        }
-      );
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "Failed to update order status");
-      }
-
-      applyUpdate(nextStatus);
-      // Restore stock if order was cancelled
-      if (nextStatus === 'Cancelled') {
-        try {
-          await restoreStock(localOrder.id);
-          console.log('✅ Stock restored for cancelled order');
-        } catch (err) {
-          console.error('❌ Failed to restore stock:', err);
-        }
-      }
-    } catch (err) {
-      console.error(err);
-      setActionError(err.message || "Failed to update order status");
-    } finally {
-      setActionLoading(false);
-    }
-  };
+    applyUpdate(nextStatus);
+    // Don't restore stock - only needed when cancelling from placed/pending
+  } catch (err) {
+    console.error(err);
+    setActionError(err.message || "Failed to update order status");
+  } finally {
+    setActionLoading(false);
+  }
+};
 
   const renderFooterButtons = () => {
     if (isCompleted) {
@@ -484,6 +517,9 @@ const SellerDashboard = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [orderModalOpen, setOrderModalOpen] = useState(false);
 
+  // snackbar state
+  const [snackbar, setSnackbar] = useState({ show: false, message: '', type: 'error' });
+
   const handleOrderExpired = async (orderId) => {
   try {
     // Double-check the order is still in placed/pending status
@@ -508,22 +544,26 @@ const SellerDashboard = () => {
     });
 
     if (res.ok) {
-      // Update state first
       setOrders((prev) =>
         prev.map((o) => (o.id === orderId ? { ...o, status: "Cancelled" } : o))
       );
+      // Don't call restoreStock here - backend already handles it
+      console.log('✅ Order auto-cancelled (backend restored stock)');
       
-      // Then restore stock (with error handling)
-      try {
-        await restoreStock(orderId);
-        console.log('✅ Order auto-cancelled and stock restored');
-      } catch (stockError) {
-        console.warn('⚠️ Stock restoration failed, but order was cancelled:', stockError);
-        // Don't throw - order cancellation succeeded even if stock restore failed
-      }
+      // Show snackbar
+      setSnackbar({
+        show: true,
+        message: 'Order expired and was automatically cancelled',
+        type: 'error'
+      });
     }
   } catch (err) {
-    console.error('❌ Failed to auto-cancel order:', err);
+    console.error('Failed to auto-cancel order:', err);
+    setSnackbar({
+      show: true,
+      message: 'Failed to cancel expired order',
+      type: 'error'
+    });
   }
 };
 
@@ -759,15 +799,33 @@ orders.forEach((order) => {
   // -----------------------------------------
   // MAIN DASHBOARD LAYOUT
   // -----------------------------------------
-  return (
-    <div className="min-h-screen bg-cream-50 flex">
-      <SellerSelectModal />
-      {orderModalOpen && selectedOrder && (
+ return (
+    <>
+      {/* Snackbar - Rendered outside main layout for proper z-index */}
+      {snackbar.show && (
+        <Snackbar
+          message={snackbar.message}
+          type={snackbar.type}
+          onClose={() => setSnackbar({ ...snackbar, show: false })}
+        />
+      )}
+      
+      <div className="min-h-screen bg-cream-50 flex">
+        <SellerSelectModal />
+        {orderModalOpen && selectedOrder && (
         <OrderDetailsModal
           order={selectedOrder}
           onClose={closeOrderModal}
           onOrderUpdated={handleOrderUpdated}
           onOrderExpired={handleOrderExpired}
+          onShowSnackbar={({ message, type }) => {
+          setSnackbar({
+            show: true,
+            message,
+            type: type || 'error'
+          });
+        }}
+
         />
       )}
 
@@ -1301,6 +1359,7 @@ orders.forEach((order) => {
         </main>
       </div>
     </div>
+    </>
   );
 };
 

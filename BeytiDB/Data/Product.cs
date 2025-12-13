@@ -29,6 +29,9 @@ public partial class Product
     [Column(TypeName = "decimal(10, 2)")]
     public decimal BasePrice { get; set; }
 
+    [NotMapped]
+    public decimal? AverageRating { get; set; }
+
     public bool IsActive { get; set; }
 
     [Precision(3)]

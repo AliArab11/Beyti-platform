@@ -1,10 +1,11 @@
 import { useState, useEffect , useRef} from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Cake, BowlFood, Heart, Bread, Coffee, Storefront, ShoppingCartSimple, Package } from "@phosphor-icons/react";
+import { Cake, BowlFood, Heart, Bread, Coffee, Storefront, ShoppingCartSimple, Package, Star } from "@phosphor-icons/react";
 import StoreView from "./StoreView";
 import OrderDetails from './Components/OrderDetails';
 import ActiveOrderBanner from './Components/ActiveOrderBanner';
 import Snackbar from './../../components/Snackbar';
+
 
 
 // Get customers function
@@ -89,7 +90,7 @@ const getStoreColors = (storeName) => {
 };
 
 // Header Component
-const Header = ({ customerName = null, customerId, cart = [], onCustomerClick, onLogout }) => {
+const Header = ({ customerName = null, customerId, cart = [], stores = [], customerAddresses = [], onCustomerClick, onLogout }) => {
   const navigate = useNavigate();  
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
@@ -153,7 +154,7 @@ const Header = ({ customerName = null, customerId, cart = [], onCustomerClick, o
                         state: { 
                             customerId, 
                             customerName,
-                            customerAddresses: [], // We don't have addresses in MainStoreView
+                            customerAddresses: customerAddresses,
                             selectedStore: targetStore,
                             storeName: targetStoreName || targetStore?.storeName,
                             storeId: targetStoreId
@@ -300,10 +301,10 @@ const Header = ({ customerName = null, customerId, cart = [], onCustomerClick, o
               className="flex items-center gap-2 pl-4 border-l border-grey-stroke bg-sage-500 hover:bg-sage-600 text-white px-4 py-2 rounded-lg transition-all"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
               </svg>
               <span className="text-sm font-semibold" style={{ fontFamily: 'Inter, sans-serif' }}>
-                Select Customer
+                Login
               </span>
             </button>
           )}
@@ -434,32 +435,31 @@ const FeaturedCarousel = ({ stores, onStoreClick }) => {
               <div 
                 key={store.id || idx} 
                 onClick={() => onStoreClick(store.id)}
-                className="flex-shrink-0 w-[calc(33.333%-16px)] bg-white rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.1)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-all cursor-pointer"
+                className="flex-shrink-0 w-[calc(33.333%-16px)] bg-white rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all cursor-pointer"
               >
-                {/* Dynamic Banner */}
-                <div className={`relative h-40 bg-gradient-to-br ${colors.bannerGradient}`} style={{ backgroundColor: '#F5F5F7' }}>
+                <div className={`relative h-32 bg-gradient-to-br ${colors.bannerGradient}`} style={{ backgroundColor: '#F5F5F7' }}>
                   <div className="absolute inset-0 opacity-20">
                     <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
                       <defs>
-                        <pattern id={`pattern-${idx}`} patternUnits="userSpaceOnUse" width="30" height="30" patternTransform="rotate(45)">
-                          <line x1="0" y1="0" x2="0" y2="30" stroke={colors.accent} strokeWidth="1" opacity="0.3"/>
+                        <pattern id={`pattern-carousel-${idx}`} patternUnits="userSpaceOnUse" width="25" height="25" patternTransform="rotate(45)">
+                          <line x1="0" y1="0" x2="0" y2="25" stroke={colors.accent} strokeWidth="1" opacity="0.3"/>
                         </pattern>
                       </defs>
-                      <rect width="100%" height="100%" fill={`url(#pattern-${idx})`}/>
+                      <rect width="100%" height="100%" fill={`url(#pattern-carousel-${idx})`}/>
                     </svg>
                   </div>
-                  <div className="absolute top-4 right-6 w-16 h-16 rounded-full opacity-15"
-                       style={{ background: `radial-gradient(circle, ${colors.accent} 0%, transparent 70%)` }}></div>
+                  <div className="absolute top-3 right-4 w-12 h-12 rounded-full opacity-15"
+                      style={{ background: `radial-gradient(circle, ${colors.accent} 0%, transparent 70%)` }}></div>
                   
-                  <div className="absolute -bottom-9 left-5">
-                    <div className={`w-[4.5rem] h-[4.5rem] rounded-full bg-gradient-to-br ${colors.gradient} border-4 border-white flex items-center justify-center`}
-                         style={{ boxShadow: `0 4px 12px ${colors.shadow}` }}>
+                  <div className="absolute -bottom-8 left-4">
+                    <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${colors.gradient} border-4 border-white flex items-center justify-center`}
+                        style={{ boxShadow: `0 4px 12px ${colors.shadow}` }}>
                       <div className="absolute inset-0 flex items-center justify-center opacity-15">
-                        <svg viewBox="0 0 100 100" className="w-16 h-16 text-white">
+                        <svg viewBox="0 0 100 100" className="w-14 h-14 text-white">
                           <polygon points="50,10 85,30 85,70 50,90 15,70 15,30" fill="currentColor"/>
                         </svg>
                       </div>
-                      <span className="relative z-10 text-[22px] font-black text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.4)]" 
+                      <span className="relative z-10 text-[18px] font-black text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.4)]" 
                             style={{ fontFamily: "Inter, sans-serif" }}>
                         {initials}
                       </span>
@@ -467,14 +467,44 @@ const FeaturedCarousel = ({ stores, onStoreClick }) => {
                   </div>
                 </div>
                 
-                <div className="pt-11 p-5 bg-white">
-                  <h3 className="font-bold text-charcoal-600 text-[17px] mb-2" style={{ fontFamily: 'Merriweather, serif' }}>{store.storeName}</h3>
-                  <div className="flex items-center gap-1">
-                    {[...Array(5)].map((_, i) => (
-                      <svg key={i} className="w-3.5 h-3.5 text-[#F5C563] fill-current" viewBox="0 0 20 20">
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                      </svg>
-                    ))}
+                <div className="pt-10 p-4 bg-white">
+                  <h3 className="font-bold text-charcoal-600 text-base mb-2" style={{ fontFamily: 'Merriweather, serif' }}>{store.storeName}</h3>
+                  <div className="flex items-center gap-1 mb-3">
+                    {(() => {
+                      const rating = store.averageRating || 0;
+                      const hasEnoughReviews = store.averageRating !== null && store.averageRating !== undefined;
+                      
+                      if (!hasEnoughReviews) {
+                        return (
+                          <span className="px-3 py-1 bg-sage-500 text-white text-xs font-bold rounded-full" style={{ fontFamily: 'Inter, sans-serif' }}>
+                            NEW
+                          </span>
+                        );
+                      }
+                      
+                      return (
+                        <>
+                          {[0,1,2,3,4].map(i => {
+                            const fillPercentage = Math.max(0, Math.min(100, (rating - i) * 100));
+                            return (
+                              <div key={i} className="relative w-3.5 h-3.5">
+                                <Star size={14} className="text-grey-stroke absolute" weight="fill" />
+                                <div className="overflow-hidden absolute" style={{ width: `${fillPercentage}%` }}>
+                                  <Star size={14} className="text-sage-500" weight="fill" />
+                                </div>
+                              </div>
+                            );
+                          })}
+                          <span className="text-xs font-semibold text-charcoal-600 ml-1" style={{ fontFamily: 'Inter, sans-serif' }}>
+                            {rating.toFixed(1)}
+                          </span>
+                        </>
+                      );
+                    })()}
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    <span className="px-3 py-1 bg-cream-100 rounded-full text-xs font-medium text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>Bakery</span>
+                    <span className="px-3 py-1 bg-cream-100 rounded-full text-xs font-medium text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>Sweets</span>
                   </div>
                 </div>
               </div>
@@ -551,12 +581,37 @@ const StoreCard = ({ store }) => {
       <div className="pt-10 p-4 bg-white">
         <h3 className="font-bold text-charcoal-600 text-base mb-2" style={{ fontFamily: 'Merriweather, serif' }}>{store.storeName}</h3>
         <div className="flex items-center gap-1 mb-3">
-          {[1,2,3,4,5].map(star => (
-            <svg key={star} className="w-3.5 h-3.5 text-[#F5C563] fill-current" viewBox="0 0 20 20">
-              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-            </svg>
-          ))}
-          <span className="text-xs font-semibold text-charcoal-600 ml-1" style={{ fontFamily: 'Inter, sans-serif' }}>4.5</span>
+          {(() => {
+            const rating = store.averageRating || 0;
+            const hasEnoughReviews = store.averageRating !== null && store.averageRating !== undefined;
+            
+            if (!hasEnoughReviews) {
+              return (
+                <span className="px-3 py-1 bg-sage-500 text-white text-xs font-bold rounded-full" style={{ fontFamily: 'Inter, sans-serif' }}>
+                  NEW
+                </span>
+              );
+            }
+            
+            return (
+              <>
+                {[0,1,2,3,4].map(i => {
+                    const fillPercentage = Math.max(0, Math.min(100, (rating - i) * 100));
+                    return (
+                      <div key={i} className="relative w-3.5 h-3.5">
+                        <Star size={14} className="text-grey-stroke absolute" weight="fill" />
+                        <div className="overflow-hidden absolute" style={{ width: `${fillPercentage}%` }}>
+                          <Star size={14} className="text-sage-500" weight="fill" />
+                        </div>
+                      </div>
+                    );
+                  })}
+                <span className="text-xs font-semibold text-charcoal-600 ml-1" style={{ fontFamily: 'Inter, sans-serif' }}>
+                  {rating.toFixed(1)}
+                </span>
+              </>
+            );
+          })()}
         </div>
         <div className="flex gap-2 flex-wrap">
           <span className="px-3 py-1 bg-cream-100 rounded-full text-xs font-medium text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>Bakery</span>
@@ -643,6 +698,7 @@ const MainStoreView = () => {
   const [customerId, setCustomerId] = useState(null);
   const [customerName, setCustomerName] = useState(null);
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
+  const [customerAddresses, setCustomerAddresses] = useState([]);
 
   // Add Snackbar state
 const [snackbar, setSnackbar] = useState({ open: false, message: '', type: 'success' });
@@ -760,96 +816,19 @@ useEffect(() => {
 
 
 
-// Fetch customer orders AND auto-cancel expired ones
+// Fetch customer orders (backend handles auto-cancellation)
 useEffect(() => {
   if (!customerId) {
     setOrders([]);
     return;
   }
 
-  const checkAndCancelExpiredOrders = async (ordersList) => {
-    const now = new Date();
-    const expiredOrders = [];
-
-    for (const order of ordersList) {
-      const status = order.status?.toLowerCase();
-      
-      // Only check orders that are still pending/placed
-      if (!['placed', 'pending'].includes(status)) continue;
-
-      // Parse order creation time
-      let orderTime;
-      const dateStr = order.createdAt;
-      
-      if (dateStr.endsWith('Z')) {
-        orderTime = new Date(dateStr);
-      } else if (dateStr.includes('T') && !dateStr.includes('+') && !dateStr.endsWith('Z')) {
-        orderTime = new Date(dateStr + 'Z');
-      } else {
-        orderTime = new Date(dateStr);
-      }
-
-      // Check if 10 minutes have passed
-      const expiryTime = new Date(orderTime.getTime() + 10 * 60 * 1000);
-      
-      if (now >= expiryTime) {
-        expiredOrders.push(order.id);
-      }
-    }
-
-    // Cancel all expired orders
-    if (expiredOrders.length > 0) {
-      console.log('🔄 Found', expiredOrders.length, 'expired orders, cancelling...');
-      
-      for (const orderId of expiredOrders) {
-        try {
-          const response = await fetch(
-            `https://localhost:7062/api/Orders/${orderId}/seller-response`,
-            {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                Status: 'Cancelled',
-                SellerNote: 'Order auto-cancelled: No response within 10 minutes'
-              })
-            }
-          );
-
-          if (response.ok) {
-            console.log('✅ Auto-cancelled order:', orderId);
-          }
-        } catch (err) {
-          console.error('❌ Failed to auto-cancel order', orderId, err);
-        }
-      }
-
-      // Refetch orders to get updated statuses
-      return true;
-    }
-
-    return false;
-  };
-
   const fetchOrders = async () => {
     try {
       const response = await fetch(`https://localhost:7062/api/Orders?customerId=${customerId}`);
       if (response.ok) {
         const data = await response.json();
-        const ordersList = Array.isArray(data) ? data : [];
-        
-        // Check for expired orders before setting state
-        const needsRefetch = await checkAndCancelExpiredOrders(ordersList);
-        
-        if (needsRefetch) {
-          // Fetch again to get updated statuses
-          const refreshResponse = await fetch(`https://localhost:7062/api/Orders?customerId=${customerId}`);
-          if (refreshResponse.ok) {
-            const refreshedData = await refreshResponse.json();
-            setOrders(Array.isArray(refreshedData) ? refreshedData : []);
-          }
-        } else {
-          setOrders(ordersList);
-        }
+        setOrders(Array.isArray(data) ? data : []);
       }
     } catch (err) {
       console.error('Error fetching orders:', err);
@@ -859,7 +838,7 @@ useEffect(() => {
 
   fetchOrders();
   
-  // Check every 30 seconds for expired orders
+  // Poll every 30 seconds
   const interval = setInterval(fetchOrders, 30000);
   
   return () => clearInterval(interval);
@@ -868,9 +847,6 @@ useEffect(() => {
 // Poll for order updates
 useEffect(() => {
   if (!activeOrder || !customerId) return;
-
- 
-
 
   const interval = setInterval(async () => {
     try {
@@ -940,11 +916,41 @@ useEffect(() => {
     setCustomerId(parseInt(savedCustomerId, 10));
     setCustomerName(savedCustomerName);
     console.log("Restored customer session:", savedCustomerName);
-  } else {
-    // No saved session, show customer select modal
-    setCustomerModalOpen(true);  
   }
+  // Removed auto-opening modal - let user browse as guest
 }, []);
+
+// Fetch customer addresses when customerId changes
+useEffect(() => {
+  const fetchCustomerAddresses = async () => {
+    if (!customerId) {
+      setCustomerAddresses([]);
+      return;
+    }
+
+    try {
+      console.log("🔍 Fetching customer addresses for ID:", customerId);
+      const response = await fetch(`https://localhost:7062/api/Customers/${customerId}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const customerData = await response.json();
+      console.log("✅ Customer data received:", customerData);
+      
+      const addresses = customerData.customerAddresses || [];
+      console.log("📍 Customer addresses extracted:", addresses);
+      
+      setCustomerAddresses(addresses);
+    } catch (err) {
+      console.error("❌ Error fetching customer addresses:", err);
+      setCustomerAddresses([]);
+    }
+  };
+
+  fetchCustomerAddresses();
+}, [customerId]);
 
 useEffect(() => {
   console.log('🔥 MainStore orderPlaced effect triggered');
@@ -1065,9 +1071,11 @@ const handleStoreNavigation = (targetStoreId) => {
         customerName={customerName}
         customerId={customerId}
         cart={cart}
+        stores={stores}
+        customerAddresses={customerAddresses}
         onCustomerClick={handleCustomerClick}
         onLogout={handleCustomerLogout}
-    />
+      />
 
     {/* Active Order Banner */}
       {(() => {
