@@ -31,6 +31,17 @@ namespace Beyti_Backend.Controllers.Api
             public int? GenderId { get; set; }
         }
 
+        public class UpdateProductDto
+        {
+            public string Name { get; set; } = null!;
+            public string? Description { get; set; }
+            public decimal BasePrice { get; set; }
+            public int SellerId { get; set; }
+            public int SubCategoryId { get; set; }
+            public byte? GenderId { get; set; }
+        }
+
+
         [HttpGet("sellers-dropdown")]
         public async Task<ActionResult<IEnumerable<object>>> GetSellerDropdown()
         {
@@ -59,48 +70,83 @@ namespace Beyti_Backend.Controllers.Api
 
         // GET: api/Products/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<Product>> GetProduct(int id)
+        public async Task<ActionResult<object>> GetProduct(int id)
         {
-            var product = await _context.Products.FindAsync(id);
+            var product = await _context.Products
+                .Include(p => p.SubCategory)
+                    .ThenInclude(sc => sc.Category)
+                .Include(p => p.Reviews)
+                .FirstOrDefaultAsync(p => p.Id == id);
 
             if (product == null)
             {
                 return NotFound();
             }
 
-            return product;
+            // Calculate average rating
+            var productReviews = product.Reviews.Where(r => !r.IsCommentHiddenBySeller).ToList();
+            decimal? averageRating = null;
+
+            if (productReviews.Count >= 5)
+            {
+                averageRating = Math.Round((decimal)productReviews.Average(r => r.Rating), 1);
+            }
+
+            return Ok(new
+            {
+                id = product.Id,
+                name = product.Name,
+                description = product.Description,
+                basePrice = product.BasePrice,
+                isActive = product.IsActive,
+                averageRating,
+                reviewCount = productReviews.Count,
+                subCategory = product.SubCategory != null ? new
+                {
+                    id = product.SubCategory.Id,
+                    name = product.SubCategory.Name,
+                    category = product.SubCategory.Category != null ? new
+                    {
+                        id = product.SubCategory.Category.Id,
+                        name = product.SubCategory.Category.Name
+                    } : null
+                } : null,
+                createdAt = product.CreatedAt
+            });
         }
 
         // PUT: api/Products/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutProduct(int id, Product product)
+        public async Task<IActionResult> PutProduct(int id, [FromBody] UpdateProductDto dto)
         {
-            if (id != product.Id)
-            {
-                return BadRequest();
-            }
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
 
-            _context.Entry(product).State = EntityState.Modified;
+            var product = await _context.Products.FindAsync(id);
+            if (product == null)
+                return NotFound();
 
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!ProductExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
+            // Optional safety checks (recommended)
+            if (!_context.Sellers.Any(s => s.Id == dto.SellerId))
+                return BadRequest("Invalid SellerId");
 
+            if (!_context.SubCategories.Any(sc => sc.Id == dto.SubCategoryId))
+                return BadRequest("Invalid SubCategoryId");
+
+            // Apply updates
+            product.Name = dto.Name;
+            product.Description = dto.Description;
+            product.BasePrice = dto.BasePrice;
+            product.SellerId = dto.SellerId;
+            product.SubCategoryId = dto.SubCategoryId;
+            product.GenderId = dto.GenderId;
+            product.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
             return NoContent();
         }
+
 
         // POST: api/Products
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754

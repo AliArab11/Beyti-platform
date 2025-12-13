@@ -6,6 +6,7 @@ import ProductList from './Components/ProductDetails';
 import Checkout from './Components/Checkout';
 import ActiveOrderBanner from './Components/ActiveOrderBanner';
 import Snackbar from './../../components/Snackbar';
+import PageHeader from '../../components/PageHeader';
 
 import OrderDetails from './Components/OrderDetails';
 import { createOrder, createOrderItem, getProductVariants, getOrder, getOrders } from '../../services/api';
@@ -233,12 +234,17 @@ const StoreHeader = ({ storeName, customerName, customerId, storeId, cart, store
               )}
             </div>
           ) : (
-            <div className="flex items-center gap-3 pl-4 border-l border-grey-stroke">
-              <div className="w-8 h-8 bg-grey-300 rounded-full flex items-center justify-center">
-                <span className="text-charcoal-400 text-sm font-semibold">?</span>
-              </div>
-              <span className="text-charcoal-400 font-medium text-sm">No Customer</span>
-            </div>
+            <button
+              onClick={() => navigate('/mainStore')}
+              className="flex items-center gap-2 pl-4 border-l border-grey-stroke bg-sage-500 hover:bg-sage-600 text-white px-4 py-2 rounded-lg transition-all"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+              </svg>
+              <span className="text-sm font-semibold" style={{ fontFamily: 'Inter, sans-serif' }}>
+                Login
+              </span>
+            </button>
           )}
         </div>
       </div>
@@ -409,13 +415,33 @@ const StoreInfo = ({ store }) => (
                   </h1>
                   
                   {/* Rating inline with name */}
-                  <div className="flex items-center gap-2.5">
-                    <Star className="w-7 h-7 text-[#556B5C]" weight="fill" />
-                    <span className="text-[22px] font-semibold text-[#556B5C]" 
-                          style={{ fontFamily: "Inter, sans-serif" }}>
-                      {store?.rating || "2.3"}
-                    </span>
-                  </div>
+                    <div className="flex items-center gap-2.5">
+                      {(() => {
+                        const reviewCount = store?.products?.reduce((count, product) => 
+                          count + (product.reviews?.filter(r => !r.isCommentHiddenBySeller)?.length || 0), 0
+                        ) || 0;
+                        
+                        const rating = store?.averageRating || 0;
+                        
+                        if (reviewCount < 5) {
+                          return (
+                            <span className="px-4 py-1.5 bg-sage-500 text-white text-sm font-bold rounded-full" style={{ fontFamily: 'Inter, sans-serif' }}>
+                              NEW
+                            </span>
+                          );
+                        }
+                        
+                        return (
+                          <>
+                            <Star className="w-7 h-7 !text-sage-500" weight="fill" />
+                            <span className="text-[22px] font-semibold text-[#556B5C]" 
+                                  style={{ fontFamily: "Inter, sans-serif" }}>
+                              {rating.toFixed(1)}
+                            </span>
+                          </>
+                        );
+                      })()}
+                    </div>
                 </div>
                 
                 {/* Categories */}
@@ -505,54 +531,79 @@ const CategorySidebar = ({ selected, onSelect }) => {
 };
 
 // Product Card
-const ProductCard = ({ product, onClick }) => (
-  <div 
-    onClick={onClick}
-    className="bg-white rounded-2xl overflow-hidden cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all group"
-  >
-    {/* Product Image */}
-    <div className="relative h-48 bg-gradient-to-br from-[#D8E8DC] to-[#C9DFD0] overflow-hidden">
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="w-32 h-32 bg-white/30 rounded-full flex items-center justify-center">
-          <svg className="w-16 h-16 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-          </svg>
+const ProductCard = ({ product, onClick }) => {
+  const rating = product?.averageRating || 0;
+  const reviewCount = product?.reviewCount || 0;
+  const hasEnoughReviews = reviewCount >= 5;
+
+  return (
+    <div 
+      onClick={onClick}
+      className="bg-white rounded-2xl overflow-hidden cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all group"
+    >
+      {/* Product Image */}
+      <div className="relative h-48 bg-gradient-to-br from-[#D8E8DC] to-[#C9DFD0] overflow-hidden">
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-32 h-32 bg-white/30 rounded-full flex items-center justify-center">
+            <svg className="w-16 h-16 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+          </div>
+        </div>
+        
+        {/* Price Badge */}
+        <div className="absolute top-4 right-4 bg-white px-4 py-2 rounded-full shadow-lg">
+          <span className="text-lg font-bold text-sage-700">
+            {product?.basePrice ? `${product.basePrice.toFixed(3)} BD` : "15.000 BD"}
+          </span>
         </div>
       </div>
-      
-      {/* Price Badge */}
-      <div className="absolute top-4 right-4 bg-white px-4 py-2 rounded-full shadow-lg">
-        <span className="text-lg font-bold text-sage-700">
-          {product?.basePrice ? `${product.basePrice.toFixed(3)} BD` : "15.000 BD"}
-        </span>
+
+      {/* Product Info */}
+      <div className="p-5">
+        <h3 className="font-bold text-charcoal-600 text-lg mb-2 line-clamp-2 group-hover:text-sage-600 transition-colors" style={{ fontFamily: 'Merriweather, serif' }}>
+          {product?.name || "Dream Cookie"}
+        </h3>
+        
+        {/* Rating or NEW badge */}
+        <div className="flex items-center gap-1 mb-3">
+          {!hasEnoughReviews ? (
+            <span className="px-3 py-1 bg-sage-500 text-white text-xs font-bold rounded-full" style={{ fontFamily: 'Inter, sans-serif' }}>
+              NEW
+            </span>
+          ) : (
+            <>
+              {[...Array(5)].map((_, i) => {
+                const fillPercentage = Math.max(0, Math.min(100, (rating - i) * 100));
+                return (
+                  <div key={i} className="relative w-4 h-4">
+                    <Star className="w-4 h-4 text-grey-stroke absolute" weight="fill" />
+                    <div className="overflow-hidden absolute" style={{ width: `${fillPercentage}%` }}>
+                      <Star className="w-4 h-4 text-sage-500" weight="fill" />
+                    </div>
+                  </div>
+                );
+              })}
+              <span className="text-sm font-semibold text-charcoal-600 ml-1" style={{ fontFamily: 'Inter, sans-serif' }}>
+                {rating.toFixed(1)}
+              </span>
+            </>
+          )}
+        </div>
+
+        {product?.description && (
+          <p className="text-sm text-charcoal-400 mb-4 line-clamp-2">
+            {product.description}
+          </p>
+        )}
+        
+        <button className="w-full bg-sage-500 hover:bg-sage-600 text-white font-semibold py-3 rounded-xl transition-all shadow-[0_2px_8px_rgba(85,107,92,0.2)]">
+          View Details
+        </button>
       </div>
     </div>
-
-    {/* Product Info */}
-    <div className="p-5">
-      <h3 className="font-bold text-charcoal-600 text-lg mb-2 line-clamp-2 group-hover:text-sage-600 transition-colors" style={{ fontFamily: 'Merriweather, serif' }}>
-        {product?.name || "Dream Cookie"}
-      </h3>
-      
-      <div className="flex items-center gap-1 mb-3">
-        {[...Array(5)].map((_, i) => (
-          <Star key={i} className="w-4 h-4 text-[#F5C563]" weight="fill" />
-        ))}
-        <span className="text-sm font-semibold text-charcoal-600 ml-1">5.0</span>
-      </div>
-
-      {product?.description && (
-        <p className="text-sm text-charcoal-400 mb-4 line-clamp-2">
-          {product.description}
-        </p>
-      )}
-      
-      <button className="w-full bg-sage-500 hover:bg-sage-600 text-white font-semibold py-3 rounded-xl transition-all shadow-[0_2px_8px_rgba(85,107,92,0.2)]">
-        View Details
-      </button>
-    </div>
-  </div>
-);
+  );
+};
 
 // Main Store View Component
 const StoreView = () => {

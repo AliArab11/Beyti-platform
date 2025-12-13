@@ -26,17 +26,36 @@ namespace Beyti_Backend.Controllers.Api
         [HttpGet]
         public async Task<ActionResult<IEnumerable<object>>> GetSellers()
         {
-            return await _context.Sellers
+            var sellers = await _context.Sellers
                 .Include(s => s.UserProfile)
                 .Include(s => s.SellerAddresses)
                     .ThenInclude(sa => sa.Address)
-                .Select(s => new
+                .Include(s => s.Products) // ← NEW: Include products
+                .ToListAsync();
+
+            var result = new List<object>();
+
+            foreach (var seller in sellers)
+            {
+                // Calculate average rating from all reviews of seller's products
+                var allReviews = await _context.Reviews
+                    .Where(r => r.Product.SellerId == seller.Id && !r.IsCommentHiddenBySeller)
+                    .ToListAsync();
+
+                decimal? averageRating = null;
+                if (allReviews.Any())
                 {
-                    s.Id,
-                    storeName = s.UserProfile.DisplayName,
-                    s.Phone,
-                    s.CreatedAt,
-                    sellerAddresses = s.SellerAddresses.Select(sa => new
+                    averageRating = Math.Round((decimal)allReviews.Average(r => r.Rating), 1);
+                }
+
+                result.Add(new
+                {
+                    seller.Id,
+                    storeName = seller.UserProfile.DisplayName,
+                    seller.Phone,
+                    seller.CreatedAt,
+                    averageRating, // ← NEW: Include rating
+                    sellerAddresses = seller.SellerAddresses.Select(sa => new
                     {
                         sa.Id,
                         address = new
@@ -48,12 +67,19 @@ namespace Beyti_Backend.Controllers.Api
                             sa.Address.Region,
                             sa.Address.PostalCode,
                             sa.Address.Country,
-                            sa.Address.Latitude,   
-                            sa.Address.Longitude  
+                            sa.Address.Latitude,
+                            sa.Address.Longitude
                         }
+                    }),
+                    products = seller.Products.Select(p => new // ← NEW: Include products for review count
+                    {
+                        p.Id,
+                        p.Name
                     })
-                })
-                .ToListAsync();
+                });
+            }
+
+            return result;
         }
 
         // GET: api/Sellers/Profile/{userProfileId} - Get seller by UserProfileId
@@ -119,6 +145,8 @@ namespace Beyti_Backend.Controllers.Api
                     .Include(s => s.Products)
                         .ThenInclude(p => p.SubCategory)
                             .ThenInclude(sc => sc.Category)
+                    .Include(s => s.Products) // ← Make sure products are loaded
+                        .ThenInclude(p => p.Reviews) // ← NEW: Include reviews
                     .FirstOrDefaultAsync(s => s.Id == id);
 
                 if (seller == null)
@@ -127,12 +155,24 @@ namespace Beyti_Backend.Controllers.Api
                 if (seller.UserProfile == null)
                     return StatusCode(500, new { message = "Seller profile data is missing" });
 
+                // ← NEW: Calculate average rating
+                var allReviews = await _context.Reviews
+                    .Where(r => r.Product.SellerId == id && !r.IsCommentHiddenBySeller)
+                    .ToListAsync();
+
+                decimal? averageRating = null;
+                if (allReviews.Any())
+                {
+                    averageRating = Math.Round((decimal)allReviews.Average(r => r.Rating), 1);
+                }
+
                 return Ok(new
                 {
                     id = seller.Id,
                     storeName = seller.UserProfile.DisplayName,
                     phone = seller.Phone,
                     createdAt = seller.CreatedAt,
+                    averageRating, // ← NEW: Add rating to response
                     sellerAddresses = seller.SellerAddresses.Select(sa => new
                     {
                         id = sa.Id,
@@ -149,23 +189,43 @@ namespace Beyti_Backend.Controllers.Api
                             longitude = sa.Address.Longitude
                         }
                     }).ToList(),
-                    products = seller.Products.Select(p => new
-                    {
-                        id = p.Id,
-                        name = p.Name,
-                        description = p.Description,
-                        basePrice = p.BasePrice,
-                        subCategory = p.SubCategory != null ? new
+                    products = seller.Products.Select(p => {
+                        var productReviews = p.Reviews.Where(r => !r.IsCommentHiddenBySeller).ToList();
+                        decimal? productAverageRating = null;
+
+                        if (productReviews.Count >= 5)
                         {
-                            id = p.SubCategory.Id,
-                            name = p.SubCategory.Name,
-                            category = p.SubCategory.Category != null ? new
+                            productAverageRating = Math.Round((decimal)productReviews.Average(r => r.Rating), 1);
+                        }
+
+                        return new
+                        {
+                            id = p.Id,
+                            name = p.Name,
+                            description = p.Description,
+                            basePrice = p.BasePrice,
+                            averageRating = productAverageRating,
+                            reviewCount = productReviews.Count,
+                            subCategory = p.SubCategory != null ? new
                             {
-                                id = p.SubCategory.Category.Id,
-                                name = p.SubCategory.Category.Name
-                            } : null
-                        } : null,
-                        createdAt = p.CreatedAt
+                                id = p.SubCategory.Id,
+                                name = p.SubCategory.Name,
+                                category = p.SubCategory.Category != null ? new
+                                {
+                                    id = p.SubCategory.Category.Id,
+                                    name = p.SubCategory.Category.Name
+                                } : null
+                            } : null,
+                            createdAt = p.CreatedAt,
+                            reviews = productReviews.Select(r => new
+                            {
+                                r.Id,
+                                r.Rating,
+                                r.Comment,
+                                r.CreatedAt,
+                                r.IsCommentHiddenBySeller
+                            }).ToList()
+                        };
                     }).ToList()
                 });
             }
@@ -196,12 +256,24 @@ namespace Beyti_Backend.Controllers.Api
                 if (seller.UserProfile == null)
                     return StatusCode(500, new { message = "Seller profile data is missing" });
 
+                // ← NEW: Calculate average rating
+                var allReviews = await _context.Reviews
+                    .Where(r => r.Product.SellerId == id && !r.IsCommentHiddenBySeller)
+                    .ToListAsync();
+
+                decimal? averageRating = null;
+                if (allReviews.Any())
+                {
+                    averageRating = Math.Round((decimal)allReviews.Average(r => r.Rating), 1);
+                }
+
                 return Ok(new
                 {
                     seller.Id,
                     storeName = seller.UserProfile.DisplayName,
                     seller.Phone,
-                    seller.CreatedAt
+                    seller.CreatedAt,
+                    averageRating // ← NEW: Add rating to response
                 });
             }
             catch (Exception ex)

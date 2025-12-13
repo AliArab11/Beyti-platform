@@ -60,6 +60,9 @@ namespace Beyti_Backend.Controllers.Api
         [HttpGet]
         public async Task<ActionResult<IEnumerable<object>>> GetOrders([FromQuery] int? customerId, [FromQuery] int? sellerId)
         {
+            // AUTO-CANCEL EXPIRED ORDERS BEFORE RETURNING RESULTS
+            await AutoCancelExpiredOrders();
+
             var query = _context.Orders
             .Include(o => o.Customer)
                 .ThenInclude(c => c.UserProfile)
@@ -67,18 +70,13 @@ namespace Beyti_Backend.Controllers.Api
             .Include(o => o.Seller)
                 .ThenInclude(s => s.UserProfile)
 
-            // Include pickup address
             .Include(o => o.PickupAddress)
-
-            // Include delivery address
             .Include(o => o.DeliveryAddress)
 
-            // Include seller → sellerAddresses → address
             .Include(o => o.Seller)
                 .ThenInclude(s => s.SellerAddresses)
                     .ThenInclude(sa => sa.Address)
 
-            // Include order items → variant → product
             .Include(o => o.OrderItems)
                 .ThenInclude(oi => oi.ProductVariant)
                     .ThenInclude(pv => pv.Product)
@@ -95,73 +93,110 @@ namespace Beyti_Backend.Controllers.Api
             }
 
             var orders = await query
-    .Select(o => new
-    {
-        o.Id,
-        o.CustomerId,
-        o.SellerId,
-        o.DeliveryAddressId,
-        o.PickupAddressId,
-        o.PaymentMethod,
-        o.PaymentStatus,
-        o.FulfillmentType,
-        o.Status,
-        o.SubtotalAmount,
-        o.DeliveryFee,
-        o.TotalAmount,
-        o.CreatedAt,
-        o.UpdatedAt,
-        customerName = o.Customer.UserProfile.DisplayName,
-        sellerName = o.Seller.UserProfile.DisplayName,
-        sellerPhone = o.Seller.Phone,
+            .Select(o => new
+            {
+                o.Id,
+                o.CustomerId,
+                o.SellerId,
+                o.DeliveryAddressId,
+                o.PickupAddressId,
+                o.PaymentMethod,
+                o.PaymentStatus,
+                o.FulfillmentType,
+                o.Status,
+                o.SubtotalAmount,
+                o.DeliveryFee,
+                o.TotalAmount,
+                o.CreatedAt,
+                o.UpdatedAt,
+                customerName = o.Customer.UserProfile.DisplayName,
+                sellerName = o.Seller.UserProfile.DisplayName,
+                sellerPhone = o.Seller.Phone,
 
-        // ADD THESE LINES - Pickup Address (Seller Location)
-        pickupAddress = o.PickupAddress != null ? new
-        {
-            o.PickupAddress.Id,
-            o.PickupAddress.Street,
-            o.PickupAddress.City,
-            o.PickupAddress.Region,
-            o.PickupAddress.Country,
-            o.PickupAddress.Latitude,
-            o.PickupAddress.Longitude,
-        } : null,
+                pickupAddress = o.PickupAddress != null ? new
+                {
+                    o.PickupAddress.Id,
+                    o.PickupAddress.Street,
+                    o.PickupAddress.City,
+                    o.PickupAddress.Region,
+                    o.PickupAddress.Country,
+                    o.PickupAddress.Latitude,
+                    o.PickupAddress.Longitude,
+                } : null,
 
-        // Delivery Address (Customer Location)
-        deliveryAddress = o.DeliveryAddress != null ? new
-        {
-            o.DeliveryAddress.Id,
-            o.DeliveryAddress.Street,
-            o.DeliveryAddress.City,
-            o.DeliveryAddress.Region,
-            o.DeliveryAddress.Country,
-            o.DeliveryAddress.Latitude,
-            o.DeliveryAddress.Longitude,
-        } : null,
+                deliveryAddress = o.DeliveryAddress != null ? new
+                {
+                    o.DeliveryAddress.Id,
+                    o.DeliveryAddress.Street,
+                    o.DeliveryAddress.City,
+                    o.DeliveryAddress.Region,
+                    o.DeliveryAddress.Country,
+                    o.DeliveryAddress.Latitude,
+                    o.DeliveryAddress.Longitude,
+                } : null,
 
-        orderItems = o.OrderItems.Select(oi => new
-        {
-            oi.Id,
-            oi.OrderId,
-            oi.ProductVariantId,
-            productId = oi.ProductVariant.Product.Id,
-            productName = oi.ProductVariant.Product.Name,
-            productPrice = oi.ProductVariant.Product.BasePrice,
-            variantSKU = oi.ProductVariant.SKU,
-            oi.Qty,
-            oi.UnitPrice,
-            oi.LineTotal
-        }).ToList()
-    })
-    .ToListAsync();
+                orderItems = o.OrderItems.Select(oi => new
+                {
+                    oi.Id,
+                    oi.OrderId,
+                    oi.ProductVariantId,
+                    productId = oi.ProductVariant.Product.Id,
+                    productName = oi.ProductVariant.Product.Name,
+                    productPrice = oi.ProductVariant.Product.BasePrice,
+                    variantSKU = oi.ProductVariant.SKU,
+                    oi.Qty,
+                    oi.UnitPrice,
+                    oi.LineTotal
+                }).ToList()
+            })
+            .ToListAsync();
 
             return Ok(orders);
+        }
+
+        // Helper method to auto-cancel expired orders
+        private async Task AutoCancelExpiredOrders()
+        {
+            var now = DateTime.UtcNow;
+            var expiryThreshold = now.AddMinutes(-1); // 10 minutes ago
+
+            var expiredOrders = await _context.Orders
+                .Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.ProductVariant)
+                .Where(o => (o.Status == "Placed" || o.Status == "Pending")
+                            && o.CreatedAt <= expiryThreshold)
+                .ToListAsync();
+
+            if (expiredOrders.Any())
+            {
+                foreach (var order in expiredOrders)
+                {
+                    // Update order status
+                    order.Status = "Cancelled";
+                    order.UpdatedAt = now;
+
+                    // Restore stock for each order item
+                    foreach (var item in order.OrderItems)
+                    {
+                        if (item.ProductVariant != null)
+                        {
+                            item.ProductVariant.StockQty += item.Qty;
+                            item.ProductVariant.UpdatedAt = now;
+                        }
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+            }
         }
 
         // GET: api/Orders/5
         [HttpGet("{id}")]
         public async Task<ActionResult<object>> GetOrder(int id)
         {
+            // AUTO-CANCEL EXPIRED ORDERS BEFORE RETURNING RESULT
+            await AutoCancelExpiredOrders();
+
             var o = await _context.Orders
                 .Include(o => o.Customer)
                     .ThenInclude(c => c.UserProfile)
@@ -442,7 +477,7 @@ namespace Beyti_Backend.Controllers.Api
             }
 
             await _context.SaveChangesAsync();
-            return Ok();
+            return Ok(new { success = true, message = "Stock restored successfully" });
         }
 
         // PUT: api/Orders/{id}/seller-response
@@ -453,25 +488,59 @@ namespace Beyti_Backend.Controllers.Api
             {
                 var order = await _context.Orders
                     .Include(o => o.DeliveryTicket)
-                    .Include(o => o.OrderItems)  // ADD THIS LINE
+                    .Include(o => o.OrderItems)
+                        .ThenInclude(oi => oi.ProductVariant)
                     .FirstOrDefaultAsync(o => o.Id == id);
 
                 if (order == null)
                     return NotFound();
 
+                // ⏰ HARD EXPIRY CHECK (authoritative)
+                var expiryMinutes = 1;
+                var expiredAt = order.CreatedAt.AddMinutes(expiryMinutes);
+
+                if (DateTime.UtcNow > expiredAt &&
+                    (order.Status == "Placed" || order.Status == "Pending"))
+                {
+                    // Auto-cancel
+                    order.Status = "Cancelled";
+                    order.UpdatedAt = DateTime.UtcNow;
+
+                    // Restore stock
+                    foreach (var item in order.OrderItems)
+                    {
+                        if (item.ProductVariant != null)
+                        {
+                            item.ProductVariant.StockQty += item.Qty;
+                            item.ProductVariant.UpdatedAt = DateTime.UtcNow;
+                        }
+                    }
+
+                    await _context.SaveChangesAsync();
+
+                    return BadRequest(new
+                    {
+                        message = "Order expired and was automatically cancelled."
+                    });
+                }
+
+
+
+                // Store the old status to check if we're transitioning TO cancelled
+                var oldStatus = order.Status;
+
                 order.Status = dto.Status;
                 order.UpdatedAt = DateTime.UtcNow;
 
-                // ADD THIS BLOCK - Restore stock if order is cancelled
-                if (dto.Status == "Cancelled")
+                // Only restore stock if we're NEWLY cancelling (not already cancelled)
+                if (dto.Status == "Cancelled" && oldStatus != "Cancelled")
                 {
                     foreach (var item in order.OrderItems)
                     {
-                        var variant = await _context.ProductVariants.FindAsync(item.ProductVariantId);
-                        if (variant != null)
+                        if (item.ProductVariant != null)
                         {
-                            variant.StockQty += item.Qty;
-                            variant.UpdatedAt = DateTime.UtcNow;
+                            item.ProductVariant.StockQty += item.Qty;
+                            item.ProductVariant.UpdatedAt = DateTime.UtcNow;
                         }
                     }
                 }

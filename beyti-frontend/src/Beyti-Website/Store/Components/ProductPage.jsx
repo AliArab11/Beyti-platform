@@ -5,6 +5,9 @@ import { Cake, Heart, Star, MagnifyingGlass, ArrowLeft, Bread, ShoppingCartSimpl
 import ActiveOrderBanner from './ActiveOrderBanner';
 import Snackbar from './../../../components/Snackbar';
 
+
+
+
 const ProductPage = ({ onAddToCart }) => {
  const { productId, storeId } = useParams();
 const location = useLocation();
@@ -132,7 +135,7 @@ useEffect(() => {
   const [quantity, setQuantity] = useState(1);
   const [isFavorite, setIsFavorite] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('description');
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
   const [showDifferentStoreModal, setShowDifferentStoreModal] = useState(false);
   const [pendingCartItem, setPendingCartItem] = useState(null);
@@ -225,6 +228,12 @@ useEffect(() => {
   };
 
 const handleAddToCart = () => {
+    // ✅ CHECK LOGIN STATUS FIRST - BEFORE ANYTHING ELSE
+    if (!customerId) {
+        showSnackbar('Please login to add items to cart', 'warning');
+        return;
+    }
+    
     if (!product) return;
     
     // Check available stock
@@ -499,12 +508,17 @@ const handleTrackOrder = () => {
                 </button>
               </div>
             ) : (
-              <div className="flex items-center gap-3 pl-4 border-l border-grey-stroke">
-                <div className="w-8 h-8 bg-grey-300 rounded-full flex items-center justify-center">
-                  <span className="text-charcoal-400 text-sm font-semibold">?</span>
-                </div>
-                <span className="text-charcoal-400 font-medium text-sm">No Customer</span>
-              </div>
+              <button
+                onClick={() => navigate('/mainStore')}
+                className="flex items-center gap-2 pl-4 border-l border-grey-stroke bg-sage-500 hover:bg-sage-600 text-white px-4 py-2 rounded-lg transition-all"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                </svg>
+                <span className="text-sm font-semibold" style={{ fontFamily: 'Inter, sans-serif' }}>
+                  Login
+                </span>
+              </button>
             )}
           </div>
         </div>
@@ -562,39 +576,63 @@ const handleTrackOrder = () => {
       </h1>
       
       {/* Rating */}
-      {reviews.length > 0 && (
-        <div className="flex items-center gap-4 mb-6">
-          <div className="flex items-center gap-2">
-            {[...Array(5)].map((_, i) => (
-              <Star 
-                key={i} 
-                size={24} 
-                weight="fill" 
-                className={i < Math.round(averageRating) ? "text-[#F5C563]" : "text-grey-stroke"}
-              />
-            ))}
-          </div>
-          <span className="text-2xl font-bold text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>
-            {averageRating}
-          </span>
+      <div className="flex items-center gap-4 mb-6">
+        {reviews.length >= 5 ? (
+          <>
+            <div className="flex items-center gap-2">
+              {[...Array(5)].map((_, i) => {
+                const fillPercentage = Math.max(0, Math.min(100, (averageRating - i) * 100));
+                return (
+                  <div key={i} className="relative w-6 h-6">
+                    <Star size={24} className="text-grey-stroke absolute" weight="fill" />
+                    <div className="overflow-hidden absolute" style={{ width: `${fillPercentage}%` }}>
+                      <Star size={24} className="text-sage-500" weight="fill" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <span className="text-2xl font-bold text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>
+              {averageRating}
+            </span>
+            <span className="text-charcoal-400" style={{ fontFamily: 'Inter, sans-serif' }}>
+              ({reviews.length} Reviews)
+            </span>
+          </>
+        ) : reviews.length > 0 ? (
+          <>
+            <span className="px-4 py-2 bg-sage-500 text-white text-sm font-bold rounded-full" style={{ fontFamily: 'Inter, sans-serif' }}>
+              NEW
+            </span>
+            <span className="text-charcoal-400" style={{ fontFamily: 'Inter, sans-serif' }}>
+              ({reviews.length} {reviews.length === 1 ? 'Review' : 'Reviews'})
+            </span>
+          </>
+        ) : (
           <span className="text-charcoal-400" style={{ fontFamily: 'Inter, sans-serif' }}>
-            ({reviews.length} Reviews)
+            No reviews yet
           </span>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Description with View More */}
       {product.description && (
         <div className="mb-6">
-          <div className={`text-charcoal-600 leading-relaxed ${activeTab === 'description' ? '' : 'line-clamp-3'}`} style={{ fontFamily: 'Inter, sans-serif' }}>
+          <div
+            className={`text-charcoal-600 leading-relaxed whitespace-pre-line ${
+              isDescriptionExpanded ? '' : 'line-clamp-3'
+            }`}
+            style={{ fontFamily: 'Inter, sans-serif' }}
+          >
             {product.description}
           </div>
+
           {product.description.length > 150 && (
             <button
-              onClick={() => setActiveTab(activeTab === 'description' ? '' : 'description')}
+              onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
               className="text-sage-600 font-semibold mt-2 hover:text-sage-700 text-sm"
             >
-              {activeTab === 'description' ? '← Show Less' : 'View More →'}
+              {isDescriptionExpanded ? '← Show Less' : 'View More →'}
             </button>
           )}
         </div>
@@ -725,14 +763,17 @@ const handleTrackOrder = () => {
                         <span className="text-3xl text-charcoal-400 font-medium">/ 5</span>
                     </div>
                     <div className="flex items-center gap-1 mb-3">
-                        {[...Array(5)].map((_, i) => (
-                        <Star 
-                            key={i} 
-                            size={28} 
-                            weight="fill" 
-                            className={i < Math.round(averageRating) ? "text-[#F5C563]" : "text-grey-stroke"}
-                        />
-                        ))}
+                      {[...Array(5)].map((_, i) => {
+                        const fillPercentage = Math.max(0, Math.min(100, (averageRating - i) * 100));
+                        return (
+                          <div key={i} className="relative w-7 h-7">
+                            <Star size={28} className="text-grey-stroke absolute" weight="fill" />
+                            <div className="overflow-hidden absolute" style={{ width: `${fillPercentage}%` }}>
+                              <Star size={28} className="text-sage-500" weight="fill" />
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                     <span className="text-lg text-charcoal-400" style={{ fontFamily: 'Inter, sans-serif' }}>
                         Based on {reviews.length} review{reviews.length !== 1 ? 's' : ''}
@@ -749,7 +790,7 @@ const handleTrackOrder = () => {
                             <span className="text-lg font-semibold text-charcoal-600 w-8" style={{ fontFamily: 'Inter, sans-serif' }}>
                             {rating}
                             </span>
-                            <Star size={20} weight="fill" className="text-[#F5C563]" />
+                            <Star size={20} weight="fill" className="!text-sage-500" />
                             <div className="flex-1 h-4 bg-cream-100 rounded-full overflow-hidden">
                             <div 
                                 className="h-full bg-[#F5C563] rounded-full transition-all duration-500"
@@ -783,14 +824,17 @@ const handleTrackOrder = () => {
                             </div>
                             <div className="flex items-center gap-3">
                                 <div className="flex items-center gap-1">
-                                {[...Array(5)].map((_, i) => (
-                                    <Star 
-                                    key={i} 
-                                    size={20} 
-                                    weight="fill" 
-                                    className={i < review.rating ? "text-[#F5C563]" : "text-grey-stroke"}
-                                    />
-                                ))}
+                                  {[...Array(5)].map((_, i) => {
+                                    const fillPercentage = Math.max(0, Math.min(100, (review.rating - i) * 100));
+                                    return (
+                                      <div key={i} className="relative w-5 h-5">
+                                        <Star size={20} className="text-grey-stroke absolute" weight="fill" />
+                                        <div className="overflow-hidden absolute" style={{ width: `${fillPercentage}%` }}>
+                                          <Star size={20} className="text-sage-500" weight="fill" />
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                                 <span className="text-charcoal-400 text-lg" style={{ fontFamily: 'Inter, sans-serif' }}>
                                 {formatDate(review.createdAt)}
@@ -812,7 +856,7 @@ const handleTrackOrder = () => {
             ) : (
                 <div className="text-center py-16">
                 <div className="w-24 h-24 bg-cream-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <Star size={48} className="text-grey-stroke" />
+                  <Star size={48} className="text-sage-500" weight="regular" />
                 </div>
                 <h3 className="text-2xl font-bold text-charcoal-600 mb-3" style={{ fontFamily: 'Merriweather, serif' }}>
                     No Reviews Yet
