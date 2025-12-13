@@ -760,19 +760,96 @@ useEffect(() => {
 
 
 
-// Fetch customer orders
+// Fetch customer orders AND auto-cancel expired ones
 useEffect(() => {
   if (!customerId) {
     setOrders([]);
     return;
   }
 
+  const checkAndCancelExpiredOrders = async (ordersList) => {
+    const now = new Date();
+    const expiredOrders = [];
+
+    for (const order of ordersList) {
+      const status = order.status?.toLowerCase();
+      
+      // Only check orders that are still pending/placed
+      if (!['placed', 'pending'].includes(status)) continue;
+
+      // Parse order creation time
+      let orderTime;
+      const dateStr = order.createdAt;
+      
+      if (dateStr.endsWith('Z')) {
+        orderTime = new Date(dateStr);
+      } else if (dateStr.includes('T') && !dateStr.includes('+') && !dateStr.endsWith('Z')) {
+        orderTime = new Date(dateStr + 'Z');
+      } else {
+        orderTime = new Date(dateStr);
+      }
+
+      // Check if 10 minutes have passed
+      const expiryTime = new Date(orderTime.getTime() + 10 * 60 * 1000);
+      
+      if (now >= expiryTime) {
+        expiredOrders.push(order.id);
+      }
+    }
+
+    // Cancel all expired orders
+    if (expiredOrders.length > 0) {
+      console.log('🔄 Found', expiredOrders.length, 'expired orders, cancelling...');
+      
+      for (const orderId of expiredOrders) {
+        try {
+          const response = await fetch(
+            `https://localhost:7062/api/Orders/${orderId}/seller-response`,
+            {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                Status: 'Cancelled',
+                SellerNote: 'Order auto-cancelled: No response within 10 minutes'
+              })
+            }
+          );
+
+          if (response.ok) {
+            console.log('✅ Auto-cancelled order:', orderId);
+          }
+        } catch (err) {
+          console.error('❌ Failed to auto-cancel order', orderId, err);
+        }
+      }
+
+      // Refetch orders to get updated statuses
+      return true;
+    }
+
+    return false;
+  };
+
   const fetchOrders = async () => {
     try {
       const response = await fetch(`https://localhost:7062/api/Orders?customerId=${customerId}`);
       if (response.ok) {
         const data = await response.json();
-        setOrders(Array.isArray(data) ? data : []);
+        const ordersList = Array.isArray(data) ? data : [];
+        
+        // Check for expired orders before setting state
+        const needsRefetch = await checkAndCancelExpiredOrders(ordersList);
+        
+        if (needsRefetch) {
+          // Fetch again to get updated statuses
+          const refreshResponse = await fetch(`https://localhost:7062/api/Orders?customerId=${customerId}`);
+          if (refreshResponse.ok) {
+            const refreshedData = await refreshResponse.json();
+            setOrders(Array.isArray(refreshedData) ? refreshedData : []);
+          }
+        } else {
+          setOrders(ordersList);
+        }
       }
     } catch (err) {
       console.error('Error fetching orders:', err);
@@ -781,6 +858,11 @@ useEffect(() => {
   };
 
   fetchOrders();
+  
+  // Check every 30 seconds for expired orders
+  const interval = setInterval(fetchOrders, 30000);
+  
+  return () => clearInterval(interval);
 }, [customerId]);
 
 // Poll for order updates
