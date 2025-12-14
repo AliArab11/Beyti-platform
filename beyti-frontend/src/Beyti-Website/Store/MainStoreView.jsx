@@ -5,6 +5,7 @@ import StoreView from "./StoreView";
 import OrderDetails from './Components/OrderDetails';
 import ActiveOrderBanner from './Components/ActiveOrderBanner';
 import Snackbar from './../../components/Snackbar';
+import CustomerHeader from '../../components/CustomerHeader';
 
 
 
@@ -89,230 +90,6 @@ const getStoreColors = (storeName) => {
   };
 };
 
-// Header Component
-const Header = ({ customerName = null, customerId, cart = [], stores = [], customerAddresses = [], onCustomerClick, onLogout }) => {
-  const navigate = useNavigate();  
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-
-  return (
-    <header className="bg-cream-50 py-4 px-8 border-b border-grey-stroke">
-      <div className="max-w-[1440px] mx-auto flex items-center justify-between">
-        <h1 className="text-[32px] font-bold text-charcoal-600" style={{ fontFamily: 'Merriweather, serif' }}>
-          Beyti
-        </h1>
-        <h2 className="text-[32px] font-bold text-charcoal-600 absolute left-1/2 -translate-x-1/2" style={{ fontFamily: 'Merriweather, serif' }}>
-          Beyti Stores
-        </h2>
-        <div className="flex items-center gap-4">
-          <button className="p-2 hover:bg-grey-200 rounded-lg transition-all">
-            <svg className="w-5 h-5 text-charcoal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-            </svg>
-          </button>
-
-           {/* Cart Button with Badge */}
-            <button
-                onClick={() => {
-                    let targetStoreId = null;
-                    let targetStoreName = null;
-                    let targetStore = null;
-                    let cartItems = [];
-                    
-                    // Find the storeId and store details from cart
-                    if (customerId) {
-                        for (let i = 0; i < localStorage.length; i++) {
-                            const key = localStorage.key(i);
-                            if (key && key.startsWith(`beyti_cart_`) && key.endsWith(`_${customerId}`)) {
-                                try {
-                                    const savedCart = localStorage.getItem(key);
-                                    if (savedCart) {
-                                        const parsedCart = JSON.parse(savedCart);
-                                        if (parsedCart.length > 0) {
-                                            cartItems = parsedCart;
-                                            // Extract storeId from key: beyti_cart_{storeId}_{customerId}
-                                            const parts = key.split('_');
-                                            targetStoreId = parts[2];
-                                            
-                                            // Get store name from cart items
-                                            targetStoreName = parsedCart[0]?.storeName;
-                                            
-                                            // Find the full store object
-                                            targetStore = stores.find(s => s.id.toString() === targetStoreId);
-                                            
-                                            break;
-                                        }
-                                    }
-                                } catch (err) {
-                                    console.error('Error parsing cart:', err);
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Navigate to checkout with full store details
-                    navigate("/checkout", { 
-                        state: { 
-                            customerId, 
-                            customerName,
-                            customerAddresses: customerAddresses,
-                            selectedStore: targetStore,
-                            storeName: targetStoreName || targetStore?.storeName,
-                            storeId: targetStoreId
-                        } 
-                    });
-                }}
-                className="p-2 hover:bg-grey-200 rounded-lg transition-all relative"
-            >
-                <ShoppingCartSimple 
-                    className="w-5 h-5 text-charcoal-400"
-                    weight="regular"
-                />
-                {cart.length > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-sage-500 text-white min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center text-xs font-bold">
-                        {cart.reduce((total, item) => total + item.quantity, 0)}
-                    </span>
-                )}
-            </button>
-          
-          {customerName ? (
-            <div className="relative">
-              {/* Customer Profile Section */}
-              <div className="flex items-center border-l border-grey-stroke pl-4">
-                {/* Name Button - Clickable to view profile */}
-                <button
-                onClick={() => {
-                    navigate('/customer-dashboard'); // Navigate to dashboard
-                }}
-                className="flex items-center gap-3 hover:bg-grey-200 rounded-lg px-3 py-2 transition-all"
-                >
-                <div className="w-8 h-8 bg-sage-500 rounded-full flex items-center justify-center">
-                    <span className="text-white text-sm font-semibold">{customerName[0]}</span>
-                </div>
-                <span className="text-charcoal-600 font-medium text-sm" style={{ fontFamily: 'Inter, sans-serif' }}>
-                    {customerName}
-                </span>
-                </button>
-
-                {/* Dropdown Arrow Button */}
-                <button
-                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="p-2 hover:bg-grey-200 rounded-lg transition-all ml-1"
-                >
-                  <svg className="w-4 h-4 text-charcoal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Dropdown Menu */}
-                {isDropdownOpen && (
-                <>
-                    <div
-                    className="fixed inset-0 z-10"
-                    onClick={() => setIsDropdownOpen(false)}
-                    />
-                    <div className="absolute right-0 mt-2 w-80 bg-grey-200 dark:bg-charcoal-500 border border-grey-stroke dark:border-charcoal-400 rounded-md shadow-[0_4px_20px_rgba(0,0,0,0.15)] z-20 overflow-hidden">
-                    {/* Profile Details Section */}
-                    <div className="px-4 py-4 border-b border-grey-stroke dark:border-charcoal-400 bg-cream-50 dark:bg-charcoal-600">
-                        <div className="flex items-start gap-3">
-                        <div className="w-12 h-12 rounded-full bg-sage-500 dark:bg-sage-700 flex items-center justify-center flex-shrink-0">
-                            <span className="text-white text-lg font-semibold">{customerName[0]}</span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-body-regular text-charcoal-600 dark:text-cream-50 font-semibold truncate" style={{ fontFamily: 'Inter, sans-serif' }}>
-                            {customerName}
-                            </p>
-                            <p className="text-label-medium text-charcoal-400 dark:text-charcoal-300 mt-0.5" style={{ fontFamily: 'Inter, sans-serif' }}>
-                            Customer
-                            </p>
-                        </div>
-                        </div>
-                    </div>
-
-                    {/* Menu Actions */}
-                    <div className="py-1">
-                        <button
-                          onClick={() => {
-                            setIsDropdownOpen(false);
-                            navigate('/customer-dashboard');
-                          }}
-                          className="w-full px-4 py-2.5 text-left text-body-regular text-charcoal-600 dark:text-cream-50 hover:bg-cream-100 dark:hover:bg-charcoal-400 transition-colors flex items-center gap-3"
-                        >
-                          <Package 
-                            size={20}
-                            weight="regular"
-                            className="text-charcoal-500 dark:text-charcoal-300"
-                          />
-
-                          <span style={{ fontFamily: 'Inter, sans-serif' }}>My Orders</span>
-                        </button>
-
-                        <button
-                        onClick={() => {
-                            setIsDropdownOpen(false);
-                            // Navigate to Addresses (placeholder)
-                        }}
-                        className="w-full px-4 py-2.5 text-left text-body-regular text-charcoal-600 dark:text-cream-50 hover:bg-cream-100 dark:hover:bg-charcoal-400 transition-colors flex items-center gap-3"
-                        >
-                        <svg className="w-5 h-5 text-charcoal-500 dark:text-charcoal-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        <span style={{ fontFamily: 'Inter, sans-serif' }}>Addresses</span>
-                        </button>
-
-                        <button
-                        onClick={() => {
-                            setIsDropdownOpen(false);
-                            // Navigate to Settings (placeholder)
-                        }}
-                        className="w-full px-4 py-2.5 text-left text-body-regular text-charcoal-600 dark:text-cream-50 hover:bg-cream-100 dark:hover:bg-charcoal-400 transition-colors flex items-center gap-3"
-                        >
-                        <svg className="w-5 h-5 text-charcoal-500 dark:text-charcoal-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        <span style={{ fontFamily: 'Inter, sans-serif' }}>Settings</span>
-                        </button>
-                    </div>
-
-                    {/* Logout Section */}
-                    <div className="border-t border-grey-stroke dark:border-charcoal-400">
-                        <button
-                        onClick={() => {
-                            setIsDropdownOpen(false);
-                            onLogout();
-                        }}
-                        className="w-full px-4 py-2.5 text-left text-body-regular text-error-text dark:text-red-400 hover:bg-error-bg dark:hover:bg-red-900/20 transition-colors flex items-center gap-3"
-                        >
-                        <svg className="w-5 h-5 text-error-text dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
-                        <span style={{ fontFamily: 'Inter, sans-serif' }}>Logout</span>
-                        </button>
-                    </div>
-                    </div>
-                </>
-                )}
-            </div>
-          ) : (
-            <button
-              onClick={onCustomerClick}
-              className="flex items-center gap-2 pl-4 border-l border-grey-stroke bg-sage-500 hover:bg-sage-600 text-white px-4 py-2 rounded-lg transition-all"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-              </svg>
-              <span className="text-sm font-semibold" style={{ fontFamily: 'Inter, sans-serif' }}>
-                Login
-              </span>
-            </button>
-          )}
-        </div>
-      </div>
-    </header>
-  );
-};
 
 
 // Main Category Tabs Component
@@ -693,6 +470,14 @@ const MainStoreView = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStoreId, setSelectedStoreId] = useState(null);
 
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [activeFilters, setActiveFilters] = useState({
+    rating: null, // null, 4, 3
+    priceRange: null, // null, 'low', 'medium', 'high'
+    distance: null, // null, 'near', 'far'
+    availability: null, // null, 'open', 'closed'
+  });
+
  // Customer state
   const [customers, setCustomers] = useState([]);
   const [customerId, setCustomerId] = useState(null);
@@ -985,6 +770,18 @@ useEffect(() => {
   }
 }, [customerId]);
 
+// Close filter dropdown when clicking outside
+useEffect(() => {
+  const handleClickOutside = (event) => {
+    if (showFilterDropdown && !event.target.closest('.relative')) {
+      setShowFilterDropdown(false);
+    }
+  };
+
+  document.addEventListener('mousedown', handleClickOutside);
+  return () => document.removeEventListener('mousedown', handleClickOutside);
+}, [showFilterDropdown]);
+
 const handleCustomerSelect = (customer) => {
   const name = customer.fullName || customer.name || `Customer #${customer.id}`;
   setCustomerId(customer.id);
@@ -1040,6 +837,26 @@ const handleTrackOrder = () => {
     }
   };
 
+  const handleFilterChange = (filterType, value) => {
+  setActiveFilters(prev => ({
+    ...prev,
+    [filterType]: prev[filterType] === value ? null : value
+  }));
+};
+
+const clearAllFilters = () => {
+  setActiveFilters({
+    rating: null,
+    priceRange: null,
+    distance: null,
+    availability: null,
+  });
+};
+
+const getActiveFilterCount = () => {
+  return Object.values(activeFilters).filter(v => v !== null).length;
+};
+
   
 // Function to handle store navigation - ALWAYS allow browsing
 const handleStoreNavigation = (targetStoreId) => {
@@ -1051,9 +868,61 @@ const handleStoreNavigation = (targetStoreId) => {
 
 
 
-  const filteredStores = stores.filter(store => 
-    store.storeName?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+const filteredStores = stores
+  .filter(store => {
+    // Search filter
+    if (searchQuery && !store.storeName?.toLowerCase().includes(searchQuery.toLowerCase())) {
+      return false;
+    }
+    
+    // Rating filter - NEW stores (no rating) are always included
+    if (activeFilters.rating) {
+      const rating = store.averageRating;
+      // If store has no rating (null/undefined), include it (will be sorted to end)
+      if (rating !== null && rating !== undefined) {
+        // Only filter out stores that have ratings below the threshold
+        if (rating < activeFilters.rating) return false;
+      }
+    }
+    
+    // Price range filter (based on average product price)
+    if (activeFilters.priceRange && store.products && store.products.length > 0) {
+      const avgPrice = store.products.reduce((sum, p) => sum + (p.basePrice || 0), 0) / store.products.length;
+      
+      if (activeFilters.priceRange === 'budget' && avgPrice >= 5) return false;
+      if (activeFilters.priceRange === 'low' && (avgPrice < 5 || avgPrice >= 10)) return false;
+      if (activeFilters.priceRange === 'medium' && (avgPrice < 10 || avgPrice >= 25)) return false;
+      if (activeFilters.priceRange === 'high' && avgPrice < 25) return false;
+    }
+    
+    return true;
+  })
+  .sort((a, b) => {
+    // Sort stores: rated stores first (by rating desc), then NEW stores
+    const ratingA = a.averageRating;
+    const ratingB = b.averageRating;
+    
+    const hasRatingA = ratingA !== null && ratingA !== undefined;
+    const hasRatingB = ratingB !== null && ratingB !== undefined;
+    
+    // Both have ratings - sort by rating (highest first)
+    if (hasRatingA && hasRatingB) {
+      return ratingB - ratingA;
+    }
+    
+    // Only A has rating - A comes first
+    if (hasRatingA && !hasRatingB) {
+      return -1;
+    }
+    
+    // Only B has rating - B comes first
+    if (!hasRatingA && hasRatingB) {
+      return 1;
+    }
+    
+    // Neither has rating - maintain original order
+    return 0;
+  });
 
 
   
@@ -1067,7 +936,7 @@ const handleStoreNavigation = (targetStoreId) => {
         onClose={() => setCustomerModalOpen(false)}
       />
       
-      <Header 
+      <CustomerHeader
         customerName={customerName}
         customerId={customerId}
         cart={cart}
@@ -1075,6 +944,9 @@ const handleStoreNavigation = (targetStoreId) => {
         customerAddresses={customerAddresses}
         onCustomerClick={handleCustomerClick}
         onLogout={handleCustomerLogout}
+        variant="store"
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
       />
 
     {/* Active Order Banner */}
@@ -1109,7 +981,194 @@ const handleStoreNavigation = (targetStoreId) => {
           />
 
           <div className="flex-1">
-            <SearchBar value={searchQuery} onChange={setSearchQuery} />
+            <div className="flex gap-4 items-center mb-8">
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search Food Stores..."
+                  className="w-full pl-12 pr-4 py-3.5 bg-white rounded-full border border-grey-stroke focus:outline-none focus:border-sage-500 text-charcoal-600 shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
+                  style={{ fontFamily: 'Inter, sans-serif', fontSize: '16px' }}
+                />
+                <svg className="w-5 h-5 text-charcoal-400 absolute left-4 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              
+              {/* Filter Button */}
+              <div className="relative">
+                <button 
+                  onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                  className="flex items-center gap-3 px-6 py-3.5 bg-white rounded-full border border-grey-stroke hover:border-sage-500 transition-all shadow-[0_2px_8px_rgba(0,0,0,0.06)] relative"
+                >
+                  <svg className="w-5 h-5 text-sage-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                  </svg>
+                  <span className="text-charcoal-600 font-semibold text-[14px]" style={{ fontFamily: 'Inter, sans-serif' }}>
+                    Filter
+                  </span>
+                  {getActiveFilterCount() > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-sage-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                      {getActiveFilterCount()}
+                    </span>
+                  )}
+                  <svg className="w-4 h-4 text-charcoal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {/* Filter Dropdown */}
+{showFilterDropdown && (
+  <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-grey-stroke z-50">
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between pb-4 border-b border-grey-stroke">
+        <h3 className="text-lg font-bold text-charcoal-600" style={{ fontFamily: 'Merriweather, serif' }}>
+          Filters
+        </h3>
+        {getActiveFilterCount() > 0 && (
+          <button
+            onClick={clearAllFilters}
+            className="text-sm text-sage-600 hover:text-sage-700 font-semibold"
+            style={{ fontFamily: 'Inter, sans-serif' }}
+          >
+            Clear All
+          </button>
+        )}
+      </div>
+
+      {/* Rating Slider */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-semibold text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>
+            Minimum Rating
+          </p>
+          <div className="flex items-center gap-1 bg-sage-100 px-3 py-1 rounded-full">
+            <Star size={14} weight="fill" className="text-sage-600" />
+            <span className="text-sm font-bold text-sage-700" style={{ fontFamily: 'Inter, sans-serif' }}>
+              {activeFilters.rating ? `${activeFilters.rating}+` : 'Any'}
+            </span>
+          </div>
+        </div>
+        <div className="relative">
+          <input
+            type="range"
+            min="0"
+            max="5"
+            step="1"
+            value={activeFilters.rating || 0}
+            onChange={(e) => {
+              const value = parseInt(e.target.value);
+              handleFilterChange('rating', value === 0 ? null : value);
+            }}
+            className="w-full h-2 bg-grey-200 rounded-full appearance-none cursor-pointer 
+                     [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 
+                     [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-sage-500 
+                     [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md
+                     [&::-webkit-slider-thumb]:hover:bg-sage-600 [&::-webkit-slider-thumb]:transition-colors
+                     [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:rounded-full 
+                     [&::-moz-range-thumb]:bg-sage-500 [&::-moz-range-thumb]:border-0 
+                     [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-md
+                     [&::-moz-range-thumb]:hover:bg-sage-600 [&::-moz-range-thumb]:transition-colors"
+            style={{
+              background: activeFilters.rating 
+                ? `linear-gradient(to right, #556B5C 0%, #556B5C ${((activeFilters.rating || 0) / 5) * 100}%, #E5E7EB ${((activeFilters.rating || 0) / 5) * 100}%, #E5E7EB 100%)`
+                : '#E5E7EB'
+            }}
+          />
+          <div className="flex justify-between mt-2 text-xs text-charcoal-400" style={{ fontFamily: 'Inter, sans-serif' }}>
+            <span>Any</span>
+            <span>1</span>
+            <span>2</span>
+            <span>3</span>
+            <span>4</span>
+            <span>5</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Price Range Slider */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-semibold text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>
+            Average Price Range
+          </p>
+          <div className="bg-sage-100 px-3 py-1 rounded-full">
+            <span className="text-sm font-bold text-sage-700" style={{ fontFamily: 'Inter, sans-serif' }}>
+              {activeFilters.priceRange === 'budget' && 'Under 5 BD'}
+              {activeFilters.priceRange === 'low' && '5-10 BD'}
+              {activeFilters.priceRange === 'medium' && '10-25 BD'}
+              {activeFilters.priceRange === 'high' && '25+ BD'}
+              {!activeFilters.priceRange && 'Any'}
+            </span>
+          </div>
+        </div>
+        <div className="relative">
+          <input
+            type="range"
+            min="0"
+            max="4"
+            step="1"
+            value={
+              activeFilters.priceRange === 'budget' ? 1 :
+              activeFilters.priceRange === 'low' ? 2 :
+              activeFilters.priceRange === 'medium' ? 3 :
+              activeFilters.priceRange === 'high' ? 4 : 0
+            }
+            onChange={(e) => {
+              const value = parseInt(e.target.value);
+              const priceMap = { 0: null, 1: 'budget', 2: 'low', 3: 'medium', 4: 'high' };
+              handleFilterChange('priceRange', priceMap[value]);
+            }}
+            className="w-full h-2 bg-grey-200 rounded-full appearance-none cursor-pointer 
+                     [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 
+                     [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-sage-500 
+                     [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md
+                     [&::-webkit-slider-thumb]:hover:bg-sage-600 [&::-webkit-slider-thumb]:transition-colors
+                     [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:rounded-full 
+                     [&::-moz-range-thumb]:bg-sage-500 [&::-moz-range-thumb]:border-0 
+                     [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-md
+                     [&::-moz-range-thumb]:hover:bg-sage-600 [&::-moz-range-thumb]:transition-colors"
+            style={{
+              background: activeFilters.priceRange
+                ? `linear-gradient(to right, #556B5C 0%, #556B5C ${
+                    (activeFilters.priceRange === 'budget' ? 1 :
+                     activeFilters.priceRange === 'low' ? 2 :
+                     activeFilters.priceRange === 'medium' ? 3 : 
+                     activeFilters.priceRange === 'high' ? 4 : 0) / 4 * 100
+                  }%, #E5E7EB ${
+                    (activeFilters.priceRange === 'budget' ? 1 :
+                     activeFilters.priceRange === 'low' ? 2 :
+                     activeFilters.priceRange === 'medium' ? 3 : 
+                     activeFilters.priceRange === 'high' ? 4 : 0) / 4 * 100
+                  }%, #E5E7EB 100%)`
+                : '#E5E7EB'
+            }}
+          />
+          <div className="flex justify-between mt-2 text-xs text-charcoal-400" style={{ fontFamily: 'Inter, sans-serif' }}>
+            <span>Any</span>
+            <span>&lt;5</span>
+            <span>5-10</span>
+            <span>10-25</span>
+            <span>25+</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Apply Button */}
+      <button
+        onClick={() => setShowFilterDropdown(false)}
+        className="w-full bg-sage-500 hover:bg-sage-600 text-white font-bold py-3 rounded-xl transition-all shadow-soft-lift"
+        style={{ fontFamily: 'Inter, sans-serif' }}
+      >
+        Apply Filters
+      </button>
+    </div>
+  </div>
+)}
+              </div>
+            </div>
             <FeaturedCarousel 
             stores={stores} 
             onStoreClick={handleStoreNavigation}

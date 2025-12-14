@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import AnalyticsCard from "../../../components/AnalyticsCard";
 import StatusChip from "../../../components/StatusChip";
 import Button from "../../../components/Button";
+import ConfirmModal from "../../../components/ConfirmModal";
+
 import {
   getProducts,
   getSubCategoryDropdown,
@@ -30,6 +32,8 @@ const Products = ({ sellerId }) => {
   const [editing, setEditing] = useState(null);
 
   const [variantError, setVariantError] = useState(null);
+
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
 
   const [form, setForm] = useState({
     name: "",
@@ -287,14 +291,43 @@ const saveProduct = async (e) => {
 };
 
   const removeProduct = async (id) => {
-    if (!confirm("Delete this product?")) return;
-    try {
-      await deleteProduct(id);
-      setProducts(products.filter((p) => p.id !== id));
-    } catch (err) {
-      alert(err.message);
-    }
-  };
+  const product = products.find(p => p.id === id);
+  const actionText = product?.isActive ? 'Deactivate' : 'Activate';
+  const statusText = product?.isActive ? 'deactivate' : 'activate';
+  const variantType = product?.isActive ? 'danger' : 'success'; // Add this line
+
+  await new Promise((resolve) => {
+    setConfirmModal({
+      isOpen: true,
+      title: `${actionText} Product`,
+      message: `Are you sure you want to ${statusText} this product? ${product?.isActive ? 'It will be hidden from customers.' : 'It will be visible to customers again.'}`,
+      variant: variantType, // Add this line
+      onConfirm: () => {
+        setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null });
+        resolve(true);
+      }
+    });
+  });
+  
+  try {
+    await deleteProduct(id);
+    const refreshed = await loadSellerProducts();
+    setProducts(refreshed);
+  } catch (err) {
+    await new Promise((resolve) => {
+      setConfirmModal({
+        isOpen: true,
+        title: 'Error',
+        message: err.message || 'Failed to update product status',
+        variant: 'danger', // Add this line
+        onConfirm: () => {
+          setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null });
+          resolve(true);
+        }
+      });
+    });
+  }
+};
 
   // ========================
 // VARIANT MANAGEMENT
@@ -417,7 +450,17 @@ setSelectedProduct(updatedProduct); // update metadata too
 };
 
 const removeVariant = async (variantId) => {
-  if (!confirm("Delete this variant?")) return;
+  await new Promise((resolve) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Variant',
+      message: 'Are you sure you want to delete this variant? This action cannot be undone.',
+      onConfirm: () => {
+        setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null });
+        resolve(true);
+      }
+    });
+  });
   
   try {
     await deleteProductVariant(variantId);
@@ -619,12 +662,12 @@ const removeVariant = async (variantId) => {
                     Edit
                     </Button>
                     <Button 
-                    variant="error" 
+                    variant={p.isActive ? "error" : "success"}
                     size="medium"
                     onClick={() => removeProduct(p.id)}
-                    >
-                    Delete
-                    </Button>
+                  >
+                    {p.isActive ? 'Deactivate' : 'Activate'}
+                  </Button>
                 </div>
                 <Button 
                     variant="ghost" 
@@ -1097,6 +1140,16 @@ const removeVariant = async (variantId) => {
     </div>
   </div>
 )}
+
+<ConfirmModal
+  isOpen={confirmModal.isOpen}
+  onClose={() => setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null })}
+  onConfirm={confirmModal.onConfirm}
+  title={confirmModal.title}
+  message={confirmModal.message}
+  confirmText={confirmModal.confirmText || "Confirm"}
+  variant={confirmModal.variant || "danger"}
+/>
     </div>
   );
 };

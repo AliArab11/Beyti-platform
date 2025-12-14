@@ -128,7 +128,7 @@ namespace Beyti_Backend.Controllers.Api
         }
 
 
-        // DELETE: api/Addresses/5
+        // DELETE: api/Addresses/5 - Now toggles IsActive instead of deleting
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteAddress(int id)
         {
@@ -138,7 +138,10 @@ namespace Beyti_Backend.Controllers.Api
                 return NotFound();
             }
 
-            _context.Addresses.Remove(address);
+            // Toggle active status instead of deleting
+            address.IsActive = !address.IsActive;
+            address.UpdatedAt = DateTime.UtcNow;
+
             await _context.SaveChangesAsync();
 
             return NoContent();

@@ -159,7 +159,7 @@ namespace Beyti_Backend.Controllers.Api
                 Rating = dto.Rating,
                 Comment = dto.Comment,
                 IsCommentHiddenBySeller = false,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             };
 
             _context.Reviews.Add(review);
@@ -191,7 +191,7 @@ namespace Beyti_Backend.Controllers.Api
             try
             {
                 review.IsCommentHiddenBySeller = updateData.IsCommentHiddenBySeller;
-                review.HiddenAt = updateData.IsCommentHiddenBySeller ? DateTime.UtcNow : null;
+                review.HiddenAt = updateData.IsCommentHiddenBySeller ? DateTime.Now : null;
                 review.HiddenReason = updateData.HiddenReason;
 
                 await _context.SaveChangesAsync();

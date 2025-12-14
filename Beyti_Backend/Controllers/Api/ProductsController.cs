@@ -181,7 +181,7 @@ namespace Beyti_Backend.Controllers.Api
         }
 
 
-        // DELETE: api/Products/5
+        // DELETE: api/Products/5 - Now toggles IsActive instead of deleting
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteProduct(int id)
         {
@@ -191,7 +191,10 @@ namespace Beyti_Backend.Controllers.Api
                 return NotFound();
             }
 
-            _context.Products.Remove(product);
+            // Toggle active status instead of deleting
+            product.IsActive = !product.IsActive;
+            product.UpdatedAt = DateTime.UtcNow;
+
             await _context.SaveChangesAsync();
 
             return NoContent();

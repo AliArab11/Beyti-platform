@@ -4,7 +4,7 @@ import { Cake, Heart, Star, MagnifyingGlass, ArrowLeft, Bread, ShoppingCartSimpl
 
 import ActiveOrderBanner from './ActiveOrderBanner';
 import Snackbar from './../../../components/Snackbar';
-
+import CustomerHeader from './../../../components/CustomerHeader';
 
 
 
@@ -17,6 +17,7 @@ const navigate = useNavigate();
 const customerId = location.state?.customerId;
 const customerName = location.state?.customerName;
 const storeName = location.state?.storeName;
+const customerAddresses = location.state?.customerAddresses || [];
 
 // Get cart from localStorage
 const [localCart, setLocalCart] = useState(() => {
@@ -213,19 +214,40 @@ useEffect(() => {
     return (sum / reviews.length).toFixed(1);
   };
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffTime = Math.abs(now - date);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays} days ago`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-    if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
-    return `${Math.floor(diffDays / 365)} years ago`;
-  };
+const formatDate = (dateString) => {
+  const date = new Date(dateString);
+  const now = new Date();
+
+  // Format date & time in user's local timezone (automatically detected)
+  const formattedDate = date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+    // No timeZone specified = uses user's local timezone
+  });
+
+  const formattedTime = date.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+    // No timeZone specified = uses user's local timezone
+  });
+
+  // Calculate relative time (PAST only)
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  let relativeTime = '';
+  if (diffDays === 0) relativeTime = 'Today';
+  else if (diffDays === 1) relativeTime = 'Yesterday';
+  else if (diffDays < 7) relativeTime = `${diffDays} days ago`;
+  else if (diffDays < 30) relativeTime = `${Math.floor(diffDays / 7)} weeks ago`;
+  else if (diffDays < 365) relativeTime = `${Math.floor(diffDays / 30)} months ago`;
+  else relativeTime = `${Math.floor(diffDays / 365)} years ago`;
+
+  return `${formattedDate} at ${formattedTime} • ${relativeTime}`;
+};
+
 
 const handleAddToCart = () => {
     // ✅ CHECK LOGIN STATUS FIRST - BEFORE ANYTHING ELSE
@@ -445,84 +467,26 @@ const handleTrackOrder = () => {
 
   return (
     <div className="min-h-screen bg-cream-50">
-      {/* Header */}
-      <header className="bg-cream-50 py-4 px-8 border-b border-grey-stroke sticky top-0 z-10">
-        <div className="max-w-[1440px] mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <button 
-                onClick={() => navigate(`/store/${storeId}`, { 
-                    state: { customerId, customerName },
-                    replace: true 
-                })}
-                className="p-2 hover:bg-grey-200 rounded-lg transition-all"
-                >
-                <ArrowLeft className="w-6 h-6 text-charcoal-600" weight="bold" />
-                </button>
-            <h1 className="text-[32px] font-bold text-charcoal-600" style={{ fontFamily: 'Merriweather, serif' }}>
-              Beyti
-            </h1>
-          </div>
-          
-          <div className="flex items-center gap-4">
-            <button className="p-2 hover:bg-grey-200 rounded-lg transition-all">
-              <svg className="w-5 h-5 text-charcoal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-            </button>
 
-            {/* Cart Button with Badge */}
-                <button
-                    onClick={() => {
-                        navigate("/checkout", {
-                            state: {
-                                customerId,
-                                customerName,
-                                storeId,
-                                storeName
-                            }
-                        });
-                    }}
-                    className="p-2 hover:bg-grey-200 rounded-lg transition-all relative"
-                >
-                    <ShoppingCartSimple className="w-5 h-5 text-charcoal-400" weight="regular" />
-                    {localCart.length > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-sage-500 text-white min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center text-xs font-bold">
-                            {localCart.reduce((total, item) => total + item.quantity, 0)}
-                        </span>
-                    )}
-                </button>
 
-            
-            {customerName ? (
-              <div className="flex items-center border-l border-grey-stroke pl-4">
-                <button
-                  onClick={() => navigate('/customer-dashboard')}
-                  className="flex items-center gap-3 hover:bg-grey-200 rounded-lg px-3 py-2 transition-all"
-                >
-                  <div className="w-8 h-8 bg-sage-500 rounded-full flex items-center justify-center">
-                    <span className="text-white text-sm font-semibold">{customerName[0]}</span>
-                  </div>
-                  <span className="text-charcoal-600 font-medium text-sm" style={{ fontFamily: 'Inter, sans-serif' }}>
-                    {customerName}
-                  </span>
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => navigate('/mainStore')}
-                className="flex items-center gap-2 pl-4 border-l border-grey-stroke bg-sage-500 hover:bg-sage-600 text-white px-4 py-2 rounded-lg transition-all"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-                </svg>
-                <span className="text-sm font-semibold" style={{ fontFamily: 'Inter, sans-serif' }}>
-                  Login
-                </span>
-              </button>
-            )}
-          </div>
-        </div>
-      </header>
+      <CustomerHeader
+        title="Beyti"
+        customerName={customerName}
+        customerId={customerId}
+        cart={localCart}
+        customerAddresses={customerAddresses}
+        onCustomerClick={() => navigate('/mainStore')}
+        onLogout={() => {
+          sessionStorage.removeItem('beyti_customerId');
+          sessionStorage.removeItem('beyti_customerName');
+          navigate('/', { replace: true });
+        }}
+        onBack={() => navigate(`/store/${storeId}`, { state: { customerId, customerName }, replace: true })}
+        showBackButton={true}
+        variant="store"
+        showSearch={false}
+      />
+
 
       {/* Active Order Banner */}
       {(() => {

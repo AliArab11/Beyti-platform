@@ -195,187 +195,115 @@ const DriverAnalytics = ({ driverId, driverName, metrics, historyJobs = [] }) =>
           </div>
         ) : (
           <div className="space-y-2">
-            {analytics.earningsByDay.map((day) => {
-              const maxEarnings = Math.max(...analytics.earningsByDay.map(d => d.earnings));
-              const widthPercent = maxEarnings > 0 ? (day.earnings / maxEarnings) * 100 : 0;
-              
-              return (
-                <div key={day.date} className="flex items-center gap-4">
-                  <span className="text-label-medium text-charcoal-600 w-20 flex-shrink-0">
-                    {formatDate(day.date)}
-                  </span>
-                  <div className="flex-1 bg-grey-100 rounded-full h-10 relative overflow-hidden">
+          {analytics.earningsByDay.slice().reverse().map((day) => {
+            const maxEarnings = Math.max(...analytics.earningsByDay.map(d => d.earnings));
+            const widthPercent = maxEarnings > 0 ? (day.earnings / maxEarnings) * 100 : 0;
+            
+            // Threshold for label placement (adjust based on your container width)
+            const MIN_LABEL_WIDTH = 15; // percentage threshold
+            const showLabelInside = widthPercent >= MIN_LABEL_WIDTH;
+            
+            const formattedAmount = Number(day.earnings).toFixed(3);
+            
+            return (
+              <div key={day.date} className="flex items-center gap-4">
+                <span className="text-label-medium text-charcoal-600 w-20 flex-shrink-0">
+                  {formatDate(day.date)}
+                </span>
+                <div className="flex-1 relative">
+                  <div className="bg-grey-100 rounded-full h-10 relative overflow-hidden">
                     <div
-                      className="bg-sage-500 h-full rounded-full flex items-center justify-end pr-4 transition-all duration-300"
-                      style={{ width: `${Math.max(widthPercent, 5)}%` }}
+                      className="bg-sage-500 h-full rounded-full transition-all duration-300 flex items-center justify-end pr-3"
+                      style={{
+                        width: `${Math.max(widthPercent, 2)}%`,
+                        minWidth: '6px'
+                      }}
                     >
-                      <span className="text-xs font-semibold text-white whitespace-nowrap">
-                        {formatCurrency(day.earnings)}
-                      </span>
+                      {showLabelInside && (
+                        <span className="text-sm font-semibold text-white whitespace-nowrap">
+                          {formattedAmount} BHD
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <span className="text-body-regular text-charcoal-400 w-24 text-right flex-shrink-0">
-                    {day.deliveries} {day.deliveries === 1 ? 'delivery' : 'deliveries'}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {/* TOP RESTAURANTS & PERFORMANCE */}
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Top Restaurants by Volume */}
-        <div className="bg-grey-200 rounded-lg p-6 shadow-soft-lift border border-grey-stroke">
-          <div className="mb-6">
-            <h2 className="text-card-h2 text-charcoal-600">Top Restaurants</h2>
-            <p className="text-body-regular text-charcoal-400 mt-1">
-              By number of deliveries
-            </p>
-          </div>
-          {analytics.topRestaurants.length === 0 ? (
-            <div className="text-center py-12">
-              <Icon.Storefront size={48} className="text-charcoal-300 mx-auto mb-3" />
-              <p className="text-body-regular text-charcoal-400">No restaurant data available</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {analytics.topRestaurants.map((restaurant, index) => (
-                <div key={restaurant.name} className="flex items-center justify-between bg-cream-50 rounded-lg p-4 border border-grey-stroke hover:shadow-md transition-shadow">
-                  <div className="flex items-center gap-4">
-                    <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-sage-500 text-cream-50 font-semibold flex-shrink-0">
-                      {index + 1}
+                  {!showLabelInside && (
+                    <span 
+                      className="absolute top-1/2 -translate-y-1/2 text-sm font-semibold text-charcoal-700 whitespace-nowrap"
+                      style={{
+                        left: `calc(${Math.max(widthPercent, 2)}% + 12px)`
+                      }}
+                    >
+                      {formattedAmount} BHD
                     </span>
-                    <div>
-                      <p className="text-body-medium text-charcoal-700 font-semibold">
-                        {restaurant.name}
-                      </p>
-                      <p className="text-body-regular text-charcoal-400">
-                        {restaurant.deliveries} {restaurant.deliveries === 1 ? 'delivery' : 'deliveries'}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-body-medium text-sage-700 font-semibold">
-                    {formatCurrency(restaurant.earnings)}
-                  </span>
+                  )}
                 </div>
-              ))}
-            </div>
-          )}
+                <span className="text-body-regular text-charcoal-400 w-24 text-right flex-shrink-0">
+                  {day.deliveries} {day.deliveries === 1 ? 'delivery' : 'deliveries'}
+                </span>
+              </div>
+            );
+          })}
         </div>
-
-        {/* Performance Insights */}
-        <div className="bg-grey-200 rounded-lg p-6 shadow-soft-lift border border-grey-stroke">
-          <div className="mb-6">
-            <h2 className="text-card-h2 text-charcoal-600">Performance Insights</h2>
-            <p className="text-body-regular text-charcoal-400 mt-1">
-              Your delivery metrics
-            </p>
-          </div>
-          <div className="space-y-4">
-            {/* Avg Delivery Time */}
-            <div className="bg-cream-50 rounded-lg p-4 border border-grey-stroke">
-              <div className="flex items-center gap-3 mb-2">
-                <Icon.Clock size={24} className="text-sage-600" />
-                <span className="text-body-medium text-charcoal-600">Avg Delivery Time</span>
-              </div>
-              <p className="text-metric-h3 text-sage-700 font-bold">
-                {analytics.performanceMetrics.avgDeliveryTime} min
-              </p>
-              <p className="text-xs text-charcoal-400 mt-1">From acceptance to completion</p>
-            </div>
-
-            {/* Total Distance */}
-            <div className="bg-cream-50 rounded-lg p-4 border border-grey-stroke">
-              <div className="flex items-center gap-3 mb-2">
-                <Icon.MapTrifold size={24} className="text-sage-600" />
-                <span className="text-body-medium text-charcoal-600">Total Distance</span>
-              </div>
-              <p className="text-metric-h3 text-sage-700 font-bold">
-                {analytics.performanceMetrics.totalDistance.toFixed(1)} km
-              </p>
-              <p className="text-xs text-charcoal-400 mt-1">Estimated total distance</p>
-            </div>
-
-            {/* Peak Hours */}
-            <div className="bg-cream-50 rounded-lg p-4 border border-grey-stroke">
-              <div className="flex items-center gap-3 mb-3">
-                <Icon.ChartBar size={24} className="text-sage-600" />
-                <span className="text-body-medium text-charcoal-600">Peak Hours</span>
-              </div>
-              {analytics.performanceMetrics.peakHours.length > 0 ? (
-                <div className="space-y-2">
-                  {analytics.performanceMetrics.peakHours.map((peak, idx) => (
-                    <div key={peak.hour} className="flex items-center justify-between">
-                      <span className="text-sm text-charcoal-600">{formatHour(peak.hour)}</span>
-                      <span className="text-sm font-semibold text-sage-700">
-                        {peak.count} {peak.count === 1 ? 'delivery' : 'deliveries'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-charcoal-400">Not enough data</p>
-              )}
-            </div>
-          </div>
-        </div>
+        )}
       </section>
 
-      {/* TOP EARNINGS BY RESTAURANT */}
-      <section className="bg-grey-200 rounded-lg p-6 shadow-soft-lift border border-grey-stroke">
-        <div className="mb-6">
-          <h2 className="text-card-h2 text-charcoal-600">Top Earnings by Restaurant</h2>
-          <p className="text-body-regular text-charcoal-400 mt-1">
-            Restaurants generating the most income
-          </p>
-        </div>
-        {analytics.earningsByRestaurant.length === 0 ? (
-          <div className="text-center py-12">
-            <Icon.CurrencyDollar size={48} className="text-charcoal-300 mx-auto mb-3" />
-            <p className="text-body-regular text-charcoal-400">No earnings data available</p>
+      {/* TOP RESTAURANTS */}
+       <section className="grid grid-cols-1 gap-6">
+
+        {/* Busiest Restaurants */}
+          <div className="bg-grey-200 rounded-lg p-6 shadow-soft-lift border border-grey-stroke">
+            <div className="mb-6">
+              <h2 className="text-card-h2 text-charcoal-600">Busiest Restaurants</h2>
+              <p className="text-body-regular text-charcoal-400 mt-1">
+                Where you deliver the most
+              </p>
+            </div>
+            {analytics.topRestaurants.length === 0 ? (
+              <div className="text-center py-12">
+                <Icon.Storefront size={48} className="text-charcoal-300 mx-auto mb-3" />
+                <p className="text-body-regular text-charcoal-400">No restaurant data available</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {analytics.topRestaurants.slice(0, 3).map((restaurant, index) => {
+                  const maxDeliveries = Math.max(...analytics.topRestaurants.map(r => r.deliveries));
+                  const widthPercent = maxDeliveries > 0 ? (restaurant.deliveries / maxDeliveries) * 100 : 0;
+                  
+                  return (
+                    <div key={restaurant.name} className="bg-cream-50 rounded-lg p-4 border border-grey-stroke">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-sage-500 text-cream-50 font-semibold text-sm flex-shrink-0">
+                            {index + 1}
+                          </span>
+                          <span className="text-body-medium text-charcoal-700 font-semibold">
+                            {restaurant.name}
+                          </span>
+                        </div>
+                        <span className="text-body-regular text-charcoal-600 font-semibold">
+                          {restaurant.deliveries} {restaurant.deliveries === 1 ? 'delivery' : 'deliveries'}
+                        </span>
+                      </div>
+                      <div className="bg-grey-100 rounded-full h-3 overflow-hidden">
+                        <div
+                          className="bg-sage-500 h-full rounded-full transition-all duration-300"
+                          style={{ width: `${Math.max(widthPercent, 2)}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="text-xs text-charcoal-400">
+                          Total earnings
+                        </span>
+                        <span className="text-xs text-sage-700 font-semibold">
+                          {formatCurrency(restaurant.earnings)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-grey-stroke">
-                  <th className="text-left py-3 px-3 text-label-medium text-charcoal-400">RANK</th>
-                  <th className="text-left py-3 px-3 text-label-medium text-charcoal-400">RESTAURANT</th>
-                  <th className="text-right py-3 px-3 text-label-medium text-charcoal-400">DELIVERIES</th>
-                  <th className="text-right py-3 px-3 text-label-medium text-charcoal-400">AVG PER DELIVERY</th>
-                  <th className="text-right py-3 px-3 text-label-medium text-charcoal-400">TOTAL EARNINGS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {analytics.earningsByRestaurant.map((restaurant, index) => (
-                  <tr key={restaurant.name} className="border-b border-grey-stroke hover:bg-cream-50 transition-colors">
-                    <td className="py-4 px-3">
-                      <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-sage-500 text-cream-50 font-semibold text-sm">
-                        {index + 1}
-                      </span>
-                    </td>
-                    <td className="py-4 px-3">
-                      <span className="text-body-regular text-charcoal-600 font-medium">
-                        {restaurant.name}
-                      </span>
-                    </td>
-                    <td className="py-4 px-3 text-right text-body-regular text-charcoal-600">
-                      {restaurant.deliveries}
-                    </td>
-                    <td className="py-4 px-3 text-right text-body-regular text-charcoal-600">
-                      {formatCurrency(restaurant.avgOrderValue)}
-                    </td>
-                    <td className="py-4 px-3 text-right text-body-medium text-sage-700 font-semibold">
-                      {formatCurrency(restaurant.earnings)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </section>
 
       {/* QUICK STATS */}

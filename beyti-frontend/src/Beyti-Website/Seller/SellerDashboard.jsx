@@ -48,11 +48,11 @@ const getStatusVariant = (status) => {
   const s = status?.toLowerCase();
   if (!s) return "neutral";
   if (s === "placed" || s === "pending") return "danger";
-  if (["accepted", "preparing", "ready for pickup"].includes(s)) return "brand";
-  if (s === "completed") return "success";
+  if (["accepted", "preparing", "ready for pickup", "picked up"].includes(s)) return "brand";
+  if (s === "completed" || s === "delivered") return "success";
   if (s === "cancelled") return "error";
   return "neutral";
-};
+};;
 
 const getPaymentVariant = (status) => {
   const s = status?.toLowerCase();

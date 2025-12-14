@@ -4,8 +4,9 @@ import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Snackbar from './../../../components/Snackbar';
-
+import CustomerHeader from './../../../components/CustomerHeader';
 import PageHeader from './../../../components/PageHeader'
+import ConfirmModal from './../../../components/ConfirmModal';
 
 
 import { 
@@ -28,6 +29,8 @@ const Checkout = () => {
   // --- STATE (unchanged) ---
   const [placingOrder, setPlacingOrder] = useState(false);
   const [orderError, setOrderError] = useState(null);  
+
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
 
   const [step, setStep] = useState(1);
   const [fulfillmentType, setFulfillmentType] = useState('');
@@ -243,6 +246,35 @@ const showSnackbar = (message, type = 'success') => {
     return null;
   };
 
+  useEffect(() => {
+  console.log("🛒 Checkout received customerAddresses:", customerAddresses);
+  console.log("🛒 customerAddresses length:", customerAddresses?.length);
+  
+  if (customerAddresses && customerAddresses.length > 0) {
+    const formattedAddresses = customerAddresses
+      .filter(ca => ca.address?.isActive !== false) // Filter out inactive addresses
+      .map((ca, index) => {
+        console.log(`🏠 Processing address ${index + 1}:`, ca);
+        const formatted = {
+          id: ca.address?.id || ca.addressId || ca.id,
+          street: ca.address?.street || '',
+          city: ca.address?.city || '',
+          region: ca.address?.region || '',
+          country: ca.address?.country || 'Bahrain',
+          postalCode: ca.address?.postalCode || '',
+          isActive: ca.address?.isActive !== false
+        };
+        console.log(`✅ Formatted address ${index + 1}:`, formatted);
+        return formatted;
+      });
+    console.log("📦 All formatted addresses:", formattedAddresses);
+    setAddresses(formattedAddresses);
+  } else {
+    console.log("⚠️ No addresses available or customerAddresses is empty");
+    setAddresses([]);
+  }
+}, [customerAddresses]);
+
   // --- EFFECT: Load customer addresses when checkout opens (unchanged) ---
   useEffect(() => {
     console.log("🛒 Checkout received customerAddresses:", customerAddresses);
@@ -397,43 +429,36 @@ const showSnackbar = (message, type = 'success') => {
     setShowAddressModal(true);
   };
 
-  const handleDeleteAddress = async (addressId) => {
-    try {
-      setDeletingAddress(addressId);
-      
-      const customerAddress = customerAddresses?.find(
-        ca => {
-          const caAddressId = ca.address?.id || ca.addressId || ca.id;
-          console.log('Comparing:', caAddressId, 'with', addressId);
-          return caAddressId === addressId;
-        }
-      );
-      
-      console.log('Found customerAddress:', customerAddress);
-      console.log('All customerAddresses:', customerAddresses);
-      
-      if (!customerAddress) {
-        console.warn('CustomerAddress link not found, trying direct delete');
-        await deleteAddress(addressId);
-      } else {
-        await deleteCustomerAddress(customerAddress.id);
-        await deleteAddress(addressId);
-      }
+ const handleDeleteAddress = async (addressId) => {
+  const address = addresses.find(a => a.id === addressId);
+  const actionText = address?.isActive !== false ? 'Deactivate' : 'Activate';
+  
+  try {
+    setDeletingAddress(addressId);
+    
+    // Toggle the address status
+    await deleteAddress(addressId);
 
-      setAddresses(addresses.filter(addr => addr.id !== addressId));
-      
-      if (selectedAddress?.id === addressId) {
-        setSelectedAddress(null);
-      }
-      
-      showSnackbar('Address deleted successfully! 🗑️', 'success');
-    } catch (err) {
-      console.error('Error deleting address:', err);
-      showSnackbar(err.message || 'Failed to delete address', 'error');
-    } finally {
-      setDeletingAddress(null);
+    // Remove from local state immediately for better UX
+    setAddresses(addresses.filter(addr => addr.id !== addressId));
+    
+    if (selectedAddress?.id === addressId) {
+      setSelectedAddress(null);
     }
-  };
+    
+    showSnackbar(`Address ${actionText.toLowerCase()}d successfully! ✓`, 'success');
+    
+    // IMPORTANT: The parent component needs to refetch customer data
+    // For now, the address will reappear if you leave and come back
+    // This is because customerAddresses prop still contains the old data
+    // You'll need to add a callback prop to refetch customer data in the parent
+  } catch (err) {
+    console.error('Error updating address:', err);
+    showSnackbar(err.message || 'Failed to update address', 'error');
+  } finally {
+    setDeletingAddress(null);
+  }
+};
 
   const handleMapSave = async () => {
     if (!mapLocation) {
@@ -660,8 +685,8 @@ const handlePlaceOrder = async () => {
       SubtotalAmount: subtotalAmount,
       DeliveryFee: deliveryFee,
       TotalAmount: totalAmount,
-      CreatedAt: new Date().toISOString(),
-      UpdatedAt: new Date().toISOString()
+      CreatedAt: Date.now(),
+      UpdatedAt: Date.now()
     };
 
     // Step 5: Create order
@@ -777,47 +802,23 @@ const handlePlaceOrder = async () => {
       {/* Full-page overlay (no dark background, just page) */}
       <div className="fixed inset-0 z-50 bg-cream-50 overflow-y-auto">
         <div className="max-w-6xl mx-auto py-8 px-4 lg:px-8">
-          {/* Top Header */}
-         <header className="bg-cream-50 py-4 px-8 border-b border-grey-stroke sticky top-0 z-10">
-            <div className="max-w-[1440px] mx-auto flex items-center justify-between">
-                <h1 className="text-[32px] font-bold text-charcoal-600" style={{ fontFamily: 'Merriweather, serif' }}>
-                Beyti
-                </h1>
-                <h2 className="text-[32px] font-bold text-charcoal-600 absolute left-1/2 -translate-x-1/2" style={{ fontFamily: 'Merriweather, serif' }}>
-                Checkout
-                </h2>
-                <div className="flex items-center gap-4">
-                <button className="p-2 hover:bg-grey-200 rounded-lg transition-all">
-                    <svg className="w-5 h-5 text-charcoal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                    </svg>
-                </button>
-                
-                {customerName ? (
-                  <div className="flex items-center gap-3 pl-4 border-l border-grey-stroke">
-                  <div className="w-8 h-8 bg-sage-500 rounded-full flex items-center justify-center">
-                      <span className="text-white text-sm font-semibold">{customerName[0]}</span>
-                  </div>
-                  <span className="text-charcoal-600 font-medium text-sm" style={{ fontFamily: 'Inter, sans-serif' }}>
-                      {customerName}
-                  </span>
-                  </div>
-              ) : (
-                <button
-                  onClick={() => navigate('/mainStore')}
-                  className="flex items-center gap-2 pl-4 border-l border-grey-stroke bg-sage-500 hover:bg-sage-600 text-white px-4 py-2 rounded-lg transition-all"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-                  </svg>
-                  <span className="text-sm font-semibold" style={{ fontFamily: 'Inter, sans-serif' }}>
-                    Login
-                  </span>
-                </button>
-              )}
-                </div>
-            </div>
-            </header>
+         
+          <CustomerHeader
+            title="Checkout"
+            customerName={customerName}
+            customerId={customerId}
+            cart={localCart}
+            stores={selectedStore ? [selectedStore] : []}
+            customerAddresses={customerAddresses}
+            onCustomerClick={() => navigate('/mainStore')}
+            onLogout={() => {
+              sessionStorage.removeItem('beyti_customerId');
+              sessionStorage.removeItem('beyti_customerName');
+              navigate('/', { replace: true });
+            }}
+            variant="store"
+            showSearch={false}
+          />
 
             {/* MAIN CONTENT */}
                 <div className="mb-8">
@@ -1162,9 +1163,17 @@ const handlePlaceOrder = async () => {
                                 <button
                                   onClick={e => {
                                     e.stopPropagation();
-                                    if (window.confirm('Are you sure you want to delete this address?')) {
+                                    setConfirmModal({
+                                    isOpen: true,
+                                    title: 'Delete Address',
+                                    message: 'Are you sure you want to delete this address? This action cannot be undone.',
+                                    confirmText: 'Delete',
+                                    variant: 'danger',
+                                    onConfirm: () => {
                                       handleDeleteAddress(addr.id);
+                                      setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null });
                                     }
+                                  });
                                   }}
                                   disabled={deletingAddress === addr.id}
                                   className={`p-2 rounded-lg transition-all ${
@@ -1553,6 +1562,17 @@ const handlePlaceOrder = async () => {
                 
         </div>
       )}
+
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null })}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText={confirmModal.confirmText || "Confirm"}
+        variant={confirmModal.variant || "danger"}
+      />
 
       {/* Snackbar */}
           <Snackbar 
