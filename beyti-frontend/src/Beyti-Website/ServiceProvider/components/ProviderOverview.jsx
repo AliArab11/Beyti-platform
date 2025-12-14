@@ -21,8 +21,10 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchDashboardData();
-    loadRecentActivity();
+    if (serviceProviderId) {
+      fetchDashboardData();
+      loadRecentActivity();
+    }
   }, [serviceProviderId]);
 
   // Reload activity when activityRefreshKey changes

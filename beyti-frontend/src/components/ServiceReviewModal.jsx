@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Star, X } from '@phosphor-icons/react';
 import Button from './Button';
 
@@ -9,7 +9,18 @@ export default function ServiceReviewModal({ isOpen, onClose, booking, onSubmit 
   const [timelinessRating, setTimelinessRating] = useState(0);
   const [comment, setComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [hoveredStar, setHoveredStar] = useState({ overall: 0, quality: 0, professionalism: 0, timeliness: 0 });
+  const [hoveredStar, setHoveredStar] = useState({ quality: 0, professionalism: 0, timeliness: 0 });
+
+  // Calculate overall rating based on other ratings
+  useEffect(() => {
+    const ratings = [qualityRating, professionalismRating, timelinessRating].filter(r => r > 0);
+    if (ratings.length > 0) {
+      const average = ratings.reduce((sum, r) => sum + r, 0) / ratings.length;
+      setOverallRating(Math.round(average));
+    } else {
+      setOverallRating(0);
+    }
+  }, [qualityRating, professionalismRating, timelinessRating]);
 
   if (!isOpen || !booking) return null;
 
@@ -17,7 +28,7 @@ export default function ServiceReviewModal({ isOpen, onClose, booking, onSubmit 
     e.preventDefault();
 
     if (overallRating === 0) {
-      alert('Please provide an overall rating');
+      alert('Please rate at least one category (Quality, Professionalism, or Timeliness)');
       return;
     }
 
@@ -63,21 +74,22 @@ export default function ServiceReviewModal({ isOpen, onClose, booking, onSubmit 
     }
   };
 
-  const StarRating = ({ rating, onRatingChange, label, name }) => {
+  const StarRating = ({ rating, onRatingChange, label, name, isReadOnly = false }) => {
     return (
       <div className="mb-6">
         <label className="block text-body-regular text-charcoal-600 dark:text-cream-50 font-medium mb-3">
-          {label} {name === 'overall' && <span className="text-error-text">*</span>}
+          {label} {isReadOnly && <span className="text-label-small text-charcoal-400 dark:text-charcoal-300">(Calculated automatically)</span>}
         </label>
         <div className="flex gap-2">
           {[1, 2, 3, 4, 5].map((star) => (
             <button
               key={star}
               type="button"
-              onMouseEnter={() => setHoveredStar({ ...hoveredStar, [name]: star })}
-              onMouseLeave={() => setHoveredStar({ ...hoveredStar, [name]: 0 })}
-              onClick={() => onRatingChange(star)}
-              className="transition-transform hover:scale-110 focus:outline-none"
+              onMouseEnter={() => !isReadOnly && setHoveredStar({ ...hoveredStar, [name]: star })}
+              onMouseLeave={() => !isReadOnly && setHoveredStar({ ...hoveredStar, [name]: 0 })}
+              onClick={() => !isReadOnly && onRatingChange(star)}
+              className={`focus:outline-none ${!isReadOnly ? 'transition-transform hover:scale-110 cursor-pointer' : 'cursor-default'}`}
+              disabled={isReadOnly}
             >
               <Star
                 size={32}
@@ -128,14 +140,6 @@ export default function ServiceReviewModal({ isOpen, onClose, booking, onSubmit 
             </p>
           </div>
 
-          {/* Overall Rating */}
-          <StarRating
-            rating={overallRating}
-            onRatingChange={setOverallRating}
-            label="Overall Rating"
-            name="overall"
-          />
-
           {/* Quality Rating */}
           <StarRating
             rating={qualityRating}
@@ -159,6 +163,17 @@ export default function ServiceReviewModal({ isOpen, onClose, booking, onSubmit 
             label="Timeliness"
             name="timeliness"
           />
+
+          {/* Overall Rating - Calculated */}
+          <div className="pt-4 border-t border-grey-stroke dark:border-charcoal-400">
+            <StarRating
+              rating={overallRating}
+              onRatingChange={() => {}}
+              label="Overall Rating"
+              name="overall"
+              isReadOnly={true}
+            />
+          </div>
 
           {/* Comment */}
           <div className="mb-6">

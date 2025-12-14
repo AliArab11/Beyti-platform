@@ -448,11 +448,15 @@ export default function ProfilePage({ userProfile, serviceProviderId, onProfileU
             </div>
           )}
 
-          {/* Account Status */}
+          {/* Account Status - Service Providers show accountStatus (Active/Inactive), not service availability status */}
           <div className="flex flex-col">
             <p className="text-label-medium text-charcoal-400 dark:text-gray-400 mb-2">Account Status</p>
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-label-medium font-medium bg-success-bg text-success-text w-fit">
-              Active
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-label-medium font-medium w-fit ${
+              userProfile.accountStatus === 'Inactive' || userProfile.accountStatus === 'Suspended'
+                ? 'bg-error-bg text-error-text'
+                : 'bg-success-bg text-success-text'
+            }`}>
+              {userProfile.accountStatus || 'Active'}
             </span>
           </div>
         </div>

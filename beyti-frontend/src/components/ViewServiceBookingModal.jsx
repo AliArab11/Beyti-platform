@@ -2,7 +2,7 @@ import { X, Scissors, MapPin, CreditCard, Calendar, Clock } from '@phosphor-icon
 import Button from './Button';
 import StatusChip from './StatusChip';
 
-export default function ViewServiceBookingModal({ isOpen, onClose, booking }) {
+export default function ViewServiceBookingModal({ isOpen, onClose, booking, onOpenReview, hasReview }) {
   if (!isOpen || !booking) return null;
 
   const formatDate = (dateString) => {
@@ -230,7 +230,18 @@ export default function ViewServiceBookingModal({ isOpen, onClose, booking }) {
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-cream-50 dark:bg-charcoal-600 border-t border-grey-stroke dark:border-charcoal-400 p-6 flex justify-end">
+        <div className="sticky bottom-0 bg-cream-50 dark:bg-charcoal-600 border-t border-grey-stroke dark:border-charcoal-400 p-6 flex justify-end gap-3">
+          {booking.status === 'Completed' && !hasReview && onOpenReview && (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                onOpenReview(booking);
+                onClose();
+              }}
+            >
+              Write Review
+            </Button>
+          )}
           <Button variant="primary" onClick={onClose}>
             Close
           </Button>

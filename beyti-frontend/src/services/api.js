@@ -1943,6 +1943,25 @@ export const toggleServiceReviewVisibility = async (reviewId) => {
 };
 
 /**
+ * Get service reviews by customer ID
+ * Note: Backend doesn't have a customer endpoint, so we fetch all and filter
+ * @param {number} customerId - Customer ID
+ * @returns {Promise<Array>} - Array of service review objects by the customer
+ */
+export const getCustomerServiceReviews = async (customerId) => {
+  try {
+    const allReviews = await fetchAPI('/ServiceReviews');
+    // Filter reviews by customer ID
+    return Array.isArray(allReviews)
+      ? allReviews.filter(review => review.customerId === customerId)
+      : [];
+  } catch (error) {
+    console.error('Error fetching customer service reviews:', error);
+    return [];
+  }
+};
+
+/**
  * Create a new service review
  * @param {Object} reviewData - Service review data
  *   Example: {

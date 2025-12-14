@@ -7,14 +7,14 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Scissors, ShoppingCart, Calendar } from '@phosphor-icons/react';
+import { PackageIcon, ScissorsIcon, ShoppingCartIcon, CalendarIcon, ChatCircleTextIcon } from '@phosphor-icons/react';
 import CustomerSidebar from '../../components/CustomerSidebar';
 import PageHeader from '../../components/PageHeader';
 import StatusChip from '../../components/StatusChip';
 import ViewOrderModal from '../../components/ViewOrderModal';
 import ViewServiceBookingModal from '../../components/ViewServiceBookingModal';
 import ServiceReviewModal from '../../components/ServiceReviewModal';
-import { getUserProfile, updateUserProfile, getCustomerOrders, getServiceBookings, createServiceReview } from '../../services/api';
+import { getUserProfile, updateUserProfile, getCustomerOrders, getServiceBookings, createServiceReview, getCustomerServiceReviews } from '../../services/api';
 import { isAuthenticated, getUserId, handleSuspensionError } from '../../utils/authUtils';
 
 export default function CustomerHistory() {
@@ -23,9 +23,10 @@ export default function CustomerHistory() {
   const [userProfile, setUserProfile] = useState(null);
   const [orders, setOrders] = useState([]);
   const [serviceBookings, setServiceBookings] = useState([]);
+  const [serviceReviews, setServiceReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('all'); // 'all', 'pending', 'orders', 'services'
-  const [viewMode, setViewMode] = useState('orders'); // 'orders', 'services'
+  const [viewMode, setViewMode] = useState('orders'); // 'orders', 'services', 'reviews'
 
   // Modal states
   const [viewOrderModal, setViewOrderModal] = useState({ isOpen: false, order: null });
@@ -83,21 +84,38 @@ export default function CustomerHistory() {
     }
   };
 
-  // Fetch orders and service bookings
+  // Fetch orders, service bookings, and service reviews
   const fetchHistory = async () => {
     try {
       setLoading(true);
-      const [ordersData, bookingsData] = await Promise.all([
+      const [ordersData, bookingsData, reviewsData] = await Promise.all([
         getCustomerOrders(customerId),
-        getServiceBookings(null, customerId)
+        getServiceBookings(null, customerId),
+        getCustomerServiceReviews(customerId)
       ]);
 
       setOrders(Array.isArray(ordersData) ? ordersData : []);
-      setServiceBookings(Array.isArray(bookingsData) ? bookingsData : []);
+      const bookings = Array.isArray(bookingsData) ? bookingsData : [];
+      setServiceBookings(bookings);
+
+      // Enrich reviews with booking data (provider name and service name)
+      const enrichedReviews = Array.isArray(reviewsData)
+        ? reviewsData.map(review => {
+            const booking = bookings.find(b => b.id === review.serviceBookingId);
+            return {
+              ...review,
+              providerName: booking?.businessName || booking?.providerName || null,
+              serviceName: booking?.serviceName || null
+            };
+          })
+        : [];
+
+      setServiceReviews(enrichedReviews);
     } catch (error) {
       console.error('Error fetching history:', error);
       setOrders([]);
       setServiceBookings([]);
+      setServiceReviews([]);
     } finally {
       setLoading(false);
     }
@@ -249,11 +267,13 @@ export default function CustomerHistory() {
     setViewBookingModal({ isOpen: true, booking });
   };
 
-  const handleOpenReview = (item, type) => {
-    if (type === 'booking') {
-      setReviewModal({ isOpen: true, booking: item });
-    }
-    // For orders, we would need to implement order reviews separately if needed
+  const handleOpenReview = (booking) => {
+    setReviewModal({ isOpen: true, booking });
+  };
+
+  // Check if a booking already has a review
+  const bookingHasReview = (bookingId) => {
+    return serviceReviews.some(review => review.serviceBookingId === bookingId);
   };
 
   const handleSubmitReview = async (reviewData) => {
@@ -305,7 +325,7 @@ export default function CustomerHistory() {
                     <p className="text-display-h2 text-charcoal-600 dark:text-cream-50 mt-2">{metrics.totalOrders}</p>
                   </div>
                   <div className="w-12 h-12 bg-sage-100 dark:bg-sage-900/30 rounded-lg flex items-center justify-center">
-                    <ShoppingCart size={24} className="text-sage-600 dark:text-sage-400" />
+                    <ShoppingCartIcon size={24} className="text-sage-600 dark:text-sage-400" />
                   </div>
                 </div>
               </div>
@@ -317,7 +337,7 @@ export default function CustomerHistory() {
                     <p className="text-display-h2 text-charcoal-600 dark:text-cream-50 mt-2">{metrics.totalBookings}</p>
                   </div>
                   <div className="w-12 h-12 bg-sage-100 dark:bg-sage-900/30 rounded-lg flex items-center justify-center">
-                    <Scissors size={24} className="text-sage-600 dark:text-sage-400" />
+                    <ScissorsIcon size={24} className="text-sage-600 dark:text-sage-400" />
                   </div>
                 </div>
               </div>
@@ -331,7 +351,7 @@ export default function CustomerHistory() {
                     </p>
                   </div>
                   <div className="w-12 h-12 bg-sage-100 dark:bg-sage-900/30 rounded-lg flex items-center justify-center">
-                    <Calendar size={24} className="text-sage-600 dark:text-sage-400" />
+                    <CalendarIcon size={24} className="text-sage-600 dark:text-sage-400" />
                   </div>
                 </div>
               </div>
@@ -345,7 +365,7 @@ export default function CustomerHistory() {
                     </p>
                   </div>
                   <div className="w-12 h-12 bg-charcoal-100 dark:bg-charcoal-500 rounded-lg flex items-center justify-center">
-                    <Package size={24} className="text-charcoal-500 dark:text-charcoal-300" />
+                    <PackageIcon size={24} className="text-charcoal-500 dark:text-charcoal-300" />
                   </div>
                 </div>
               </div>
@@ -364,7 +384,7 @@ export default function CustomerHistory() {
                         : 'bg-grey-200 dark:bg-charcoal-500 text-charcoal-600 dark:text-cream-50 hover:bg-grey-300 dark:hover:bg-charcoal-400'
                     }`}
                   >
-                    <ShoppingCart size={18} className="inline mr-2" />
+                    <ShoppingCartIcon size={18} className="inline mr-2" />
                     Orders ({metrics.totalOrders})
                   </button>
                   <button
@@ -375,8 +395,19 @@ export default function CustomerHistory() {
                         : 'bg-grey-200 dark:bg-charcoal-500 text-charcoal-600 dark:text-cream-50 hover:bg-grey-300 dark:hover:bg-charcoal-400'
                     }`}
                   >
-                    <Scissors size={18} className="inline mr-2" />
+                    <ScissorsIcon size={18} className="inline mr-2" />
                     Services ({metrics.totalBookings})
+                  </button>
+                  <button
+                    onClick={() => setViewMode('reviews')}
+                    className={`px-6 py-3 rounded-md text-body-regular transition-colors ${
+                      viewMode === 'reviews'
+                        ? 'bg-sage-500 text-cream-50 dark:bg-sage-700'
+                        : 'bg-grey-200 dark:bg-charcoal-500 text-charcoal-600 dark:text-cream-50 hover:bg-grey-300 dark:hover:bg-charcoal-400'
+                    }`}
+                  >
+                    <ChatCircleTextIcon size={18} className="inline mr-2" />
+                    My Reviews ({serviceReviews.length})
                   </button>
                 </div>
 
@@ -581,21 +612,89 @@ export default function CustomerHistory() {
                                   </StatusChip>
                                 </td>
                                 <td className="p-4 text-center">
-                                  <div className="flex items-center justify-center gap-2">
-                                    <button
-                                      onClick={() => handleViewBooking(booking)}
-                                      className="px-4 py-2 bg-sage-500 hover:bg-sage-600 dark:bg-sage-700 dark:hover:bg-sage-600 text-cream-50 rounded-md text-body-small transition-colors"
-                                    >
-                                      View
-                                    </button>
-                                    {booking.status === 'Completed' && (
-                                      <button
-                                        onClick={() => handleOpenReview(booking, 'booking')}
-                                        className="px-4 py-2 bg-charcoal-600 hover:bg-charcoal-500 dark:bg-charcoal-400 dark:hover:bg-charcoal-300 text-cream-50 dark:text-charcoal-600 rounded-md text-body-small transition-colors"
-                                      >
-                                        Review
-                                      </button>
-                                    )}
+                                  <button
+                                    onClick={() => handleViewBooking(booking)}
+                                    className="px-4 py-2 bg-sage-500 hover:bg-sage-600 dark:bg-sage-700 dark:hover:bg-sage-600 text-cream-50 rounded-md text-body-small transition-colors"
+                                  >
+                                    View
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Reviews Table */}
+                {viewMode === 'reviews' && (
+                  <div className="bg-cream-50 dark:bg-charcoal-600 border border-grey-stroke dark:border-charcoal-400 rounded-lg overflow-hidden">
+                    <div className="p-4 border-b border-grey-stroke dark:border-charcoal-400">
+                      <h3 className="text-card-h3 text-charcoal-600 dark:text-cream-50">
+                        My Service Reviews ({serviceReviews.length})
+                      </h3>
+                    </div>
+                    {serviceReviews.length === 0 ? (
+                      <div className="p-12 text-center text-charcoal-400 dark:text-charcoal-300">
+                        No reviews found. Complete a service booking to leave a review!
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="bg-grey-100 dark:bg-charcoal-500 border-b border-grey-stroke dark:border-charcoal-400">
+                              <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Review ID</th>
+                              <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Date</th>
+                              <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Service Provider</th>
+                              <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Service</th>
+                              <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Overall Rating</th>
+                              <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Quality</th>
+                              <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Professionalism</th>
+                              <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Timeliness</th>
+                              <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Comment</th>
+                              <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Provider Response</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-grey-stroke dark:divide-charcoal-400">
+                            {serviceReviews.map((review) => (
+                              <tr key={review.id} className="hover:bg-cream-100 dark:hover:bg-charcoal-500 transition-colors">
+                                <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50 font-semibold">
+                                  #{review.id}
+                                </td>
+                                <td className="p-4 text-body-small text-charcoal-600 dark:text-cream-50">
+                                  {formatDate(review.createdAt)}
+                                </td>
+                                <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50">
+                                  {review.providerName || review.businessName || 'N/A'}
+                                </td>
+                                <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50">
+                                  {review.serviceName || 'N/A'}
+                                </td>
+                                <td className="p-4 text-center">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <span className="text-sage-600 dark:text-sage-400 font-semibold">{review.overallRating}</span>
+                                    <span className="text-charcoal-400 dark:text-charcoal-300">/5</span>
+                                  </div>
+                                </td>
+                                <td className="p-4 text-center text-body-small text-charcoal-600 dark:text-cream-50">
+                                  {review.qualityRating ? `${review.qualityRating}/5` : '—'}
+                                </td>
+                                <td className="p-4 text-center text-body-small text-charcoal-600 dark:text-cream-50">
+                                  {review.professionalismRating ? `${review.professionalismRating}/5` : '—'}
+                                </td>
+                                <td className="p-4 text-center text-body-small text-charcoal-600 dark:text-cream-50">
+                                  {review.timelinessRating ? `${review.timelinessRating}/5` : '—'}
+                                </td>
+                                <td className="p-4 text-body-small text-charcoal-600 dark:text-cream-50 max-w-xs">
+                                  <div className="truncate" title={review.comment}>
+                                    {review.comment || 'No comment'}
+                                  </div>
+                                </td>
+                                <td className="p-4 text-body-small text-charcoal-600 dark:text-cream-50 max-w-xs">
+                                  <div className="truncate" title={review.providerResponse}>
+                                    {review.providerResponse || 'No response yet'}
                                   </div>
                                 </td>
                               </tr>
@@ -623,6 +722,8 @@ export default function CustomerHistory() {
         isOpen={viewBookingModal.isOpen}
         onClose={() => setViewBookingModal({ isOpen: false, booking: null })}
         booking={viewBookingModal.booking}
+        onOpenReview={handleOpenReview}
+        hasReview={viewBookingModal.booking ? bookingHasReview(viewBookingModal.booking.id) : false}
       />
 
       <ServiceReviewModal

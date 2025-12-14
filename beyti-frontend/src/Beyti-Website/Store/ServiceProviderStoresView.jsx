@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Scissors } from "@phosphor-icons/react";
-import { getServiceProviders, getServiceCategoryList, getUserProfile, updateUserProfile, getServiceProviderServices } from "../../services/api";
+import { getServiceProviders, getServiceCategoryList, getUserProfile, updateUserProfile, getServiceProviderServices, getProviderServiceReviews } from "../../services/api";
 import { isAuthenticated, getUserId, handleSuspensionError } from "../../utils/authUtils";
 import PageHeader from "../../components/PageHeader";
 import CustomerSidebar from "../../components/CustomerSidebar";
@@ -56,7 +56,7 @@ const SearchBar = ({ value, onChange }) => (
 
 
 // Star Rating Component
-const StarRating = ({ rating, reviewCount }) => {
+const StarRating = ({ rating }) => {
   const fullStars = Math.floor(rating);
   const hasHalfStar = rating % 1 >= 0.5;
   const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
@@ -87,7 +87,7 @@ const StarRating = ({ rating, reviewCount }) => {
         ))}
       </div>
       <span className="text-charcoal-500 text-xs" style={{ fontFamily: 'Inter, sans-serif' }}>
-        {rating > 0 ? `${rating.toFixed(1)} (${reviewCount})` : 'No reviews'}
+        {rating > 0 ? `${rating.toFixed(1)}` : 'No reviews'}
       </span>
     </div>
   );
@@ -138,7 +138,7 @@ const ProviderCard = ({ provider, onClick, services }) => {
 
         {/* Star Rating */}
         <div className="mb-2">
-          <StarRating rating={provider.averageRating || 0} reviewCount={provider.reviewCount || 0} />
+          <StarRating rating={provider.averageRating || 0} />
         </div>
 
         {/* Services List */}
@@ -321,24 +321,43 @@ const ServiceProviderStoresView = () => {
       setProviders(normalizedProviders);
       setCategories(Array.isArray(categoriesData) ? categoriesData : []);
 
-      // Fetch services for each provider
+      // Fetch services and reviews for each provider
       if (normalizedProviders.length > 0) {
         const servicesMap = {};
-        await Promise.all(
+        const updatedProviders = await Promise.all(
           normalizedProviders.map(async (provider) => {
             try {
               const services = await getServiceProviderServices(provider.id);
               console.log(`[fetchInitialData] Services for provider ${provider.id}:`, services);
               console.log(`[fetchInitialData] First service structure:`, services[0]);
               servicesMap[provider.id] = Array.isArray(services) ? services : [];
+
+              // Fetch reviews for this provider to calculate accurate rating
+              const reviews = await getProviderServiceReviews(provider.id);
+              console.log(`[fetchInitialData] Reviews for provider ${provider.id}:`, reviews);
+
+              // Calculate average rating from ALL reviews (including hidden ones)
+              let averageRating = provider.averageRating || 0;
+              if (Array.isArray(reviews) && reviews.length > 0) {
+                const totalRating = reviews.reduce((acc, review) => acc + (review.overallRating || 0), 0);
+                averageRating = totalRating / reviews.length;
+                console.log(`[fetchInitialData] Calculated average rating for provider ${provider.id}: ${averageRating.toFixed(2)} from ${reviews.length} reviews`);
+              }
+
+              return {
+                ...provider,
+                averageRating
+              };
             } catch (error) {
-              console.error(`Failed to fetch services for provider ${provider.id}:`, error);
+              console.error(`Failed to fetch services/reviews for provider ${provider.id}:`, error);
               servicesMap[provider.id] = [];
+              return provider;
             }
           })
         );
         console.log('[fetchInitialData] Final servicesMap:', servicesMap);
         setProviderServices(servicesMap);
+        setProviders(updatedProviders);
       }
 
       // Set first category as default

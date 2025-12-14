@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Scissors, Star, MagnifyingGlass, ArrowLeft } from "@phosphor-icons/react";
-import { getServiceProviderById, getServiceCatalogs, getServiceProviderServices } from "../../services/api";
+import { getServiceProviderById, getServiceCatalogs, getServiceProviderServices, getProviderServiceReviews } from "../../services/api";
 import { isAuthenticated } from "../../utils/authUtils";
 import PageHeader from "../../components/PageHeader";
 import ServiceDetailsSheet from "./Components/ServiceDetailsSheet";
@@ -146,10 +146,6 @@ const ServiceProviderInfo = ({ provider }) => {
                   </p>
                 )}
 
-                <p>
-                  <span className="font-semibold text-[#556B5C]">Reviews:</span>{" "}
-                  <span className="text-charcoal-600">{provider?.reviewCount || 0} reviews</span>
-                </p>
               </div>
             </div>
 
@@ -266,6 +262,7 @@ const ServiceProviderDetailView = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("popular");
   const [services, setServices] = useState([]);
+  const [allReviews, setAllReviews] = useState([]);
 
   // Service booking states
   const [selectedService, setSelectedService] = useState(null);
@@ -302,7 +299,55 @@ const ServiceProviderDetailView = () => {
         // Fetch services for this provider
         const servicesData = await getServiceProviderServices(providerId);
         console.log('[ServiceProviderDetailView] Services data:', servicesData);
-        setServices(Array.isArray(servicesData) ? servicesData : []);
+
+        // Fetch all reviews for this provider
+        const reviewsData = await getProviderServiceReviews(providerId);
+        console.log('[ServiceProviderDetailView] Reviews data:', reviewsData);
+        setAllReviews(Array.isArray(reviewsData) ? reviewsData : []);
+
+        // Calculate average rating for each service based on ALL reviews (including hidden)
+        const servicesWithRatings = (Array.isArray(servicesData) ? servicesData : []).map(service => {
+          // Filter ALL reviews for this specific service (including hidden ones for rating calculation)
+          const allServiceReviews = (Array.isArray(reviewsData) ? reviewsData : []).filter(
+            review => review.serviceCatalogId === service.id
+          );
+
+          // Filter only visible reviews for display count
+          const visibleServiceReviews = allServiceReviews.filter(review => !review.isHidden);
+
+          console.log(`[Service ${service.id}] Found ${allServiceReviews.length} total reviews (${visibleServiceReviews.length} visible)`);
+
+          let averageRating = 0;
+          if (allServiceReviews.length > 0) {
+            // Calculate rating from ALL reviews (including hidden ones)
+            const sum = allServiceReviews.reduce((acc, review) => acc + (review.overallRating || 0), 0);
+            averageRating = sum / allServiceReviews.length;
+            console.log(`[Service ${service.id}] Average rating: ${averageRating.toFixed(2)} from all reviews`);
+          }
+
+          return {
+            ...service,
+            averageRating,
+            reviewCount: visibleServiceReviews.length // Show count of visible reviews only
+          };
+        });
+
+        setServices(servicesWithRatings);
+
+        // Calculate overall provider rating from all reviews
+        const allReviewsArray = Array.isArray(reviewsData) ? reviewsData : [];
+        if (allReviewsArray.length > 0) {
+          const totalRating = allReviewsArray.reduce((acc, review) => acc + (review.overallRating || 0), 0);
+          const providerAverageRating = totalRating / allReviewsArray.length;
+          console.log(`[Provider ${providerId}] Calculated average rating: ${providerAverageRating.toFixed(2)} from ${allReviewsArray.length} reviews`);
+
+          // Update provider with calculated rating
+          setProvider(prevProvider => ({
+            ...prevProvider,
+            averageRating: providerAverageRating,
+            reviewCount: allReviewsArray.length
+          }));
+        }
 
         // Set first catalog as default
         if (catalogsData && catalogsData.length > 0) {
@@ -512,6 +557,7 @@ const ServiceProviderDetailView = () => {
         isOpen={showServiceDetails}
         onClose={closeServiceDetails}
         onBookService={handleBookService}
+        allReviews={allReviews}
       />
 
       {/* Service Checkout Modal */}
