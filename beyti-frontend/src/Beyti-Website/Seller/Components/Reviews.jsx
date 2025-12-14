@@ -74,6 +74,8 @@ const Reviews = ({ sellerId, sellerName }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const [expandedComments, setExpandedComments] = useState(new Set());
+
   // productsWithReviews: [{ productId, productName, totalOrders, reviews: [...], totalReviews, avgRating, hiddenCount, lastReviewAt }]
   const [products, setProducts] = useState([]);
 
@@ -354,50 +356,11 @@ const Reviews = ({ sellerId, sellerName }) => {
     return list;
   }, [flatReviews, ratingFilter, productFilter, visibilityFilter, sortBy, searchTerm]);
 
-  // Group filtered reviews by product for card/accordion view
-  const groupedByProduct = useMemo(() => {
-    const map = new Map();
-    filteredReviews.forEach((r) => {
-      if (!map.has(r.productId)) {
-        map.set(r.productId, {
-          productId: r.productId,
-          productName: r.productName || "Unnamed Product",
-          reviews: [],
-        });
-      }
-      map.get(r.productId).reviews.push(r);
-    });
-    return Array.from(map.values());
-  }, [filteredReviews]);
-
-  const topProductsByRating = useMemo(() => {
-    if (!products.length) return [];
-    return [...products]
-      .filter((p) => p.totalReviews > 0)
-      .sort((a, b) => b.avgRating - a.avgRating)
-      .slice(0, 3);
-  }, [products]);
-
-  const recentReviewSnippets = useMemo(() => {
-    const sorted = [...flatReviews].sort((a, b) => {
-      const da = a.createdAt ? new Date(a.createdAt) : null;
-      const db = b.createdAt ? new Date(b.createdAt) : null;
-      return (db || 0) - (da || 0);
-    });
-    return sorted.slice(0, 5);
-  }, [flatReviews]);
 
   // ------------------------------------------------------------------
   // Actions
   // ------------------------------------------------------------------
-  const toggleProductRow = (productId) => {
-    setExpandedProducts((prev) => {
-      const next = new Set(prev);
-      if (next.has(productId)) next.delete(productId);
-      else next.add(productId);
-      return next;
-    });
-  };
+
 
   const handleToggleVisibility = (review, productId) => {
   setVisibilityModal({
@@ -551,345 +514,87 @@ const confirmVisibilityChange = async (reason) => {
             </div>
           </section>
 
-          {/* Filters row */}
-          <section className="bg-grey-200 rounded-lg p-5 border border-grey-stroke shadow-soft-lift space-y-4">
-
-            {/* Filters row */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-charcoal-500">
-                <Icon.Funnel size={18} className="text-sage-600" />
-                <span className="text-body-medium">
-                    {filteredReviews.length} review{filteredReviews.length === 1 ? "" : "s"}
-                </span>
-                </div>
-                <div className="flex items-center gap-2 text-charcoal-500">
-                <Icon.Star size={18} className="text-sage-600" weight="fill" />
-                <span className="text-body-medium">
-                    {filteredReviews.length} review
-                    {filteredReviews.length === 1 ? "" : "s"} matching filters
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-2 md:gap-3">
-                {/* Rating filter */}
-                <select
-                  value={ratingFilter}
-                  onChange={(e) => setRatingFilter(e.target.value)}
-                  className="px-3 py-2 rounded-lg border border-grey-stroke bg-cream-50 text-sm text-charcoal-600 focus:outline-none focus:ring-2 focus:ring-sage-400"
-                >
-                  <option value="all">All ratings</option>
-                  <option value="5">5 stars only</option>
-                  <option value="4plus">4 stars & up</option>
-                  <option value="3plus">3 stars & up</option>
-                  <option value="below3">Below 3 stars</option>
-                </select>
-
-                {/* Product filter */}
-                <select
-                  value={productFilter}
-                  onChange={(e) => setProductFilter(e.target.value)}
-                  className="px-3 py-2 rounded-lg border border-grey-stroke bg-cream-50 text-sm text-charcoal-600 focus:outline-none focus:ring-2 focus:ring-sage-400"
-                >
-                  <option value="all">All products</option>
-                  {products.map((p) => (
-                    <option key={p.productId} value={p.productId}>
-                      {p.productName}
-                    </option>
-                  ))}
-                </select>
-
-                {/* Visibility filter */}
-                <select
-                  value={visibilityFilter}
-                  onChange={(e) => setVisibilityFilter(e.target.value)}
-                  className="px-3 py-2 rounded-lg border border-grey-stroke bg-cream-50 text-sm text-charcoal-600 focus:outline-none focus:ring-2 focus:ring-sage-400"
-                >
-                  <option value="all">All reviews</option>
-                  <option value="visible">Visible only</option>
-                  <option value="hidden">Hidden only</option>
-                </select>
-
-                {/* Sort */}
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="px-3 py-2 rounded-lg border border-grey-stroke bg-cream-50 text-sm text-charcoal-600 focus:outline-none focus:ring-2 focus:ring-sage-400"
-                >
-                  <option value="newest">Newest first</option>
-                  <option value="oldest">Oldest first</option>
-                  <option value="ratingHigh">Highest rating</option>
-                  <option value="ratingLow">Lowest rating</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Search */}
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <span className="absolute left-3 top-2.5 text-charcoal-300">
-                  <Icon.MagnifyingGlass size={16} />
-                </span>
+          {/* Simple Filters */}
+          <section className="bg-grey-200 rounded-lg p-4 border border-grey-stroke shadow-soft-lift">
+            <div className="flex flex-col md:flex-row gap-3">
+              {/* Search */}
+              <div className="flex-1 relative">
+                <Icon.MagnifyingGlass 
+                  size={18} 
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal-400"
+                />
                 <input
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search by comment, customer, product, or order #..."
-                  className="w-full pl-9 pr-3 py-2 rounded-lg border border-grey-stroke bg-cream-50 text-sm text-charcoal-600 focus:outline-none focus:ring-2 focus:ring-sage-400"
+                  placeholder="Search reviews..."
+                  className="w-full pl-10 pr-4 py-2 text-sm border border-grey-stroke rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sage-500"
                 />
               </div>
+
+              {/* Rating filter */}
+              <select
+                value={ratingFilter}
+                onChange={(e) => setRatingFilter(e.target.value)}
+                className="px-3 py-2 text-sm border border-grey-stroke rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sage-500"
+              >
+                <option value="all">All Ratings</option>
+                <option value="5">5★</option>
+                <option value="4plus">4★+</option>
+                <option value="3plus">3★+</option>
+                <option value="below3">&lt;3★</option>
+              </select>
+
+              {/* Product filter */}
+              <select
+                value={productFilter}
+                onChange={(e) => setProductFilter(e.target.value)}
+                className="px-3 py-2 text-sm border border-grey-stroke rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sage-500"
+              >
+                <option value="all">All Products</option>
+                {products.map((p) => (
+                  <option key={p.productId} value={p.productId}>
+                    {p.productName}
+                  </option>
+                ))}
+              </select>
+
+              {/* Visibility */}
+              <select
+                value={visibilityFilter}
+                onChange={(e) => setVisibilityFilter(e.target.value)}
+                className="px-3 py-2 text-sm border border-grey-stroke rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sage-500"
+              >
+                <option value="all">All</option>
+                <option value="visible">Visible</option>
+                <option value="hidden">Hidden</option>
+              </select>
+
+              {/* Sort */}
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="px-3 py-2 text-sm border border-grey-stroke rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sage-500"
+              >
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+                <option value="ratingHigh">Highest ★</option>
+                <option value="ratingLow">Lowest ★</option>
+              </select>
+              
+              <span className="text-sm text-charcoal-500 whitespace-nowrap py-2">
+                {filteredReviews.length} {filteredReviews.length === 1 ? 'review' : 'reviews'}
+              </span>
             </div>
           </section>
 
-          {/* Main content: left (grouped cards) + right (highlights) */}
-          <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left: grouped by product */}
-            <div className="lg:col-span-2 space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-card-h2 text-charcoal-600">
-                    Reviews by Product
-                  </h2>
-                  <p className="text-body-regular text-charcoal-400">
-                    Expand a product to read its reviews and manage visibility.
-                  </p>
-                </div>
-              </div>
-
-              {groupedByProduct.length === 0 ? (
-                <div className="bg-grey-200 rounded-lg p-4 border border-grey-stroke">
-                  <p className="text-body-regular text-charcoal-500">
-                    No reviews match the current filters. Try adjusting your
-                    rating or visibility filters.
-                  </p>
-                </div>
-              ) : (
-                groupedByProduct.map((group) => {
-                  const productMeta = products.find(
-                    (p) => p.productId === group.productId
-                  );
-
-                  return (
-                    <div
-                      key={group.productId}
-                      className="bg-grey-200 rounded-lg border border-grey-stroke shadow-soft-lift overflow-hidden"
-                    >
-                      {/* Product header row */}
-                      <button
-                        type="button"
-                        onClick={() => toggleProductRow(group.productId)}
-                        className="w-full flex items-center justify-between px-5 py-4 hover:bg-cream-50 transition-all duration-200 text-left group"
-                        >
-                        <div className="flex items-center gap-4 flex-1">
-                            {/* Expand/Collapse Icon */}
-                            <div className={`
-                            transition-transform duration-200
-                            ${expandedProducts.has(group.productId) ? "rotate-90" : ""}
-                            `}>
-                            <Icon.CaretRight size={20} className="text-charcoal-400 group-hover:text-sage-600" />
-                            </div>
-
-                            {/* Product Image */}
-                            <div className="w-12 h-12 rounded-lg bg-cream-50 flex items-center justify-center overflow-hidden border border-grey-stroke">
-                            {productMeta?.productImage ? (
-                                <img
-                                src={productMeta.productImage}
-                                alt={productMeta.productName}
-                                className="w-full h-full object-cover"
-                                />
-                            ) : (
-                                <Icon.Package size={20} className="text-charcoal-400" />
-                            )}
-                            </div>
-
-                            {/* Product Info */}
-                            <div className="flex-1">
-                            <p className="text-body-medium text-charcoal-700 mb-0.5">
-                                {group.productName}
-                            </p>
-                            <p className="text-label-medium text-charcoal-400">
-                                {productMeta?.totalOrders || 0} orders • {productMeta?.totalReviews || group.reviews.length} review{(productMeta?.totalReviews || group.reviews.length) === 1 ? "" : "s"}
-                            </p>
-                            </div>
-                        </div>
-
-                        {/* Rating on the right */}
-                        <div className="flex items-center gap-2">
-                            <RatingStars value={productMeta?.avgRating || 0} size="sm" />
-                        </div>
-                        </button>
-
-                      {/* Reviews list for this product */}
-                      {expandedProducts.has(group.productId) && (
-                        <div className="bg-cream-50 border-t border-grey-stroke px-4 py-4 md:px-5 md:py-5 space-y-3">
-                          {group.reviews.map((review) => (
-                            <div
-                                key={review.id}
-                                className={`
-                                    rounded-lg border p-4 space-y-3
-                                    ${review.isCommentHiddenBySeller
-                                    ? "bg-error-bg/30 border-error-btn/60"
-                                    : "bg-cream-50 border-grey-stroke hover:border-sage-400 transition-colors"}
-                                `}
-                                >
-                                {/* Header Row with customer info and action button */}
-                                <div className="flex items-start justify-between gap-3">
-                                    <div className="flex-1 space-y-2">
-                                    {/* Stars and customer name */}
-                                    <div className="flex items-center gap-3 flex-wrap">
-                                        <RatingStars value={review.rating || 0} />
-                                        <span className="text-body-medium text-charcoal-600 font-medium">
-                                        {review.customerName || "Customer"}
-                                        </span>
-                                        {review.isCommentHiddenBySeller && (
-                                        <StatusChip variant="error">Hidden</StatusChip>
-                                        )}
-                                    </div>
-                                    
-                                    {/* Date and order info */}
-                                    <div className="flex items-center gap-3 text-label-medium text-charcoal-400">
-                                        <span className="flex items-center gap-1">
-                                        <Icon.CalendarBlank size={14} />
-                                        {formatDate(review.createdAt)}
-                                        </span>
-                                        {review.orderId && (
-                                        <span className="flex items-center gap-1">
-                                            <Icon.ShoppingBag size={14} />
-                                            Order #{review.orderId}
-                                        </span>
-                                        )}
-                                    </div>
-                                    </div>
-
-                                    {/* Action Button - positioned top-right */}
-                                    <CRUDButton
-                                    variant={review.isCommentHiddenBySeller ? "success" : "danger"}
-                                    onClick={() => handleToggleVisibility(review, group.productId)}
-                                    disabled={updatingReviewId === review.id}
-                                    >
-                                    {updatingReviewId === review.id
-                                        ? "Updating..."
-                                        : review.isCommentHiddenBySeller
-                                        ? "Unhide"
-                                        : "Hide"}
-                                    </CRUDButton>
-                                </div>
-
-                                {/* Review Comment */}
-                                <p className={`
-                                    text-body-regular leading-relaxed
-                                    ${review.isCommentHiddenBySeller
-                                    ? "text-charcoal-400 line-through"
-                                    : "text-charcoal-700"}
-                                `}>
-                                    {review.comment || "No comment provided."}
-                                </p>
-
-                                {/* Hidden Reason - only shown if review is hidden */}
-                                {review.isCommentHiddenBySeller && review.hiddenReason && (
-                                    <div className="flex items-start gap-2 pt-2 border-t border-error-btn/20">
-                                    <Icon.WarningCircle size={16} className="text-error-text mt-0.5 flex-shrink-0" />
-                                    <p className="text-label-medium text-error-text">
-                                        <span className="font-semibold">Reason:</span> {review.hiddenReason}
-                                    </p>
-                                    </div>
-                                )}
-                                </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            {/* Right: highlights / side panel */}
-            <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-              {/* Top products by rating */}
-              <div className="bg-grey-200 rounded-lg p-5 border border-grey-stroke shadow-soft-lift space-y-3">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-card-h2 text-charcoal-600">
-                    Top Rated Products
-                  </h2>
-                  <Icon.ChartBar size={18} className="text-sage-600" />
-                </div>
-                {topProductsByRating.length === 0 ? (
-                  <p className="text-body-regular text-charcoal-400">
-                    Not enough reviews yet for rating insights.
-                  </p>
-                ) : (
-                  <ul className="space-y-3">
-                    {topProductsByRating.map((p) => (
-                      <li
-                        key={p.productId}
-                        className="flex items-center justify-between bg-cream-50 rounded-lg px-3 py-2 border border-grey-stroke"
-                      >
-                        <div className="flex flex-col">
-                          <span className="text-body-medium text-charcoal-600">
-                            {p.productName}
-                          </span>
-                          <span className="text-label-medium text-charcoal-400">
-                            {p.totalReviews} review
-                            {p.totalReviews === 1 ? "" : "s"}
-                          </span>
-                        </div>
-                        <RatingStars value={p.avgRating || 0} size="lg" />
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              {/* Recent reviews */}
-              <div className="bg-grey-200 rounded-lg p-5 border border-grey-stroke shadow-soft-lift space-y-3">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-card-h2 text-charcoal-600">
-                    Recent Reviews
-                  </h2>
-                  <Icon.Clock size={18} className="text-sage-600" />
-                </div>
-                {recentReviewSnippets.length === 0 ? (
-                  <p className="text-body-regular text-charcoal-400">
-                    No recent reviews yet.
-                  </p>
-                ) : (
-                  <ul className="space-y-3">
-                    {recentReviewSnippets.map((r) => (
-                      <li
-                        key={r.id}
-                        className="bg-cream-50 rounded-lg px-3 py-2 border border-grey-stroke"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex flex-col">
-                            <span className="text-label-medium text-charcoal-500">
-                              {r.productName}
-                            </span>
-                            <span className="text-label-medium text-charcoal-400">
-                              {formatDate(r.createdAt)}
-                            </span>
-                          </div>
-                          <RatingStars value={r.rating || 0} size="sm" />
-                        </div>
-                        <p className="text-xs text-charcoal-600 mt-1 line-clamp-2">
-                          {r.comment || "No comment provided."}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </aside>
-          </section>
+         
 
           {/* Table view */}
           <section className="bg-grey-200 rounded-lg p-5 border border-grey-stroke shadow-soft-lift space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Icon.Table size={20} className="text-sage-600" />
-                <h2 className="text-card-h2 text-charcoal-600">All Reviews</h2>
-                <span className="text-label-medium text-charcoal-400">
-                    ({filteredReviews.length} total)
-                </span>
-                </div>
+            <div className="flex items-center gap-2">
+              <Icon.ChatCircleDots size={20} className="text-sage-600" />
+              <h2 className="text-card-h2 text-charcoal-600">All Reviews</h2>
             </div>
 
             {filteredReviews.length === 0 ? (
@@ -917,13 +622,28 @@ const confirmVisibilityChange = async (reason) => {
                         r.productName || "Product",
                         r.customerName || "Customer",
                         <RatingStars key={`stars-${r.id}`} value={r.rating || 0} />,
-                        <span
-                          key={`comment-${r.id}`}
-                          className="block max-w-xs truncate"
-                          title={r.comment || ""}
-                        >
-                          {r.comment || "No comment"}
-                        </span>,
+                       <div key={`comment-${r.id}`} className="max-w-xs">
+                          <p className={`text-sm text-charcoal-700 ${
+                            expandedComments.has(r.id) ? '' : 'line-clamp-2'
+                          }`}>
+                            {r.comment || "No comment"}
+                          </p>
+                          {r.comment && r.comment.length > 100 && (
+                            <button
+                              onClick={() => {
+                                setExpandedComments(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(r.id)) next.delete(r.id);
+                                  else next.add(r.id);
+                                  return next;
+                                });
+                              }}
+                              className="text-xs text-sage-600 hover:text-sage-700 font-medium mt-1"
+                            >
+                              {expandedComments.has(r.id) ? 'Show less' : 'Show more'} →
+                            </button>
+                          )}
+                        </div>,
                         formatDate(r.createdAt),
                         <StatusChip
                           key={`vis-${r.id}`}
