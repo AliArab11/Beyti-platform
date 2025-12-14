@@ -56,33 +56,33 @@ const PlaceholderPage = ({ pageName }) => (
 );
 
 export default function App() {
-  const navItems = [
-    { path: '/', label: 'Registration' },
+ const navItems = [
+    // { path: '/', label: 'Registration' },
     { path: '/login', label: 'Login' },
     { path: '/register', label: 'Sign Up' },
-    { path: '/membership', label: 'Membership' },
-    { path: '/addplan', label: 'Add Plan' },
-    { path: '/seller', label: 'Seller' },
+    // { path: '/membership', label: 'Membership' },
+    // { path: '/addplan', label: 'Add Plan' },
+    // { path: '/seller', label: 'Seller' },
     { path: '/seller-dashboard', label: 'Seller Dashboard' },
     { path: '/store', label: 'Store' },
     { path: '/stores', label: 'All Stores' },
     { path: '/mainStore', label: 'Seller Stores' },
     { path: '/serviceProviders', label: 'Service Providers' },
-    { path: '/product', label: 'Product' },
-    { path: '/category', label: 'Category' },
-    { path: '/customer', label: 'Customer' },
-    { path: '/driver', label: 'Driver' },
+    // { path: '/product', label: 'Product' },
+    // { path: '/category', label: 'Category' },
+    // { path: '/customer', label: 'Customer' },
+    // { path: '/driver', label: 'Driver' },
     { path: '/driver-dashboard', label: 'Driver Dashboard' },
-    { path: '/admin', label: 'Admin' },
-    { path: '/serviceprovider', label: 'Service Provider' },
+    // { path: '/admin', label: 'Admin' },
+    // { path: '/serviceprovider', label: 'Service Provider' },
     { path: '/serviceprovider-dashboard', label: 'SP Dashboard' },
     { path: '/admin-view', label: 'Admin Dashboard' },
-    { path: '/notification', label: 'Notification' },
-    { path: '/admindashboard', label: 'Admin Dash (Old)'},
-    { path: '/servicerequest', label: 'Service Request'},
-    { path: '/design-demo', label: 'Design Demo'},
-    { path: '/dashboard-template', label: 'Dashboard Template'},
-    { path: '/user-management', label: 'User Management (New)'}
+    // { path: '/notification', label: 'Notification' },
+    // { path: '/admindashboard', label: 'Admin Dash (Old)'},
+    // { path: '/servicerequest', label: 'Service Request'},
+    // { path: '/design-demo', label: 'Design Demo'},
+    // { path: '/dashboard-template', label: 'Dashboard Template'},
+    // { path: '/user-management', label: 'User Management (New)'}
   ];
   return (
     <ThemeProvider>

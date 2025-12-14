@@ -11,7 +11,10 @@ import { Package, Scissors, ShoppingCart, Calendar } from '@phosphor-icons/react
 import CustomerSidebar from '../../components/CustomerSidebar';
 import PageHeader from '../../components/PageHeader';
 import StatusChip from '../../components/StatusChip';
-import { getUserProfile, updateUserProfile, getCustomerOrders, getServiceBookings } from '../../services/api';
+import ViewOrderModal from '../../components/ViewOrderModal';
+import ViewServiceBookingModal from '../../components/ViewServiceBookingModal';
+import ServiceReviewModal from '../../components/ServiceReviewModal';
+import { getUserProfile, updateUserProfile, getCustomerOrders, getServiceBookings, createServiceReview } from '../../services/api';
 import { isAuthenticated, getUserId, handleSuspensionError } from '../../utils/authUtils';
 
 export default function CustomerHistory() {
@@ -23,6 +26,11 @@ export default function CustomerHistory() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('all'); // 'all', 'pending', 'orders', 'services'
   const [viewMode, setViewMode] = useState('orders'); // 'orders', 'services'
+
+  // Modal states
+  const [viewOrderModal, setViewOrderModal] = useState({ isOpen: false, order: null });
+  const [viewBookingModal, setViewBookingModal] = useState({ isOpen: false, booking: null });
+  const [reviewModal, setReviewModal] = useState({ isOpen: false, booking: null });
 
   // Check authentication on mount
   useEffect(() => {
@@ -231,6 +239,34 @@ export default function CustomerHistory() {
       return { orders: filteredOrders, bookings: filteredBookings };
     }
   }, [orders, serviceBookings, activeTab, viewMode]);
+
+  // Handler functions
+  const handleViewOrder = (order) => {
+    setViewOrderModal({ isOpen: true, order });
+  };
+
+  const handleViewBooking = (booking) => {
+    setViewBookingModal({ isOpen: true, booking });
+  };
+
+  const handleOpenReview = (item, type) => {
+    if (type === 'booking') {
+      setReviewModal({ isOpen: true, booking: item });
+    }
+    // For orders, we would need to implement order reviews separately if needed
+  };
+
+  const handleSubmitReview = async (reviewData) => {
+    try {
+      await createServiceReview(reviewData);
+      alert('Review submitted successfully!');
+      // Optionally refresh bookings to update any review-related data
+      await fetchHistory();
+    } catch (error) {
+      console.error('Error submitting review:', error);
+      throw error;
+    }
+  };
 
   return (
     <div className="flex min-h-screen bg-cream-50 dark:bg-charcoal-600">
@@ -575,6 +611,26 @@ export default function CustomerHistory() {
           </div>
         </main>
       </div>
+
+      {/* Modals */}
+      <ViewOrderModal
+        isOpen={viewOrderModal.isOpen}
+        onClose={() => setViewOrderModal({ isOpen: false, order: null })}
+        order={viewOrderModal.order}
+      />
+
+      <ViewServiceBookingModal
+        isOpen={viewBookingModal.isOpen}
+        onClose={() => setViewBookingModal({ isOpen: false, booking: null })}
+        booking={viewBookingModal.booking}
+      />
+
+      <ServiceReviewModal
+        isOpen={reviewModal.isOpen}
+        onClose={() => setReviewModal({ isOpen: false, booking: null })}
+        booking={reviewModal.booking}
+        onSubmit={handleSubmitReview}
+      />
     </div>
   );
 }
