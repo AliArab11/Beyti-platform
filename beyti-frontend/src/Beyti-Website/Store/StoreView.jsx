@@ -404,6 +404,7 @@ const StoreView = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("popular");
 
+
   const [bannerDismissed, setBannerDismissed] = useState(() => {
   if (!customerId) return false;
   return localStorage.getItem(`beyti_bannerDismissed_${customerId}`) === 'true';
@@ -863,6 +864,8 @@ useEffect(() => {
     
     fetchCustomerDetails();
   }, [customerId]);
+
+
   // Get category title
   const getCategoryTitle = (categoryId) => {
     const titles = {
@@ -876,9 +879,48 @@ useEffect(() => {
     return titles[categoryId] || "Products";
   };
 
-  const filteredProducts = store?.products?.filter(product =>
-    product.name?.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || [];
+const filteredProducts = (store?.products || [])
+  .filter(product => {
+    // Search filter
+    if (searchQuery && !product.name?.toLowerCase().includes(searchQuery.toLowerCase())) {
+      return false;
+    }
+    
+    return true;
+  })
+  .sort((a, b) => {
+    // Helper function to check if product is new (less than 5 reviews)
+    const isNewProduct = (product) => {
+      const reviewCount = product.reviews?.filter(r => !r.isCommentHiddenBySeller)?.length || 0;
+      return reviewCount < 5;
+    };
+    
+    const aIsNew = isNewProduct(a);
+    const bIsNew = isNewProduct(b);
+    const aRating = a.averageRating || 0;
+    const bRating = b.averageRating || 0;
+    
+    // Apply sorting
+    if (sortBy === 'price-low') return (a.basePrice || 0) - (b.basePrice || 0);
+    if (sortBy === 'price-high') return (b.basePrice || 0) - (a.basePrice || 0);
+    if (sortBy === 'newest') return new Date(b.createdAt) - new Date(a.createdAt);
+    
+    if (sortBy === 'rating-high') {
+      // New products go last when sorting high to low
+      if (aIsNew && !bIsNew) return 1;
+      if (!aIsNew && bIsNew) return -1;
+      return bRating - aRating;
+    }
+    
+    if (sortBy === 'rating-low') {
+      // New products go first when sorting low to high
+      if (aIsNew && !bIsNew) return -1;
+      if (!aIsNew && bIsNew) return 1;
+      return aRating - bRating;
+    }
+    
+    return 0; // Default: popular (no sorting)
+  });
 
   if (loading) {
     return (
@@ -952,7 +994,7 @@ useEffect(() => {
           <CategorySidebar selected={selectedCategory} onSelect={setSelectedCategory} />
           
           <div className="flex-1">
-            {/* Category Title with Search and Sort - ALL IN ONE ROW */}
+            {/* Category Title with Search, Filter and Sort - ALL IN ONE ROW */}
             <div className="flex items-center justify-between mb-8">
               {/* Category Title on the left */}
               <h2 className="text-3xl font-bold text-[#556B5C]" style={{ fontFamily: 'Merriweather, serif' }}>
@@ -961,6 +1003,7 @@ useEffect(() => {
               
               {/* Search and Sort on the right */}
               <div className="flex gap-3 items-center">
+                {/* Sort Dropdown */}
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
@@ -970,23 +1013,26 @@ useEffect(() => {
                   <option value="popular">Sort All</option>
                   <option value="price-low">Price: Low to High</option>
                   <option value="price-high">Price: High to Low</option>
+                  <option value="rating-high">Rating: High to Low</option>
+                  <option value="rating-low">Rating: Low to High</option>
                   <option value="newest">Newest First</option>
                 </select>
-                
-                <div className="relative w-64">
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search Products..."
-                    className="w-full pl-10 pr-4 py-2.5 bg-white rounded-full border border-grey-stroke focus:outline-none focus:border-sage-500 text-charcoal-600 shadow-[0_2px_8px_rgba(0,0,0,0.06)] text-sm"
-                    style={{ fontFamily: 'Inter, sans-serif' }}
-                  />
-                  <MagnifyingGlass className="w-4 h-4 text-charcoal-400 absolute left-3.5 top-1/2 -translate-y-1/2" weight="bold" />
+                  
+                  {/* Search Input */}
+                  <div className="relative w-64">
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search Products..."
+                      className="w-full pl-10 pr-4 py-2.5 bg-white rounded-full border border-grey-stroke focus:outline-none focus:border-sage-500 text-charcoal-600 shadow-[0_2px_8px_rgba(0,0,0,0.06)] text-sm"
+                      style={{ fontFamily: 'Inter, sans-serif' }}
+                    />
+                    <MagnifyingGlass className="w-4 h-4 text-charcoal-400 absolute left-3.5 top-1/2 -translate-y-1/2" weight="bold" />
+                  </div>
                 </div>
               </div>
-            </div>
-            
+                          
             {/* Products Grid */}
             {filteredProducts.length > 0 ? (
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

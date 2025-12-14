@@ -1473,7 +1473,7 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
             phone: driverList.find(d => d.id === driverId)?.phone || '',
             address: driverList.find(d => d.id === driverId)?.address || '',
             createdAt: driverList.find(d => d.id === driverId)?.createdAt,
-            updatedAt: new Date().toISOString()
+            updatedAt: Date.now()
           }}
           entityId={driverId}
           userId={driverId}

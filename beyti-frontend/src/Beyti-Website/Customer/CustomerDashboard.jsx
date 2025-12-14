@@ -45,7 +45,6 @@ const getCustomers = async () => fetchAPI("/Customers");
 const getCustomerOrders = async (customerId) => 
   fetchAPI(`/Orders?customerId=${customerId}`);
 
-// Helper functions
 const formatDate = (value) => {
   if (!value) return "—";
   const d = new Date(value);
@@ -53,7 +52,8 @@ const formatDate = (value) => {
   return d.toLocaleDateString("en-GB", {
     day: "2-digit",
     month: "short",
-    year: "numeric",
+    year: "numeric"
+    // No timeZone = uses user's local timezone
   });
 };
 
@@ -193,7 +193,7 @@ const OrderDetailsModal = ({ order, onClose, onReorder, openReviewModal, onDelet
                             </div>
                             <p className="text-xs text-charcoal-600 italic">"{item.review.comment}"</p>
                             <p className="text-xs text-charcoal-400">
-                              {new Date(item.review.createdAt).toLocaleDateString()}
+                              {formatDate(item.review.createdAt)}
                             </p>
                           </div>
                         )}
@@ -691,7 +691,7 @@ const handleSubmitReview = async () => {
                   customerId: customerId,
                   rating: reviewModal.rating,
                   comment: reviewModal.comment,
-                  createdAt: new Date().toISOString()
+                  createdAt: Date.now()
                 }
               };
             }

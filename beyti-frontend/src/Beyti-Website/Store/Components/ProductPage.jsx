@@ -214,19 +214,40 @@ useEffect(() => {
     return (sum / reviews.length).toFixed(1);
   };
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffTime = Math.abs(now - date);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays} days ago`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-    if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
-    return `${Math.floor(diffDays / 365)} years ago`;
-  };
+const formatDate = (dateString) => {
+  const date = new Date(dateString);
+  const now = new Date();
+
+  // Format date & time in user's local timezone (automatically detected)
+  const formattedDate = date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+    // No timeZone specified = uses user's local timezone
+  });
+
+  const formattedTime = date.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+    // No timeZone specified = uses user's local timezone
+  });
+
+  // Calculate relative time (PAST only)
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  let relativeTime = '';
+  if (diffDays === 0) relativeTime = 'Today';
+  else if (diffDays === 1) relativeTime = 'Yesterday';
+  else if (diffDays < 7) relativeTime = `${diffDays} days ago`;
+  else if (diffDays < 30) relativeTime = `${Math.floor(diffDays / 7)} weeks ago`;
+  else if (diffDays < 365) relativeTime = `${Math.floor(diffDays / 30)} months ago`;
+  else relativeTime = `${Math.floor(diffDays / 365)} years ago`;
+
+  return `${formattedDate} at ${formattedTime} • ${relativeTime}`;
+};
+
 
 const handleAddToCart = () => {
     // ✅ CHECK LOGIN STATUS FIRST - BEFORE ANYTHING ELSE

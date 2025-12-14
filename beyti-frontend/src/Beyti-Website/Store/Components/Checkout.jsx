@@ -685,8 +685,8 @@ const handlePlaceOrder = async () => {
       SubtotalAmount: subtotalAmount,
       DeliveryFee: deliveryFee,
       TotalAmount: totalAmount,
-      CreatedAt: new Date().toISOString(),
-      UpdatedAt: new Date().toISOString()
+      CreatedAt: Date.now(),
+      UpdatedAt: Date.now()
     };
 
     // Step 5: Create order

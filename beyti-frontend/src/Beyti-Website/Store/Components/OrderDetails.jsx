@@ -87,13 +87,15 @@ return (
               Order #{order.id}
             </h2>
             <p className="text-sm mt-1" style={{ fontFamily: 'Inter, sans-serif', color: '#E8F0EA' }}>
-              Placed on {new Date(order.createdAt).toLocaleDateString('en-US', { 
-                month: 'long', 
-                day: 'numeric', 
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              })}
+              Placed on {new Date(order.createdAt).toLocaleString('en-US', { 
+              month: 'long', 
+              day: 'numeric', 
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: true
+              // No timeZone = uses user's local timezone
+            })}
             </p>
           </div>
           <button 

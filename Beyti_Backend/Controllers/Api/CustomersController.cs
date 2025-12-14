@@ -63,22 +63,24 @@ namespace Beyti_Backend.Controllers.Api
                         fullName = c.UserProfile.DisplayName,
                         c.Phone,
                         c.CreatedAt,
-                        customerAddresses = c.CustomerAddresses.Select(ca => new
-                        {
-                            ca.Id,
-                            address = new
+                        customerAddresses = c.CustomerAddresses
+                            .Where(ca => ca.Address.IsActive)  // ← Filter active addresses
+                            .Select(ca => new
                             {
-                                ca.Address.Id,
-                                ca.Address.Label,
-                                ca.Address.Street,
-                                ca.Address.City,
-                                ca.Address.Region,
-                                ca.Address.PostalCode,
-                                ca.Address.Country,
-                                ca.Address.Latitude,
-                                ca.Address.Longitude
-                            }
-                        })
+                                ca.Id,
+                                address = new
+                                {
+                                    ca.Address.Id,
+                                    ca.Address.Label,
+                                    ca.Address.Street,
+                                    ca.Address.City,
+                                    ca.Address.Region,
+                                    ca.Address.PostalCode,
+                                    ca.Address.Country,
+                                    ca.Address.Latitude,
+                                    ca.Address.Longitude
+                                }
+                            })  // ← Added closing brace here
                     })
                     .FirstOrDefaultAsync();
 
@@ -89,30 +91,32 @@ namespace Beyti_Backend.Controllers.Api
             }
 
             return await query
-                .Select(c => new
-                {
-                    c.Id,
-                    fullName = c.UserProfile.DisplayName,
-                    c.Phone,
-                    c.CreatedAt,
-                    customerAddresses = c.CustomerAddresses.Select(ca => new
-                    {
-                        ca.Id,
-                        address = new
-                        {
-                            ca.Address.Id,
-                            ca.Address.Label,
-                            ca.Address.Street,
-                            ca.Address.City,
-                            ca.Address.Region,
-                            ca.Address.PostalCode,
-                            ca.Address.Country,
-                            ca.Address.Latitude,
-                            ca.Address.Longitude
-                        }
-                    })
-                })
-                .ToListAsync();
+     .Select(c => new
+     {
+         c.Id,
+         fullName = c.UserProfile.DisplayName,
+         c.Phone,
+         c.CreatedAt,
+         customerAddresses = c.CustomerAddresses
+             .Where(ca => ca.Address.IsActive)  // ← ADD THIS LINE
+             .Select(ca => new
+             {
+                 ca.Id,
+                 address = new
+                 {
+                     ca.Address.Id,
+                     ca.Address.Label,
+                     ca.Address.Street,
+                     ca.Address.City,
+                     ca.Address.Region,
+                     ca.Address.PostalCode,
+                     ca.Address.Country,
+                     ca.Address.Latitude,
+                     ca.Address.Longitude
+                 }
+             })
+     })
+     .ToListAsync();
         }
 
 
@@ -135,8 +139,10 @@ namespace Beyti_Backend.Controllers.Api
                 fullName = customer.UserProfile.DisplayName,
                 customer.Phone,
                 customer.CreatedAt,
-                customerAddresses = customer.CustomerAddresses.Select(ca => new
-                {
+                customerAddresses = customer.CustomerAddresses
+                    .Where(ca => ca.Address.IsActive)  // ← ADD THIS LINE
+                    .Select(ca => new
+                    {
                     ca.Id,
                     addressId = ca.AddressId,
                     address = new

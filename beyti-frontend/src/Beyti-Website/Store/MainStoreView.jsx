@@ -470,6 +470,14 @@ const MainStoreView = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStoreId, setSelectedStoreId] = useState(null);
 
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [activeFilters, setActiveFilters] = useState({
+    rating: null, // null, 4, 3
+    priceRange: null, // null, 'low', 'medium', 'high'
+    distance: null, // null, 'near', 'far'
+    availability: null, // null, 'open', 'closed'
+  });
+
  // Customer state
   const [customers, setCustomers] = useState([]);
   const [customerId, setCustomerId] = useState(null);
@@ -762,6 +770,18 @@ useEffect(() => {
   }
 }, [customerId]);
 
+// Close filter dropdown when clicking outside
+useEffect(() => {
+  const handleClickOutside = (event) => {
+    if (showFilterDropdown && !event.target.closest('.relative')) {
+      setShowFilterDropdown(false);
+    }
+  };
+
+  document.addEventListener('mousedown', handleClickOutside);
+  return () => document.removeEventListener('mousedown', handleClickOutside);
+}, [showFilterDropdown]);
+
 const handleCustomerSelect = (customer) => {
   const name = customer.fullName || customer.name || `Customer #${customer.id}`;
   setCustomerId(customer.id);
@@ -817,6 +837,26 @@ const handleTrackOrder = () => {
     }
   };
 
+  const handleFilterChange = (filterType, value) => {
+  setActiveFilters(prev => ({
+    ...prev,
+    [filterType]: prev[filterType] === value ? null : value
+  }));
+};
+
+const clearAllFilters = () => {
+  setActiveFilters({
+    rating: null,
+    priceRange: null,
+    distance: null,
+    availability: null,
+  });
+};
+
+const getActiveFilterCount = () => {
+  return Object.values(activeFilters).filter(v => v !== null).length;
+};
+
   
 // Function to handle store navigation - ALWAYS allow browsing
 const handleStoreNavigation = (targetStoreId) => {
@@ -828,9 +868,61 @@ const handleStoreNavigation = (targetStoreId) => {
 
 
 
-  const filteredStores = stores.filter(store => 
-    store.storeName?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+const filteredStores = stores
+  .filter(store => {
+    // Search filter
+    if (searchQuery && !store.storeName?.toLowerCase().includes(searchQuery.toLowerCase())) {
+      return false;
+    }
+    
+    // Rating filter - NEW stores (no rating) are always included
+    if (activeFilters.rating) {
+      const rating = store.averageRating;
+      // If store has no rating (null/undefined), include it (will be sorted to end)
+      if (rating !== null && rating !== undefined) {
+        // Only filter out stores that have ratings below the threshold
+        if (rating < activeFilters.rating) return false;
+      }
+    }
+    
+    // Price range filter (based on average product price)
+    if (activeFilters.priceRange && store.products && store.products.length > 0) {
+      const avgPrice = store.products.reduce((sum, p) => sum + (p.basePrice || 0), 0) / store.products.length;
+      
+      if (activeFilters.priceRange === 'budget' && avgPrice >= 5) return false;
+      if (activeFilters.priceRange === 'low' && (avgPrice < 5 || avgPrice >= 10)) return false;
+      if (activeFilters.priceRange === 'medium' && (avgPrice < 10 || avgPrice >= 25)) return false;
+      if (activeFilters.priceRange === 'high' && avgPrice < 25) return false;
+    }
+    
+    return true;
+  })
+  .sort((a, b) => {
+    // Sort stores: rated stores first (by rating desc), then NEW stores
+    const ratingA = a.averageRating;
+    const ratingB = b.averageRating;
+    
+    const hasRatingA = ratingA !== null && ratingA !== undefined;
+    const hasRatingB = ratingB !== null && ratingB !== undefined;
+    
+    // Both have ratings - sort by rating (highest first)
+    if (hasRatingA && hasRatingB) {
+      return ratingB - ratingA;
+    }
+    
+    // Only A has rating - A comes first
+    if (hasRatingA && !hasRatingB) {
+      return -1;
+    }
+    
+    // Only B has rating - B comes first
+    if (!hasRatingA && hasRatingB) {
+      return 1;
+    }
+    
+    // Neither has rating - maintain original order
+    return 0;
+  });
 
 
   
@@ -889,7 +981,194 @@ const handleStoreNavigation = (targetStoreId) => {
           />
 
           <div className="flex-1">
-            <SearchBar value={searchQuery} onChange={setSearchQuery} />
+            <div className="flex gap-4 items-center mb-8">
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search Food Stores..."
+                  className="w-full pl-12 pr-4 py-3.5 bg-white rounded-full border border-grey-stroke focus:outline-none focus:border-sage-500 text-charcoal-600 shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
+                  style={{ fontFamily: 'Inter, sans-serif', fontSize: '16px' }}
+                />
+                <svg className="w-5 h-5 text-charcoal-400 absolute left-4 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              
+              {/* Filter Button */}
+              <div className="relative">
+                <button 
+                  onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                  className="flex items-center gap-3 px-6 py-3.5 bg-white rounded-full border border-grey-stroke hover:border-sage-500 transition-all shadow-[0_2px_8px_rgba(0,0,0,0.06)] relative"
+                >
+                  <svg className="w-5 h-5 text-sage-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                  </svg>
+                  <span className="text-charcoal-600 font-semibold text-[14px]" style={{ fontFamily: 'Inter, sans-serif' }}>
+                    Filter
+                  </span>
+                  {getActiveFilterCount() > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-sage-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                      {getActiveFilterCount()}
+                    </span>
+                  )}
+                  <svg className="w-4 h-4 text-charcoal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {/* Filter Dropdown */}
+{showFilterDropdown && (
+  <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-grey-stroke z-50">
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between pb-4 border-b border-grey-stroke">
+        <h3 className="text-lg font-bold text-charcoal-600" style={{ fontFamily: 'Merriweather, serif' }}>
+          Filters
+        </h3>
+        {getActiveFilterCount() > 0 && (
+          <button
+            onClick={clearAllFilters}
+            className="text-sm text-sage-600 hover:text-sage-700 font-semibold"
+            style={{ fontFamily: 'Inter, sans-serif' }}
+          >
+            Clear All
+          </button>
+        )}
+      </div>
+
+      {/* Rating Slider */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-semibold text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>
+            Minimum Rating
+          </p>
+          <div className="flex items-center gap-1 bg-sage-100 px-3 py-1 rounded-full">
+            <Star size={14} weight="fill" className="text-sage-600" />
+            <span className="text-sm font-bold text-sage-700" style={{ fontFamily: 'Inter, sans-serif' }}>
+              {activeFilters.rating ? `${activeFilters.rating}+` : 'Any'}
+            </span>
+          </div>
+        </div>
+        <div className="relative">
+          <input
+            type="range"
+            min="0"
+            max="5"
+            step="1"
+            value={activeFilters.rating || 0}
+            onChange={(e) => {
+              const value = parseInt(e.target.value);
+              handleFilterChange('rating', value === 0 ? null : value);
+            }}
+            className="w-full h-2 bg-grey-200 rounded-full appearance-none cursor-pointer 
+                     [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 
+                     [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-sage-500 
+                     [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md
+                     [&::-webkit-slider-thumb]:hover:bg-sage-600 [&::-webkit-slider-thumb]:transition-colors
+                     [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:rounded-full 
+                     [&::-moz-range-thumb]:bg-sage-500 [&::-moz-range-thumb]:border-0 
+                     [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-md
+                     [&::-moz-range-thumb]:hover:bg-sage-600 [&::-moz-range-thumb]:transition-colors"
+            style={{
+              background: activeFilters.rating 
+                ? `linear-gradient(to right, #556B5C 0%, #556B5C ${((activeFilters.rating || 0) / 5) * 100}%, #E5E7EB ${((activeFilters.rating || 0) / 5) * 100}%, #E5E7EB 100%)`
+                : '#E5E7EB'
+            }}
+          />
+          <div className="flex justify-between mt-2 text-xs text-charcoal-400" style={{ fontFamily: 'Inter, sans-serif' }}>
+            <span>Any</span>
+            <span>1</span>
+            <span>2</span>
+            <span>3</span>
+            <span>4</span>
+            <span>5</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Price Range Slider */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-semibold text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>
+            Average Price Range
+          </p>
+          <div className="bg-sage-100 px-3 py-1 rounded-full">
+            <span className="text-sm font-bold text-sage-700" style={{ fontFamily: 'Inter, sans-serif' }}>
+              {activeFilters.priceRange === 'budget' && 'Under 5 BD'}
+              {activeFilters.priceRange === 'low' && '5-10 BD'}
+              {activeFilters.priceRange === 'medium' && '10-25 BD'}
+              {activeFilters.priceRange === 'high' && '25+ BD'}
+              {!activeFilters.priceRange && 'Any'}
+            </span>
+          </div>
+        </div>
+        <div className="relative">
+          <input
+            type="range"
+            min="0"
+            max="4"
+            step="1"
+            value={
+              activeFilters.priceRange === 'budget' ? 1 :
+              activeFilters.priceRange === 'low' ? 2 :
+              activeFilters.priceRange === 'medium' ? 3 :
+              activeFilters.priceRange === 'high' ? 4 : 0
+            }
+            onChange={(e) => {
+              const value = parseInt(e.target.value);
+              const priceMap = { 0: null, 1: 'budget', 2: 'low', 3: 'medium', 4: 'high' };
+              handleFilterChange('priceRange', priceMap[value]);
+            }}
+            className="w-full h-2 bg-grey-200 rounded-full appearance-none cursor-pointer 
+                     [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 
+                     [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-sage-500 
+                     [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md
+                     [&::-webkit-slider-thumb]:hover:bg-sage-600 [&::-webkit-slider-thumb]:transition-colors
+                     [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:rounded-full 
+                     [&::-moz-range-thumb]:bg-sage-500 [&::-moz-range-thumb]:border-0 
+                     [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-md
+                     [&::-moz-range-thumb]:hover:bg-sage-600 [&::-moz-range-thumb]:transition-colors"
+            style={{
+              background: activeFilters.priceRange
+                ? `linear-gradient(to right, #556B5C 0%, #556B5C ${
+                    (activeFilters.priceRange === 'budget' ? 1 :
+                     activeFilters.priceRange === 'low' ? 2 :
+                     activeFilters.priceRange === 'medium' ? 3 : 
+                     activeFilters.priceRange === 'high' ? 4 : 0) / 4 * 100
+                  }%, #E5E7EB ${
+                    (activeFilters.priceRange === 'budget' ? 1 :
+                     activeFilters.priceRange === 'low' ? 2 :
+                     activeFilters.priceRange === 'medium' ? 3 : 
+                     activeFilters.priceRange === 'high' ? 4 : 0) / 4 * 100
+                  }%, #E5E7EB 100%)`
+                : '#E5E7EB'
+            }}
+          />
+          <div className="flex justify-between mt-2 text-xs text-charcoal-400" style={{ fontFamily: 'Inter, sans-serif' }}>
+            <span>Any</span>
+            <span>&lt;5</span>
+            <span>5-10</span>
+            <span>10-25</span>
+            <span>25+</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Apply Button */}
+      <button
+        onClick={() => setShowFilterDropdown(false)}
+        className="w-full bg-sage-500 hover:bg-sage-600 text-white font-bold py-3 rounded-xl transition-all shadow-soft-lift"
+        style={{ fontFamily: 'Inter, sans-serif' }}
+      >
+        Apply Filters
+      </button>
+    </div>
+  </div>
+)}
+              </div>
+            </div>
             <FeaturedCarousel 
             stores={stores} 
             onStoreClick={handleStoreNavigation}
