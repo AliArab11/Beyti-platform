@@ -184,6 +184,18 @@ export default function ProviderOnboarding() {
       const userEmail = localStorage.getItem('userEmail');
       const userPhone = localStorage.getItem('userPhone');
 
+      console.log('[ProviderOnboarding] userId from localStorage:', userId);
+      console.log('[ProviderOnboarding] All localStorage:', {
+        userId,
+        userEmail,
+        userPhone,
+        authToken: localStorage.getItem('authToken')
+      });
+
+      if (!userId) {
+        throw new Error('User ID not found. Please register or login first before completing onboarding.');
+      }
+
       // Step 1: Create Address
       // Combine location fields into proper address format
       const streetParts = [
@@ -237,7 +249,8 @@ export default function ProviderOnboarding() {
           minServicePrice: parseFloat(formData.minPrice),
           maxServicePrice: parseFloat(formData.maxPrice),
           displayName: formData.businessName,
-          status: 'Available'
+          status: 'Available',
+          userId: userId  // Pass userId for onboarding - links to existing UserProfile
         })
       });
 

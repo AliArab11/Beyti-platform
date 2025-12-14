@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import AnalyticsCard from "../../../components/AnalyticsCard";
 import StatusChip from "../../../components/StatusChip";
 import Button from "../../../components/Button";
+import ConfirmModal from "../../../components/ConfirmModal";
+
 import {
   getProducts,
   getSubCategoryDropdown,
@@ -28,6 +30,10 @@ const Products = ({ sellerId }) => {
   const [filterStatus, setFilterStatus] = useState("all");
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
+
+  const [variantError, setVariantError] = useState(null);
+
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
 
   const [form, setForm] = useState({
     name: "",
@@ -73,6 +79,38 @@ const Products = ({ sellerId }) => {
   }
 
   return sellerProducts;
+};
+
+// ========================
+// SKU VALIDATION
+// ========================
+const checkDuplicateSKU = async (sku, currentVariantId = null) => {
+  if (!sku || sku.trim() === '') return { isDuplicate: false };
+  
+  const normalizedSku = sku.trim().toLowerCase();
+  
+  // Get fresh product data to ensure we have latest variants
+  const freshProducts = await loadSellerProducts();
+  
+  // Check against all products and their variants
+  for (const product of freshProducts) {
+    if (!product.variants) continue;
+    
+    for (const variant of product.variants) {
+      // Skip if checking the same variant being edited
+      if (currentVariantId && variant.id === currentVariantId) continue;
+      
+      if (variant.sku?.toLowerCase() === normalizedSku) {
+        return {
+          isDuplicate: true,
+          productName: product.name,
+          variantDetails: `${variant.colorValue || ''} ${variant.sizeValue || ''}`.trim() || 'Unnamed variant'
+        };
+      }
+    }
+  }
+  
+  return { isDuplicate: false };
 };
 
  useEffect(() => {
@@ -173,11 +211,12 @@ const Products = ({ sellerId }) => {
   const closeModal = () => setShowModal(false);
 
   // ========================
-  // SUBMIT HANDLER
-  // ========================
+// SUBMIT HANDLER
+// ========================
 const saveProduct = async (e) => {
   e.preventDefault();
 
+  // Step 1: Prepare the basic product data
   const payload = {
     Name: form.name.trim(),
     Description: form.description.trim(),
@@ -187,29 +226,52 @@ const saveProduct = async (e) => {
   };
 
   try {
+    // Step 2: Check if we're EDITING or CREATING
     if (editing) {
       await updateProduct(editing.id, payload);
+      
     } else {
+      // VALIDATION 1: Check if SKU is provided
+      if (!form.sku || form.sku.trim() === '') {
+        alert('SKU is required for the initial variant');
+        return; // Stop here, don't create product
+      }
+      
+      // VALIDATION 2: Check if Stock Quantity is provided
+      if (!form.stockQty || form.stockQty === '') {
+        alert('Stock Quantity is required for the initial variant');
+        return; // Stop here, don't create product
+      }
+
+      // VALIDATION 3: Check for duplicate SKU (only if SKU exists after previous validations)
+      if (form.sku && form.sku.trim()) {
+        const skuCheck = await checkDuplicateSKU(form.sku.trim());
+        
+        if (skuCheck.isDuplicate) {
+          alert('This SKU is already in use. Please choose a different SKU code.');
+          return;
+        }
+      }
+
+      // All validations passed! Now create the product
       const created = await createProduct(payload);
 
-      // Only create variant if stockQty is provided
-      if (form.stockQty && parseInt(form.stockQty) > 0) {
-        await createProductVariant({
-          ProductId: created.id,
-          ColorValue: form.colorValue.trim() || null,
-          SizeValue: form.sizeValue.trim() || null,
-          SKU: form.sku.trim() || null,
-          Price: null,
-          StockQty: parseInt(form.stockQty),
-        });
-      }
+      // Then immediately create the required initial variant
+      await createProductVariant({
+        ProductId: created.id,
+        ColorValue: form.colorValue.trim() || null,
+        SizeValue: form.sizeValue.trim() || null,
+        SKU: form.sku.trim(),
+        Price: null,
+        StockQty: parseInt(form.stockQty),
+      });
     }
 
-    // Refresh products
+    // Step 3: Refresh the products list to show changes
     const refreshed = await loadSellerProducts();
     setProducts(refreshed);
     
-    // Close modal and reset form
+    // Step 4: Close modal and reset form
     closeModal();
     setForm({
       name: "",
@@ -221,6 +283,7 @@ const saveProduct = async (e) => {
       colorValue: "",
       sizeValue: "",
     });
+    
   } catch (err) {
     console.error("Save product error:", err);
     alert(err.message || "Failed to save product");
@@ -228,14 +291,43 @@ const saveProduct = async (e) => {
 };
 
   const removeProduct = async (id) => {
-    if (!confirm("Delete this product?")) return;
-    try {
-      await deleteProduct(id);
-      setProducts(products.filter((p) => p.id !== id));
-    } catch (err) {
-      alert(err.message);
-    }
-  };
+  const product = products.find(p => p.id === id);
+  const actionText = product?.isActive ? 'Deactivate' : 'Activate';
+  const statusText = product?.isActive ? 'deactivate' : 'activate';
+  const variantType = product?.isActive ? 'danger' : 'success'; // Add this line
+
+  await new Promise((resolve) => {
+    setConfirmModal({
+      isOpen: true,
+      title: `${actionText} Product`,
+      message: `Are you sure you want to ${statusText} this product? ${product?.isActive ? 'It will be hidden from customers.' : 'It will be visible to customers again.'}`,
+      variant: variantType, // Add this line
+      onConfirm: () => {
+        setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null });
+        resolve(true);
+      }
+    });
+  });
+  
+  try {
+    await deleteProduct(id);
+    const refreshed = await loadSellerProducts();
+    setProducts(refreshed);
+  } catch (err) {
+    await new Promise((resolve) => {
+      setConfirmModal({
+        isOpen: true,
+        title: 'Error',
+        message: err.message || 'Failed to update product status',
+        variant: 'danger', // Add this line
+        onConfirm: () => {
+          setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null });
+          resolve(true);
+        }
+      });
+    });
+  }
+};
 
   // ========================
 // VARIANT MANAGEMENT
@@ -243,6 +335,7 @@ const saveProduct = async (e) => {
 const openVariantModal = async (product) => {
   setSelectedProduct(product);
   setEditingVariant(null);
+  setVariantError(null); // Clear any previous errors
   setVariantForm({
     colorValue: "",
     sizeValue: "",
@@ -268,10 +361,12 @@ const closeVariantModal = () => {
   setSelectedProduct(null);
   setVariants([]);
   setEditingVariant(null);
+  setVariantError(null); // Clear error when closing
 };
 
 const openEditVariant = (variant) => {
   setEditingVariant(variant);
+  setVariantError(null); // Clear error when switching variants
   setVariantForm({
     colorValue: variant.colorValue || "",
     sizeValue: variant.sizeValue || "",
@@ -283,6 +378,36 @@ const openEditVariant = (variant) => {
 
 const saveVariant = async (e) => {
   e.preventDefault();
+  setVariantError(null);
+
+  // VALIDATION 1: SKU is required
+  if (!variantForm.sku || variantForm.sku.trim() === '') {
+    setVariantError('SKU is required for each variant');
+    return;
+  }
+
+  // VALIDATION 2: Stock Quantity is required
+  if (variantForm.stockQty === '' || variantForm.stockQty === null || variantForm.stockQty === undefined) {
+    setVariantError('Stock Quantity is required');
+    return;
+  }
+
+  // VALIDATION 3: Stock Quantity must be 0 or greater
+  if (Number(variantForm.stockQty) < 0) {
+    setVariantError('Stock Quantity must be 0 or greater');
+    return;
+  }
+
+  // VALIDATION 4: Check for duplicate SKU
+  const skuCheck = await checkDuplicateSKU(
+    variantForm.sku.trim(), 
+    editingVariant?.id
+  );
+  
+  if (skuCheck.isDuplicate) {
+    setVariantError('This SKU is already in use. Please choose a different SKU code.');
+    return;
+  }
 
   const payload = {
     ProductId: selectedProduct.id,
@@ -309,7 +434,8 @@ const updatedProduct = refreshed.find(p => p.id === selectedProduct.id);
 setVariants(updatedProduct?.variants || []);
 setSelectedProduct(updatedProduct); // update metadata too
     
-    // Reset form
+    // Reset form and clear error
+    setVariantError(null);
     setEditingVariant(null);
     setVariantForm({
       colorValue: "",
@@ -324,7 +450,17 @@ setSelectedProduct(updatedProduct); // update metadata too
 };
 
 const removeVariant = async (variantId) => {
-  if (!confirm("Delete this variant?")) return;
+  await new Promise((resolve) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Variant',
+      message: 'Are you sure you want to delete this variant? This action cannot be undone.',
+      onConfirm: () => {
+        setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null });
+        resolve(true);
+      }
+    });
+  });
   
   try {
     await deleteProductVariant(variantId);
@@ -451,10 +587,7 @@ const removeVariant = async (variantId) => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProducts.map((p) => {
-            // Debug: Log product variants
-            if (p.variants) {
-                console.log(`Product ${p.name} has ${p.variants.length} variants:`, p.variants);
-            }
+           
             
             return (
             <div
@@ -529,12 +662,12 @@ const removeVariant = async (variantId) => {
                     Edit
                     </Button>
                     <Button 
-                    variant="error" 
+                    variant={p.isActive ? "error" : "success"}
                     size="medium"
                     onClick={() => removeProduct(p.id)}
-                    >
-                    Delete
-                    </Button>
+                  >
+                    {p.isActive ? 'Deactivate' : 'Activate'}
+                  </Button>
                 </div>
                 <Button 
                     variant="ghost" 
@@ -637,19 +770,22 @@ const removeVariant = async (variantId) => {
               
 
               {!editing && (
-                <>
-                  <div className="border-t-2 border-grey-stroke pt-6 mt-2">
-                    <h3 className="text-card-h3 text-charcoal-700 mb-4">
-                      Initial Variant (Optional)
-                    </h3>
-
+            <>
+              <div className="border-t-2 border-grey-stroke pt-6 mt-2">
+                <h3 className="text-card-h3 text-charcoal-700 mb-4">
+                  Initial Variant (Required)
+                </h3>
+                <p className="text-body-regular text-charcoal-400 mb-4">
+                  Every product must have at least one variant with stock and SKU
+                </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       <div>
                         <label className="block text-label-medium text-charcoal-600 mb-2 font-semibold">
-                          Stock Qty
+                          Stock Qty <span className="text-error-text">*</span>
                         </label>
                         <input
                           type="number"
+                          required
                           min="0"
                           value={form.stockQty}
                           onChange={(e) =>
@@ -661,10 +797,11 @@ const removeVariant = async (variantId) => {
 
                       <div>
                         <label className="block text-label-medium text-charcoal-600 mb-2 font-semibold">
-                          SKU
+                          SKU <span className="text-error-text">*</span>
                         </label>
                         <input
                           type="text"
+                          required
                           value={form.sku}
                           onChange={(e) =>
                             setForm({ ...form, sku: e.target.value })
@@ -673,6 +810,10 @@ const removeVariant = async (variantId) => {
                         />
                       </div>
                     </div>
+
+                    <h4 className="text-card-h3 text-charcoal-600 mt-5 mb-3">
+                      Variant Attributes (Optional)
+                    </h4>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       <div>
@@ -766,6 +907,12 @@ const removeVariant = async (variantId) => {
             </h3>
 
             <form onSubmit={saveVariant} className="space-y-4">
+              {/* Error Display */}
+              {variantError && (
+                <div className="bg-error-bg border-l-4 border-error-btn px-4 py-3 rounded">
+                  <p className="text-sm text-error-text">{variantError}</p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-label-medium text-charcoal-600 mb-2 font-semibold">
@@ -800,17 +947,21 @@ const removeVariant = async (variantId) => {
 
               <div>
                 <label className="block text-label-medium text-charcoal-600 mb-2 font-semibold">
-                  SKU
+                  SKU <span className="text-error-text">*</span>
                 </label>
                 <input
                   type="text"
+                  required
                   value={variantForm.sku}
                   onChange={(e) =>
                     setVariantForm({ ...variantForm, sku: e.target.value })
                   }
-                  placeholder="Stock Keeping Unit"
+                  placeholder="e.g., PROD-001-RED-M"
                   className="w-full border-2 border-grey-stroke rounded-lg p-3 bg-white text-body-regular text-charcoal-600 focus:outline-none focus:border-sage-500 focus:ring-2 focus:ring-sage-100 transition-all"
                 />
+                <p className="text-xs text-charcoal-400 mt-1">
+                  Must be unique across all products
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -855,6 +1006,7 @@ const removeVariant = async (variantId) => {
                     variant="secondary"
                     onClick={() => {
                       setEditingVariant(null);
+                      setVariantError(null); // Clear error
                       setVariantForm({
                         colorValue: "",
                         sizeValue: "",
@@ -988,6 +1140,16 @@ const removeVariant = async (variantId) => {
     </div>
   </div>
 )}
+
+<ConfirmModal
+  isOpen={confirmModal.isOpen}
+  onClose={() => setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null })}
+  onConfirm={confirmModal.onConfirm}
+  title={confirmModal.title}
+  message={confirmModal.message}
+  confirmText={confirmModal.confirmText || "Confirm"}
+  variant={confirmModal.variant || "danger"}
+/>
     </div>
   );
 };

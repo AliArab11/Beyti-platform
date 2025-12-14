@@ -5,6 +5,8 @@ import CRUDButton from "../../../components/CRUDButton";
 import { Table, TableHeader, TableBody, TableRow } from "../../../components/Table";
 
 import { getSellerOrders } from "../../../services/api";
+import OrderTimer from "./OrderTimer";
+import { restoreStock } from "../../../services/api";
 
 // STATUS → CHIP COLOR
 const getStatusVariant = (status) => {
@@ -47,6 +49,44 @@ const Orders = ({ sellerId, sellerName, onOpenOrderModal, orders: externalOrders
   const [activeTab, setActiveTab] = useState("all");
   const [sortBy, setSortBy] = useState("newest"); // newest, oldest, amount-high, amount-low
   const [searchQuery, setSearchQuery] = useState("");
+
+  const handleOrderExpired = async (orderId) => {
+  try {
+    // Double-check the order is still in placed/pending status
+    const order = orders.find(o => o.id === orderId);
+    const status = order?.status?.toLowerCase();
+    
+    if (!order || !['placed', 'pending'].includes(status)) {
+      console.log('⚠️ Order not in placed/pending status, skipping auto-cancel');
+      return;
+    }
+
+    console.log('⏰ Auto-cancelling order:', orderId);
+    
+    const baseUrl = "https://localhost:7062/api/Orders";
+    const res = await fetch(`${baseUrl}/${orderId}/seller-response`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        Status: "Cancelled",
+        SellerNote: "Order auto-cancelled: No response within 10 minutes",
+      }),
+    });
+
+    if (res.ok) {
+      setOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, status: "Cancelled" } : o))
+      );
+      if (onOrderUpdate) {
+        onOrderUpdate({ id: orderId, status: "Cancelled" });
+      }
+      await restoreStock(orderId);
+      console.log('✅ Order auto-cancelled and stock restored');
+    }
+  } catch (err) {
+    console.error('Failed to auto-cancel order:', err);
+  }
+};
 
   // Use external orders if provided, otherwise fetch
   useEffect(() => {
@@ -353,12 +393,19 @@ const Orders = ({ sellerId, sellerName, onOpenOrderModal, orders: externalOrders
                       <span className={isNew ? "font-semibold" : ""}>
                         {order.customerName ?? "—"}
                       </span>,
-                      <StatusChip
-                        variant={getStatusVariant(order.status)}
-                        key={`status-${order.id}`}
-                      >
-                        {order.status}
-                      </StatusChip>,
+                     <div key={`status-timer-${order.id}`} className="flex items-center gap-2">
+                        <StatusChip variant={getStatusVariant(order.status)}>
+                          {order.status}
+                        </StatusChip>
+                        {["placed", "pending"].includes(order.status?.toLowerCase()) && (
+                          <OrderTimer 
+                            order={order} 
+                            onExpire={handleOrderExpired}
+                            size="small"
+                            showIcon={false}
+                          />
+                        )}
+                      </div>,
                       <span className={isNew ? "font-semibold" : ""}>
                         {formatCurrency(order.totalAmount)}
                       </span>,

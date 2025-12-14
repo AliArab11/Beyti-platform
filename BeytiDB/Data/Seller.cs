@@ -23,6 +23,9 @@ public partial class Seller
     [StringLength(30)]
     public string? Phone { get; set; }  // Optional
 
+    [NotMapped] // This means it won't be stored in database, just calculated
+    public decimal? AverageRating { get; set; }
+
     [Precision(3)]
     public DateTime CreatedAt { get; set; }
 

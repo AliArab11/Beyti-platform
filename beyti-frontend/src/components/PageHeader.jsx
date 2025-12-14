@@ -18,9 +18,11 @@
  */
 
 import React, { useState } from 'react';
-import { MagnifyingGlass, CaretDown, User } from '@phosphor-icons/react';
+import { useNavigate } from 'react-router-dom';
+import { MagnifyingGlass, Bell, CaretDown, User } from '@phosphor-icons/react';
 import SettingsModal from './SettingsModal';
 import ProfileModal from './ProfileModal';
+import { logout } from '../utils/auth';
 import NotificationDropdown from './NotificationDropdown';
 
 const PageHeader = ({
@@ -37,9 +39,12 @@ const PageHeader = ({
   onUserMenuClick,
   onProfileClick,
   onProfileUpdate, // Callback when profile is updated
+  onLogout,
+  additionalActions = null, 
   className = '',
   ...props
 }) => {
+  const navigate = useNavigate();
   const [searchValue, setSearchValue] = useState('');
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -71,6 +76,18 @@ const PageHeader = ({
   const handleSettingsClick = () => {
     setIsUserMenuOpen(false);
     setIsSettingsOpen(true);
+  };
+
+  const handleLogout = () => {
+    setIsUserMenuOpen(false);
+    // Call custom logout handler if provided
+    if (onLogout) {
+      onLogout();
+    } else {
+      // Default logout behavior
+      logout();
+      navigate('/login');
+    }
   };
 
   return (
@@ -120,6 +137,9 @@ const PageHeader = ({
       <div className="flex items-center gap-4">
         {/* Notification Bell */}
         <NotificationDropdown userId={userId} />
+
+        {/* Additional Actions (like Cart Button) */}
+        {additionalActions}
 
         {/* User Dropdown */}
         <div className="relative">
@@ -192,6 +212,20 @@ const PageHeader = ({
 
                 {/* Menu Actions */}
                 <div className="py-1">
+                  {/* Return to Home - Only show for Customer role */}
+                  {userRole === 'Customer' && (
+                    <button
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        window.location.href = '/mainStore';
+                      }}
+                      className="w-full px-4 py-2.5 text-left text-body-regular text-charcoal-600 dark:text-cream-50 hover:bg-cream-100 dark:hover:bg-charcoal-400 transition-colors flex items-center gap-2"
+                    >
+                      <span className="text-charcoal-500 dark:text-charcoal-300">🏠</span>
+                      <span>Return to Home</span>
+                    </button>
+                  )}
+                  
                   <button
                     onClick={handleProfileClick}
                     className="w-full px-4 py-2.5 text-left text-body-regular text-charcoal-600 dark:text-cream-50 hover:bg-cream-100 dark:hover:bg-charcoal-400 transition-colors flex items-center gap-2"
@@ -210,7 +244,10 @@ const PageHeader = ({
 
                 {/* Logout Section */}
                 <div className="border-t border-grey-stroke dark:border-charcoal-400">
-                  <button className="w-full px-4 py-2.5 text-left text-body-regular text-error-text dark:text-red-400 hover:bg-error-bg dark:hover:bg-red-900/20 transition-colors flex items-center gap-2">
+                  <button
+                    onClick={handleLogout}
+                    className="w-full px-4 py-2.5 text-left text-body-regular text-error-text dark:text-red-400 hover:bg-error-bg dark:hover:bg-red-900/20 transition-colors flex items-center gap-2"
+                  >
                     <span>🚪</span>
                     <span>Logout</span>
                   </button>

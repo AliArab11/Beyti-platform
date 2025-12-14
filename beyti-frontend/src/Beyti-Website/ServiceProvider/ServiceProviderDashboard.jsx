@@ -40,11 +40,22 @@ export default function ServiceProviderDashboard() {
   // Fetch user profile details
   const fetchUserProfile = async () => {
     try {
-      const profile = await getUserProfile(userProfileId);
-      console.log('[fetchUserProfile] Received profile:', profile);
+      // 1. Check if we have a valid User ID to query
+      if (!userProfileId) {
+        console.warn('[fetchUserProfile] No userProfileId available, skipping fetch.');
+        return;
+      }
+
+      // 2. CRITICAL CHANGE: Use getProviderProfile instead of getUserProfile
+      // This hits the new endpoint: GET /api/ServiceProviderDashboard/Profile/{id}
+      const profile = await getProviderProfile(userProfileId);
+      
+      console.log('[fetchUserProfile] Received provider profile:', profile);
+
       if (profile) {
-        // API returns PascalCase, convert to camelCase for frontend use
+        // 3. Map the Backend (PascalCase) data to Frontend (camelCase)
         const normalizedProfile = {
+          id: profile.Id, // CRITICAL: This is the actual ServiceProviderId (e.g., 6)
           userProfileId: profile.UserProfileId,
           displayName: profile.DisplayName,
           roleType: profile.RoleType,
@@ -52,12 +63,13 @@ export default function ServiceProviderDashboard() {
           accountStatus: profile.AccountStatus, // UserProfile.Status (Active/Suspended)
           phone: profile.Phone,
           businessName: profile.BusinessName,
+          // Address fields from the new controller
           street: profile.Street,
           city: profile.City,
           region: profile.Region,
           postalCode: profile.PostalCode,
           country: profile.Country,
-          address: profile.Address,
+          address: profile.Address, // Formatted string
           createdAt: profile.CreatedAt,
           updatedAt: profile.UpdatedAt,
         };
@@ -72,13 +84,17 @@ export default function ServiceProviderDashboard() {
         }
 
         setUserProfile(normalizedProfile);
+        
+        // CRITICAL: Save the ServiceProviderId to state so other widgets can use it
+        // (Make sure you have [serviceProviderId, setServiceProviderId] = useState(null) defined above)
+        setServiceProviderId(normalizedProfile.id); 
+
         if (normalizedProfile.displayName) {
           setDisplayName(normalizedProfile.displayName);
         }
-        // Set provider status from profile - this comes from ServiceProvider.Status
-        // The UserProfilesController returns ServiceProvider.Status for service providers
+
+        // Set provider status (Available/Busy/Unavailable)
         if (normalizedProfile.status) {
-          console.log('[fetchUserProfile] Setting providerStatus to:', normalizedProfile.status);
           setProviderStatus(normalizedProfile.status);
         }
       }
@@ -114,7 +130,9 @@ export default function ServiceProviderDashboard() {
   };
 
   useEffect(() => {
-    fetchUserProfile();
+    if (userProfileId) {
+        fetchUserProfile();
+    }
   }, [userProfileId]);
 
   // Handle status change

@@ -247,12 +247,27 @@ namespace Beyti_Backend.Controllers.Api
                 ticket.Status = dto.Status;
                 ticket.UpdatedAt = DateTime.UtcNow;
 
-                // If delivered, update order status
-                if (dto.Status == "Delivered")
+                // Sync Order Status with Delivery Ticket Status
+                switch (dto.Status)
                 {
-                    ticket.Order.Status = "Completed";
-                    ticket.Order.UpdatedAt = DateTime.UtcNow;
+                    case "Accepted":
+                        ticket.Order.Status = "Accepted";
+                        break;
+
+                    case "Picked Up":
+                        ticket.Order.Status = "Picked Up";   // Out for Delivery
+                        break;
+
+                    case "Delivered":
+                        ticket.Order.Status = "Completed";
+                        break;
+
+                    default:
+                        ticket.Order.Status = dto.Status;
+                        break;
                 }
+
+                ticket.Order.UpdatedAt = DateTime.UtcNow;
 
                 await _context.SaveChangesAsync();
                 return NoContent();

@@ -5,9 +5,12 @@ import NavigationButton from "../../components/NavigationButton";
 import AnalyticsCard from "../../components/AnalyticsCard";
 import StatusChip from "../../components/StatusChip";
 import CRUDButton from "../../components/CRUDButton";
+import Snackbar from "../../components/Snackbar";
+
 import { Table, TableHeader, TableBody, TableRow } from "../../components/Table";
 
-import { getSellerOrders, getSellers } from "../../services/api";
+import { getSellerOrders, getSellers, restoreStock } from "../../services/api";
+import OrderTimer from "./Components/OrderTimer";
 import Orders from "./Components/Orders"; 
 import Analytics from "./Components/Analytics";
 import Products from "./Components/Products";
@@ -45,11 +48,11 @@ const getStatusVariant = (status) => {
   const s = status?.toLowerCase();
   if (!s) return "neutral";
   if (s === "placed" || s === "pending") return "danger";
-  if (["accepted", "preparing", "ready for pickup"].includes(s)) return "brand";
-  if (s === "completed") return "success";
+  if (["accepted", "preparing", "ready for pickup", "picked up"].includes(s)) return "brand";
+  if (s === "completed" || s === "delivered") return "success";
   if (s === "cancelled") return "error";
   return "neutral";
-};
+};;
 
 const getPaymentVariant = (status) => {
   const s = status?.toLowerCase();
@@ -61,10 +64,40 @@ const getPaymentVariant = (status) => {
 };
 
 // ---------- Order Details Modal (Option A - Centered) ----------
-const OrderDetailsModal = ({ order, onClose, onOrderUpdated }) => {
+const OrderDetailsModal = ({ order, onClose, onOrderUpdated, onOrderExpired, onShowSnackbar }) => {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState(null);
   const [localOrder, setLocalOrder] = useState(order);
+
+   useEffect(() => {
+    setLocalOrder(order);
+  }, [order]);
+
+  // Handle timer expiration - update UI and close modal
+ const handleTimerExpired = async (orderId) => {
+  console.log('⏰ Timer expired in modal for order:', orderId);
+  
+  // Check if already cancelled to prevent duplicate calls
+  if (localOrder.status?.toLowerCase() === 'cancelled') {
+    console.log('⚠️ Order already cancelled, skipping');
+    onClose();
+    return;
+  }
+  
+  // Update local state immediately for instant UI feedback
+  const cancelledOrder = { ...localOrder, status: "Cancelled" };
+  setLocalOrder(cancelledOrder);
+  
+  // Call parent's handler to trigger the API call
+  if (onOrderExpired) {
+    await onOrderExpired(orderId);
+  }
+  
+  // Close modal after a brief delay
+  setTimeout(() => {
+    onClose();
+  }, 1500);
+};
 
   // derived flags
   const status = (localOrder.status || "").toLowerCase();
@@ -86,67 +119,107 @@ const OrderDetailsModal = ({ order, onClose, onOrderUpdated }) => {
   };
 
   const handleSellerResponse = async (newStatus) => {
-    setActionLoading(true);
-    setActionError(null);
+  setActionLoading(true);
+  setActionError(null);
+  try {
+    const res = await fetch(`${baseUrl}/${localOrder.id}/seller-response`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        Status: newStatus,
+        SellerNote: null,
+      }),
+    });
+
+    if (!res.ok) {
+  let errorMessage = "Failed to update order";
+  
+  try {
+    const errorData = await res.json();
+    errorMessage = errorData.message || errorData.Message || errorMessage;
+  } catch (e) {
+    // If JSON parsing fails, try text
     try {
-      const res = await fetch(`${baseUrl}/${localOrder.id}/seller-response`, {
+      const errorText = await res.text();
+      if (errorText) errorMessage = errorText;
+    } catch (textError) {
+      // Use default message
+    }
+    
+  }
+  console.log('❌ API Error Response:', errorMessage);
+      
+      // Check if it's an expiry error
+      if ( errorMessage.includes("expired") || errorMessage.includes("cancelled") )  {
+        // Update local state
+        const cancelledOrder = { ...localOrder, status: "Cancelled" };
+        setLocalOrder(cancelledOrder);
+        if (onOrderUpdated) onOrderUpdated(cancelledOrder);
+        
+        // Show snackbar
+        if (onShowSnackbar) {
+          onShowSnackbar({
+            message: errorMessage,
+            type: 'error'
+          });
+        }
+        
+        // Close modal after brief delay
+        setTimeout(() => {
+          onClose();
+        }, 1500);
+        
+        return;
+      }
+      
+      throw new Error(errorMessage);
+    }
+
+    applyUpdate(newStatus);
+  } catch (err) {
+    console.error(err);
+    setActionError(err.message || "Failed to update order");
+  } finally {
+    setActionLoading(false);
+  }
+};
+
+  const handleAdvanceStatus = async () => {
+  let nextStatus = null;
+
+  if (isAccepted) nextStatus = "Preparing";
+  else if (isPreparing) nextStatus = "Ready for Pickup";
+  else if (isReadyForPickup && isPickup) nextStatus = "Completed";
+  else return;
+
+  setActionLoading(true);
+  setActionError(null);
+  try {
+    const res = await fetch(
+      `${baseUrl}/${localOrder.id}/update-seller-status`,
+      {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          Status: newStatus,
-          SellerNote: null,
+          Status: nextStatus,
         }),
-      });
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "Failed to update order");
       }
+    );
 
-      applyUpdate(newStatus);
-    } catch (err) {
-      console.error(err);
-      setActionError(err.message || "Failed to update order");
-    } finally {
-      setActionLoading(false);
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || "Failed to update order status");
     }
-  };
 
-  const handleAdvanceStatus = async () => {
-    let nextStatus = null;
-
-    if (isAccepted) nextStatus = "Preparing";
-    else if (isPreparing) nextStatus = "Ready for Pickup";
-    else if (isReadyForPickup && isPickup) nextStatus = "Completed";
-    else return;
-
-    setActionLoading(true);
-    setActionError(null);
-    try {
-      const res = await fetch(
-        `${baseUrl}/${localOrder.id}/update-seller-status`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            Status: nextStatus,
-          }),
-        }
-      );
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "Failed to update order status");
-      }
-
-      applyUpdate(nextStatus);
-    } catch (err) {
-      console.error(err);
-      setActionError(err.message || "Failed to update order status");
-    } finally {
-      setActionLoading(false);
-    }
-  };
+    applyUpdate(nextStatus);
+    // Don't restore stock - only needed when cancelling from placed/pending
+  } catch (err) {
+    console.error(err);
+    setActionError(err.message || "Failed to update order status");
+  } finally {
+    setActionLoading(false);
+  }
+};
 
   const renderFooterButtons = () => {
     if (isCompleted) {
@@ -249,15 +322,25 @@ const OrderDetailsModal = ({ order, onClose, onOrderUpdated }) => {
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
-          {/* Status + Payment row */}
+         {/* Status + Payment row */}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="space-y-1">
               <p className="text-xs text-charcoal-400 uppercase tracking-wide">
                 Status
               </p>
-              <StatusChip variant={getStatusVariant(localOrder.status)}>
-                {localOrder.status || "Unknown"}
-              </StatusChip>
+              <div className="flex items-center gap-3">
+                <StatusChip variant={getStatusVariant(localOrder.status)}>
+                  {localOrder.status || "Unknown"}
+                </StatusChip>
+                {isPlaced && (
+                  <OrderTimer 
+                    order={localOrder} 
+                    onExpire={handleTimerExpired}
+                    size="large"
+                    showIcon={true}
+                  />
+                )}
+              </div>
             </div>
             <div className="space-y-1">
               <p className="text-xs text-charcoal-400 uppercase tracking-wide">
@@ -268,6 +351,35 @@ const OrderDetailsModal = ({ order, onClose, onOrderUpdated }) => {
               </span>
             </div>
           </div>
+
+          {/* Timer Warning Banner - Only for placed orders */}
+          {isPlaced && (
+            <div className="bg-orange-50 border-l-4 border-orange-500 px-4 py-3 rounded-lg">
+              <div className="flex items-center gap-3">
+                <svg
+                  className="w-6 h-6 text-orange-600 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-orange-800">
+                    Action Required
+                  </p>
+                  <div className="text-sm text-orange-700">
+                    Please accept or decline this order to continue processing.
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Customer & Store info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-grey-100 rounded-xl p-4 border border-grey-stroke">
@@ -295,14 +407,16 @@ const OrderDetailsModal = ({ order, onClose, onOrderUpdated }) => {
                 {formatCurrency(localOrder.totalAmount || 0)}
               </p>
             </div>
-            <div>
-              <p className="text-xs text-charcoal-400 mb-1 uppercase tracking-wide">
-                Delivery Fee
-              </p>
-              <p className="text-sm font-semibold text-charcoal-700">
-                {formatCurrency(localOrder.deliveryFee || 0)}
-              </p>
-            </div>
+            {localOrder.fulfillmentType === "Delivery" && (
+              <div>
+                <p className="text-xs text-charcoal-400 mb-1 uppercase tracking-wide">
+                  Delivery Fee
+                </p>
+                <p className="text-sm font-semibold text-charcoal-700">
+                  {formatCurrency(localOrder.deliveryFee || 0)}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Items */}
@@ -403,6 +517,56 @@ const SellerDashboard = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [orderModalOpen, setOrderModalOpen] = useState(false);
 
+  // snackbar state
+  const [snackbar, setSnackbar] = useState({ show: false, message: '', type: 'error' });
+
+  const handleOrderExpired = async (orderId) => {
+  try {
+    // Double-check the order is still in placed/pending status
+    const order = orders.find(o => o.id === orderId);
+    const status = order?.status?.toLowerCase();
+    
+    if (!order || !['placed', 'pending'].includes(status)) {
+      console.log('⚠️ Order not in placed/pending status, skipping auto-cancel');
+      return;
+    }
+
+    console.log('⏰ Auto-cancelling order:', orderId);
+    
+    const baseUrl = "https://localhost:7062/api/Orders";
+    const res = await fetch(`${baseUrl}/${orderId}/seller-response`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        Status: "Cancelled",
+        SellerNote: "Order auto-cancelled: No response within 10 minutes",
+      }),
+    });
+
+    if (res.ok) {
+      setOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, status: "Cancelled" } : o))
+      );
+      // Don't call restoreStock here - backend already handles it
+      console.log('✅ Order auto-cancelled (backend restored stock)');
+      
+      // Show snackbar
+      setSnackbar({
+        show: true,
+        message: 'Order expired and was automatically cancelled',
+        type: 'error'
+      });
+    }
+  } catch (err) {
+    console.error('Failed to auto-cancel order:', err);
+    setSnackbar({
+      show: true,
+      message: 'Failed to cancel expired order',
+      type: 'error'
+    });
+  }
+};
+
   // Disable page scroll when modals are open
 useEffect(() => {
   if (selectModalOpen || orderModalOpen) {
@@ -494,26 +658,33 @@ useEffect(() => {
     sevenDaysAgo.setDate(now.getDate() - 7);
 
     let totalRevenue = 0;
-    let pendingOrders = 0;
-    let last7DaysRevenue = 0;
-    let last7DaysOrders = 0;
+let pendingOrders = 0;
+let last7DaysRevenue = 0;
+let last7DaysOrders = 0;
 
-    const productMap = new Map();
+const productMap = new Map();
 
-    orders.forEach((order) => {
-      const amount = order.totalAmount || 0;
-      totalRevenue += amount;
+orders.forEach((order) => {
+  const amount = order.totalAmount || 0;
+  const status = order.status?.toLowerCase();
+  
+  // Only count revenue for completed orders
+  if (status === "completed" || status === "delivered") {
+    totalRevenue += amount;
+  }
 
-      const status = order.status?.toLowerCase();
-      if (status === "placed" || status === "pending") {
-        pendingOrders += 1;
-      }
+  if (status === "placed" || status === "pending") {
+    pendingOrders += 1;
+  }
 
-      const created = new Date(order.createdAt);
-      if (!Number.isNaN(created.getTime()) && created >= sevenDaysAgo) {
-        last7DaysRevenue += amount;
-        last7DaysOrders += 1;
-      }
+  const created = new Date(order.createdAt);
+  if (!Number.isNaN(created.getTime()) && created >= sevenDaysAgo) {
+    // Only count last 7 days revenue for completed orders
+    if (status === "completed" || status === "delivered") {
+      last7DaysRevenue += amount;
+    }
+    last7DaysOrders += 1;
+  }
 
       (order.orderItems || []).forEach((item) => {
         const key = item.productId || item.productName || "unknown";
@@ -628,14 +799,33 @@ useEffect(() => {
   // -----------------------------------------
   // MAIN DASHBOARD LAYOUT
   // -----------------------------------------
-  return (
-    <div className="min-h-screen bg-cream-50 flex">
-      <SellerSelectModal />
-      {orderModalOpen && selectedOrder && (
+ return (
+    <>
+      {/* Snackbar - Rendered outside main layout for proper z-index */}
+      {snackbar.show && (
+        <Snackbar
+          message={snackbar.message}
+          type={snackbar.type}
+          onClose={() => setSnackbar({ ...snackbar, show: false })}
+        />
+      )}
+      
+      <div className="min-h-screen bg-cream-50 flex">
+        <SellerSelectModal />
+        {orderModalOpen && selectedOrder && (
         <OrderDetailsModal
           order={selectedOrder}
           onClose={closeOrderModal}
           onOrderUpdated={handleOrderUpdated}
+          onOrderExpired={handleOrderExpired}
+          onShowSnackbar={({ message, type }) => {
+          setSnackbar({
+            show: true,
+            message,
+            type: type || 'error'
+          });
+        }}
+
         />
       )}
 
@@ -901,60 +1091,66 @@ useEffect(() => {
                         />
                        <TableBody>
                         {filteredRecentOrders.map((order) => {
-                            // Check if order is a new request (within last 30 minutes)
-                            const status = order.status?.toLowerCase();
-                            const isRequest = ["placed", "pending"].includes(status);
-                            
-                            let isNew = false;
-                            if (isRequest) {
+                          const status = order.status?.toLowerCase();
+                          const isRequest = ["placed", "pending"].includes(status);
+                          
+                          let isNew = false;
+                          if (isRequest) {
                             const orderTime = new Date(order.createdAt);
                             const now = new Date();
                             const diffMinutes = (now - orderTime) / (1000 * 60);
-                            isNew = diffMinutes <= 100000;
-                            }
-                            
-                            return (
+                            isNew = diffMinutes <= 10;
+                          }
+                          
+                          return (
                             <TableRow
-                                key={order.id}
-                                className={isNew ? "bg-danger-bg" : ""}
-                                data={[
+                              key={order.id}
+                              className={isNew ? "bg-danger-bg" : ""}
+                              data={[
                                 <div className="flex items-center gap-2" key={`id-${order.id}`}>
-                                    {isNew && (
+                                  {isNew && (
                                     <span className="flex h-2 w-2">
-                                        <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-danger-btn opacity-75"></span>
-                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-danger-btn"></span>
+                                      <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-danger-btn opacity-75"></span>
+                                      <span className="relative inline-flex rounded-full h-2 w-2 bg-danger-btn"></span>
                                     </span>
-                                    )}
-                                    <span className={isNew ? "font-semibold text-danger-text" : ""}>
+                                  )}
+                                  <span className={isNew ? "font-semibold text-danger-text" : ""}>
                                     #{order.id}
-                                    </span>
+                                  </span>
                                 </div>,
                                 <span className={isNew ? "font-semibold" : ""}>
-                                    {order.customerName || "—"}
+                                  {order.customerName || "—"}
                                 </span>,
-                                <StatusChip
-                                    key={`status-${order.id}`}
-                                    variant={getStatusVariant(order.status)}
-                                >
+                                <div key={`status-timer-${order.id}`} className="flex items-center gap-2">
+                                  <StatusChip variant={getStatusVariant(order.status)}>
                                     {order.status || "Unknown"}
-                                </StatusChip>,
+                                  </StatusChip>
+                                  {isRequest && (
+                                    <OrderTimer 
+                                      order={order} 
+                                      onExpire={handleOrderExpired}
+                                      size="small"
+                                      showIcon={false}
+                                    />
+                                  )}
+                                </div>,
                                 <span className={isNew ? "font-semibold" : ""}>
-                                    {formatCurrency(order.totalAmount || 0)}
+                                  {formatCurrency(order.totalAmount || 0)}
                                 </span>,
                                 formatDate(order.createdAt),
-                                ]}
-                                actions={
+                              ]}
+                              actions={
                                 <CRUDButton
-                                    variant={isNew ? "danger" : "neutral"}
-                                    onClick={() => openOrderModal(order)}
+                                  variant={isNew ? "danger" : "neutral"}
+                                  onClick={() => openOrderModal(order)}
                                 >
-                                    {isNew ? "Respond Now" : "View Details"}
+                                  {isNew ? "Respond Now" : "View Details"}
                                 </CRUDButton>
-                                }
+                              }
                             />
-                            );
+                          );
                         })}
-                        </TableBody>
+                      </TableBody>
                       </Table>
                     )}
                   </div>
@@ -1163,6 +1359,7 @@ useEffect(() => {
         </main>
       </div>
     </div>
+    </>
   );
 };
 

@@ -16,7 +16,10 @@ import StoreTypeSelection from "./Beyti-Website/Store/StoreTypeSelection.jsx";
 import ServiceProviderStoresView from "./Beyti-Website/Store/ServiceProviderStoresView.jsx";
 import ServiceProviderDetailView from "./Beyti-Website/Store/ServiceProviderDetailView.jsx";
 import StoreView from "./Beyti-Website/Store/StoreView.jsx";
+import ProductPage from "./Beyti-Website/Store/Components/ProductPage.jsx";
+import Checkout from "./Beyti-Website/Store/Components/Checkout.jsx";
 import StoreDetailsPage from "./Pages/Seller/StoreDetails";
+import CustomerDashboardPage from './Beyti-Website/Customer/CustomerDashboard.jsx';
 import CustomerNotifications from "./Beyti-Website/Customer/CustomerNotifications.jsx";
 import CustomerHistory from "./Beyti-Website/Customer/CustomerHistory.jsx";
 
@@ -43,6 +46,8 @@ import SellerOnboarding from './Beyti-Website/Registration/SellerOnboarding';
 import ProviderOnboarding from './Beyti-Website/Registration/ProviderOnboarding';
 import DriverOnboarding from './Beyti-Website/Registration/DriverOnboarding';
 import AdminView from './Beyti-Website/Admin/AdminView.jsx';
+import DashboardRouter from './components/DashboardRouter';
+import DriverDashboardPlaceholder from './Beyti-Website/Driver/DriverDashboardPlaceholder';
 import AccountSuspended from './Beyti-Website/Auth/AccountSuspended';
 
 // Placeholder components for pages that don't exist yet
@@ -181,12 +186,18 @@ export default function App() {
               <Route path="reviews" element={<SellerReviewsPage />} />
             </Route>
 
+            <Route path="/customer-dashboard" element={<CustomerDashboardPage />} />
+
+            <Route path="/checkout" element={<Checkout />} />
+
+
             <Route path="/store" element={<StoresPage />} />
             <Route path="/stores" element={<StoreTypeSelection />} />
             <Route path="/mainStore" element={<MainStoreView />} />
             <Route path="/serviceProviders" element={<ServiceProviderStoresView />} />
             <Route path="/service-provider/:providerId" element={<ServiceProviderDetailView />} />
             <Route path="/store/:storeId" element={<StoreView />} />
+            <Route path="/store/:storeId/product/:productId" element={<ProductPage />} />
             <Route path="/store/:id" element={<StoreDetailsPage />} />
             <Route path="/product" element={<ProductsPage />} />
             <Route path="/category" element={<CategoryPage />} />
@@ -213,6 +224,8 @@ export default function App() {
             <Route path="/design-demo" element={<DesignSystemDemo />} />
             <Route path="/dashboard-template" element={<DashboardTemplate />} />
             <Route path="/user-management" element={<AdminUserManagementNew />} />
+            <Route path="/dashboard" element={<DashboardRouter />} />
+            <Route path="/driver-placeholder" element={<DriverDashboardPlaceholder />} />
           </Routes>
         </main>
       </div>

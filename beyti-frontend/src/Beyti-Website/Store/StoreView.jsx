@@ -1,8 +1,16 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { Cake, Heart, Star, MagnifyingGlass, ArrowLeft, Bread, ShoppingCartSimple, X } from "@phosphor-icons/react";
-import ProductDetailsSheet from './Components/ProductDetails.jsx';
+import { Cake, Heart, Star, MagnifyingGlass, ArrowLeft, Bread, ShoppingCartSimple, X, Package } from "@phosphor-icons/react";
+import ProductPage from './Components/ProductPage';
+import ProductList from './Components/ProductDetails';  
 import Checkout from './Components/Checkout';
+import ActiveOrderBanner from './Components/ActiveOrderBanner';
+import Snackbar from './../../components/Snackbar';
+import PageHeader from '../../components/PageHeader';
+import CustomerHeader from '../../components/CustomerHeader';
+
+import OrderDetails from './Components/OrderDetails';
+import { createOrder, createOrderItem, getProductVariants, getOrder, getOrders } from '../../services/api';
 // Mock API call - replace with your actual API
 const getStoreDetails = async (storeId) => {
   try {
@@ -15,60 +23,6 @@ const getStoreDetails = async (storeId) => {
   }
 };
 
-
-const StoreHeader = ({ storeName, customerName, onBack }) => (
-  <header className="bg-cream-50 py-4 px-8 border-b border-grey-stroke sticky top-0 z-10">
-    <div className="max-w-[1440px] mx-auto flex items-center justify-between">
-      <div className="flex items-center gap-6">
-        <button 
-          onClick={onBack}
-          className="p-2 hover:bg-grey-200 rounded-lg transition-all"
-        >
-          <ArrowLeft className="w-6 h-6 text-charcoal-600" weight="bold" />
-        </button>
-        <h1 className="text-[32px] font-bold text-charcoal-600" style={{ fontFamily: 'Merriweather, serif' }}>
-          Beyti
-        </h1>
-      </div>
-      
-      <div className="flex items-center gap-4">
-        <button className="p-2 hover:bg-grey-200 rounded-lg transition-all">
-          <svg className="w-5 h-5 text-charcoal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-          </svg>
-        </button>
-        <button className="p-2 hover:bg-grey-200 rounded-lg transition-all">
-          <svg className="w-5 h-5 text-charcoal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-          </svg>
-        </button>
-        <button className="p-2 hover:bg-grey-200 rounded-lg transition-all">
-          <svg className="w-5 h-5 text-charcoal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-          </svg>
-        </button>
-        {customerName ? (
-          <div className="flex items-center gap-3 pl-4 border-l border-grey-stroke">
-            <div className="w-8 h-8 bg-sage-500 rounded-full flex items-center justify-center">
-              <span className="text-white text-sm font-semibold">{customerName[0]}</span>
-            </div>
-            <span className="text-charcoal-600 font-medium text-sm">{customerName}</span>
-            <svg className="w-4 h-4 text-charcoal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </div>
-        ) : (
-          <div className="flex items-center gap-3 pl-4 border-l border-grey-stroke">
-            <div className="w-8 h-8 bg-grey-300 rounded-full flex items-center justify-center">
-              <span className="text-charcoal-400 text-sm font-semibold">?</span>
-            </div>
-            <span className="text-charcoal-400 font-medium text-sm">No Customer</span>
-          </div>
-        )}
-      </div>
-    </div>
-  </header>
-);
 
 // Store Info Section
 const StoreInfo = ({ store }) => (
@@ -233,13 +187,33 @@ const StoreInfo = ({ store }) => (
                   </h1>
                   
                   {/* Rating inline with name */}
-                  <div className="flex items-center gap-2.5">
-                    <Star className="w-7 h-7 text-[#556B5C]" weight="fill" />
-                    <span className="text-[22px] font-semibold text-[#556B5C]" 
-                          style={{ fontFamily: "Inter, sans-serif" }}>
-                      {store?.rating || "2.3"}
-                    </span>
-                  </div>
+                    <div className="flex items-center gap-2.5">
+                      {(() => {
+                        const reviewCount = store?.products?.reduce((count, product) => 
+                          count + (product.reviews?.filter(r => !r.isCommentHiddenBySeller)?.length || 0), 0
+                        ) || 0;
+                        
+                        const rating = store?.averageRating || 0;
+                        
+                        if (reviewCount < 5) {
+                          return (
+                            <span className="px-4 py-1.5 bg-sage-500 text-white text-sm font-bold rounded-full" style={{ fontFamily: 'Inter, sans-serif' }}>
+                              NEW
+                            </span>
+                          );
+                        }
+                        
+                        return (
+                          <>
+                            <Star className="w-7 h-7 !text-sage-500" weight="fill" />
+                            <span className="text-[22px] font-semibold text-[#556B5C]" 
+                                  style={{ fontFamily: "Inter, sans-serif" }}>
+                              {rating.toFixed(1)}
+                            </span>
+                          </>
+                        );
+                      })()}
+                    </div>
                 </div>
                 
                 {/* Categories */}
@@ -329,54 +303,79 @@ const CategorySidebar = ({ selected, onSelect }) => {
 };
 
 // Product Card
-const ProductCard = ({ product, onClick }) => (
-  <div 
-    onClick={onClick}
-    className="bg-white rounded-2xl overflow-hidden cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all group"
-  >
-    {/* Product Image */}
-    <div className="relative h-48 bg-gradient-to-br from-[#D8E8DC] to-[#C9DFD0] overflow-hidden">
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="w-32 h-32 bg-white/30 rounded-full flex items-center justify-center">
-          <svg className="w-16 h-16 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-          </svg>
+const ProductCard = ({ product, onClick }) => {
+  const rating = product?.averageRating || 0;
+  const reviewCount = product?.reviewCount || 0;
+  const hasEnoughReviews = reviewCount >= 5;
+
+  return (
+    <div 
+      onClick={onClick}
+      className="bg-white rounded-2xl overflow-hidden cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all group"
+    >
+      {/* Product Image */}
+      <div className="relative h-48 bg-gradient-to-br from-[#D8E8DC] to-[#C9DFD0] overflow-hidden">
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-32 h-32 bg-white/30 rounded-full flex items-center justify-center">
+            <svg className="w-16 h-16 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+          </div>
+        </div>
+        
+        {/* Price Badge */}
+        <div className="absolute top-4 right-4 bg-white px-4 py-2 rounded-full shadow-lg">
+          <span className="text-lg font-bold text-sage-700">
+            {product?.basePrice ? `${product.basePrice.toFixed(3)} BD` : "15.000 BD"}
+          </span>
         </div>
       </div>
-      
-      {/* Price Badge */}
-      <div className="absolute top-4 right-4 bg-white px-4 py-2 rounded-full shadow-lg">
-        <span className="text-lg font-bold text-sage-700">
-          {product?.basePrice ? `${product.basePrice.toFixed(3)} BD` : "15.000 BD"}
-        </span>
+
+      {/* Product Info */}
+      <div className="p-5">
+        <h3 className="font-bold text-charcoal-600 text-lg mb-2 line-clamp-2 group-hover:text-sage-600 transition-colors" style={{ fontFamily: 'Merriweather, serif' }}>
+          {product?.name || "Dream Cookie"}
+        </h3>
+        
+        {/* Rating or NEW badge */}
+        <div className="flex items-center gap-1 mb-3">
+          {!hasEnoughReviews ? (
+            <span className="px-3 py-1 bg-sage-500 text-white text-xs font-bold rounded-full" style={{ fontFamily: 'Inter, sans-serif' }}>
+              NEW
+            </span>
+          ) : (
+            <>
+              {[...Array(5)].map((_, i) => {
+                const fillPercentage = Math.max(0, Math.min(100, (rating - i) * 100));
+                return (
+                  <div key={i} className="relative w-4 h-4">
+                    <Star className="w-4 h-4 text-grey-stroke absolute" weight="fill" />
+                    <div className="overflow-hidden absolute" style={{ width: `${fillPercentage}%` }}>
+                      <Star className="w-4 h-4 text-sage-500" weight="fill" />
+                    </div>
+                  </div>
+                );
+              })}
+              <span className="text-sm font-semibold text-charcoal-600 ml-1" style={{ fontFamily: 'Inter, sans-serif' }}>
+                {rating.toFixed(1)}
+              </span>
+            </>
+          )}
+        </div>
+
+        {product?.description && (
+          <p className="text-sm text-charcoal-400 mb-4 line-clamp-2">
+            {product.description}
+          </p>
+        )}
+        
+        <button className="w-full bg-sage-500 hover:bg-sage-600 text-white font-semibold py-3 rounded-xl transition-all shadow-[0_2px_8px_rgba(85,107,92,0.2)]">
+          View Details
+        </button>
       </div>
     </div>
-
-    {/* Product Info */}
-    <div className="p-5">
-      <h3 className="font-bold text-charcoal-600 text-lg mb-2 line-clamp-2 group-hover:text-sage-600 transition-colors" style={{ fontFamily: 'Merriweather, serif' }}>
-        {product?.name || "Dream Cookie"}
-      </h3>
-      
-      <div className="flex items-center gap-1 mb-3">
-        {[...Array(5)].map((_, i) => (
-          <Star key={i} className="w-4 h-4 text-[#F5C563]" weight="fill" />
-        ))}
-        <span className="text-sm font-semibold text-charcoal-600 ml-1">5.0</span>
-      </div>
-
-      {product?.description && (
-        <p className="text-sm text-charcoal-400 mb-4 line-clamp-2">
-          {product.description}
-        </p>
-      )}
-      
-      <button className="w-full bg-sage-500 hover:bg-sage-600 text-white font-semibold py-3 rounded-xl transition-all shadow-[0_2px_8px_rgba(85,107,92,0.2)]">
-        View Details
-      </button>
-    </div>
-  </div>
-);
+  );
+};
 
 // Main Store View Component
 const StoreView = () => {
@@ -388,8 +387,15 @@ const StoreView = () => {
   const customerId = location.state?.customerId;
   const customerName = location.state?.customerName;
 
+  const itemAdded = location.state?.itemAdded;
+  const itemName = location.state?.itemName;
+  const itemQuantity = location.state?.itemQuantity;
+
   const [customerAddresses, setCustomerAddresses] = useState([]);
   const [loadingAddresses, setLoadingAddresses] = useState(false);
+
+  const [showDifferentStoreModal, setShowDifferentStoreModal] = useState(false);
+  const [pendingCartItem, setPendingCartItem] = useState(null);
 
   const [store, setStore] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -397,42 +403,366 @@ const StoreView = () => {
   const [selectedCategory, setSelectedCategory] = useState("popular");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("popular");
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [showProductSheet, setShowProductSheet] = useState(false);
-  const [cart, setCart] = useState([]);
+
+
+  const [bannerDismissed, setBannerDismissed] = useState(() => {
+  if (!customerId) return false;
+  return localStorage.getItem(`beyti_bannerDismissed_${customerId}`) === 'true';
+  });
+
+const [snackbar, setSnackbar] = useState({ open: false, message: '', type: 'success' });
+
+const showSnackbar = (message, type = 'success') => {
+  setSnackbar({ open: true, message, type });
+  setTimeout(() => setSnackbar({ open: false, message: '', type: 'success' }), 5000);
+};
+
+    const [cart, setCart] = useState(() => {
+    // Initialize cart from localStorage - CHECK ALL STORES
+    try {
+        if (customerId) {
+        // Check all cart keys for this customer
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith(`beyti_cart_`) && key.endsWith(`_${customerId}`)) {
+            const savedCart = localStorage.getItem(key);
+            if (savedCart) {
+                const parsedCart = JSON.parse(savedCart);
+                if (parsedCart.length > 0) {
+                console.log('📦 Loaded cart from:', key, parsedCart);
+                return parsedCart;
+                }
+            }
+            }
+        }
+        }
+    } catch (err) {
+        console.error('Error loading cart from localStorage:', err);
+    }
+    return [];
+    });
+
+       // Sync cart state with localStorage changes
+            useEffect(() => {
+            console.log('🛒 CART STATE CHANGED:', cart);
+            console.log('📊 Total items:', cart.length);
+            console.log('📦 Total quantity:', cart.reduce((sum, item) => sum + item.quantity, 0));
+            
+            // Save to localStorage whenever cart changes
+            if (customerId && cart.length > 0) {
+                // Get the store ID from the cart items
+                const cartStoreId = cart[0]?.sellerId;
+                if (cartStoreId) {
+                localStorage.setItem(`beyti_cart_${cartStoreId}_${customerId}`, JSON.stringify(cart));
+                console.log('💾 Saved cart to localStorage for store:', cartStoreId);
+                }
+            }
+            }, [cart, customerId]);
+
+            // Poll localStorage for cart updates from other pages
+            useEffect(() => {
+            if (!customerId) {
+                setCart([]);
+                return;
+            }
+
+            const updateCart = () => {
+                try {
+                // Check all cart keys for this customer
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith(`beyti_cart_`) && key.endsWith(`_${customerId}`)) {
+                    const savedCart = localStorage.getItem(key);
+                    if (savedCart) {
+                        const parsedCart = JSON.parse(savedCart);
+                        if (parsedCart.length > 0) {
+                        setCart(parsedCart);
+                        return;
+                        }
+                    }
+                    }
+                }
+                setCart([]);
+                } catch (err) {
+                console.error('Error updating cart:', err);
+                }
+            };
+
+            updateCart();
+            
+            // Update cart every 500ms to catch changes
+            const interval = setInterval(updateCart, 500);
+            
+            return () => clearInterval(interval);
+            }, [customerId]);
+
   const [showCartModal, setShowCartModal] = useState(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
 
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', type: 'success' });
+// Load active order from localStorage on mount
+const [activeOrder, setActiveOrder] = useState(null);
 
-    const showSnackbar = (message, type = 'success') => {
-    setSnackbar({ open: true, message, type });
-    setTimeout(() => setSnackbar({ open: false, message: '', type: 'success' }), 3000);
-    };
+const [orders, setOrders] = useState([]);
 
-const handleProductClick = (product) => {
-  setSelectedProduct(product);
-  setShowProductSheet(true);
+// Load and poll active order for the selected customer (like cart polling)
+useEffect(() => {
+  if (!customerId) {
+    setActiveOrder(null);
+    return;
+  }
+
+  const updateActiveOrder = () => {
+    try {
+      const savedOrder = localStorage.getItem(`beyti_activeOrder_${customerId}`);
+      if (savedOrder) {
+        const parsedOrder = JSON.parse(savedOrder);
+        setActiveOrder(parsedOrder);
+      } else {
+        setActiveOrder(null);
+      }
+    } catch (err) {
+      console.error('Error loading active order:', err);
+    }
+  };
+
+  // Load immediately
+  updateActiveOrder();
+  
+  // Poll every 1 second to catch changes
+  const interval = setInterval(updateActiveOrder, 1000);
+  
+  return () => clearInterval(interval);
+}, [customerId]);
+
+// Fetch customer orders
+useEffect(() => {
+  if (!customerId) {
+    setOrders([]);
+    return;
+  }
+
+  const fetchOrders = async () => {
+    try {
+      const response = await fetch(`https://localhost:7062/api/Orders?customerId=${customerId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setOrders(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Error fetching orders:', err);
+      setOrders([]);
+    }
+  };
+
+  fetchOrders();
+}, [customerId]);
+
+// Reset banner dismissed state when customer changes
+useEffect(() => {
+  if (customerId) {
+    const dismissed = localStorage.getItem(`beyti_bannerDismissed_${customerId}`) === 'true';
+    setBannerDismissed(dismissed);
+  }
+}, [customerId]);
+
+
+const fetchSingleOrder = async (orderId) => {
+  try {
+    const res = await fetch(`https://localhost:7062/api/Orders/${orderId}`);
+    if (!res.ok) throw new Error("Failed to fetch order");
+    return await res.json();
+  } catch (err) {
+    console.error("❌ Error fetching single order:", err);
+    return null;
+  }
 };
 
-const handleAddToCart = (item) => {
-  // Check if item already exists in cart
-  const existingItem = cart.find(cartItem => cartItem.id === item.id);
+const handleCustomerLogout = () => {
+  // Clear customer session
+  sessionStorage.removeItem('beyti_customerId');
+  sessionStorage.removeItem('beyti_customerName');
   
-  if (existingItem) {
-    // Update quantity if item exists
-    setCart(cart.map(cartItem => 
-      cartItem.id === item.id 
-        ? { ...cartItem, quantity: cartItem.quantity + item.quantity }
-        : cartItem
-    ));
-  } else {
-    // Add new item to cart
-    setCart([...cart, item]);
+  // Clear active order
+  if (customerId) {
+    localStorage.removeItem(`beyti_activeOrder_${customerId}`);
+    localStorage.removeItem(`beyti_cart_${storeId}_${customerId}`); // ← ADD THIS
+    localStorage.removeItem(`beyti_bannerDismissed_${customerId}`);
   }
   
-  // Show success message (optional)
-  alert(`Added ${item.quantity}x ${item.name} to cart!`);
+  // Clear cart state
+  setCart([]); // ← ADD THIS
+  
+  // Navigate back to main store view
+  navigate('/', { replace: true });
+  
+  console.log("Customer logged out from store view");
+};
+
+const handleDismissBanner = () => {
+  setBannerDismissed(true);
+  localStorage.setItem(`beyti_bannerDismissed_${customerId}`, 'true');
+};
+
+const handleTrackOrder = () => {
+  navigate('/customer-dashboard');
+};
+
+
+
+useEffect(() => {
+  if (!activeOrder || !customerId) return;
+
+  console.log("📡 POLLING STARTED for Order:", activeOrder.id);
+
+  const interval = setInterval(async () => {
+    console.log("⏳ Polling tick...");
+
+    try {
+    const updatedList = await getOrders(
+        Number(activeOrder.customerId)
+    );
+
+
+     const updated = await fetchSingleOrder(activeOrder.id);
+      console.log("📥 Backend responded with:", updated);
+
+      if (updated.status !== activeOrder.status) {
+        console.log("🎉 STATUS CHANGED → updating!");
+        
+        // Preserve all fields when updating
+        const completeUpdatedOrder = {
+        ...activeOrder, // Keep all existing fields
+        ...updated, // Apply updates from backend
+        customerId: activeOrder.customerId,  
+        sellerId: activeOrder.sellerId,  
+        // Ensure critical fields are preserved
+        storeName: updated.sellerName || activeOrder.storeName,
+        storePhone: activeOrder.storePhone || updated.sellerPhone,
+        pickupAddress: updated.pickupAddress || activeOrder.pickupAddress, // Use backend data first
+        deliveryAddress: updated.deliveryAddress || activeOrder.deliveryAddress,
+        };
+        
+        setActiveOrder(completeUpdatedOrder);
+        localStorage.setItem(`beyti_activeOrder_${customerId}`, JSON.stringify(completeUpdatedOrder));
+      }
+    } catch (err) {
+      console.error("🔥 POLLING ERROR:", err);
+    }
+  }, 5000);
+
+  return () => clearInterval(interval);
+}, [activeOrder]);
+
+
+
+
+
+
+
+
+
+const handleProductClick = (product) => {
+  navigate(`/store/${storeId}/product/${product.id}`, {
+    state: {
+      customerId,
+      customerName,
+      storeName: store?.storeName,
+      storeId,
+      customerAddresses,   // ⬅ PASS
+    selectedStore: store  // ⬅ PASS
+    }
+  });
+};
+
+    const handleAddToCart = (item) => {
+    console.log('🎯 handleAddToCart called with:', item);
+    console.log('📊 Current cart state:', cart);
+    
+    // Ensure sellerId is present
+    const itemWithSeller = {
+        ...item,
+        sellerId: item.sellerId || store?.id
+    };
+    
+    console.log('✅ Item with seller:', itemWithSeller);
+    
+    // Check if cart has items from a different store
+    if (cart.length > 0 && cart[0].sellerId !== itemWithSeller.sellerId) {
+        // Show modal asking user what to do
+        setPendingCartItem(itemWithSeller);
+        setShowDifferentStoreModal(true);
+        return;
+    }
+    
+    // Find if this exact product + variant combo exists
+    const existingItemIndex = cart.findIndex(cartItem => {
+        const sameProduct = cartItem.id === itemWithSeller.id;
+        const sameVariant = (!cartItem.selectedVariant && !itemWithSeller.selectedVariant) ||
+                            (cartItem.selectedVariant?.id === itemWithSeller.selectedVariant?.id);
+        return sameProduct && sameVariant;
+    });
+    
+    console.log('🔍 Existing item index:', existingItemIndex);
+    
+    if (existingItemIndex !== -1) {
+        // Item exists - ADD to existing quantity
+        const updatedCart = [...cart];
+        const existingItem = updatedCart[existingItemIndex];
+        const newQuantity = existingItem.quantity + itemWithSeller.quantity;
+        const newTotalPrice = existingItem.basePrice * newQuantity;
+        
+        console.log('📈 Updating existing item:');
+        console.log('   Old quantity:', existingItem.quantity);
+        console.log('   Adding:', itemWithSeller.quantity);
+        console.log('   New quantity:', newQuantity);
+        
+        updatedCart[existingItemIndex] = {
+        ...existingItem,
+        quantity: newQuantity,
+        totalPrice: newTotalPrice
+        };
+        
+        setCart(updatedCart);
+        console.log('✨ Cart updated (existing item):', updatedCart);
+        showSnackbar(`Added ${itemWithSeller.quantity}x ${itemWithSeller.name} to cart!`, 'success');
+    } else {
+        // New item - add to cart
+        console.log('🆕 Adding new item to cart');
+        const newCart = [...cart, itemWithSeller];
+        setCart(newCart);
+        console.log('✨ Cart updated (new item):', newCart);
+        showSnackbar(`Added ${itemWithSeller.quantity}x ${itemWithSeller.name} to cart!`, 'success');
+    }
+    };
+    
+
+const handleClearAndAdd = () => {
+  if (!pendingCartItem) return;
+  
+  // Clear cart and add new item
+  const newCart = [pendingCartItem];
+  setCart(newCart);
+  
+  // Update localStorage - remove old store's cart
+  const oldStoreId = cart[0]?.sellerId;
+  if (oldStoreId && customerId) {
+    localStorage.removeItem(`beyti_cart_${oldStoreId}_${customerId}`);
+  }
+  
+  // Save new cart
+  if (customerId && storeId) {
+    localStorage.setItem(`beyti_cart_${storeId}_${customerId}`, JSON.stringify(newCart));
+  }
+  
+  setShowDifferentStoreModal(false);
+  setPendingCartItem(null);
+  showSnackbar(`Cleared previous cart and added ${pendingCartItem.name}!`, 'success');
+};
+
+const handleCancelAdd = () => {
+  setShowDifferentStoreModal(false);
+  setPendingCartItem(null);
+  showSnackbar('Item not added to cart', 'warning');
 };
 
 const handleUpdateQuantity = (productId, newQuantity) => {
@@ -451,28 +781,51 @@ const handleRemoveFromCart = (productId) => {
   setCart(cart.filter(item => item.id !== productId));
 };
 
-  useEffect(() => {
+// Effect 1: Load store data
+useEffect(() => {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    // Scroll to top when component mounts or storeId changes
-    window.scrollTo({ top: 70, behavior: 'smooth' });
-
-    const loadStore = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await getStoreDetails(storeId);
-        setStore(data);
-      } catch (err) {
-        setError(err.message || "Failed to load store");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (storeId) {
-      loadStore();
+  const loadStore = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await getStoreDetails(storeId);
+      setStore(data);
+    } catch (err) {
+      setError(err.message || "Failed to load store");
+    } finally {
+      setLoading(false);
     }
-  }, [storeId]);
+  };
+
+  if (storeId) {
+    loadStore();
+  }
+}, [storeId]);
+
+// Show snackbar when item is added
+useEffect(() => {
+  if (itemAdded && itemName && itemQuantity) {
+    // Small delay to ensure component is mounted and ready
+    const timer = setTimeout(() => {
+      showSnackbar(`Added ${itemQuantity}x ${itemName} to cart!`, 'success');
+    }, 100);
+    
+    // Clear the flags after showing
+    const clearTimer = setTimeout(() => {
+      navigate(location.pathname, { 
+        replace: true, 
+        state: { customerId, customerName } 
+      });
+    }, 500);
+    
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(clearTimer);
+    };
+  }
+}, [itemAdded, itemName, itemQuantity, customerId, customerName, navigate, location.pathname]);
+
 
   // Fetch full customer details including addresses
   useEffect(() => {
@@ -503,13 +856,16 @@ const handleRemoveFromCart = (productId) => {
       } catch (err) {
         console.error("❌ Error fetching customer details:", err);
         setCustomerAddresses([]);
-      } finally {
+        showSnackbar('Could not load customer addresses', 'error');
+        } finally {
         setLoadingAddresses(false);
       }
     };
     
     fetchCustomerDetails();
   }, [customerId]);
+
+
   // Get category title
   const getCategoryTitle = (categoryId) => {
     const titles = {
@@ -523,9 +879,48 @@ const handleRemoveFromCart = (productId) => {
     return titles[categoryId] || "Products";
   };
 
-  const filteredProducts = store?.products?.filter(product =>
-    product.name?.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || [];
+const filteredProducts = (store?.products || [])
+  .filter(product => {
+    // Search filter
+    if (searchQuery && !product.name?.toLowerCase().includes(searchQuery.toLowerCase())) {
+      return false;
+    }
+    
+    return true;
+  })
+  .sort((a, b) => {
+    // Helper function to check if product is new (less than 5 reviews)
+    const isNewProduct = (product) => {
+      const reviewCount = product.reviews?.filter(r => !r.isCommentHiddenBySeller)?.length || 0;
+      return reviewCount < 5;
+    };
+    
+    const aIsNew = isNewProduct(a);
+    const bIsNew = isNewProduct(b);
+    const aRating = a.averageRating || 0;
+    const bRating = b.averageRating || 0;
+    
+    // Apply sorting
+    if (sortBy === 'price-low') return (a.basePrice || 0) - (b.basePrice || 0);
+    if (sortBy === 'price-high') return (b.basePrice || 0) - (a.basePrice || 0);
+    if (sortBy === 'newest') return new Date(b.createdAt) - new Date(a.createdAt);
+    
+    if (sortBy === 'rating-high') {
+      // New products go last when sorting high to low
+      if (aIsNew && !bIsNew) return 1;
+      if (!aIsNew && bIsNew) return -1;
+      return bRating - aRating;
+    }
+    
+    if (sortBy === 'rating-low') {
+      // New products go first when sorting low to high
+      if (aIsNew && !bIsNew) return -1;
+      if (!aIsNew && bIsNew) return 1;
+      return aRating - bRating;
+    }
+    
+    return 0; // Default: popular (no sorting)
+  });
 
   if (loading) {
     return (
@@ -562,11 +957,36 @@ const handleRemoveFromCart = (productId) => {
 
   return (
     <div className="min-h-screen bg-cream-50">
-      <StoreHeader 
-        storeName={store?.storeName} 
-        customerName={customerName} 
-        onBack={() => navigate(-1)} 
-        />
+      <CustomerHeader
+        title={store?.storeName || "Beyti"}
+        customerName={customerName}
+        customerId={customerId}
+        cart={cart}
+        stores={[store]}
+        customerAddresses={customerAddresses}
+        onCustomerClick={() => navigate('/mainStore')}
+        onLogout={handleCustomerLogout}
+        onBack={() => navigate('/mainStore', { state: { customerId, customerName }, replace: true })}
+        showBackButton={true}
+        variant="store"
+        showSearch={false}
+      />
+
+    {/* Active Order Banner */}
+      {(() => {
+        const count = orders.filter(o => 
+          !['completed', 'cancelled', 'delivered'].includes(o.status?.toLowerCase())
+        ).length;
+        return count > 0 && !bannerDismissed && (
+          <ActiveOrderBanner 
+            activeOrderCount={count}
+            onTrack={handleTrackOrder}
+            onDismiss={handleDismissBanner}
+          />
+        );
+      })()}
+
+
       <StoreInfo store={store} />
       
       <div className="max-w-[1440px] mx-auto px-12 py-8">
@@ -574,7 +994,7 @@ const handleRemoveFromCart = (productId) => {
           <CategorySidebar selected={selectedCategory} onSelect={setSelectedCategory} />
           
           <div className="flex-1">
-            {/* Category Title with Search and Sort - ALL IN ONE ROW */}
+            {/* Category Title with Search, Filter and Sort - ALL IN ONE ROW */}
             <div className="flex items-center justify-between mb-8">
               {/* Category Title on the left */}
               <h2 className="text-3xl font-bold text-[#556B5C]" style={{ fontFamily: 'Merriweather, serif' }}>
@@ -583,6 +1003,7 @@ const handleRemoveFromCart = (productId) => {
               
               {/* Search and Sort on the right */}
               <div className="flex gap-3 items-center">
+                {/* Sort Dropdown */}
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
@@ -592,23 +1013,26 @@ const handleRemoveFromCart = (productId) => {
                   <option value="popular">Sort All</option>
                   <option value="price-low">Price: Low to High</option>
                   <option value="price-high">Price: High to Low</option>
+                  <option value="rating-high">Rating: High to Low</option>
+                  <option value="rating-low">Rating: Low to High</option>
                   <option value="newest">Newest First</option>
                 </select>
-                
-                <div className="relative w-64">
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search Products..."
-                    className="w-full pl-10 pr-4 py-2.5 bg-white rounded-full border border-grey-stroke focus:outline-none focus:border-sage-500 text-charcoal-600 shadow-[0_2px_8px_rgba(0,0,0,0.06)] text-sm"
-                    style={{ fontFamily: 'Inter, sans-serif' }}
-                  />
-                  <MagnifyingGlass className="w-4 h-4 text-charcoal-400 absolute left-3.5 top-1/2 -translate-y-1/2" weight="bold" />
+                  
+                  {/* Search Input */}
+                  <div className="relative w-64">
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search Products..."
+                      className="w-full pl-10 pr-4 py-2.5 bg-white rounded-full border border-grey-stroke focus:outline-none focus:border-sage-500 text-charcoal-600 shadow-[0_2px_8px_rgba(0,0,0,0.06)] text-sm"
+                      style={{ fontFamily: 'Inter, sans-serif' }}
+                    />
+                    <MagnifyingGlass className="w-4 h-4 text-charcoal-400 absolute left-3.5 top-1/2 -translate-y-1/2" weight="bold" />
+                  </div>
                 </div>
               </div>
-            </div>
-            
+                          
             {/* Products Grid */}
             {filteredProducts.length > 0 ? (
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -635,159 +1059,151 @@ const handleRemoveFromCart = (productId) => {
         </div>
       </div>
 
-      {/* Product Details Bottom Sheet */}
-      <ProductDetailsSheet
-        product={selectedProduct}
-        isOpen={showProductSheet}
-        onClose={() => setShowProductSheet(false)}
-        onAddToCart={handleAddToCart}
-        storeName={store?.storeName}
-        />
-        {/* Floating Cart Button */}
-        {cart.length > 0 && (
-        <button
-            onClick={() => setShowCheckoutModal(true)}
-            className="fixed bottom-8 right-8 z-50 bg-sage-500 hover:bg-sage-600 text-white w-16 h-16 rounded-full shadow-[0_8px_30px_rgba(85,107,92,0.4)] hover:shadow-[0_12px_40px_rgba(85,107,92,0.5)] transition-all transform hover:scale-110 flex items-center justify-center"
-        >
-            <ShoppingCartSimple className="w-9 h-9 drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]" weight="regular" />
-            
-            {/* Item Count Badge */}
-            <span className="absolute -top-1 -right-1 bg-red-800 text-white min-w-[24px] h-6 px-1.5 rounded-full flex items-center justify-center text-xs font-bold shadow-[0_4px_12px_rgba(153,27,27,0.6)]">
-            {cart.reduce((total, item) => total + item.quantity, 0)}
-            </span>
-        </button>
-        )}
+      
 
-      {/* Cart Modal */}
-      {showCartModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-6 text-center">
-              <h2 className="text-3xl font-black text-white mb-2">Your Cart</h2>
-              <p className="text-white/90 font-medium">
-                {cart.length} item{cart.length !== 1 ? 's' : ''} • {cart.reduce((total, item) => total + item.quantity, 0)} total
-              </p>
-            </div>
 
-            {/* Cart Items */}
-            <div className="p-6 overflow-y-auto max-h-[50vh]">
-              {cart.map((item) => (
-                <div key={item.id} className="bg-cream-50 p-5 rounded-xl mb-4 border border-grey-stroke">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <h3 className="text-lg font-bold text-charcoal-600 mb-2">{item.name}</h3>
-                      <p className="text-sage-600 font-semibold">
-                        {item.basePrice.toFixed(3)} BD × {item.quantity}
-                      </p>
-                      {item.selectedVariant && (
-                        <p className="text-sm text-charcoal-400 mt-1">
-                          Variant: {item.selectedVariant.colorValue || ''} {item.selectedVariant.sizeValue || ''}
-                        </p>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-black text-sage-700">
-                        {item.totalPrice.toFixed(3)} BD
-                      </p>
-                      <button
-                        onClick={() => setCart(cart.filter(c => c.id !== item.id))}
-                        className="mt-2 text-red-500 hover:text-red-700 font-semibold text-sm"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
 
-            {/* Total */}
-            <div className="border-t border-grey-stroke p-6 bg-cream-50">
-              <div className="flex justify-between items-center mb-4">
-                <span className="text-xl font-bold text-charcoal-600">Total:</span>
-                <span className="text-3xl font-black text-sage-700">
-                  {cart.reduce((total, item) => total + item.totalPrice, 0).toFixed(3)} BD
-                </span>
-              </div>
-              
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowCartModal(false)}
-                  className="flex-1 bg-grey-200 hover:bg-grey-300 text-charcoal-600 font-bold py-3 rounded-xl transition-all"
-                >
-                  Continue Shopping
-                </button>
-                <button
-                onClick={() => {
-                    setShowCartModal(false);
-                    setShowCheckoutModal(true);
-                }}
-                className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-bold py-3 rounded-xl transition-all"
-                >
-                Checkout
-                </button>
-              </div>
-            </div>
+      {/* Snackbar */}
+      <Snackbar 
+        open={snackbar.open}
+        message={snackbar.message}
+        type={snackbar.type}
+        onClose={() => setSnackbar({ open: false, message: '', type: 'success' })}
+      />
 
-            {/* Close Button */}
-            <button
-              onClick={() => setShowCartModal(false)}
-              className="absolute top-4 right-4 bg-white/90 p-2 rounded-full shadow-lg hover:bg-white transition-all"
-            >
-              <X size={20} className="text-charcoal-600" weight="bold" />
-            </button>
+
+{/* Different Store Modal */}
+{showDifferentStoreModal && (
+  <div className="fixed inset-0 bg-charcoal-600/40 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
+    <div className="relative bg-white rounded-3xl shadow-[0_8px_40px_rgba(0,0,0,0.12)] w-full max-w-lg overflow-hidden border-2 border-grey-stroke">
+      
+      {/* Header with Sage Green Brand Colors */}
+      <div className="relative bg-gradient-to-br from-sage-500 to-sage-700 px-8 py-8">
+        {/* Decorative circles */}
+        <div className="absolute top-4 right-4 w-24 h-24 bg-white/10 rounded-full" />
+        <div className="absolute -bottom-6 left-8 w-16 h-16 bg-white/10 rounded-full" />
+        
+        <div className="relative flex items-start gap-4">
+          <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg">
+            <ShoppingCartSimple size={32} weight="bold" className="text-sage-600" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-display-h2 text-white mb-2" style={{ fontFamily: 'Merriweather, serif' }}>
+              Different Store Detected
+            </h3>
+            <p className="text-body-regular text-sage-100" style={{ fontFamily: 'Inter, sans-serif' }}>
+              Your cart contains items from another store
+            </p>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Checkout Modal */}
-        {showCheckoutModal && (
-        <Checkout
-            cart={cart}
-            storeName={store?.storeName}
-            customerId={customerId}
-            customerName={customerName}
-            customerAddresses={customerAddresses}
-            onClose={() => setShowCheckoutModal(false)}
-            onUpdateQuantity={handleUpdateQuantity}
-            onRemoveItem={handleRemoveFromCart}
-            showSnackbar={showSnackbar}
-        />
+      {/* Content */}
+      <div className="p-8">
+        {/* Warning Box */}
+        <div className="bg-danger-bg border-2 border-danger-btn rounded-2xl p-5 mb-6">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 bg-danger-btn rounded-xl flex items-center justify-center flex-shrink-0">
+              <span className="text-2xl">⚠️</span>
+            </div>
+            <div className="flex-1">
+              <p className="text-body-medium text-charcoal-600 font-semibold mb-2" style={{ fontFamily: 'Inter, sans-serif' }}>
+                Important: One store at a time
+              </p>
+              <p className="text-body-regular text-danger-text leading-relaxed" style={{ fontFamily: 'Inter, sans-serif' }}>
+                You can only order from one store per transaction. Choose how you'd like to proceed.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Current Cart Store */}
+        <div className="bg-cream-50 border-2 border-grey-stroke rounded-2xl p-5 mb-4">
+          <p className="text-label-medium text-sage-700 uppercase tracking-wider mb-3" style={{ fontFamily: 'Inter, sans-serif' }}>
+            Current Cart
+          </p>
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-gradient-to-br from-sage-500 to-sage-700 rounded-xl flex items-center justify-center shadow-md">
+              <Storefront size={28} weight="fill" className="text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-card-h2 text-charcoal-600 truncate" style={{ fontFamily: 'Merriweather, serif' }}>
+                {cart[0]?.storeName || 'Another Store'}
+              </p>
+              <p className="text-body-regular text-charcoal-400" style={{ fontFamily: 'Inter, sans-serif' }}>
+                {cart.length} item{cart.length !== 1 ? 's' : ''} • {cart.reduce((sum, item) => sum + item.totalPrice, 0).toFixed(3)} BD
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* New Item to Add */}
+        {pendingCartItem && (
+          <div className="bg-sage-100 border-2 border-sage-500 rounded-2xl p-5 mb-6">
+            <p className="text-label-medium text-sage-700 uppercase tracking-wider mb-3" style={{ fontFamily: 'Inter, sans-serif' }}>
+              New Item
+            </p>
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-gradient-to-br from-sage-100 to-cream-100 rounded-xl flex items-center justify-center shadow-md border-2 border-sage-500">
+                <Package size={28} className="text-sage-700" weight="fill" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-body-medium text-charcoal-600 font-bold truncate" style={{ fontFamily: 'Inter, sans-serif' }}>
+                  {pendingCartItem.name}
+                </p>
+                <p className="text-body-regular text-sage-700 font-semibold" style={{ fontFamily: 'Inter, sans-serif' }}>
+                  {pendingCartItem.basePrice.toFixed(3)} BD
+                </p>
+                <p className="text-label-medium text-charcoal-400 mt-1" style={{ fontFamily: 'Inter, sans-serif' }}>
+                  From: {pendingCartItem.storeName || storeName}
+                </p>
+              </div>
+            </div>
+          </div>
         )}
-        
-{/* Snackbar */}
-{snackbar.open && (
-  <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80]">
-    <div 
-      className={`px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 min-w-[300px] transition-all duration-300 ${
-        snackbar.type === 'success' ? 'bg-green-500 text-white' :
-        snackbar.type === 'error' ? 'bg-red-500 text-white' :
-        'bg-yellow-500 text-white'
-      }`}
-      style={{
-        animation: 'slideUp 0.3s ease-out'
-      }}
-    >
-      <style>{`
-        @keyframes slideUp {
-          from {
-            transform: translateY(20px);
-            opacity: 0;
-          }
-          to {
-            transform: translateY(0);
-            opacity: 1;
-          }
-        }
-      `}</style>
-      <span className="text-2xl">
-        {snackbar.type === 'success' ? '✓' : snackbar.type === 'error' ? '✕' : '⚠'}
-      </span>
-      <p className="font-semibold">{snackbar.message}</p>
+
+        {/* Action Buttons */}
+        <div className="space-y-3">
+          <button
+            onClick={handleClearAndAdd}
+            className="w-full bg-sage-500 hover:bg-sage-700 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-soft-lift hover:shadow-[0_6px_20px_rgba(85,107,92,0.3)] flex items-center justify-center gap-3 group text-button"
+            style={{ fontFamily: 'Inter, sans-serif' }}
+          >
+            <ShoppingCartSimple size={22} weight="bold" />
+            <span>Clear Cart & Add This Item</span>
+            <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+            </svg>
+          </button>
+          
+          <button
+            onClick={handleCancelAdd}
+            className="w-full bg-grey-200 border-2 border-grey-stroke hover:bg-cream-100 text-charcoal-600 font-bold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2 text-button"
+            style={{ fontFamily: 'Inter, sans-serif' }}
+          >
+            <X size={20} weight="bold" />
+            <span>Keep Current Cart</span>
+          </button>
+        </div>
+
+        {/* Help Text */}
+        <div className="mt-6 bg-cream-100 rounded-xl p-4 border border-grey-stroke">
+          <p className="text-label-medium text-charcoal-500 text-center leading-relaxed" style={{ fontFamily: 'Inter, sans-serif' }}>
+            💡 <span className="font-semibold">Tip:</span> Complete your current order first, then you can shop from other stores
+          </p>
+        </div>
+      </div>
     </div>
   </div>
 )}
+
+    {/* Snackbar */}
+      <Snackbar 
+        open={snackbar.open}
+        message={snackbar.message}
+        type={snackbar.type}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+      />
 
     </div>
   );

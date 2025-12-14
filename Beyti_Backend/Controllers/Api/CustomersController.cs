@@ -25,6 +25,12 @@ namespace Beyti_Backend.Controllers.Api
         public string Country { get; set; }
     }
 
+    public class CustomerOnboardingDto
+    {
+        public string UserId { get; set; }  // IdentityUserId
+        public string? Phone { get; set; }
+    }
+
     [Route("api/[controller]")]
     [ApiController]
     public class CustomersController : ControllerBase
@@ -57,22 +63,24 @@ namespace Beyti_Backend.Controllers.Api
                         fullName = c.UserProfile.DisplayName,
                         c.Phone,
                         c.CreatedAt,
-                        customerAddresses = c.CustomerAddresses.Select(ca => new
-                        {
-                            ca.Id,
-                            address = new
+                        customerAddresses = c.CustomerAddresses
+                            .Where(ca => ca.Address.IsActive)  // ← Filter active addresses
+                            .Select(ca => new
                             {
-                                ca.Address.Id,
-                                ca.Address.Label,
-                                ca.Address.Street,
-                                ca.Address.City,
-                                ca.Address.Region,
-                                ca.Address.PostalCode,
-                                ca.Address.Country,
-                                ca.Address.Latitude,
-                                ca.Address.Longitude
-                            }
-                        })
+                                ca.Id,
+                                address = new
+                                {
+                                    ca.Address.Id,
+                                    ca.Address.Label,
+                                    ca.Address.Street,
+                                    ca.Address.City,
+                                    ca.Address.Region,
+                                    ca.Address.PostalCode,
+                                    ca.Address.Country,
+                                    ca.Address.Latitude,
+                                    ca.Address.Longitude
+                                }
+                            })  // ← Added closing brace here
                     })
                     .FirstOrDefaultAsync();
 
@@ -83,30 +91,32 @@ namespace Beyti_Backend.Controllers.Api
             }
 
             return await query
-                .Select(c => new
-                {
-                    c.Id,
-                    fullName = c.UserProfile.DisplayName,
-                    c.Phone,
-                    c.CreatedAt,
-                    customerAddresses = c.CustomerAddresses.Select(ca => new
-                    {
-                        ca.Id,
-                        address = new
-                        {
-                            ca.Address.Id,
-                            ca.Address.Label,
-                            ca.Address.Street,
-                            ca.Address.City,
-                            ca.Address.Region,
-                            ca.Address.PostalCode,
-                            ca.Address.Country,
-                            ca.Address.Latitude,
-                            ca.Address.Longitude
-                        }
-                    })
-                })
-                .ToListAsync();
+     .Select(c => new
+     {
+         c.Id,
+         fullName = c.UserProfile.DisplayName,
+         c.Phone,
+         c.CreatedAt,
+         customerAddresses = c.CustomerAddresses
+             .Where(ca => ca.Address.IsActive)  // ← ADD THIS LINE
+             .Select(ca => new
+             {
+                 ca.Id,
+                 address = new
+                 {
+                     ca.Address.Id,
+                     ca.Address.Label,
+                     ca.Address.Street,
+                     ca.Address.City,
+                     ca.Address.Region,
+                     ca.Address.PostalCode,
+                     ca.Address.Country,
+                     ca.Address.Latitude,
+                     ca.Address.Longitude
+                 }
+             })
+     })
+     .ToListAsync();
         }
 
 
@@ -129,8 +139,10 @@ namespace Beyti_Backend.Controllers.Api
                 fullName = customer.UserProfile.DisplayName,
                 customer.Phone,
                 customer.CreatedAt,
-                customerAddresses = customer.CustomerAddresses.Select(ca => new
-                {
+                customerAddresses = customer.CustomerAddresses
+                    .Where(ca => ca.Address.IsActive)  // ← ADD THIS LINE
+                    .Select(ca => new
+                    {
                     ca.Id,
                     addressId = ca.AddressId,
                     address = new
@@ -192,6 +204,56 @@ namespace Beyti_Backend.Controllers.Api
                     error = ex.Message,
                     innerError = ex.InnerException?.Message
                 });
+            }
+        }
+
+        // POST: api/Customers/Onboard
+        // Called when user selects "I want to Shop" during role selection
+        [HttpPost("Onboard")]
+        public async Task<IActionResult> OnboardCustomer([FromBody] CustomerOnboardingDto dto)
+        {
+            try
+            {
+                // Find existing UserProfile by IdentityUserId
+                var profile = await _context.UserProfiles
+                    .FirstOrDefaultAsync(up => up.IdentityUserId == dto.UserId);
+
+                if (profile == null)
+                    return BadRequest(new { error = "User profile not found" });
+
+                // Check if already a customer
+                var existingCustomer = await _context.Customers
+                    .FirstOrDefaultAsync(c => c.UserProfileId == profile.Id);
+
+                if (existingCustomer != null)
+                    return Ok(new { message = "Already a customer", customerId = existingCustomer.Id });
+
+                // Update UserProfile to Customer role
+                profile.RoleType = "Customer";
+                profile.UpdatedAt = DateTime.UtcNow;
+
+                // Create Customer record
+                var customer = new Customer
+                {
+                    UserProfileId = profile.Id,
+                    Phone = dto.Phone,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                _context.Customers.Add(customer);
+                await _context.SaveChangesAsync();
+
+                return Ok(new
+                {
+                    customerId = customer.Id,
+                    userProfileId = profile.Id,
+                    message = "Customer profile created successfully"
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = ex.Message });
             }
         }
 

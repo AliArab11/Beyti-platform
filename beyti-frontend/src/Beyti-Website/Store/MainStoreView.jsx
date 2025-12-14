@@ -1,7 +1,13 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Cake, BowlFood, Heart, Bread, Coffee, Storefront } from "@phosphor-icons/react";
+import { useState, useEffect , useRef} from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { Cake, BowlFood, Heart, Bread, Coffee, Storefront, ShoppingCartSimple, Package, Star } from "@phosphor-icons/react";
 import StoreView from "./StoreView";
+import OrderDetails from './Components/OrderDetails';
+import ActiveOrderBanner from './Components/ActiveOrderBanner';
+import Snackbar from './../../components/Snackbar';
+import CustomerHeader from '../../components/CustomerHeader';
+
+
 
 // Get customers function
 const getCustomers = async () => {
@@ -84,64 +90,7 @@ const getStoreColors = (storeName) => {
   };
 };
 
-// Header Component
-const Header = ({ customerName = null, onCustomerClick }) => (
-  <header className="bg-cream-50 py-4 px-8 border-b border-grey-stroke">
-    <div className="max-w-[1440px] mx-auto flex items-center justify-between">
-      <h1 className="text-[32px] font-bold text-charcoal-600" style={{ fontFamily: 'Merriweather, serif' }}>
-        Beyti
-      </h1>
-      <h2 className="text-[32px] font-bold text-charcoal-600 absolute left-1/2 -translate-x-1/2" style={{ fontFamily: 'Merriweather, serif' }}>
-        Beyti Stores
-      </h2>
-      <div className="flex items-center gap-4">
-        <button className="p-2 hover:bg-grey-200 rounded-lg transition-all">
-          <svg className="w-5 h-5 text-charcoal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-          </svg>
-        </button>
-        <button className="p-2 hover:bg-grey-200 rounded-lg transition-all">
-          <svg className="w-5 h-5 text-charcoal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-          </svg>
-        </button>
-        <button className="p-2 hover:bg-grey-200 rounded-lg transition-all">
-          <svg className="w-5 h-5 text-charcoal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-          </svg>
-        </button>
-        {customerName ? (
-          <div 
-            onClick={onCustomerClick}
-            className="flex items-center gap-3 pl-4 border-l border-grey-stroke cursor-pointer hover:bg-grey-200 rounded-lg px-3 py-1 transition-all"
-          >
-            <div className="w-8 h-8 bg-sage-500 rounded-full flex items-center justify-center">
-              <span className="text-white text-sm font-semibold">{customerName[0]}</span>
-            </div>
-            <span className="text-charcoal-600 font-medium text-sm" style={{ fontFamily: 'Inter, sans-serif' }}>
-              {customerName}
-            </span>
-            <svg className="w-4 h-4 text-charcoal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </div>
-        ) : (
-          <button
-            onClick={onCustomerClick}
-            className="flex items-center gap-2 pl-4 border-l border-grey-stroke bg-sage-500 hover:bg-sage-600 text-white px-4 py-2 rounded-lg transition-all"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-            <span className="text-sm font-semibold" style={{ fontFamily: 'Inter, sans-serif' }}>
-              Select Customer
-            </span>
-          </button>
-        )}
-      </div>
-    </div>
-  </header>
-);
+
 
 // Main Category Tabs Component
 const CategoryTabs = ({ categories, selected, onSelect }) => (
@@ -263,32 +212,31 @@ const FeaturedCarousel = ({ stores, onStoreClick }) => {
               <div 
                 key={store.id || idx} 
                 onClick={() => onStoreClick(store.id)}
-                className="flex-shrink-0 w-[calc(33.333%-16px)] bg-white rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.1)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-all cursor-pointer"
+                className="flex-shrink-0 w-[calc(33.333%-16px)] bg-white rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all cursor-pointer"
               >
-                {/* Dynamic Banner */}
-                <div className={`relative h-40 bg-gradient-to-br ${colors.bannerGradient}`} style={{ backgroundColor: '#F5F5F7' }}>
+                <div className={`relative h-32 bg-gradient-to-br ${colors.bannerGradient}`} style={{ backgroundColor: '#F5F5F7' }}>
                   <div className="absolute inset-0 opacity-20">
                     <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
                       <defs>
-                        <pattern id={`pattern-${idx}`} patternUnits="userSpaceOnUse" width="30" height="30" patternTransform="rotate(45)">
-                          <line x1="0" y1="0" x2="0" y2="30" stroke={colors.accent} strokeWidth="1" opacity="0.3"/>
+                        <pattern id={`pattern-carousel-${idx}`} patternUnits="userSpaceOnUse" width="25" height="25" patternTransform="rotate(45)">
+                          <line x1="0" y1="0" x2="0" y2="25" stroke={colors.accent} strokeWidth="1" opacity="0.3"/>
                         </pattern>
                       </defs>
-                      <rect width="100%" height="100%" fill={`url(#pattern-${idx})`}/>
+                      <rect width="100%" height="100%" fill={`url(#pattern-carousel-${idx})`}/>
                     </svg>
                   </div>
-                  <div className="absolute top-4 right-6 w-16 h-16 rounded-full opacity-15"
-                       style={{ background: `radial-gradient(circle, ${colors.accent} 0%, transparent 70%)` }}></div>
+                  <div className="absolute top-3 right-4 w-12 h-12 rounded-full opacity-15"
+                      style={{ background: `radial-gradient(circle, ${colors.accent} 0%, transparent 70%)` }}></div>
                   
-                  <div className="absolute -bottom-9 left-5">
-                    <div className={`w-[4.5rem] h-[4.5rem] rounded-full bg-gradient-to-br ${colors.gradient} border-4 border-white flex items-center justify-center`}
-                         style={{ boxShadow: `0 4px 12px ${colors.shadow}` }}>
+                  <div className="absolute -bottom-8 left-4">
+                    <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${colors.gradient} border-4 border-white flex items-center justify-center`}
+                        style={{ boxShadow: `0 4px 12px ${colors.shadow}` }}>
                       <div className="absolute inset-0 flex items-center justify-center opacity-15">
-                        <svg viewBox="0 0 100 100" className="w-16 h-16 text-white">
+                        <svg viewBox="0 0 100 100" className="w-14 h-14 text-white">
                           <polygon points="50,10 85,30 85,70 50,90 15,70 15,30" fill="currentColor"/>
                         </svg>
                       </div>
-                      <span className="relative z-10 text-[22px] font-black text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.4)]" 
+                      <span className="relative z-10 text-[18px] font-black text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.4)]" 
                             style={{ fontFamily: "Inter, sans-serif" }}>
                         {initials}
                       </span>
@@ -296,14 +244,44 @@ const FeaturedCarousel = ({ stores, onStoreClick }) => {
                   </div>
                 </div>
                 
-                <div className="pt-11 p-5 bg-white">
-                  <h3 className="font-bold text-charcoal-600 text-[17px] mb-2" style={{ fontFamily: 'Merriweather, serif' }}>{store.storeName}</h3>
-                  <div className="flex items-center gap-1">
-                    {[...Array(5)].map((_, i) => (
-                      <svg key={i} className="w-3.5 h-3.5 text-[#F5C563] fill-current" viewBox="0 0 20 20">
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                      </svg>
-                    ))}
+                <div className="pt-10 p-4 bg-white">
+                  <h3 className="font-bold text-charcoal-600 text-base mb-2" style={{ fontFamily: 'Merriweather, serif' }}>{store.storeName}</h3>
+                  <div className="flex items-center gap-1 mb-3">
+                    {(() => {
+                      const rating = store.averageRating || 0;
+                      const hasEnoughReviews = store.averageRating !== null && store.averageRating !== undefined;
+                      
+                      if (!hasEnoughReviews) {
+                        return (
+                          <span className="px-3 py-1 bg-sage-500 text-white text-xs font-bold rounded-full" style={{ fontFamily: 'Inter, sans-serif' }}>
+                            NEW
+                          </span>
+                        );
+                      }
+                      
+                      return (
+                        <>
+                          {[0,1,2,3,4].map(i => {
+                            const fillPercentage = Math.max(0, Math.min(100, (rating - i) * 100));
+                            return (
+                              <div key={i} className="relative w-3.5 h-3.5">
+                                <Star size={14} className="text-grey-stroke absolute" weight="fill" />
+                                <div className="overflow-hidden absolute" style={{ width: `${fillPercentage}%` }}>
+                                  <Star size={14} className="text-sage-500" weight="fill" />
+                                </div>
+                              </div>
+                            );
+                          })}
+                          <span className="text-xs font-semibold text-charcoal-600 ml-1" style={{ fontFamily: 'Inter, sans-serif' }}>
+                            {rating.toFixed(1)}
+                          </span>
+                        </>
+                      );
+                    })()}
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    <span className="px-3 py-1 bg-cream-100 rounded-full text-xs font-medium text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>Bakery</span>
+                    <span className="px-3 py-1 bg-cream-100 rounded-full text-xs font-medium text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>Sweets</span>
                   </div>
                 </div>
               </div>
@@ -380,12 +358,37 @@ const StoreCard = ({ store }) => {
       <div className="pt-10 p-4 bg-white">
         <h3 className="font-bold text-charcoal-600 text-base mb-2" style={{ fontFamily: 'Merriweather, serif' }}>{store.storeName}</h3>
         <div className="flex items-center gap-1 mb-3">
-          {[1,2,3,4,5].map(star => (
-            <svg key={star} className="w-3.5 h-3.5 text-[#F5C563] fill-current" viewBox="0 0 20 20">
-              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-            </svg>
-          ))}
-          <span className="text-xs font-semibold text-charcoal-600 ml-1" style={{ fontFamily: 'Inter, sans-serif' }}>4.5</span>
+          {(() => {
+            const rating = store.averageRating || 0;
+            const hasEnoughReviews = store.averageRating !== null && store.averageRating !== undefined;
+            
+            if (!hasEnoughReviews) {
+              return (
+                <span className="px-3 py-1 bg-sage-500 text-white text-xs font-bold rounded-full" style={{ fontFamily: 'Inter, sans-serif' }}>
+                  NEW
+                </span>
+              );
+            }
+            
+            return (
+              <>
+                {[0,1,2,3,4].map(i => {
+                    const fillPercentage = Math.max(0, Math.min(100, (rating - i) * 100));
+                    return (
+                      <div key={i} className="relative w-3.5 h-3.5">
+                        <Star size={14} className="text-grey-stroke absolute" weight="fill" />
+                        <div className="overflow-hidden absolute" style={{ width: `${fillPercentage}%` }}>
+                          <Star size={14} className="text-sage-500" weight="fill" />
+                        </div>
+                      </div>
+                    );
+                  })}
+                <span className="text-xs font-semibold text-charcoal-600 ml-1" style={{ fontFamily: 'Inter, sans-serif' }}>
+                  {rating.toFixed(1)}
+                </span>
+              </>
+            );
+          })()}
         </div>
         <div className="flex gap-2 flex-wrap">
           <span className="px-3 py-1 bg-cream-100 rounded-full text-xs font-medium text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>Bakery</span>
@@ -458,6 +461,8 @@ const CustomerSelectModal = ({ isOpen, customers, onSelect, onClose }) => {
 // Main Component
 const MainStoreView = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+
   const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("Food & Drink");
@@ -465,11 +470,199 @@ const MainStoreView = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStoreId, setSelectedStoreId] = useState(null);
 
-    // Customer state
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [activeFilters, setActiveFilters] = useState({
+    rating: null, // null, 4, 3
+    priceRange: null, // null, 'low', 'medium', 'high'
+    distance: null, // null, 'near', 'far'
+    availability: null, // null, 'open', 'closed'
+  });
+
+ // Customer state
   const [customers, setCustomers] = useState([]);
   const [customerId, setCustomerId] = useState(null);
   const [customerName, setCustomerName] = useState(null);
-  const [customerModalOpen, setCustomerModalOpen] = useState(true);
+  const [customerModalOpen, setCustomerModalOpen] = useState(false);
+  const [customerAddresses, setCustomerAddresses] = useState([]);
+
+  // Add Snackbar state
+const [snackbar, setSnackbar] = useState({ open: false, message: '', type: 'success' });
+const orderPlacedShown = useRef(false);
+
+const showSnackbar = (message, type = 'success') => {
+  setSnackbar({ open: true, message, type });
+  setTimeout(() => setSnackbar({ open: false, message: '', type: 'success' }), 5000);
+};
+
+  // Cart state - load from localStorage
+  const [cart, setCart] = useState(() => {
+    try {
+      if (customerId) {
+        // Check all cart keys for this customer
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith(`beyti_cart_`) && key.endsWith(`_${customerId}`)) {
+            try {
+              const savedCart = localStorage.getItem(key);
+              if (savedCart) {
+                const parsedCart = JSON.parse(savedCart);
+                if (parsedCart.length > 0) {
+                  return parsedCart;
+                }
+              }
+            } catch (err) {
+              console.error('Error parsing cart from key:', key, err);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error loading cart:', err);
+    }
+    return [];
+  });
+
+  // Update cart when customer changes or on mount
+  useEffect(() => {
+    if (!customerId) {
+      setCart([]);
+      return;
+    }
+
+    // Poll localStorage for cart updates - check ALL stores
+    const updateCart = () => {
+      try {
+        let allItems = [];
+        
+        // Check all localStorage keys for this customer
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith(`beyti_cart_`) && key.endsWith(`_${customerId}`)) {
+            const savedCart = localStorage.getItem(key);
+            if (savedCart) {
+              const parsedCart = JSON.parse(savedCart);
+              if (parsedCart.length > 0) {
+                allItems = parsedCart; // Take the first non-empty cart we find
+                break;
+              }
+            }
+          }
+        }
+        
+        setCart(allItems);
+      } catch (err) {
+        console.error('Error updating cart:', err);
+      }
+    };
+
+    updateCart();
+    
+    // Update cart every 500ms to catch changes
+    const interval = setInterval(updateCart, 500);
+    
+    return () => clearInterval(interval);
+  }, [customerId]);
+
+// Add active order state
+const [activeOrder, setActiveOrder] = useState(null);
+
+const [orders, setOrders] = useState([]);
+
+// Load and poll active order for the selected customer (like cart polling)
+useEffect(() => {
+  if (!customerId) {
+    setActiveOrder(null);
+    return;
+  }
+
+  const updateActiveOrder = () => {
+    try {
+      const savedOrder = localStorage.getItem(`beyti_activeOrder_${customerId}`);
+      if (savedOrder) {
+        const parsedOrder = JSON.parse(savedOrder);
+        setActiveOrder(parsedOrder);
+      } else {
+        setActiveOrder(null);
+      }
+    } catch (err) {
+      console.error('Error loading active order:', err);
+    }
+  };
+
+  // Load immediately
+  updateActiveOrder();
+  
+  // Poll every 1 second to catch changes
+  const interval = setInterval(updateActiveOrder, 1000);
+  
+  return () => clearInterval(interval);
+}, [customerId]);
+
+
+
+
+// Fetch customer orders (backend handles auto-cancellation)
+useEffect(() => {
+  if (!customerId) {
+    setOrders([]);
+    return;
+  }
+
+  const fetchOrders = async () => {
+    try {
+      const response = await fetch(`https://localhost:7062/api/Orders?customerId=${customerId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setOrders(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Error fetching orders:', err);
+      setOrders([]);
+    }
+  };
+
+  fetchOrders();
+  
+  // Poll every 30 seconds
+  const interval = setInterval(fetchOrders, 30000);
+  
+  return () => clearInterval(interval);
+}, [customerId]);
+
+// Poll for order updates
+useEffect(() => {
+  if (!activeOrder || !customerId) return;
+
+  const interval = setInterval(async () => {
+    try {
+      const response = await fetch(`https://localhost:7062/api/Orders/${activeOrder.id}`);
+      if (response.ok) {
+        const updated = await response.json();
+        if (updated.status !== activeOrder.status) {
+          const completeUpdatedOrder = {
+            ...activeOrder,
+            ...updated,
+            storeName: updated.sellerName || activeOrder.storeName,
+            storePhone: activeOrder.storePhone || updated.sellerPhone,
+            pickupAddress: updated.pickupAddress || activeOrder.pickupAddress,
+            deliveryAddress: updated.deliveryAddress || activeOrder.deliveryAddress,
+          };
+          setActiveOrder(completeUpdatedOrder);
+        }
+      }
+    } catch (err) {
+      console.error('Polling error:', err);
+    }
+  }, 5000);
+
+  return () => clearInterval(interval);
+}, [activeOrder]);
+
+const [bannerDismissed, setBannerDismissed] = useState(() => {
+  if (!customerId) return false;
+  return localStorage.getItem(`beyti_bannerDismissed_${customerId}`) === 'true';
+});
+
 
   const categories = ["Food & Drink", "Clothing & Accessories", "Self-Care & Beauty"];
   
@@ -498,14 +691,134 @@ const MainStoreView = () => {
     };
     loadCustomers();
   }, []);
-const handleCustomerSelect = (customer) => {
-    setCustomerId(customer.id);
-    setCustomerName(customer.fullName || customer.name || `Customer #${customer.id}`);
-    setCustomerModalOpen(false);
-    
-    // Store the full customer object to access addresses later
-    console.log("Selected customer with addresses:", customer);
+
+// Load saved customer from sessionStorage on mount
+useEffect(() => {
+  const savedCustomerId = sessionStorage.getItem('beyti_customerId');
+  const savedCustomerName = sessionStorage.getItem('beyti_customerName');
+  
+  if (savedCustomerId && savedCustomerName) {
+    setCustomerId(parseInt(savedCustomerId, 10));
+    setCustomerName(savedCustomerName);
+    console.log("Restored customer session:", savedCustomerName);
+  }
+  // Removed auto-opening modal - let user browse as guest
+}, []);
+
+// Fetch customer addresses when customerId changes
+useEffect(() => {
+  const fetchCustomerAddresses = async () => {
+    if (!customerId) {
+      setCustomerAddresses([]);
+      return;
+    }
+
+    try {
+      console.log("🔍 Fetching customer addresses for ID:", customerId);
+      const response = await fetch(`https://localhost:7062/api/Customers/${customerId}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const customerData = await response.json();
+      console.log("✅ Customer data received:", customerData);
+      
+      const addresses = customerData.customerAddresses || [];
+      console.log("📍 Customer addresses extracted:", addresses);
+      
+      setCustomerAddresses(addresses);
+    } catch (err) {
+      console.error("❌ Error fetching customer addresses:", err);
+      setCustomerAddresses([]);
+    }
   };
+
+  fetchCustomerAddresses();
+}, [customerId]);
+
+useEffect(() => {
+  console.log('🔥 MainStore orderPlaced effect triggered');
+  console.log('📦 location.state:', location.state);
+  console.log('📦 orderPlacedShown.current:', orderPlacedShown.current);
+  
+  // Only run this if we're actually on the main store page (not navigating away)
+  if (location.state?.orderPlaced && !orderPlacedShown.current && location.pathname === '/mainStore') {
+    console.log('✅ SHOWING ORDER PLACED SNACKBAR');
+    orderPlacedShown.current = true;
+    
+    showSnackbar(`Order #${location.state.orderId} placed successfully! 🎉`, 'success');
+    
+    setTimeout(() => {
+      // Only navigate if still on mainStore page
+      if (window.location.pathname === '/mainStore') {
+        navigate(location.pathname, { 
+          replace: true, 
+          state: { customerId, customerName } 
+        });
+      }
+      orderPlacedShown.current = false;
+    }, 3500);
+  }
+}, [location.state, location.pathname, customerId, customerName, navigate]);
+
+// Reset banner dismissed state when customer changes
+useEffect(() => {
+  if (customerId) {
+    const dismissed = localStorage.getItem(`beyti_bannerDismissed_${customerId}`) === 'true';
+    setBannerDismissed(dismissed);
+  }
+}, [customerId]);
+
+// Close filter dropdown when clicking outside
+useEffect(() => {
+  const handleClickOutside = (event) => {
+    if (showFilterDropdown && !event.target.closest('.relative')) {
+      setShowFilterDropdown(false);
+    }
+  };
+
+  document.addEventListener('mousedown', handleClickOutside);
+  return () => document.removeEventListener('mousedown', handleClickOutside);
+}, [showFilterDropdown]);
+
+const handleCustomerSelect = (customer) => {
+  const name = customer.fullName || customer.name || `Customer #${customer.id}`;
+  setCustomerId(customer.id);
+  setCustomerName(name);
+  setCustomerModalOpen(false);
+  
+  // Save to sessionStorage
+  sessionStorage.setItem('beyti_customerId', customer.id.toString());
+  sessionStorage.setItem('beyti_customerName', name);
+  
+  console.log("Selected customer with addresses:", customer);
+};
+
+const handleCustomerLogout = () => {
+  // Clear customer session
+  sessionStorage.removeItem('beyti_customerId');
+  sessionStorage.removeItem('beyti_customerName');
+  setCustomerId(null);
+  setCustomerName(null);
+  setActiveOrder(null);
+  
+  // Clear any active order from localStorage
+  if (customerId) {
+    localStorage.removeItem(`beyti_activeOrder_${customerId}`);
+  }
+  
+  console.log("Customer logged out");
+};
+
+const handleDismissBanner = () => {
+  setBannerDismissed(true);
+  localStorage.setItem(`beyti_bannerDismissed_${customerId}`, 'true');
+};
+
+const handleTrackOrder = () => {
+  navigate('/customer-dashboard');
+};
 
   const handleCustomerClick = () => {
     setCustomerModalOpen(true);
@@ -524,9 +837,93 @@ const handleCustomerSelect = (customer) => {
     }
   };
 
-  const filteredStores = stores.filter(store => 
-    store.storeName?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleFilterChange = (filterType, value) => {
+  setActiveFilters(prev => ({
+    ...prev,
+    [filterType]: prev[filterType] === value ? null : value
+  }));
+};
+
+const clearAllFilters = () => {
+  setActiveFilters({
+    rating: null,
+    priceRange: null,
+    distance: null,
+    availability: null,
+  });
+};
+
+const getActiveFilterCount = () => {
+  return Object.values(activeFilters).filter(v => v !== null).length;
+};
+
+  
+// Function to handle store navigation - ALWAYS allow browsing
+const handleStoreNavigation = (targetStoreId) => {
+  // Always allow navigation to browse stores
+  navigate(`/store/${targetStoreId}`, { 
+    state: { customerId, customerName } 
+  });
+};
+
+
+
+const filteredStores = stores
+  .filter(store => {
+    // Search filter
+    if (searchQuery && !store.storeName?.toLowerCase().includes(searchQuery.toLowerCase())) {
+      return false;
+    }
+    
+    // Rating filter - NEW stores (no rating) are always included
+    if (activeFilters.rating) {
+      const rating = store.averageRating;
+      // If store has no rating (null/undefined), include it (will be sorted to end)
+      if (rating !== null && rating !== undefined) {
+        // Only filter out stores that have ratings below the threshold
+        if (rating < activeFilters.rating) return false;
+      }
+    }
+    
+    // Price range filter (based on average product price)
+    if (activeFilters.priceRange && store.products && store.products.length > 0) {
+      const avgPrice = store.products.reduce((sum, p) => sum + (p.basePrice || 0), 0) / store.products.length;
+      
+      if (activeFilters.priceRange === 'budget' && avgPrice >= 5) return false;
+      if (activeFilters.priceRange === 'low' && (avgPrice < 5 || avgPrice >= 10)) return false;
+      if (activeFilters.priceRange === 'medium' && (avgPrice < 10 || avgPrice >= 25)) return false;
+      if (activeFilters.priceRange === 'high' && avgPrice < 25) return false;
+    }
+    
+    return true;
+  })
+  .sort((a, b) => {
+    // Sort stores: rated stores first (by rating desc), then NEW stores
+    const ratingA = a.averageRating;
+    const ratingB = b.averageRating;
+    
+    const hasRatingA = ratingA !== null && ratingA !== undefined;
+    const hasRatingB = ratingB !== null && ratingB !== undefined;
+    
+    // Both have ratings - sort by rating (highest first)
+    if (hasRatingA && hasRatingB) {
+      return ratingB - ratingA;
+    }
+    
+    // Only A has rating - A comes first
+    if (hasRatingA && !hasRatingB) {
+      return -1;
+    }
+    
+    // Only B has rating - B comes first
+    if (!hasRatingA && hasRatingB) {
+      return 1;
+    }
+    
+    // Neither has rating - maintain original order
+    return 0;
+  });
+
 
   
 
@@ -539,10 +936,33 @@ const handleCustomerSelect = (customer) => {
         onClose={() => setCustomerModalOpen(false)}
       />
       
-      <Header 
+      <CustomerHeader
         customerName={customerName}
+        customerId={customerId}
+        cart={cart}
+        stores={stores}
+        customerAddresses={customerAddresses}
         onCustomerClick={handleCustomerClick}
+        onLogout={handleCustomerLogout}
+        variant="store"
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
       />
+
+    {/* Active Order Banner */}
+      {(() => {
+        const count = orders.filter(o => 
+          !['completed', 'cancelled', 'delivered'].includes(o.status?.toLowerCase())
+        ).length;
+        return count > 0 && !bannerDismissed && (
+          <ActiveOrderBanner 
+            activeOrderCount={count}
+            onTrack={handleTrackOrder}
+            onDismiss={handleDismissBanner}
+          />
+        );
+      })()}
+
 
       <div className="max-w-[1440px] mx-auto px-8 py-8">
         <div className="flex justify-center">
@@ -561,15 +981,197 @@ const handleCustomerSelect = (customer) => {
           />
 
           <div className="flex-1">
-            <SearchBar value={searchQuery} onChange={setSearchQuery} />
+            <div className="flex gap-4 items-center mb-8">
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search Food Stores..."
+                  className="w-full pl-12 pr-4 py-3.5 bg-white rounded-full border border-grey-stroke focus:outline-none focus:border-sage-500 text-charcoal-600 shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
+                  style={{ fontFamily: 'Inter, sans-serif', fontSize: '16px' }}
+                />
+                <svg className="w-5 h-5 text-charcoal-400 absolute left-4 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              
+              {/* Filter Button */}
+              <div className="relative">
+                <button 
+                  onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                  className="flex items-center gap-3 px-6 py-3.5 bg-white rounded-full border border-grey-stroke hover:border-sage-500 transition-all shadow-[0_2px_8px_rgba(0,0,0,0.06)] relative"
+                >
+                  <svg className="w-5 h-5 text-sage-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                  </svg>
+                  <span className="text-charcoal-600 font-semibold text-[14px]" style={{ fontFamily: 'Inter, sans-serif' }}>
+                    Filter
+                  </span>
+                  {getActiveFilterCount() > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-sage-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                      {getActiveFilterCount()}
+                    </span>
+                  )}
+                  <svg className="w-4 h-4 text-charcoal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {/* Filter Dropdown */}
+{showFilterDropdown && (
+  <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-grey-stroke z-50">
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between pb-4 border-b border-grey-stroke">
+        <h3 className="text-lg font-bold text-charcoal-600" style={{ fontFamily: 'Merriweather, serif' }}>
+          Filters
+        </h3>
+        {getActiveFilterCount() > 0 && (
+          <button
+            onClick={clearAllFilters}
+            className="text-sm text-sage-600 hover:text-sage-700 font-semibold"
+            style={{ fontFamily: 'Inter, sans-serif' }}
+          >
+            Clear All
+          </button>
+        )}
+      </div>
+
+      {/* Rating Slider */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-semibold text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>
+            Minimum Rating
+          </p>
+          <div className="flex items-center gap-1 bg-sage-100 px-3 py-1 rounded-full">
+            <Star size={14} weight="fill" className="text-sage-600" />
+            <span className="text-sm font-bold text-sage-700" style={{ fontFamily: 'Inter, sans-serif' }}>
+              {activeFilters.rating ? `${activeFilters.rating}+` : 'Any'}
+            </span>
+          </div>
+        </div>
+        <div className="relative">
+          <input
+            type="range"
+            min="0"
+            max="5"
+            step="1"
+            value={activeFilters.rating || 0}
+            onChange={(e) => {
+              const value = parseInt(e.target.value);
+              handleFilterChange('rating', value === 0 ? null : value);
+            }}
+            className="w-full h-2 bg-grey-200 rounded-full appearance-none cursor-pointer 
+                     [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 
+                     [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-sage-500 
+                     [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md
+                     [&::-webkit-slider-thumb]:hover:bg-sage-600 [&::-webkit-slider-thumb]:transition-colors
+                     [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:rounded-full 
+                     [&::-moz-range-thumb]:bg-sage-500 [&::-moz-range-thumb]:border-0 
+                     [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-md
+                     [&::-moz-range-thumb]:hover:bg-sage-600 [&::-moz-range-thumb]:transition-colors"
+            style={{
+              background: activeFilters.rating 
+                ? `linear-gradient(to right, #556B5C 0%, #556B5C ${((activeFilters.rating || 0) / 5) * 100}%, #E5E7EB ${((activeFilters.rating || 0) / 5) * 100}%, #E5E7EB 100%)`
+                : '#E5E7EB'
+            }}
+          />
+          <div className="flex justify-between mt-2 text-xs text-charcoal-400" style={{ fontFamily: 'Inter, sans-serif' }}>
+            <span>Any</span>
+            <span>1</span>
+            <span>2</span>
+            <span>3</span>
+            <span>4</span>
+            <span>5</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Price Range Slider */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-semibold text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>
+            Average Price Range
+          </p>
+          <div className="bg-sage-100 px-3 py-1 rounded-full">
+            <span className="text-sm font-bold text-sage-700" style={{ fontFamily: 'Inter, sans-serif' }}>
+              {activeFilters.priceRange === 'budget' && 'Under 5 BD'}
+              {activeFilters.priceRange === 'low' && '5-10 BD'}
+              {activeFilters.priceRange === 'medium' && '10-25 BD'}
+              {activeFilters.priceRange === 'high' && '25+ BD'}
+              {!activeFilters.priceRange && 'Any'}
+            </span>
+          </div>
+        </div>
+        <div className="relative">
+          <input
+            type="range"
+            min="0"
+            max="4"
+            step="1"
+            value={
+              activeFilters.priceRange === 'budget' ? 1 :
+              activeFilters.priceRange === 'low' ? 2 :
+              activeFilters.priceRange === 'medium' ? 3 :
+              activeFilters.priceRange === 'high' ? 4 : 0
+            }
+            onChange={(e) => {
+              const value = parseInt(e.target.value);
+              const priceMap = { 0: null, 1: 'budget', 2: 'low', 3: 'medium', 4: 'high' };
+              handleFilterChange('priceRange', priceMap[value]);
+            }}
+            className="w-full h-2 bg-grey-200 rounded-full appearance-none cursor-pointer 
+                     [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 
+                     [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-sage-500 
+                     [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md
+                     [&::-webkit-slider-thumb]:hover:bg-sage-600 [&::-webkit-slider-thumb]:transition-colors
+                     [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:rounded-full 
+                     [&::-moz-range-thumb]:bg-sage-500 [&::-moz-range-thumb]:border-0 
+                     [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-md
+                     [&::-moz-range-thumb]:hover:bg-sage-600 [&::-moz-range-thumb]:transition-colors"
+            style={{
+              background: activeFilters.priceRange
+                ? `linear-gradient(to right, #556B5C 0%, #556B5C ${
+                    (activeFilters.priceRange === 'budget' ? 1 :
+                     activeFilters.priceRange === 'low' ? 2 :
+                     activeFilters.priceRange === 'medium' ? 3 : 
+                     activeFilters.priceRange === 'high' ? 4 : 0) / 4 * 100
+                  }%, #E5E7EB ${
+                    (activeFilters.priceRange === 'budget' ? 1 :
+                     activeFilters.priceRange === 'low' ? 2 :
+                     activeFilters.priceRange === 'medium' ? 3 : 
+                     activeFilters.priceRange === 'high' ? 4 : 0) / 4 * 100
+                  }%, #E5E7EB 100%)`
+                : '#E5E7EB'
+            }}
+          />
+          <div className="flex justify-between mt-2 text-xs text-charcoal-400" style={{ fontFamily: 'Inter, sans-serif' }}>
+            <span>Any</span>
+            <span>&lt;5</span>
+            <span>5-10</span>
+            <span>10-25</span>
+            <span>25+</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Apply Button */}
+      <button
+        onClick={() => setShowFilterDropdown(false)}
+        className="w-full bg-sage-500 hover:bg-sage-600 text-white font-bold py-3 rounded-xl transition-all shadow-soft-lift"
+        style={{ fontFamily: 'Inter, sans-serif' }}
+      >
+        Apply Filters
+      </button>
+    </div>
+  </div>
+)}
+              </div>
+            </div>
             <FeaturedCarousel 
             stores={stores} 
-            onStoreClick={(id) => navigate(`/store/${id}`, { 
-                state: { 
-                customerId, 
-                customerName 
-                } 
-            })}
+            onStoreClick={handleStoreNavigation}
             />
 
             {loading ? (
@@ -593,20 +1195,22 @@ const handleCustomerSelect = (customer) => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {filteredStores.map(store => (
-                 <div key={store.id} onClick={() => navigate(`/store/${store.id}`, { 
-                    state: { 
-                        customerId, 
-                        customerName 
-                    } 
-                    })}>
-                    <StoreCard store={store} />
+                    <div key={store.id} onClick={() => handleStoreNavigation(store.id)}>
+                        <StoreCard store={store} />
                     </div>
-                ))}
+                    ))}
               </div>
             )}
           </div>
         </div>
       </div>
+      {/* Snackbar */}
+      <Snackbar 
+        open={snackbar.open}
+        message={snackbar.message}
+        type={snackbar.type}
+        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+      />
     </div>
   );
 };

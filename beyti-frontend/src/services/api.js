@@ -441,6 +441,38 @@ export const getSeller = async (id) => {
 };
 
 /**
+ * Get seller profile by UserProfileId
+ * WORKAROUND: Backend doesn't have a dedicated endpoint for this
+ * This fetches all sellers and finds the one with matching UserProfileId
+ * @param {number} userProfileId - User Profile ID
+ * @returns {Promise<object|null>} - Seller object or null if not found
+ */
+export const getSellerByUserProfileId = async (userProfileId) => {
+  try {
+    // Backend doesn't have /Sellers/Profile/{userProfileId} endpoint
+    // Fetch all sellers and filter by UserProfileId
+    const sellers = await fetchAPI('/Sellers');
+
+    if (!sellers || !Array.isArray(sellers)) {
+      return null;
+    }
+
+    // Find seller with matching UserProfileId (check both camelCase and PascalCase)
+    const seller = sellers.find(s =>
+      s.UserProfileId === userProfileId ||
+      s.userProfileId === userProfileId ||
+      s.UserProfileId === parseInt(userProfileId) ||
+      s.userProfileId === parseInt(userProfileId)
+    );
+
+    return seller || null;
+  } catch (error) {
+    console.warn('[API] Error fetching sellers:', error);
+    return null;
+  }
+};
+
+/**
  * Create a new seller
  * @param {object} data - Seller data (PascalCase: UserProfileId, StoreName, Phone)
  * @returns {Promise<object>} - Created seller object
@@ -789,6 +821,12 @@ export const getOrders = async (customerId = null, sellerId = null) => {
   return await fetchAPI(url);
 };
 
+export const getOrderWithDetails = async (id, customerId) => {
+  const res = await fetch(`https://localhost:7062/api/Orders?customerId=${customerId}`);
+  return (await res.json()).find(o => o.id === id);
+};
+
+
 /**
  * Get a single order by ID
  * @param {number} id - Order ID
@@ -852,6 +890,64 @@ export const deleteOrder = async (id) => {
     method: 'DELETE',
   });
 };
+
+/**
+ * Validate stock availability before placing order
+ * @param {Array} items - Array of {ProductId, VariantId, Quantity}
+ * @returns {Promise<object>} - Validation result
+ */
+export const validateStock = async (items) => {
+  return await fetchAPI('/Orders/validate-stock', {
+    method: 'POST',
+    body: JSON.stringify(items),
+  });
+};
+
+/**
+ * Reserve stock for order items
+ * @param {Array} items - Array of {ProductId, VariantId, Quantity}
+ * @returns {Promise<void>}
+ */
+export const reserveStock = async (items) => {
+  return await fetchAPI('/Orders/reserve-stock', {
+    method: 'POST',
+    body: JSON.stringify(items),
+  });
+};
+
+/**
+ * Restore stock when order is cancelled
+ * @param {number} orderId - Order ID
+ * @returns {Promise<void>}
+ */
+export const restoreStock = async (orderId) => {
+  try {
+    const response = await fetch(`https://localhost:7062/api/Orders/${orderId}/restore-stock`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    // If response is 204 No Content or empty, that's OK
+    if (response.status === 204 || response.status === 200) {
+      console.log('✅ Stock restored successfully');
+      return { success: true };
+    }
+
+    // Try to parse JSON only if there's content
+    const text = await response.text();
+    if (text) {
+      return JSON.parse(text);
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('❌ Failed to restore stock:', error);
+    throw error;
+  }
+};
+
 
 // --- Order Item APIs ---
 
@@ -1284,6 +1380,37 @@ export const getDriver = async (id) => {
 };
 
 /**
+ * Get driver profile by UserProfileId
+ * WORKAROUND: Backend doesn't have a dedicated endpoint for this
+ * @param {number} userProfileId - User Profile ID
+ * @returns {Promise<object|null>} - Driver object or null if not found
+ */
+export const getDriverByUserProfileId = async (userProfileId) => {
+  try {
+    // Backend doesn't have /Drivers/Profile/{userProfileId} endpoint
+    // Fetch all drivers and filter by UserProfileId
+    const drivers = await fetchAPI('/Drivers');
+
+    if (!drivers || !Array.isArray(drivers)) {
+      return null;
+    }
+
+    // Find driver with matching UserProfileId (check both camelCase and PascalCase)
+    const driver = drivers.find(d =>
+      d.UserProfileId === userProfileId ||
+      d.userProfileId === userProfileId ||
+      d.UserProfileId === parseInt(userProfileId) ||
+      d.userProfileId === parseInt(userProfileId)
+    );
+
+    return driver || null;
+  } catch (error) {
+    console.warn('[API] Error fetching drivers:', error);
+    return null;
+  }
+};
+
+/**
  * Create a new driver
  * @param {object} data - Driver data (PascalCase: UserProfileId, Phone, Status)
  * @returns {Promise<object>} - Created driver object
@@ -1324,7 +1451,32 @@ export const deleteDriver = async (id) => {
 
 // Profile
 export const getProviderProfile = async (userProfileId) => {
-  return await fetchAPI(`/ServiceProviderDashboard/Profile/${userProfileId}`);
+  try {
+    // First try the dashboard endpoint (for logged-in service provider)
+    return await fetchAPI(`/ServiceProviderDashboard/Profile/${userProfileId}`);
+  } catch (error) {
+    // If dashboard endpoint fails, fallback to fetching all providers and filtering
+    try {
+      const providers = await fetchAPI('/ServiceProviders');
+
+      if (!providers || !Array.isArray(providers)) {
+        return null;
+      }
+
+      // Find provider with matching UserProfileId (check both camelCase and PascalCase)
+      const provider = providers.find(p =>
+        p.UserProfileId === userProfileId ||
+        p.userProfileId === userProfileId ||
+        p.UserProfileId === parseInt(userProfileId) ||
+        p.userProfileId === parseInt(userProfileId)
+      );
+
+      return provider || null;
+    } catch (fallbackError) {
+      console.warn('[API] Error fetching service providers:', fallbackError);
+      return null;
+    }
+  }
 };
 
 export const updateProviderProfile = async (userProfileId, data) => {

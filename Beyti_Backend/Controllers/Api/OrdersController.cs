@@ -48,18 +48,39 @@ namespace Beyti_Backend.Controllers.Api
             public string? SellerNote { get; set; }
         }
 
+        public class StockValidationItem
+        {
+            public int ProductId { get; set; }
+            public int VariantId { get; set; }
+            public int Quantity { get; set; }
+        }
+
 
         // GET: api/Orders
         [HttpGet]
         public async Task<ActionResult<IEnumerable<object>>> GetOrders([FromQuery] int? customerId, [FromQuery] int? sellerId)
         {
+            // AUTO-CANCEL EXPIRED ORDERS BEFORE RETURNING RESULTS
+            await AutoCancelExpiredOrders();
+
             var query = _context.Orders
-                .Include(o => o.Customer)
-                .Include(o => o.Seller)
-                .Include(o => o.OrderItems)
-                    .ThenInclude(oi => oi.ProductVariant)
-                        .ThenInclude(pv => pv.Product)
-                .AsQueryable();
+            .Include(o => o.Customer)
+                .ThenInclude(c => c.UserProfile)
+
+            .Include(o => o.Seller)
+                .ThenInclude(s => s.UserProfile)
+
+            .Include(o => o.PickupAddress)
+            .Include(o => o.DeliveryAddress)
+
+            .Include(o => o.Seller)
+                .ThenInclude(s => s.SellerAddresses)
+                    .ThenInclude(sa => sa.Address)
+
+            .Include(o => o.OrderItems)
+                .ThenInclude(oi => oi.ProductVariant)
+                    .ThenInclude(pv => pv.Product)
+            .AsQueryable();
 
             if (customerId.HasValue)
             {
@@ -72,52 +93,171 @@ namespace Beyti_Backend.Controllers.Api
             }
 
             var orders = await query
-                .Select(o => new
+            .Select(o => new
+            {
+                o.Id,
+                o.CustomerId,
+                o.SellerId,
+                o.DeliveryAddressId,
+                o.PickupAddressId,
+                o.PaymentMethod,
+                o.PaymentStatus,
+                o.FulfillmentType,
+                o.Status,
+                o.SubtotalAmount,
+                o.DeliveryFee,
+                o.TotalAmount,
+                o.CreatedAt,
+                o.UpdatedAt,
+                customerName = o.Customer.UserProfile.DisplayName,
+                sellerName = o.Seller.UserProfile.DisplayName,
+                sellerPhone = o.Seller.Phone,
+
+                pickupAddress = o.PickupAddress != null ? new
                 {
-                    o.Id,
-                    o.CustomerId,
-                    o.SellerId,
-                    o.PaymentMethod,
-                    o.PaymentStatus,
-                    o.FulfillmentType,
-                    o.Status,
-                    o.SubtotalAmount,
-                    o.DeliveryFee,
-                    o.TotalAmount,
-                    o.CreatedAt,
-                    o.UpdatedAt,
-                    customerName = o.Customer.UserProfile.DisplayName,
-                    sellerName = o.Seller.UserProfile.DisplayName,
-                    orderItems = o.OrderItems.Select(oi => new
-                    {
-                        oi.Id,
-                        oi.OrderId,
-                        oi.ProductVariantId,
-                        productId = oi.ProductVariant.Product.Id,
-                        productName = oi.ProductVariant.Product.Name,
-                        productPrice = oi.ProductVariant.Product.BasePrice,
-                        variantSKU = oi.ProductVariant.SKU,
-                        oi.Qty,
-                        oi.UnitPrice,
-                        oi.LineTotal
-                    }).ToList()
-                })
-                .ToListAsync();
+                    o.PickupAddress.Id,
+                    o.PickupAddress.Street,
+                    o.PickupAddress.City,
+                    o.PickupAddress.Region,
+                    o.PickupAddress.Country,
+                    o.PickupAddress.Latitude,
+                    o.PickupAddress.Longitude,
+                } : null,
+
+                deliveryAddress = o.DeliveryAddress != null ? new
+                {
+                    o.DeliveryAddress.Id,
+                    o.DeliveryAddress.Street,
+                    o.DeliveryAddress.City,
+                    o.DeliveryAddress.Region,
+                    o.DeliveryAddress.Country,
+                    o.DeliveryAddress.Latitude,
+                    o.DeliveryAddress.Longitude,
+                } : null,
+
+                orderItems = o.OrderItems.Select(oi => new
+                {
+                    oi.Id,
+                    oi.OrderId,
+                    oi.ProductVariantId,
+                    productId = oi.ProductVariant.Product.Id,
+                    productName = oi.ProductVariant.Product.Name,
+                    productPrice = oi.ProductVariant.Product.BasePrice,
+                    variantSKU = oi.ProductVariant.SKU,
+                    oi.Qty,
+                    oi.UnitPrice,
+                    oi.LineTotal
+                }).ToList()
+            })
+            .ToListAsync();
 
             return Ok(orders);
         }
 
+        // Helper method to auto-cancel expired orders
+        private async Task AutoCancelExpiredOrders()
+        {
+            var now = DateTime.UtcNow;
+            var expiryThreshold = now.AddMinutes(-1); // 10 minutes ago
+
+            var expiredOrders = await _context.Orders
+                .Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.ProductVariant)
+                .Where(o => (o.Status == "Placed" || o.Status == "Pending")
+                            && o.CreatedAt <= expiryThreshold)
+                .ToListAsync();
+
+            if (expiredOrders.Any())
+            {
+                foreach (var order in expiredOrders)
+                {
+                    // Update order status
+                    order.Status = "Cancelled";
+                    order.UpdatedAt = now;
+
+                    // Restore stock for each order item
+                    foreach (var item in order.OrderItems)
+                    {
+                        if (item.ProductVariant != null)
+                        {
+                            item.ProductVariant.StockQty += item.Qty;
+                            item.ProductVariant.UpdatedAt = now;
+                        }
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+            }
+        }
+
         // GET: api/Orders/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<Order>> GetOrder(int id)
+        public async Task<ActionResult<object>> GetOrder(int id)
         {
-            var order = await _context.Orders.FindAsync(id);
-            if (order == null)
-            {
+            // AUTO-CANCEL EXPIRED ORDERS BEFORE RETURNING RESULT
+            await AutoCancelExpiredOrders();
+
+            var o = await _context.Orders
+                .Include(o => o.Customer)
+                    .ThenInclude(c => c.UserProfile)
+                .Include(o => o.Seller)
+                    .ThenInclude(s => s.UserProfile)
+                .Include(o => o.PickupAddress)
+                .Include(o => o.DeliveryAddress)
+                .Include(o => o.Seller)
+                    .ThenInclude(s => s.SellerAddresses)
+                        .ThenInclude(sa => sa.Address)
+                .Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.ProductVariant)
+                        .ThenInclude(pv => pv.Product)
+                .FirstOrDefaultAsync(o => o.Id == id);
+
+            if (o == null)
                 return NotFound();
-            }
-            return order;
+
+            return Ok(new
+            {
+                o.Id,
+                o.CustomerId,
+                o.SellerId,
+                o.PaymentMethod,
+                o.PaymentStatus,
+                o.FulfillmentType,
+                o.Status,
+                o.SubtotalAmount,
+                o.DeliveryFee,
+                o.TotalAmount,
+                o.CreatedAt,
+                o.UpdatedAt,
+
+                customerName = o.Customer?.UserProfile?.DisplayName,
+                sellerName = o.Seller?.UserProfile?.DisplayName,
+                sellerPhone = o.Seller?.Phone,
+
+                pickupAddress = o.PickupAddress != null ? new
+                {
+                    o.PickupAddress.Id,
+                    o.PickupAddress.Street,
+                    o.PickupAddress.City,
+                    o.PickupAddress.Region,
+                    o.PickupAddress.Country,
+                    o.PickupAddress.Latitude,
+                    o.PickupAddress.Longitude
+                } : null,
+
+                deliveryAddress = o.DeliveryAddress != null ? new
+                {
+                    o.DeliveryAddress.Id,
+                    o.DeliveryAddress.Street,
+                    o.DeliveryAddress.City,
+                    o.DeliveryAddress.Region,
+                    o.DeliveryAddress.Country,
+                    o.DeliveryAddress.Latitude,
+                    o.DeliveryAddress.Longitude
+                } : null
+            });
         }
+
 
         // PUT: api/Orders/5
         [HttpPut("{id}")]
@@ -202,6 +342,144 @@ namespace Beyti_Backend.Controllers.Api
             return CreatedAtAction("GetOrder", new { id = order.Id }, order);
         }
 
+        // POST: api/Orders/validate-stock
+        [HttpPost("validate-stock")]
+        public async Task<ActionResult<object>> ValidateStock([FromBody] List<StockValidationItem> items)
+        {
+            var unavailableItems = new List<object>();
+            var adjustedItems = new List<object>();
+
+            foreach (var item in items)
+            {
+                var variant = await _context.ProductVariants
+                    .Include(pv => pv.Product)
+                    .FirstOrDefaultAsync(pv => pv.Id == item.VariantId);
+
+                if (variant == null)
+                {
+                    unavailableItems.Add(new
+                    {
+                        productId = item.ProductId,
+                        productName = "Unknown Product",
+                        requested = item.Quantity,
+                        available = 0
+                    });
+                    continue;
+                }
+
+                if (variant.StockQty == 0)
+                {
+                    unavailableItems.Add(new
+                    {
+                        productId = item.ProductId,
+                        productName = variant.Product.Name,
+                        requested = item.Quantity,
+                        available = 0
+                    });
+                }
+                else if (variant.StockQty < item.Quantity)
+                {
+                    adjustedItems.Add(new
+                    {
+                        productId = item.ProductId,
+                        productName = variant.Product.Name,
+                        variantId = item.VariantId,
+                        requested = item.Quantity,
+                        available = variant.StockQty
+                    });
+                }
+            }
+
+            if (unavailableItems.Count > 0 || adjustedItems.Count > 0)
+            {
+                return Ok(new
+                {
+                    valid = false,
+                    unavailableItems,
+                    adjustedItems
+                });
+            }
+
+            return Ok(new { valid = true });
+        }
+
+        // POST: api/Orders/reserve-stock
+        [HttpPost("reserve-stock")]
+        public async Task<ActionResult> ReserveStock([FromBody] List<StockValidationItem> items)
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync();
+
+            try
+            {
+                foreach (var item in items)
+                {
+                    // Load normally (EF tracking)
+                    var variant = await _context.ProductVariants
+                        .Include(v => v.Product)
+                        .FirstOrDefaultAsync(v => v.Id == item.VariantId);
+
+                    if (variant == null)
+                    {
+                        await transaction.RollbackAsync();
+                        return BadRequest(new { success = false, message = $"Variant {item.VariantId} not found" });
+                    }
+
+                    // Apply row-level update lock
+                    await _context.Database.ExecuteSqlRawAsync(
+                        "SELECT 1 FROM ProductVariant WITH (UPDLOCK, ROWLOCK) WHERE Id = {0}",
+                        item.VariantId
+                    );
+
+
+                    if (variant.StockQty < item.Quantity)
+                    {
+                        await transaction.RollbackAsync();
+                        return BadRequest(new
+                        {
+                            success = false,
+                            message = $"Insufficient stock for {variant.Product?.Name ?? "product"}. Requested: {item.Quantity}, Available: {variant.StockQty}"
+                        });
+                    }
+
+                    variant.StockQty -= item.Quantity;
+                    variant.UpdatedAt = DateTime.UtcNow;
+                }
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return Ok(new { success = true, message = "Stock reserved successfully" });  // ✅ NOW RETURNS JSON
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                return StatusCode(500, new { success = false, message = "Error reserving stock", error = ex.Message });
+            }
+        }
+
+
+        // POST: api/Orders/{orderId}/restore-stock
+        [HttpPost("{orderId}/restore-stock")]
+        public async Task<ActionResult> RestoreStock(int orderId)
+        {
+            var orderItems = await _context.OrderItems
+                .Where(oi => oi.OrderId == orderId)
+                .ToListAsync();
+
+            foreach (var item in orderItems)
+            {
+                var variant = await _context.ProductVariants.FindAsync(item.ProductVariantId);
+                if (variant != null)
+                {
+                    variant.StockQty += item.Qty;
+                    variant.UpdatedAt = DateTime.UtcNow;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { success = true, message = "Stock restored successfully" });
+        }
+
         // PUT: api/Orders/{id}/seller-response
         [HttpPut("{id}/seller-response")]
         public async Task<IActionResult> SellerResponseToOrder(int id, [FromBody] SellerOrderResponseDto dto)
@@ -210,13 +488,62 @@ namespace Beyti_Backend.Controllers.Api
             {
                 var order = await _context.Orders
                     .Include(o => o.DeliveryTicket)
+                    .Include(o => o.OrderItems)
+                        .ThenInclude(oi => oi.ProductVariant)
                     .FirstOrDefaultAsync(o => o.Id == id);
 
                 if (order == null)
                     return NotFound();
 
+                // ⏰ HARD EXPIRY CHECK (authoritative)
+                var expiryMinutes = 1;
+                var expiredAt = order.CreatedAt.AddMinutes(expiryMinutes);
+
+                if (DateTime.UtcNow > expiredAt &&
+                    (order.Status == "Placed" || order.Status == "Pending"))
+                {
+                    // Auto-cancel
+                    order.Status = "Cancelled";
+                    order.UpdatedAt = DateTime.UtcNow;
+
+                    // Restore stock
+                    foreach (var item in order.OrderItems)
+                    {
+                        if (item.ProductVariant != null)
+                        {
+                            item.ProductVariant.StockQty += item.Qty;
+                            item.ProductVariant.UpdatedAt = DateTime.UtcNow;
+                        }
+                    }
+
+                    await _context.SaveChangesAsync();
+
+                    return BadRequest(new
+                    {
+                        message = "Order expired and was automatically cancelled."
+                    });
+                }
+
+
+
+                // Store the old status to check if we're transitioning TO cancelled
+                var oldStatus = order.Status;
+
                 order.Status = dto.Status;
                 order.UpdatedAt = DateTime.UtcNow;
+
+                // Only restore stock if we're NEWLY cancelling (not already cancelled)
+                if (dto.Status == "Cancelled" && oldStatus != "Cancelled")
+                {
+                    foreach (var item in order.OrderItems)
+                    {
+                        if (item.ProductVariant != null)
+                        {
+                            item.ProductVariant.StockQty += item.Qty;
+                            item.ProductVariant.UpdatedAt = DateTime.UtcNow;
+                        }
+                    }
+                }
 
                 // If order is accepted and it's a delivery, create a delivery ticket
                 if (dto.Status == "Accepted" && order.FulfillmentType == "Delivery")
@@ -255,17 +582,31 @@ namespace Beyti_Backend.Controllers.Api
                 if (order == null)
                     return NotFound();
 
-                order.Status = dto.Status;
-                order.UpdatedAt = DateTime.UtcNow;
-
-                // If status is "Ready for Pickup" and it's a delivery, update delivery ticket
-                if (dto.Status == "Ready for Pickup" && order.FulfillmentType == "Delivery" && order.DeliveryTicket != null)
+                // SPECIAL HANDLING FOR DELIVERY ORDERS
+                if (order.FulfillmentType == "Delivery" && dto.Status == "Ready for Pickup")
                 {
-                    order.DeliveryTicket.Status = "Available";
-                    order.DeliveryTicket.UpdatedAt = DateTime.UtcNow;
+                    // Customer should NOT see "Ready for Pickup"
+                    // So DO NOT update order.Status to "Ready for Pickup"
+
+                    // Keep customer status at "Preparing"
+                    order.Status = "Preparing";
+
+                    // Update delivery ticket so drivers see it
+                    if (order.DeliveryTicket != null)
+                    {
+                        order.DeliveryTicket.Status = "Available";
+                        order.DeliveryTicket.UpdatedAt = DateTime.UtcNow;
+                    }
+                }
+                else
+                {
+                    // Normal flow for pickup orders
+                    order.Status = dto.Status;
                 }
 
+                order.UpdatedAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
+
                 return NoContent();
             }
             catch (Exception ex)
@@ -273,6 +614,7 @@ namespace Beyti_Backend.Controllers.Api
                 return StatusCode(500, new { message = "Error updating status", error = ex.Message });
             }
         }
+
 
         // DELETE: api/Orders/5
         [HttpDelete("{id}")]

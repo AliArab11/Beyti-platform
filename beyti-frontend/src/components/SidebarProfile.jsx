@@ -14,17 +14,32 @@
  */
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CaretDown, User } from '@phosphor-icons/react';
+import { logout } from '../utils/auth';
 
 const SidebarProfile = ({
   userName = 'Ali',
   userRole = 'Super Admin',
   avatarUrl,
   onProfileClick,
+  onLogout,
   className = '',
   ...props
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    // Call custom logout handler if provided
+    if (onLogout) {
+      onLogout();
+    } else {
+      // Default logout behavior
+      logout();
+      navigate('/login');
+    }
+  };
 
   return (
     <div
@@ -77,7 +92,10 @@ const SidebarProfile = ({
           <button className="w-full text-left px-3 py-2 text-body-regular text-cream-200 dark:text-cream-50 hover:bg-sage-700 dark:hover:bg-charcoal-400 rounded transition-colors">
             Preferences
           </button>
-          <button className="w-full text-left px-3 py-2 text-body-regular text-error-btn dark:text-error-btn hover:bg-sage-700 dark:hover:bg-charcoal-400 rounded transition-colors">
+          <button
+            onClick={handleLogout}
+            className="w-full text-left px-3 py-2 text-body-regular text-error-btn dark:text-error-btn hover:bg-sage-700 dark:hover:bg-charcoal-400 rounded transition-colors"
+          >
             Logout
           </button>
         </div>
