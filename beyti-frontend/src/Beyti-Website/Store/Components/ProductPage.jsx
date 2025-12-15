@@ -172,41 +172,40 @@ useEffect(() => {
   }
 }, [customerId]);
 
-  const fetchProductDetails = async () => {
-    try {
-      setLoading(true);
+
+
+ const fetchProductDetails = async () => {
+  try {
+    setLoading(true);
+    
+    // Fetch product details
+    const productRes = await fetch(`https://localhost:7062/api/Products/${productId}`);
+    if (productRes.ok) {
+      const productData = await productRes.json();
+      setProduct(productData);
       
-      // Fetch product details
-      const productRes = await fetch(`https://localhost:7062/api/Products/${productId}`);
-      if (productRes.ok) {
-        const productData = await productRes.json();
-        setProduct(productData);
+      // Use reviews from product data (already filtered by backend)
+      if (productData.reviews) {
+        setReviews(Array.isArray(productData.reviews) ? productData.reviews : []);
       }
-
-      // Fetch variants
-      const variantsRes = await fetch(`https://localhost:7062/api/ProductVariants?productId=${productId}`);
-      if (variantsRes.ok) {
-        const variantsData = await variantsRes.json();
-        setVariants(variantsData);
-        if (variantsData.length > 0) {
-          setSelectedVariant(variantsData[0]);
-        }
-      }
-
-      // Fetch reviews
-      const reviewsRes = await fetch(`https://localhost:7062/api/Reviews?productId=${productId}`);
-      if (reviewsRes.ok) {
-        const reviewsData = await reviewsRes.json();
-        const visibleReviews = reviewsData.filter(r => !r.isCommentHiddenBySeller);
-        setReviews(visibleReviews);
-      }
-    } catch (err) {
-      console.error('Error loading product:', err);
-      showSnackbar('Failed to load product details', 'error');
-    } finally {
-      setLoading(false);
     }
-  };
+
+    // Fetch variants
+    const variantsRes = await fetch(`https://localhost:7062/api/ProductVariants?productId=${productId}`);
+    if (variantsRes.ok) {
+      const variantsData = await variantsRes.json();
+      setVariants(variantsData);
+      if (variantsData.length > 0) {
+        setSelectedVariant(variantsData[0]);
+      }
+    }
+  } catch (err) {
+    console.error('Error loading product:', err);
+    showSnackbar('Failed to load product details', 'error');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const calculateAverageRating = () => {
     if (reviews.length === 0) return 0;
@@ -776,16 +775,16 @@ const handleTrackOrder = () => {
                     <div key={review.id} className="bg-cream-50 p-8 rounded-2xl border border-grey-stroke">
                         <div className="flex items-start justify-between mb-4">
                         <div className="flex items-center gap-4">
-                            <div className="w-16 h-16 rounded-full bg-sage-500 flex items-center justify-center flex-shrink-0">
-                            <span className="text-white font-bold text-2xl" style={{ fontFamily: 'Inter, sans-serif' }}>
-                                {(review.customerName || 'A')[0].toUpperCase()}
-                            </span>
-                            </div>
-                            
-                            <div>
-                            <div className="font-bold text-charcoal-600 text-xl mb-2" style={{ fontFamily: 'Inter, sans-serif' }}>
-                                {review.customerName || 'Anonymous Customer'}
-                            </div>
+                          <div className="w-16 h-16 rounded-full bg-sage-500 flex items-center justify-center flex-shrink-0">
+                          <span className="text-white font-bold text-2xl" style={{ fontFamily: 'Inter, sans-serif' }}>
+                              {review.isCommentHidden ? 'A' : (review.customerName || 'A')[0].toUpperCase()}
+                          </span>
+                          </div>
+                          
+                          <div>
+                          <div className="font-bold text-charcoal-600 text-xl mb-2" style={{ fontFamily: 'Inter, sans-serif' }}>
+                              {review.isCommentHidden ? 'Anonymous Customer' : (review.customerName || 'Anonymous Customer')}
+                          </div>
                             <div className="flex items-center gap-3">
                                 <div className="flex items-center gap-1">
                                   {[...Array(5)].map((_, i) => {
@@ -808,11 +807,15 @@ const handleTrackOrder = () => {
                         </div>
                         </div>
 
-                        {review.comment && (
-                        <p className="text-charcoal-600 text-lg leading-relaxed ml-20" style={{ fontFamily: 'Inter, sans-serif' }}>
-                            "{review.comment}"
-                        </p>
-                        )}
+                        {review.comment ? (
+                      <p className="text-charcoal-600 text-lg leading-relaxed ml-20" style={{ fontFamily: 'Inter, sans-serif' }}>
+                        "{review.comment}"
+                      </p>
+                    ) : review.isCommentHidden ? (
+                      <p className="text-charcoal-400 text-sm italic ml-20" style={{ fontFamily: 'Inter, sans-serif' }}>
+                        Comment hidden by seller
+                      </p>
+                    ) : null}
                     </div>
                     ))}
                 </div>

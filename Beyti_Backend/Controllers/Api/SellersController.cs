@@ -189,8 +189,10 @@ namespace Beyti_Backend.Controllers.Api
                             longitude = sa.Address.Longitude
                         }
                     }).ToList(),
-                    products = seller.Products.Select(p => {
-                        var productReviews = p.Reviews.Where(r => !r.IsCommentHiddenBySeller).ToList();
+                    products = seller.Products
+                    .Where(p => p.IsActive) // ← ADD THIS LINE to filter only active products
+                    .Select(p => {
+                     var productReviews = p.Reviews.Where(r => !r.IsCommentHiddenBySeller).ToList();
                         decimal? productAverageRating = null;
 
                         if (productReviews.Count >= 5)
@@ -204,6 +206,7 @@ namespace Beyti_Backend.Controllers.Api
                             name = p.Name,
                             description = p.Description,
                             basePrice = p.BasePrice,
+                            isActive = p.IsActive, // ← ADD THIS LINE
                             averageRating = productAverageRating,
                             reviewCount = productReviews.Count,
                             subCategory = p.SubCategory != null ? new

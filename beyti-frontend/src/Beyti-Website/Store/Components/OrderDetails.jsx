@@ -241,17 +241,6 @@ return (
                   <Storefront size={24} weight="fill" className="text-sage-600" />
                   Pickup Location
                 </h3>
-
-                <button
-                  onClick={() => {
-                    if (mapRef.current) {
-                      mapRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-                    }
-                  }}
-                  className="bg-sage-600 hover:bg-sage-700 text-white text-sm font-semibold py-2 px-4 rounded-xl shadow transition-all"
-                >
-                  View Map
-                </button>
               </div>
 
               {/* INFO BLOCK */}

@@ -881,6 +881,11 @@ useEffect(() => {
 
 const filteredProducts = (store?.products || [])
   .filter(product => {
+    // Filter out inactive products
+    if (product.isActive === false) {
+      return false;
+    }
+    
     // Search filter
     if (searchQuery && !product.name?.toLowerCase().includes(searchQuery.toLowerCase())) {
       return false;
@@ -888,6 +893,7 @@ const filteredProducts = (store?.products || [])
     
     return true;
   })
+  
   .sort((a, b) => {
     // Helper function to check if product is new (less than 5 reviews)
     const isNewProduct = (product) => {
