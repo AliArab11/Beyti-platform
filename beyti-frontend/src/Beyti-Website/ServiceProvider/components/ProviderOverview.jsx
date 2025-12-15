@@ -10,7 +10,8 @@ import {
   Package,
   CalendarCheck,
   Calendar,
-  User
+  User,
+  Bell
 } from '@phosphor-icons/react';
 
 export default function ProviderOverview({ serviceProviderId, onNavigateToBookings, activityRefreshKey }) {
@@ -53,19 +54,58 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
 
       console.log('Statistics from backend:', statisticsData);
 
-      // Get today's date (start and end of day)
+      // Get today's date (start and end of day in local timezone)
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
 
-      // Filter today's bookings
-      const todaysBookings = allBookings.filter(booking => {
-        const bookingDate = new Date(booking.BookingDateTime || booking.CreatedAt);
-        return bookingDate >= today && bookingDate < tomorrow;
+      console.log('Filtering bookings for today:', {
+        todayStart: today.toISOString(),
+        tomorrowStart: tomorrow.toISOString(),
+        totalBookings: allBookings.length
       });
 
-      setTodayBookings(todaysBookings);
+      // Log all bookings to see their structure
+      console.log('All bookings data:', allBookings);
+
+      // Filter today's bookings based on BookingDateTime (scheduled time)
+      const todaysBookings = allBookings.filter(booking => {
+        // Use BookingDateTime as the primary field for scheduling
+        const bookingDateTimeStr = booking.bookingDateTime || booking.BookingDateTime;
+
+        if (!bookingDateTimeStr) {
+          console.warn('Booking missing BookingDateTime:', booking.id || booking.Id);
+          return false;
+        }
+
+        const bookingDate = new Date(bookingDateTimeStr);
+        const isToday = bookingDate >= today && bookingDate < tomorrow;
+
+        if (isToday) {
+          console.log('Found today\'s booking:', {
+            id: booking.id,
+            service: booking.serviceName,
+            customer: booking.customerName,
+            time: bookingDate.toLocaleString(),
+            status: booking.status,
+            fullBooking: booking
+          });
+        }
+
+        return isToday;
+      });
+
+      console.log(`Found ${todaysBookings.length} bookings for today`);
+
+      // Sort today's bookings by time (earliest first)
+      const sortedTodaysBookings = todaysBookings.sort((a, b) => {
+        const dateA = new Date(a.bookingDateTime || a.BookingDateTime);
+        const dateB = new Date(b.bookingDateTime || b.BookingDateTime);
+        return dateA - dateB;
+      });
+
+      setTodayBookings(sortedTodaysBookings);
 
       // Try to fetch reviews filtered by service provider
       let averageRating = 0;
@@ -134,7 +174,7 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
 
   const formatTime = (dateString) => {
     const date = new Date(dateString);
-    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
   };
 
   const renderStarRating = (rating) => {
@@ -186,6 +226,35 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
 
   return (
     <div className="space-y-8">
+      {/* Pending Requests Alert - Similar to Admin Flagged Users */}
+      {stats && stats.pendingRequests > 0 && (
+        <div
+          onClick={() => onNavigateToBookings && onNavigateToBookings('Pending')}
+          className="bg-warning-bg border-2 border-warning-stroke rounded-lg p-4 cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.01]"
+        >
+          <div className="flex items-center gap-4">
+            <div className="flex-shrink-0">
+              <div className="w-12 h-12 bg-warning-text rounded-full flex items-center justify-center animate-pulse">
+                <CalendarCheck size={24} className="text-white" weight="fill" />
+              </div>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-card-h3 text-charcoal-600 dark:text-white font-semibold">
+                {stats.pendingRequests} Pending Booking Request{stats.pendingRequests > 1 ? 's' : ''}
+              </h3>
+              <p className="text-body-regular text-charcoal-400 dark:text-gray-400 mt-1">
+                Click here to review and respond to pending booking requests
+              </p>
+            </div>
+            <div className="flex-shrink-0">
+              <span className="text-body-medium text-warning-text font-semibold">
+                Review Now →
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Row - Today's Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <AnalyticsCard
@@ -193,7 +262,7 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
           metrics={[
             {
               value: loading ? '...' : stats.todayBookings.toString(),
-              label: 'Scheduled for Today'
+              label: new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
             }
           ]}
         />
@@ -208,15 +277,20 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
           ]}
         />
 
-        <AnalyticsCard
-          title="Pending Requests"
-          metrics={[
-            {
-              value: loading ? '...' : stats.pendingRequests.toString(),
-              label: 'Awaiting Confirmation'
-            }
-          ]}
-        />
+        <div
+          onClick={() => stats.pendingRequests > 0 && onNavigateToBookings && onNavigateToBookings('Pending')}
+          className={stats.pendingRequests > 0 ? 'cursor-pointer transition-transform hover:scale-105' : ''}
+        >
+          <AnalyticsCard
+            title="Pending Requests"
+            metrics={[
+              {
+                value: loading ? '...' : stats.pendingRequests.toString(),
+                label: stats.pendingRequests > 0 ? 'Click to Review' : 'Awaiting Confirmation'
+              }
+            ]}
+          />
+        </div>
 
         <AnalyticsCard
           title="Total Earnings"
@@ -232,13 +306,13 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
       {/* Today's Bookings Table */}
       <div>
         <Table
-          title="Today's Bookings"
+          title={`Today's Schedule - ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}`}
           actionButton={
             <CRUDButton
               variant="success"
-              onClick={() => onNavigateToBookings && onNavigateToBookings(null)}
+              onClick={() => onNavigateToBookings && onNavigateToBookings('schedule')}
             >
-              View All Bookings
+              View Schedule
             </CRUDButton>
           }
         >
@@ -259,26 +333,26 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
               />
             ) : todayBookings.length === 0 ? (
               <TableRow
-                data={['No bookings scheduled for today', '', '', '', '', '']}
+                data={[`No bookings scheduled for ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}`, '', '', '', '', '']}
               />
             ) : (
               todayBookings.map((booking) => (
                 <TableRow
-                  key={booking.Id}
+                  key={booking.id}
                   data={[
-                    booking.ServiceName || 'N/A',
-                    booking.CustomerName || 'N/A',
-                    formatTime(booking.BookingDateTime || booking.CreatedAt),
-                    <StatusChip variant={getStatusVariant(booking.Status)}>
-                      {booking.Status}
+                    booking.serviceName || 'N/A',
+                    booking.customerName || 'N/A',
+                    formatTime(booking.bookingDateTime || booking.BookingDateTime),
+                    <StatusChip variant={getStatusVariant(booking.status)}>
+                      {booking.status}
                     </StatusChip>,
-                    booking.QuotedPrice ? `${booking.QuotedPrice.toFixed(3)} BD` : 'Pending'
+                    booking.quotedPrice ? `${booking.quotedPrice.toFixed(3)} BD` : 'Pending'
                   ]}
                   actions={
                     <>
                       <CRUDButton
                         variant="success"
-                        onClick={() => handleViewBookingDetails(booking.Id)}
+                        onClick={() => handleViewBookingDetails(booking.id)}
                       >
                         View
                       </CRUDButton>

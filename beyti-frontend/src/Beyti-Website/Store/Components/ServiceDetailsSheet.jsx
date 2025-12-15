@@ -93,6 +93,7 @@ const ServiceDetailsSheet = ({
   if (!service) return null;
 
   const averageRating = calculateAverageRating();
+  const isActive = service?.isActive !== false; // Default to true if undefined
 
   return (
     <>
@@ -152,9 +153,19 @@ const ServiceDetailsSheet = ({
               <div className="flex-1 overflow-y-auto p-8 space-y-6">
                 {/* Service Title */}
                 <div>
-                  <h1 className="text-3xl font-bold text-charcoal-600 mb-2" style={{ fontFamily: 'Merriweather, serif' }}>
-                    {service.name}
-                  </h1>
+                  <div className="flex items-center gap-3 mb-2">
+                    <h1 className="text-3xl font-bold text-charcoal-600" style={{ fontFamily: 'Merriweather, serif' }}>
+                      {service.name}
+                    </h1>
+                    {/* Status Badge */}
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                      isActive
+                        ? 'bg-green-500 text-white'
+                        : 'bg-charcoal-500 text-white'
+                    }`} style={{ fontFamily: 'Inter, sans-serif' }}>
+                      {isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
                   {provider && (
                     <p className="text-base text-charcoal-400 font-medium" style={{ fontFamily: 'Inter, sans-serif' }}>
                       {provider.businessName || provider.displayName}
@@ -297,13 +308,28 @@ const ServiceDetailsSheet = ({
 
               {/* Bottom Action Bar - Fixed */}
               <div className="bg-white border-t-2 border-grey-stroke p-6">
+                {!isActive && (
+                  <div className="mb-3 bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-2">
+                    <div className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0">
+                      <span className="text-white text-xs font-bold">!</span>
+                    </div>
+                    <p className="text-sm text-amber-800 font-medium" style={{ fontFamily: 'Inter, sans-serif' }}>
+                      This service is currently unavailable for booking.
+                    </p>
+                  </div>
+                )}
                 <button
                   onClick={handleBookService}
-                  className="w-full bg-sage-500 hover:bg-sage-600 text-white font-bold py-3.5 px-6 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-3"
+                  disabled={!isActive}
+                  className={`w-full font-bold py-3.5 px-6 rounded-xl shadow-md transition-all flex items-center justify-center gap-3 ${
+                    isActive
+                      ? 'bg-sage-500 hover:bg-sage-600 hover:shadow-lg text-white cursor-pointer'
+                      : 'bg-grey-200 text-charcoal-400 cursor-not-allowed'
+                  }`}
                   style={{ fontFamily: 'Inter, sans-serif' }}
                 >
                   <Calendar size={22} weight="bold" />
-                  <span>Book Appointment</span>
+                  <span>{isActive ? 'Book Appointment' : 'Service Unavailable'}</span>
                 </button>
               </div>
             </div>

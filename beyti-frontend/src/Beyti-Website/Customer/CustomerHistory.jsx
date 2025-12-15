@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PackageIcon, ScissorsIcon, ShoppingCartIcon, CalendarIcon, ChatCircleTextIcon } from '@phosphor-icons/react';
+import { PackageIcon, ScissorsIcon, ShoppingCartIcon, CalendarIcon, ChatCircleTextIcon, CalendarCheck, CheckCircle, Circle } from '@phosphor-icons/react';
 import CustomerSidebar from '../../components/CustomerSidebar';
 import PageHeader from '../../components/PageHeader';
 import StatusChip from '../../components/StatusChip';
@@ -225,11 +225,17 @@ export default function CustomerHistory() {
       ['Pending', 'PendingQuote', 'DepositPending', 'Confirmed', 'InProgress'].includes(b.status)
     ).length;
 
+    // Services in progress - not yet completed or rejected (final states)
+    const inProgressBookings = serviceBookings.filter(b =>
+      !['Completed', 'Rejected', 'Canceled'].includes(b.status)
+    );
+
     return {
       totalOrders: orders.length,
       totalBookings: serviceBookings.length,
       pendingOrders,
       pendingBookings,
+      inProgressBookings,
       completedOrders: orders.filter(o => o.status?.toLowerCase() === 'completed').length,
       completedBookings: serviceBookings.filter(b => b.status === 'Completed').length,
     };
@@ -316,6 +322,172 @@ export default function CustomerHistory() {
         {/* Main Content Area */}
         <main className="flex-1 p-8 overflow-y-auto">
           <div className="max-w-7xl mx-auto space-y-6">
+            {/* Service Tracking - Show services in progress until Completed or Rejected */}
+            {metrics && metrics.inProgressBookings && metrics.inProgressBookings.length > 0 && (
+              <div className="bg-cream-50 dark:bg-charcoal-600 border border-grey-stroke dark:border-charcoal-400 rounded-lg overflow-hidden">
+                <div className="bg-sage-100 dark:bg-sage-900/30 p-4 border-b border-grey-stroke dark:border-charcoal-400">
+                  <h3 className="text-card-h3 text-charcoal-600 dark:text-white font-semibold flex items-center gap-2">
+                    <CalendarCheck size={24} className="text-sage-600 dark:text-sage-400" weight="fill" />
+                    Services In Progress ({metrics.inProgressBookings.length})
+                  </h3>
+                  <p className="text-body-small text-charcoal-400 dark:text-charcoal-300 mt-1">
+                    Track your service bookings until they are completed or rejected
+                  </p>
+                </div>
+
+                <div className="p-4 space-y-4">
+                  {metrics.inProgressBookings.map((booking) => {
+                    // Helper function to get checkpoint status
+                    const getCheckpointStatus = (checkpointName) => {
+                      const statusOrder = ['Pending', 'PendingQuote', 'DepositPending', 'Confirmed', 'InProgress'];
+                      const currentIndex = statusOrder.indexOf(booking.status);
+                      const checkpointIndex = statusOrder.indexOf(checkpointName);
+
+                      if (currentIndex >= checkpointIndex) return 'completed';
+                      return 'pending';
+                    };
+
+                    return (
+                      <div
+                        key={booking.id}
+                        className="bg-grey-100 dark:bg-charcoal-500 border border-grey-stroke dark:border-charcoal-400 rounded-lg p-6 hover:shadow-md transition-shadow"
+                      >
+                        {/* Service Header */}
+                        <div className="flex items-start justify-between gap-4 mb-4">
+                          <div className="flex-1">
+                            <h4 className="text-body-medium text-charcoal-600 dark:text-white font-semibold mb-1">
+                              {booking.serviceName || 'Service'}
+                            </h4>
+                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-body-small text-charcoal-400 dark:text-charcoal-300">
+                              <span><span className="font-medium">Provider:</span> {booking.businessName || booking.providerName || 'N/A'}</span>
+                              <span><span className="font-medium">Date:</span> {formatDate(booking.serviceDate)}</span>
+                              <span><span className="font-medium">Booking ID:</span> #{booking.id}</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleViewBooking(booking)}
+                            className="px-4 py-2 bg-sage-500 hover:bg-sage-600 dark:bg-sage-700 dark:hover:bg-sage-600 text-cream-50 rounded-md text-body-small transition-colors flex-shrink-0"
+                          >
+                            View Details
+                          </button>
+                        </div>
+
+                        {/* Checkpoint Timeline */}
+                        <div className="relative">
+                          <div className="flex items-center justify-between">
+                            {/* Checkpoint 1: Pending */}
+                            <div className="flex flex-col items-center flex-1">
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${
+                                getCheckpointStatus('Pending') === 'completed'
+                                  ? 'bg-sage-500 border-sage-500'
+                                  : 'bg-grey-200 dark:bg-charcoal-600 border-grey-stroke dark:border-charcoal-400'
+                              }`}>
+                                {getCheckpointStatus('Pending') === 'completed' ? (
+                                  <CheckCircle size={20} className="text-white" weight="fill" />
+                                ) : (
+                                  <Circle size={20} className="text-charcoal-400 dark:text-charcoal-300" weight="regular" />
+                                )}
+                              </div>
+                              <div className="mt-2 text-center">
+                                <p className={`text-label-small font-medium ${
+                                  getCheckpointStatus('Pending') === 'completed'
+                                    ? 'text-sage-600 dark:text-sage-400'
+                                    : 'text-charcoal-400 dark:text-charcoal-300'
+                                }`}>
+                                  Pending
+                                </p>
+                                <p className="text-label-small text-charcoal-400 dark:text-charcoal-300">
+                                  Awaiting Confirmation
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Connection Line 1 */}
+                            <div className={`flex-1 h-0.5 mx-2 -mt-12 ${
+                              getCheckpointStatus('Confirmed') === 'completed'
+                                ? 'bg-sage-500'
+                                : 'bg-grey-stroke dark:bg-charcoal-400'
+                            }`} />
+
+                            {/* Checkpoint 2: Confirmed */}
+                            <div className="flex flex-col items-center flex-1">
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${
+                                getCheckpointStatus('Confirmed') === 'completed'
+                                  ? 'bg-sage-500 border-sage-500'
+                                  : 'bg-grey-200 dark:bg-charcoal-600 border-grey-stroke dark:border-charcoal-400'
+                              }`}>
+                                {getCheckpointStatus('Confirmed') === 'completed' ? (
+                                  <CheckCircle size={20} className="text-white" weight="fill" />
+                                ) : (
+                                  <Circle size={20} className="text-charcoal-400 dark:text-charcoal-300" weight="regular" />
+                                )}
+                              </div>
+                              <div className="mt-2 text-center">
+                                <p className={`text-label-small font-medium ${
+                                  getCheckpointStatus('Confirmed') === 'completed'
+                                    ? 'text-sage-600 dark:text-sage-400'
+                                    : 'text-charcoal-400 dark:text-charcoal-300'
+                                }`}>
+                                  Confirmed
+                                </p>
+                                <p className="text-label-small text-charcoal-400 dark:text-charcoal-300">
+                                  Booking Approved
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Connection Line 2 */}
+                            <div className={`flex-1 h-0.5 mx-2 -mt-12 ${
+                              getCheckpointStatus('InProgress') === 'completed'
+                                ? 'bg-sage-500'
+                                : 'bg-grey-stroke dark:bg-charcoal-400'
+                            }`} />
+
+                            {/* Checkpoint 3: In Progress */}
+                            <div className="flex flex-col items-center flex-1">
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${
+                                getCheckpointStatus('InProgress') === 'completed'
+                                  ? 'bg-sage-500 border-sage-500'
+                                  : 'bg-grey-200 dark:bg-charcoal-600 border-grey-stroke dark:border-charcoal-400'
+                              }`}>
+                                {getCheckpointStatus('InProgress') === 'completed' ? (
+                                  <CheckCircle size={20} className="text-white" weight="fill" />
+                                ) : (
+                                  <Circle size={20} className="text-charcoal-400 dark:text-charcoal-300" weight="regular" />
+                                )}
+                              </div>
+                              <div className="mt-2 text-center">
+                                <p className={`text-label-small font-medium ${
+                                  getCheckpointStatus('InProgress') === 'completed'
+                                    ? 'text-sage-600 dark:text-sage-400'
+                                    : 'text-charcoal-400 dark:text-charcoal-300'
+                                }`}>
+                                  In Progress
+                                </p>
+                                <p className="text-label-small text-charcoal-400 dark:text-charcoal-300">
+                                  Service Started
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Current Status Badge */}
+                          <div className="mt-4 flex items-center justify-center">
+                            <div className="flex items-center gap-2 px-4 py-2 bg-cream-50 dark:bg-charcoal-600 rounded-full border border-grey-stroke dark:border-charcoal-400">
+                              <span className="text-label-small text-charcoal-400 dark:text-charcoal-300">Current Status:</span>
+                              <StatusChip variant={getBookingStatusVariant(booking.status)}>
+                                {booking.status}
+                              </StatusChip>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Metrics Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div className="bg-cream-50 dark:bg-charcoal-600 border border-grey-stroke dark:border-charcoal-400 rounded-lg p-6">

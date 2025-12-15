@@ -188,67 +188,102 @@ const CategorySidebar = ({ catalogs, selected, onSelect }) => {
 };
 
 // Service Card Component with MinPrice "Starting from" badge
-const ServiceCard = ({ service, onClick }) => (
-  <div
-    onClick={onClick}
-    className="bg-white rounded-2xl overflow-hidden cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all group"
-  >
-    {/* Service Icon */}
-    <div className="relative h-48 bg-gradient-to-br from-[#E8D8E0] to-[#DFC9D8] overflow-hidden">
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="w-32 h-32 bg-white/30 rounded-full flex items-center justify-center">
-          <Scissors className="w-16 h-16 text-white/60" weight="regular" />
+const ServiceCard = ({ service, onClick }) => {
+  const isActive = service?.isActive !== false; // Default to true if undefined
+
+  return (
+    <div
+      onClick={isActive ? onClick : undefined}
+      className={`bg-white rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-all group relative ${
+        isActive
+          ? 'cursor-pointer hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)]'
+          : 'opacity-60 cursor-not-allowed'
+      }`}
+    >
+      {/* Inactive Overlay */}
+      {!isActive && (
+        <div className="absolute inset-0 bg-charcoal-600/20 z-10 flex items-center justify-center backdrop-blur-[1px]">
+          <div className="bg-charcoal-600/90 text-white px-6 py-3 rounded-full font-bold text-sm shadow-xl" style={{ fontFamily: 'Inter, sans-serif' }}>
+            Currently Unavailable
+          </div>
         </div>
-      </div>
-
-      {/* MinPrice Badge - "Starting from" */}
-      <div className="absolute top-4 right-4 bg-white px-4 py-2.5 rounded-full shadow-lg">
-        <div className="text-xs font-medium text-sage-600 text-center" style={{ fontFamily: 'Inter, sans-serif', lineHeight: '1.2' }}>
-          Starting from
-        </div>
-        <div className="text-base font-bold text-sage-700 text-center" style={{ fontFamily: 'Inter, sans-serif', lineHeight: '1.2' }}>
-          {service?.minPrice ? `${service.minPrice.toFixed(3)} BD` : "20.000 BD"}
-        </div>
-      </div>
-    </div>
-
-    {/* Service Info */}
-    <div className="p-5">
-      <h3 className="font-bold text-charcoal-600 text-lg mb-2 line-clamp-2 group-hover:text-sage-600 transition-colors" style={{ fontFamily: 'Merriweather, serif' }}>
-        {service?.name || "Service"}
-      </h3>
-
-      {/* Dynamic Star Rating */}
-      <div className="flex items-center gap-1 mb-3">
-        {[...Array(5)].map((_, i) => (
-          <Star 
-            key={i} 
-            className="w-4 h-4" 
-            weight="fill"
-            style={{ 
-              color: i < Math.floor(service?.averageRating || 0) 
-                ? '#F5C563' 
-                : '#E5E7EB' 
-            }}
-          />
-        ))}
-        <span className="text-sm font-semibold text-charcoal-600 ml-1">
-          {service?.averageRating ? service.averageRating.toFixed(1) : "N/A"}
-        </span>
-      </div>
-
-      {service?.description && (
-        <p className="text-sm text-charcoal-400 mb-4 line-clamp-2">
-          {service.description}
-        </p>
       )}
 
-      <button className="w-full bg-sage-500 hover:bg-sage-600 text-white font-semibold py-3 rounded-xl transition-all shadow-[0_2px_8px_rgba(85,107,92,0.2)]">
-        View Details
-      </button>
+      {/* Service Icon */}
+      <div className="relative h-48 bg-gradient-to-br from-[#E8D8E0] to-[#DFC9D8] overflow-hidden">
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-32 h-32 bg-white/30 rounded-full flex items-center justify-center">
+            <Scissors className="w-16 h-16 text-white/60" weight="regular" />
+          </div>
+        </div>
+
+        {/* Status Badge - Top Left */}
+        <div className={`absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold shadow-lg ${
+          isActive
+            ? 'bg-green-500 text-white'
+            : 'bg-charcoal-500 text-white'
+        }`} style={{ fontFamily: 'Inter, sans-serif' }}>
+          {isActive ? 'Active' : 'Inactive'}
+        </div>
+
+        {/* MinPrice Badge - "Starting from" */}
+        <div className="absolute top-4 right-4 bg-white px-4 py-2.5 rounded-full shadow-lg">
+          <div className="text-xs font-medium text-sage-600 text-center" style={{ fontFamily: 'Inter, sans-serif', lineHeight: '1.2' }}>
+            Starting from
+          </div>
+          <div className="text-base font-bold text-sage-700 text-center" style={{ fontFamily: 'Inter, sans-serif', lineHeight: '1.2' }}>
+            {service?.minPrice ? `${service.minPrice.toFixed(3)} BD` : "20.000 BD"}
+          </div>
+        </div>
+      </div>
+
+      {/* Service Info */}
+      <div className="p-5">
+        <h3 className={`font-bold text-lg mb-2 line-clamp-2 transition-colors ${
+          isActive ? 'text-charcoal-600 group-hover:text-sage-600' : 'text-charcoal-400'
+        }`} style={{ fontFamily: 'Merriweather, serif' }}>
+          {service?.name || "Service"}
+        </h3>
+
+        {/* Dynamic Star Rating */}
+        <div className="flex items-center gap-1 mb-3">
+          {[...Array(5)].map((_, i) => (
+            <Star
+              key={i}
+              className="w-4 h-4"
+              weight="fill"
+              style={{
+                color: i < Math.floor(service?.averageRating || 0)
+                  ? '#F5C563'
+                  : '#E5E7EB'
+              }}
+            />
+          ))}
+          <span className="text-sm font-semibold text-charcoal-600 ml-1">
+            {service?.averageRating ? service.averageRating.toFixed(1) : "N/A"}
+          </span>
+        </div>
+
+        {service?.description && (
+          <p className={`text-sm mb-4 line-clamp-2 ${isActive ? 'text-charcoal-400' : 'text-charcoal-300'}`}>
+            {service.description}
+          </p>
+        )}
+
+        <button
+          disabled={!isActive}
+          className={`w-full font-semibold py-3 rounded-xl transition-all shadow-[0_2px_8px_rgba(85,107,92,0.2)] ${
+            isActive
+              ? 'bg-sage-500 hover:bg-sage-600 text-white'
+              : 'bg-grey-200 text-charcoal-400 cursor-not-allowed'
+          }`}
+        >
+          {isActive ? 'View Details' : 'Unavailable'}
+        </button>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // Main Service Provider Detail View Component
 const ServiceProviderDetailView = () => {
