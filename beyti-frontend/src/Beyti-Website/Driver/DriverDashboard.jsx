@@ -7,6 +7,7 @@ import L from 'leaflet'
 
 import { useNavigate, useLocation } from "react-router-dom";
 import PageHeader from "../../components/PageHeader";
+import ProfilePage from '../../components/ProfilePage';
 
 import DriverOrdersPage from "./Components/DriverOrders";
 import DriverAnalytics from "./Components/DriverAnalytics";
@@ -122,6 +123,8 @@ const getPageTitle = () => {
     return "Order Management";
   } else if (location.pathname.includes("/driver-dashboard/analytics")) {
     return "Analytics";
+  } else if (location.pathname.includes("/driver-dashboard/profile")) {
+    return "My Profile";
   } else {
     return "Dashboard";
   }
@@ -1438,6 +1441,19 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
           >
             Analytics
           </NavigationButton>
+
+          <NavigationButton
+            selected={location.pathname.includes("/driver-dashboard/profile")}
+            onClick={() => navigate("profile")}
+            icon={
+              <Icon.User
+                size={20}
+                weight={location.pathname.includes("/driver-dashboard/profile") ? "fill" : "regular"}
+              />
+            }
+          >
+            Profile
+          </NavigationButton>
         </nav>
 
         <div className="border-t border-sage-700 p-4">
@@ -1477,6 +1493,7 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
           }}
           entityId={driverId}
           userId={driverId}
+          onProfileClick={() => navigate('profile')}
           onProfileUpdate={handleProfileUpdate}
         />
 
@@ -1964,14 +1981,35 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
               }
             }}
           />
-        ) : location.pathname.includes("/driver-dashboard/analytics") ? (
-          <DriverAnalytics
-            driverId={driverId}
-            driverName={driverName}
-            metrics={metrics}
-            historyJobs={historyJobs}
-          />  
-        ) : null}
+       ) : location.pathname.includes("/driver-dashboard/analytics") ? (
+            <DriverAnalytics
+              driverId={driverId}
+              driverName={driverName}
+              metrics={metrics}
+              historyJobs={historyJobs}
+            />  
+          ) : location.pathname.includes("/driver-dashboard/profile") ? (
+            <ProfilePage
+              userProfile={{
+                userProfileId: driverId,
+                displayName: driverName,
+                phone: driverList.find(d => d.id === driverId)?.phone || '',
+                street: driverList.find(d => d.id === driverId)?.street || '',
+                city: driverList.find(d => d.id === driverId)?.city || '',
+                region: driverList.find(d => d.id === driverId)?.region || '',
+                postalCode: driverList.find(d => d.id === driverId)?.postalCode || '',
+                country: driverList.find(d => d.id === driverId)?.country || 'Bahrain',
+                address: driverList.find(d => d.id === driverId)?.address || '',
+                status: isOnline ? 'Available' : 'Offline',
+                createdAt: driverList.find(d => d.id === driverId)?.createdAt,
+                updatedAt: new Date().toISOString()
+              }}
+              userRole="Driver"
+              entityId={driverId}
+              onProfileUpdate={handleProfileUpdate}
+              readOnly={false}
+            />
+) : null}
 
 
                {/* Top Restaurants - Only on Dashboard */}

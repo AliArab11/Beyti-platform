@@ -21,7 +21,6 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MagnifyingGlass, Bell, CaretDown, User } from '@phosphor-icons/react';
 import SettingsModal from './SettingsModal';
-import ProfileModal from './ProfileModal';
 import { logout } from '../utils/auth';
 import NotificationDropdown from './NotificationDropdown';
 
@@ -48,7 +47,6 @@ const PageHeader = ({
   const [searchValue, setSearchValue] = useState('');
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   const handleSearch = (e) => {
     setSearchValue(e.target.value);
@@ -57,21 +55,16 @@ const PageHeader = ({
     }
   };
 
-  const handleProfileClick = () => {
-    setIsUserMenuOpen(false);
-    // Open profile modal by default, or call custom handler if provided
-    if (onProfileClick) {
-      onProfileClick();
-    } else {
-      setIsProfileModalOpen(true);
-    }
-  };
+const handleProfileClick = () => {
+  setIsUserMenuOpen(false);
+  // Navigate to profile page by default, or call custom handler if provided
+  if (onProfileClick) {
+    onProfileClick();
+  } else {
+    navigate('/profile');
+  }
+};
 
-  const handleProfileModalUpdate = async (updates) => {
-    if (onProfileUpdate) {
-      await onProfileUpdate(updates);
-    }
-  };
 
   const handleSettingsClick = () => {
     setIsUserMenuOpen(false);
@@ -261,15 +254,6 @@ const PageHeader = ({
       {/* Settings Modal */}
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
 
-      {/* Profile Modal */}
-      <ProfileModal
-        isOpen={isProfileModalOpen}
-        onClose={() => setIsProfileModalOpen(false)}
-        userProfile={userProfile}
-        userRole={userRole}
-        entityId={entityId}
-        onProfileUpdate={handleProfileModalUpdate}
-      />
     </header>
   );
 };

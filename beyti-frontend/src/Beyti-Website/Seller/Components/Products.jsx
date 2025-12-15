@@ -39,6 +39,7 @@ const Products = ({ sellerId }) => {
     name: "",
     description: "",
     basePrice: "",
+    discountPercentage: "",
     subCategoryId: "",
     stockQty: "",
     sku: "",
@@ -184,6 +185,7 @@ const checkDuplicateSKU = async (sku, currentVariantId = null) => {
       name: "",
       description: "",
       basePrice: "",
+      discountPercentage: "",
       subCategoryId: "",
       stockQty: "",
       sku: "",
@@ -194,19 +196,20 @@ const checkDuplicateSKU = async (sku, currentVariantId = null) => {
   };
 
   const openEdit = (p) => {
-    setEditing(p);
-    setForm({
-      name: p.name,
-      description: p.description || "",
-      basePrice: p.basePrice,
-      subCategoryId: p.subCategoryId,
-      stockQty: "",
-      sku: "",
-      colorValue: "",
-      sizeValue: "",
-    });
-    setShowModal(true);
-  };
+  setEditing(p);
+  setForm({
+    name: p.name,
+    description: p.description || "",
+    basePrice: p.basePrice,
+    discountPercentage: p.discountPercentage || "",
+    subCategoryId: p.subCategoryId,
+    stockQty: "",
+    sku: "",
+    colorValue: "",
+    sizeValue: "",
+  });
+  setShowModal(true);
+};
 
   const closeModal = () => setShowModal(false);
 
@@ -218,12 +221,13 @@ const saveProduct = async (e) => {
 
   // Step 1: Prepare the basic product data
   const payload = {
-    Name: form.name.trim(),
-    Description: form.description.trim(),
-    BasePrice: parseFloat(form.basePrice),
-    SellerId: sellerId,
-    SubCategoryId: parseInt(form.subCategoryId),
-  };
+  Name: form.name.trim(),
+  Description: form.description.trim(),
+  BasePrice: parseFloat(form.basePrice),
+  DiscountPercentage: form.discountPercentage ? parseFloat(form.discountPercentage) : null,
+  SellerId: sellerId,
+  SubCategoryId: parseInt(form.subCategoryId),
+};
 
   try {
     // Step 2: Check if we're EDITING or CREATING
@@ -277,6 +281,7 @@ const saveProduct = async (e) => {
       name: "",
       description: "",
       basePrice: "",
+      discountPercentage: "",
       subCategoryId: "",
       stockQty: "",
       sku: "",
@@ -595,26 +600,32 @@ const removeVariant = async (variantId) => {
                 className="bg-white rounded-xl overflow-hidden border border-grey-stroke shadow-soft-lift hover:shadow-lg transition-all hover:scale-[1.02] duration-200"
             >
               <div className="bg-gradient-to-br from-sage-100 to-sage-200 h-48 flex items-center justify-center relative">
-                <svg
-                  className="w-20 h-20 text-sage-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                  />
-                </svg>
+              <svg
+                className="w-20 h-20 text-sage-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                />
+              </svg>
 
+              {/* Status badges */}
+              <div className="absolute top-3 right-3 flex flex-col gap-2">
                 {!p.isActive && (
-                  <div className="absolute top-3 right-3">
-                    <StatusChip variant="neutral">Inactive</StatusChip>
-                </div>
+                  <StatusChip variant="neutral">Inactive</StatusChip>
+                )}
+                {p.discountPercentage && (
+                  <div className="px-3 py-1.5 bg-error-btn text-white text-sm font-bold rounded-full shadow-md">
+                    {p.discountPercentage}% OFF
+                  </div>
                 )}
               </div>
+            </div>
 
               <div className="p-5 space-y-3">
                 <div>
@@ -627,17 +638,33 @@ const removeVariant = async (variantId) => {
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-label-small text-charcoal-400">PRICE</p>
+                <div>
+                  <p className="text-label-small text-charcoal-400">PRICE</p>
+                  {p.discountPercentage ? (
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-baseline gap-2">
+                        <p className="text-body-large text-sage-700 font-bold">
+                          {formatCurrency(p.basePrice - (p.basePrice * (p.discountPercentage / 100)))}
+                        </p>
+                        <span className="px-2 py-0.5 bg-error-btn text-white text-xs font-bold rounded-full">
+                          {p.discountPercentage}% OFF
+                        </span>
+                      </div>
+                      <p className="text-body-regular text-charcoal-400 line-through">
+                        {formatCurrency(p.basePrice)}
+                      </p>
+                    </div>
+                  ) : (
                     <p className="text-body-large text-sage-700 font-bold">
                       {formatCurrency(p.basePrice)}
                     </p>
-                  </div>
-
-                  {p.subCategory && (
-                    <StatusChip variant="brand">{p.subCategory.name}</StatusChip>
                   )}
                 </div>
+
+                {p.subCategory && (
+                  <StatusChip variant="brand">{p.subCategory.name}</StatusChip>
+                )}
+              </div>
 
                 {/* Variant Count Badge */}
                     {p.variants && p.variants.length > 0 && (
@@ -766,6 +793,27 @@ const removeVariant = async (variantId) => {
                     ))}
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-label-medium text-charcoal-600 mb-2 font-semibold">
+                  Discount Percentage (Optional)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={form.discountPercentage}
+                  onChange={(e) =>
+                    setForm({ ...form, discountPercentage: e.target.value })
+                  }
+                  placeholder="e.g., 15 for 15% off"
+                  className="w-full border-2 border-grey-stroke rounded-lg p-3 bg-white text-body-regular text-charcoal-600 focus:outline-none focus:border-sage-500 focus:ring-2 focus:ring-sage-100 transition-all"
+                />
+                <p className="text-xs text-charcoal-400 mt-1">
+                  Leave empty for no discount
+                </p>
               </div>
               
 

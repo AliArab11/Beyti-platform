@@ -32,6 +32,17 @@ public partial class Seller
     [Precision(3)]
     public DateTime UpdatedAt { get; set; }
 
+    // 🔹 MAIN STORE CATEGORY (Food / Clothes / Self Care)
+    public int CategoryId { get; set; }
+
+    [ForeignKey("CategoryId")]
+    public virtual Category Category { get; set; } = null!;
+
+    // 🔹 SUBCATEGORIES (max 3 – enforced in backend)
+    public virtual ICollection<SellerSubCategory> SellerSubCategories { get; set; }
+        = new List<SellerSubCategory>();
+
+
     [InverseProperty("Seller")]
     public virtual ICollection<Order> Orders { get; set; } = new List<Order>();
 

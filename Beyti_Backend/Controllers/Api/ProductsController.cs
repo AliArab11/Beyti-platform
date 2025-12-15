@@ -29,6 +29,7 @@ namespace Beyti_Backend.Controllers.Api
             public int SellerId { get; set; }
             public int SubCategoryId { get; set; }
             public int? GenderId { get; set; }
+            public decimal? DiscountPercentage { get; set; }
         }
 
         public class UpdateProductDto
@@ -39,6 +40,7 @@ namespace Beyti_Backend.Controllers.Api
             public int SellerId { get; set; }
             public int SubCategoryId { get; set; }
             public byte? GenderId { get; set; }
+            public decimal? DiscountPercentage { get; set; }
         }
 
 
@@ -117,6 +119,7 @@ namespace Beyti_Backend.Controllers.Api
                 name = product.Name,
                 description = product.Description,
                 basePrice = product.BasePrice,
+                discountPercentage = product.DiscountPercentage,
                 isActive = product.IsActive,
                 averageRating,
                 reviewCount = allReviews.Count,
@@ -161,6 +164,7 @@ namespace Beyti_Backend.Controllers.Api
             product.SellerId = dto.SellerId;
             product.SubCategoryId = dto.SubCategoryId;
             product.GenderId = dto.GenderId;
+            product.DiscountPercentage = dto.DiscountPercentage;
             product.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
@@ -187,6 +191,7 @@ namespace Beyti_Backend.Controllers.Api
                 Name = dto.Name,
                 Description = dto.Description,
                 BasePrice = dto.BasePrice,
+                DiscountPercentage = dto.DiscountPercentage,
                 SellerId = dto.SellerId,
                 SubCategoryId = dto.SubCategoryId,
                 CreatedAt = DateTime.UtcNow,

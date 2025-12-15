@@ -6,6 +6,7 @@ import AnalyticsCard from "../../components/AnalyticsCard";
 import StatusChip from "../../components/StatusChip";
 import CRUDButton from "../../components/CRUDButton";
 import Snackbar from "../../components/Snackbar";
+import ProfilePage from '../../components/ProfilePage';
 
 import { Table, TableHeader, TableBody, TableRow } from "../../components/Table";
 
@@ -487,19 +488,22 @@ const OrderDetailsModal = ({ order, onClose, onOrderUpdated, onOrderExpired, onS
 // ---------- Main Component ----------
 const SellerDashboard = () => {
 
-    const getPageTitle = () => {
-    if (location.pathname.includes("/seller-dashboard/orders")) {
-      return "Order Management";
-    } else if (location.pathname.includes("/seller-dashboard/products")) {
-      return "Product Management";
-    } else if (location.pathname.includes("/seller-dashboard/analytics")) {
-      return "Analytics & Insights";
-    } else if (location.pathname.includes("/seller-dashboard/reviews")) {
-      return "Customer Reviews";
-    } else {
-      return "Seller Dashboard";
-    }
-  };
+
+const getPageTitle = () => {
+  if (location.pathname.includes("/seller-dashboard/orders")) {
+    return "Order Management";
+  } else if (location.pathname.includes("/seller-dashboard/products")) {
+    return "Product Management";
+  } else if (location.pathname.includes("/seller-dashboard/analytics")) {
+    return "Analytics & Insights";
+  } else if (location.pathname.includes("/seller-dashboard/reviews")) {
+    return "Customer Reviews";
+  } else if (location.pathname.includes("/seller-dashboard/profile")) {
+    return "My Profile";
+  } else {
+    return "Seller Dashboard";
+  } 
+};
 
 
   const navigate = useNavigate();
@@ -904,6 +908,20 @@ const productsArr = Array.from(productMap.values()).sort(
           >
             Reviews
           </NavigationButton>
+
+          {/* Profile */}
+          <NavigationButton
+            selected={location.pathname.includes("/seller-dashboard/profile")}
+            onClick={() => navigate("profile")}
+            icon={
+              <Icon.User
+                size={20}
+                weight={location.pathname.includes("/seller-dashboard/profile") ? "fill" : "regular"}
+              />
+            }
+          >
+            Profile
+          </NavigationButton>
         </nav>
 
         <div className="border-t border-sage-700 p-4">
@@ -944,6 +962,7 @@ const productsArr = Array.from(productMap.values()).sort(
           }}
           entityId={sellerId}
           userId={sellerId}
+          onProfileClick={() => navigate('profile')}
           onProfileUpdate={async (updates) => {
             try {
               console.log('Profile updates:', updates);
@@ -958,6 +977,7 @@ const productsArr = Array.from(productMap.values()).sort(
             }
           }}
         />
+        
         </div>
 
         <main className="flex-1 p-6 lg:p-8">
@@ -1351,7 +1371,47 @@ const productsArr = Array.from(productMap.values()).sort(
                         orders={orders}
                     />
                     ) : location.pathname.includes("/seller-dashboard/reviews") ? (
-                    <Reviews sellerId={sellerId} sellerName={sellerName} />
+                      <Reviews sellerId={sellerId} sellerName={sellerName} />
+                    ) : location.pathname.includes("/seller-dashboard/profile") ? (
+                      <ProfilePage
+                        userProfile={{
+                          userProfileId: sellerId,
+                          displayName: sellerName,
+                          phone: sellerList.find(s => s.id === sellerId)?.phone || '',
+                          street: sellerList.find(s => s.id === sellerId)?.street || '',
+                          city: sellerList.find(s => s.id === sellerId)?.city || '',
+                          region: sellerList.find(s => s.id === sellerId)?.region || '',
+                          postalCode: sellerList.find(s => s.id === sellerId)?.postalCode || '',
+                          country: sellerList.find(s => s.id === sellerId)?.country || 'Bahrain',
+                          address: sellerList.find(s => s.id === sellerId)?.address || '',
+                          status: 'Active',
+                          categoryId: sellerList.find(s => s.id === sellerId)?.categoryId,
+                          subCategoryIds: sellerList.find(s => s.id === sellerId)?.subCategoryIds || [],
+                          createdAt: sellerList.find(s => s.id === sellerId)?.createdAt,
+                          updatedAt: new Date().toISOString()
+                        }}
+                        userRole="Seller"
+                        entityId={sellerId}
+                        onProfileUpdate={async (updates) => {
+                          try {
+                            console.log('Profile updates:', updates);
+                            console.log('Current seller data:', sellerList.find(s => s.id === sellerId));
+                            
+                            const sellers = await getSellers();
+                            const updatedSeller = sellers.find(s => s.id === sellerId);
+                            if (updatedSeller) {
+                              setSellerName(updatedSeller.storeName || sellerName);
+                              setSellerList(prev => prev.map(s => 
+                                s.id === sellerId ? updatedSeller : s
+                              ));
+                            }
+                          } catch (error) {
+                            console.error('Error updating profile:', error);
+                            throw error;
+                          }
+                        }}
+                        readOnly={false}
+                      />
                     ) : null}
             </>
             )}
