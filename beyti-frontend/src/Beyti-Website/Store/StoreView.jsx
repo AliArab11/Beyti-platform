@@ -11,6 +11,8 @@ import CustomerHeader from '../../components/CustomerHeader';
 
 import OrderDetails from './Components/OrderDetails';
 import { createOrder, createOrderItem, getProductVariants, getOrder, getOrders } from '../../services/api';
+
+
 // Mock API call - replace with your actual API
 const getStoreDetails = async (storeId) => {
   try {
@@ -302,11 +304,23 @@ const CategorySidebar = ({ selected, onSelect }) => {
   );
 };
 
+const calculateDiscountedPrice = (originalPrice, discountPercentage) => {
+  if (!discountPercentage || discountPercentage <= 0) return null;
+  return originalPrice - (originalPrice * (discountPercentage / 100));
+};
+
 // Product Card
 const ProductCard = ({ product, onClick }) => {
+     console.log('🔍 Product data:', product.name, {
+       basePrice: product?.basePrice,
+       discountPercentage: product?.discountPercentage,
+       hasDiscount: !!product?.discountPercentage
+     });
   const rating = product?.averageRating || 0;
   const reviewCount = product?.reviewCount || 0;
   const hasEnoughReviews = reviewCount >= 5;
+
+  
 
   return (
     <div 
@@ -324,10 +338,34 @@ const ProductCard = ({ product, onClick }) => {
         </div>
         
         {/* Price Badge */}
-        <div className="absolute top-4 right-4 bg-white px-4 py-2 rounded-full shadow-lg">
-          <span className="text-lg font-bold text-sage-700">
-            {product?.basePrice ? `${product.basePrice.toFixed(3)} BD` : "15.000 BD"}
-          </span>
+        <div className="absolute top-4 right-4">
+          {(() => {
+            const originalPrice = product?.basePrice || 15.000;
+            const discount = product?.discountPercentage || product?.discount;
+            const discountedPrice = discount ? calculateDiscountedPrice(originalPrice, discount) : null;
+            
+            return discountedPrice ? (
+              <div className="bg-white px-3 py-2 rounded-2xl shadow-lg">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-charcoal-400 line-through" style={{ fontFamily: 'Inter, sans-serif' }}>
+                    {originalPrice.toFixed(3)} BD
+                  </span>
+                  <span className="text-lg font-bold text-sage-700" style={{ fontFamily: 'Inter, sans-serif' }}>
+                    {discountedPrice.toFixed(3)} BD
+                  </span>
+                  <div className="bg-sage-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                    {discount}% OFF
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white px-4 py-2 rounded-full shadow-lg">
+                <span className="text-lg font-bold text-sage-700">
+                  {originalPrice.toFixed(3)} BD
+                </span>
+              </div>
+            );
+          })()}
         </div>
       </div>
 
@@ -674,15 +712,23 @@ const handleProductClick = (product) => {
   });
 };
 
-    const handleAddToCart = (item) => {
-    console.log('🎯 handleAddToCart called with:', item);
-    console.log('📊 Current cart state:', cart);
-    
-    // Ensure sellerId is present
-    const itemWithSeller = {
-        ...item,
-        sellerId: item.sellerId || store?.id
-    };
+  const handleAddToCart = (item) => {
+  console.log('🎯 handleAddToCart called with:', item);
+  console.log('📊 Current cart state:', cart);
+  
+  // Calculate final price with discount if applicable
+  const originalPrice = item.basePrice;
+  const discount = item.discountPercentage;
+  const finalPrice = discount ? calculateDiscountedPrice(originalPrice, discount) : originalPrice;
+  
+  // Ensure sellerId is present
+  const itemWithSeller = {
+    ...item,
+    basePrice: finalPrice,
+    originalPrice: originalPrice,
+    discountPercentage: discount,
+    sellerId: item.sellerId || store?.id
+  };
     
     console.log('✅ Item with seller:', itemWithSeller);
     
@@ -881,6 +927,11 @@ useEffect(() => {
 
 const filteredProducts = (store?.products || [])
   .filter(product => {
+    // Filter out inactive products
+    if (product.isActive === false) {
+      return false;
+    }
+    
     // Search filter
     if (searchQuery && !product.name?.toLowerCase().includes(searchQuery.toLowerCase())) {
       return false;
@@ -888,6 +939,7 @@ const filteredProducts = (store?.products || [])
     
     return true;
   })
+
   .sort((a, b) => {
     // Helper function to check if product is new (less than 5 reviews)
     const isNewProduct = (product) => {

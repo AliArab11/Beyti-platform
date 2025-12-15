@@ -4,6 +4,7 @@ import * as Icon from "@phosphor-icons/react";
 import AnalyticsCard from "../../../components/AnalyticsCard";
 import StatusChip from "../../../components/StatusChip";
 import CRUDButton from "../../../components/CRUDButton";
+import Snackbar from "../../../components/Snackbar";
 import { Table, TableHeader, TableBody, TableRow } from "../../../components/Table";
 
 import { getSellerOrders } from "../../../services/api";
@@ -75,6 +76,7 @@ const Reviews = ({ sellerId, sellerName }) => {
   const [error, setError] = useState(null);
 
   const [expandedComments, setExpandedComments] = useState(new Set());
+  const [snackbar, setSnackbar] = useState({ show: false, message: '', type: 'success' });
 
   // productsWithReviews: [{ productId, productName, totalOrders, reviews: [...], totalReviews, avgRating, hiddenCount, lastReviewAt }]
   const [products, setProducts] = useState([]);
@@ -207,6 +209,17 @@ const Reviews = ({ sellerId, sellerName }) => {
 
     loadData();
   }, [sellerId]);
+
+    // Auto-hide snackbar after duration
+  useEffect(() => {
+    if (snackbar.show) {
+      const timer = setTimeout(() => {
+        setSnackbar({ show: false, message: '', type: 'success' });
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [snackbar.show]);
+
 
   // ------------------------------------------------------------------
   // Derived metrics
@@ -377,7 +390,7 @@ const confirmVisibilityChange = async (reason) => {
   try {
     setUpdatingReviewId(review.id);
 
-    await fetch(`https://localhost:7062/api/Reviews/${review.id}`, {
+    const response = await fetch(`https://localhost:7062/api/Reviews/${review.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -385,6 +398,10 @@ const confirmVisibilityChange = async (reason) => {
         HiddenReason: mode === "hide" ? reason.trim() : null,
       }),
     });
+
+    if (!response.ok) {
+      throw new Error(`Failed to update review: ${response.status}`);
+    }
 
     // update UI
     setProducts((prev) =>
@@ -398,16 +415,30 @@ const confirmVisibilityChange = async (reason) => {
                       ...r,
                       isCommentHiddenBySeller: mode === "hide",
                       hiddenReason: mode === "hide" ? reason.trim() : null,
+                      hiddenAt: mode === "hide" ? new Date().toISOString() : null,
                     }
                   : r
               ),
+              hiddenCount: mode === "hide" 
+                ? (p.hiddenCount || 0) + 1 
+                : Math.max(0, (p.hiddenCount || 0) - 1),
             }
           : p
       )
     );
+
+    setSnackbar({
+      show: true,
+      message: `Review ${mode === "hide" ? "hidden" : "unhidden"} successfully!`,
+      type: 'success'
+    });
   } catch (err) {
     console.error(err);
-    alert("Failed to update review");
+    setSnackbar({
+      show: true,
+      message: `Failed to update review: ${err.message}`,
+      type: 'error'
+    });
   } finally {
     setUpdatingReviewId(null);
     setVisibilityModal({ show: false, review: null, productId: null, mode: "hide" });
@@ -623,27 +654,41 @@ const confirmVisibilityChange = async (reason) => {
                         r.customerName || "Customer",
                         <RatingStars key={`stars-${r.id}`} value={r.rating || 0} />,
                        <div key={`comment-${r.id}`} className="max-w-xs">
-                          <p className={`text-sm text-charcoal-700 ${
-                            expandedComments.has(r.id) ? '' : 'line-clamp-2'
-                          }`}>
-                            {r.comment || "No comment"}
-                          </p>
-                          {r.comment && r.comment.length > 100 && (
-                            <button
-                              onClick={() => {
-                                setExpandedComments(prev => {
-                                  const next = new Set(prev);
-                                  if (next.has(r.id)) next.delete(r.id);
-                                  else next.add(r.id);
-                                  return next;
-                                });
-                              }}
-                              className="text-xs text-sage-600 hover:text-sage-700 font-medium mt-1"
-                            >
-                              {expandedComments.has(r.id) ? 'Show less' : 'Show more'} →
-                            </button>
-                          )}
-                        </div>,
+                        <p className={`text-sm ${
+                          r.isCommentHiddenBySeller 
+                            ? 'text-charcoal-400 line-through' 
+                            : 'text-charcoal-700'
+                        } ${expandedComments.has(r.id) ? '' : 'line-clamp-2'}`}>
+                          {r.comment || "No comment"}
+                        </p>
+                        {r.comment && r.comment.length > 100 && (
+                          <button
+                            onClick={() => {
+                              setExpandedComments(prev => {
+                                const next = new Set(prev);
+                                if (next.has(r.id)) next.delete(r.id);
+                                else next.add(r.id);
+                                return next;
+                              });
+                            }}
+                            className="text-xs text-sage-600 hover:text-sage-700 font-medium mt-1"
+                          >
+                            {expandedComments.has(r.id) ? 'Show less' : 'Show more'} →
+                          </button>
+                        )}
+                        {r.isCommentHiddenBySeller && r.hiddenReason && (
+                          <div className="mt-2 p-2 bg-error-bg border-l-2 border-error-btn rounded">
+                            <p className="text-xs text-error-text">
+                              <span className="font-semibold">Hidden reason:</span> {r.hiddenReason}
+                            </p>
+                            {r.hiddenAt && (
+                              <p className="text-xs text-charcoal-400 mt-1">
+                                Hidden on {formatDate(r.hiddenAt)}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>,
                         formatDate(r.createdAt),
                         <StatusChip
                           key={`vis-${r.id}`}
@@ -680,14 +725,23 @@ const confirmVisibilityChange = async (reason) => {
         </>
       )}
       <ReviewVisibilityModal
-  show={visibilityModal.show}
-  mode={visibilityModal.mode}
-  review={visibilityModal.review}
-  onClose={() =>
-    setVisibilityModal({ show: false, review: null, productId: null, mode: "hide" })
-  }
-  onConfirm={confirmVisibilityChange}
-/>
+      show={visibilityModal.show}
+      mode={visibilityModal.mode}
+      review={visibilityModal.review}
+      onClose={() =>
+        setVisibilityModal({ show: false, review: null, productId: null, mode: "hide" })
+      }
+      onConfirm={confirmVisibilityChange}
+    />
+
+    {/* Snackbar */}
+    <Snackbar
+      open={snackbar.show}
+      message={snackbar.message}
+      type={snackbar.type}
+      autoHideDuration={4000}
+      onClose={() => setSnackbar({ show: false, message: '', type: 'success' })}
+    />
 
     </div>
   );

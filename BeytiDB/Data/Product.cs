@@ -32,6 +32,9 @@ public partial class Product
     [NotMapped]
     public decimal? AverageRating { get; set; }
 
+    [Column(TypeName = "decimal(5, 2)")]
+    public decimal? DiscountPercentage { get; set; }
+
     public bool IsActive { get; set; }
 
     [Precision(3)]

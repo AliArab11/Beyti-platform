@@ -10,6 +10,7 @@ import { Table, TableHeader, TableBody, TableRow } from "../../components/Table"
 import '../Seller/Components/modalAnimations.css';
 import OrderDetails from '../Store/Components/OrderDetails';
 import Snackbar from '../../components/Snackbar';
+import ProfilePage from '../../components/ProfilePage';
 
 import {
   createReview,
@@ -370,10 +371,13 @@ useEffect(() => {
     loadCustomers();
   }, []);
 
-  // Load orders
- // Load orders with reviews
+ // Load orders with reviews - only on mount or when customerId changes
 useEffect(() => {
   if (!customerId) return;
+  
+  // Only load if we don't have orders yet
+  if (orders.length > 0) return;
+  
   const loadOrders = async () => {
   try {
     setLoading(true);
@@ -412,7 +416,7 @@ useEffect(() => {
   }
 };
   loadOrders();
-}, [customerId]);
+}, [customerId]); // Removed orders from dependency to prevent infinite loops
 
 
 
@@ -474,13 +478,15 @@ const displayedOrders = useMemo(() => {
 // Set the currently displayed active order based on index
 const currentActiveOrder = activeOrders.length > 0 ? activeOrders[activeOrderIndex] : null;
 
-  const getPageTitle = () => {
+const getPageTitle = () => {
   if (location.pathname === "/customer-dashboard" || location.pathname.includes("/customer-dashboard/orders")) {
     return "My Orders";
     } else if (location.pathname.includes("/customer-dashboard/addresses")) {
       return "My Addresses";
     } else if (location.pathname.includes("/customer-dashboard/favorites")) {
       return "My Favorites";
+    } else if (location.pathname.includes("/customer-dashboard/profile")) {
+      return "My Profile";
     } else {
       return "Dashboard";
     }
@@ -875,9 +881,9 @@ const pastOrders = useMemo(() => {
 
         <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
           <NavigationButton
-            selected={location.pathname === "/customer-dashboard" || location.pathname.includes("/customer-dashboard")}
+            selected={location.pathname === "/customer-dashboard" || location.pathname === "/customer-dashboard/"}
             onClick={() => navigate("/customer-dashboard")}
-            icon={<Icon.Package size={20} weight={location.pathname === "/customer-dashboard" ? "fill" : "regular"} />}
+            icon={<Icon.Package size={20} weight={(location.pathname === "/customer-dashboard" || location.pathname === "/customer-dashboard/") ? "fill" : "regular"} />}
           >
             My Orders
           </NavigationButton>
@@ -905,6 +911,14 @@ const pastOrders = useMemo(() => {
           >
             Favorites
           </NavigationButton>
+
+          <NavigationButton
+            selected={location.pathname.includes("/customer-dashboard/profile")}
+            onClick={() => navigate("profile")}
+            icon={<Icon.User size={20} weight={location.pathname.includes("/profile") ? "fill" : "regular"} />}
+          >
+            Profile
+          </NavigationButton>
         </nav>
 
       </aside>
@@ -931,6 +945,7 @@ const pastOrders = useMemo(() => {
               }}
               entityId={customerId}
               userId={customerId}
+              onProfileClick={() => navigate('profile')}
               additionalActions={
                 <button
                   onClick={() => {
@@ -1019,21 +1034,23 @@ const pastOrders = useMemo(() => {
               </div>
             )}
 
-            {customerId && loading && (
+            {customerId && loading && !location.pathname.includes("/customer-dashboard/profile") && (
               <div className="bg-grey-200 rounded-lg p-6 shadow-soft-lift text-center border border-grey-stroke">
                 <p className="text-body-medium text-charcoal-400">Loading your dashboard...</p>
               </div>
             )}
 
-            {customerId && error && !loading && (
+            {customerId && error && !loading && !location.pathname.includes("/customer-dashboard/profile") && (
               <div className="bg-error-bg border-l-4 border-error-btn p-4 rounded shadow-soft-lift">
                 <p className="text-body-medium text-error-text">{error}</p>
               </div>
             )}
 
-            {customerId && !loading && !error && (
+           {customerId && !loading && !error && (
             <>
-                {/* Active Orders Carousel */}
+              {!location.pathname.includes("/customer-dashboard/profile") && (
+                <>
+                  {/* Active Orders Carousel */}
                     {activeOrders.length > 0 && (
                     <section className="mb-8 relative">
                     {/* Left Arrow - Outside card */}
@@ -1264,9 +1281,45 @@ const pastOrders = useMemo(() => {
                       </div>
                       </section>
                    
+               </>
+              )}
             </>
-            
-            )}
+          )}
+            {location.pathname.includes("/customer-dashboard/profile") && (
+            <ProfilePage
+              userProfile={{
+                userProfileId: customerId,
+                displayName: customerName,
+                phone: customerList.find(c => c.id === customerId)?.phone || '',
+                street: customerList.find(c => c.id === customerId)?.street || '',
+                city: customerList.find(c => c.id === customerId)?.city || '',
+                region: customerList.find(c => c.id === customerId)?.region || '',
+                postalCode: customerList.find(c => c.id === customerId)?.postalCode || '',
+                country: customerList.find(c => c.id === customerId)?.country || 'Bahrain',
+                address: customerList.find(c => c.id === customerId)?.customerAddresses?.[0]?.fullAddress || '',
+                status: 'Active',
+                createdAt: customerList.find(c => c.id === customerId)?.createdAt,
+                updatedAt: new Date().toISOString()
+              }}
+              userRole="Customer"
+              entityId={customerId}
+              onProfileUpdate={async (updates) => {
+                try {
+                  console.log('Profile updates:', updates);
+                  // Reload customer data after update
+                  const customers = await getCustomers();
+                  const updatedCustomer = customers.find(c => c.id === customerId);
+                  if (updatedCustomer) {
+                    setCustomerName(updatedCustomer.fullName || customerName);
+                  }
+                } catch (error) {
+                  console.error('Error updating profile:', error);
+                  throw error;
+                }
+              }}
+              readOnly={false}
+            />
+          )}
           </div>
         </main>
       </div>
@@ -1388,6 +1441,8 @@ const pastOrders = useMemo(() => {
             type={snackbar.type}
             onClose={() => setSnackbar({ open: false, message: '', type: 'success' })}
           />
+
+        
     </div>
   );
 

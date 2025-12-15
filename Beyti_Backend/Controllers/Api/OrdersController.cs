@@ -93,6 +93,7 @@ namespace Beyti_Backend.Controllers.Api
             }
 
             var orders = await query
+            .OrderByDescending(o => o.CreatedAt)
             .Select(o => new
             {
                 o.Id,
@@ -494,35 +495,6 @@ namespace Beyti_Backend.Controllers.Api
 
                 if (order == null)
                     return NotFound();
-
-                // ⏰ HARD EXPIRY CHECK (authoritative)
-                var expiryMinutes = 1;
-                var expiredAt = order.CreatedAt.AddMinutes(expiryMinutes);
-
-                if (DateTime.UtcNow > expiredAt &&
-                    (order.Status == "Placed" || order.Status == "Pending"))
-                {
-                    // Auto-cancel
-                    order.Status = "Cancelled";
-                    order.UpdatedAt = DateTime.UtcNow;
-
-                    // Restore stock
-                    foreach (var item in order.OrderItems)
-                    {
-                        if (item.ProductVariant != null)
-                        {
-                            item.ProductVariant.StockQty += item.Qty;
-                            item.ProductVariant.UpdatedAt = DateTime.UtcNow;
-                        }
-                    }
-
-                    await _context.SaveChangesAsync();
-
-                    return BadRequest(new
-                    {
-                        message = "Order expired and was automatically cancelled."
-                    });
-                }
 
 
 

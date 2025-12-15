@@ -1,7 +1,24 @@
 import { X, CheckCircle, WarningCircle, XCircle } from "@phosphor-icons/react";
+import { useState, useEffect } from "react";
 
 const Snackbar = ({ open, message, type = 'success', onClose }) => {
-  if (!open) return null;
+  const [isVisible, setIsVisible] = useState(false);
+  const [shouldRender, setShouldRender] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setShouldRender(true);
+      // Small delay to trigger enter animation
+      setTimeout(() => setIsVisible(true), 10);
+    } else {
+      setIsVisible(false);
+      // Wait for exit animation to complete before removing from DOM
+      const timer = setTimeout(() => setShouldRender(false), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [open]);
+
+  if (!shouldRender) return null;
 
   const icons = {
     success: <CheckCircle size={24} weight="fill" className="text-white" />,
@@ -17,24 +34,16 @@ const Snackbar = ({ open, message, type = 'success', onClose }) => {
 
   return (
     <div 
-      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999]"
+      className="fixed z-[9999] transition-all duration-300 ease-out"
       style={{
-        animation: 'slideUp 0.3s ease-out forwards',
-         left: '50%'
+        bottom: '24px',
+        left: '50%',
+        transform: isVisible 
+          ? 'translateX(-50%) translateY(0)' 
+          : 'translateX(-50%) translateY(120px)',
+        opacity: isVisible ? 1 : 0
       }}
     >
-      <style>{`
-         @keyframes slideUp {
-            from {
-            transform: translateX(-50%) translateY(100px);
-            opacity: 0;
-            }
-            to {
-            transform: translateX(-50%) translateY(0);
-            opacity: 1;
-            }
-        }
-      `}</style>
       <div 
         className={`${colors[type]} text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 min-w-[320px] max-w-[500px]`}
       >

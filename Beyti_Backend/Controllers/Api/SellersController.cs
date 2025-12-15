@@ -54,7 +54,9 @@ namespace Beyti_Backend.Controllers.Api
                     storeName = seller.UserProfile.DisplayName,
                     seller.Phone,
                     seller.CreatedAt,
-                    averageRating, // ← NEW: Include rating
+                    averageRating,
+                    categoryId = seller.CategoryId,  // ← ADD THIS
+                    categoryName = seller.Category?.Name,  // ← ADD THIS
                     sellerAddresses = seller.SellerAddresses.Select(sa => new
                     {
                         sa.Id,
@@ -92,6 +94,7 @@ namespace Beyti_Backend.Controllers.Api
                     .Include(s => s.UserProfile)
                     .Include(s => s.SellerAddresses)
                         .ThenInclude(sa => sa.Address)
+                    .Include(s => s.SellerSubCategories)
                     .FirstOrDefaultAsync(s => s.UserProfileId == userProfileId);
 
                 if (seller == null)
@@ -105,13 +108,15 @@ namespace Beyti_Backend.Controllers.Api
                 return Ok(new
                 {
                     SellerId = seller.Id,
-                    Id = seller.Id, // For compatibility
+                    Id = seller.Id,
                     UserProfileId = seller.UserProfileId,
                     StoreName = seller.UserProfile.DisplayName,
                     Phone = seller.Phone,
                     CreatedAt = seller.CreatedAt,
                     DisplayName = seller.UserProfile.DisplayName,
                     RoleType = seller.UserProfile.RoleType,
+                    CategoryId = seller.CategoryId,
+                    SubCategoryIds = seller.SellerSubCategories.Select(ssc => ssc.SubCategoryId).ToList(),
                     Address = primaryAddress != null ? new
                     {
                         Street = primaryAddress.Street,
@@ -189,8 +194,10 @@ namespace Beyti_Backend.Controllers.Api
                             longitude = sa.Address.Longitude
                         }
                     }).ToList(),
-                    products = seller.Products.Select(p => {
-                        var productReviews = p.Reviews.Where(r => !r.IsCommentHiddenBySeller).ToList();
+                    products = seller.Products
+                    .Where(p => p.IsActive) // ← ADD THIS LINE to filter only active products
+                    .Select(p => {
+                     var productReviews = p.Reviews.Where(r => !r.IsCommentHiddenBySeller).ToList();
                         decimal? productAverageRating = null;
 
                         if (productReviews.Count >= 5)
@@ -204,6 +211,8 @@ namespace Beyti_Backend.Controllers.Api
                             name = p.Name,
                             description = p.Description,
                             basePrice = p.BasePrice,
+                            discountPercentage = p.DiscountPercentage,
+                            isActive = p.IsActive, // ← ADD THIS LINE
                             averageRating = productAverageRating,
                             reviewCount = productReviews.Count,
                             subCategory = p.SubCategory != null ? new
@@ -403,6 +412,60 @@ namespace Beyti_Backend.Controllers.Api
                 return StatusCode(500, new
                 {
                     message = "Error updating seller",
+                    error = ex.Message
+                });
+            }
+        }
+
+        // PUT: api/Sellers/{id}/subcategories
+        [HttpPut("{id}/subcategories")]
+        public async Task<IActionResult> UpdateSellerSubCategories(int id, [FromBody] List<int> subCategoryIds)
+        {
+            try
+            {
+                var seller = await _context.Sellers
+                    .Include(s => s.SellerSubCategories)
+                    .Include(s => s.Category)
+                    .FirstOrDefaultAsync(s => s.Id == id);
+
+                if (seller == null)
+                    return NotFound(new { message = "Seller not found" });
+
+                // Validate max 3 subcategories
+                if (subCategoryIds.Count > 3)
+                    return BadRequest(new { message = "Maximum 3 subcategories allowed" });
+
+                // Validate all subcategories belong to seller's main category
+                var validSubCategories = await _context.SubCategories
+                    .Where(sc => subCategoryIds.Contains(sc.Id) && sc.CategoryId == seller.CategoryId)
+                    .ToListAsync();
+
+                if (validSubCategories.Count != subCategoryIds.Count)
+                    return BadRequest(new { message = "All subcategories must belong to the seller's main category" });
+
+                // Remove existing subcategories
+                _context.SellerSubCategories.RemoveRange(seller.SellerSubCategories);
+
+                // Add new subcategories
+                foreach (var subCategoryId in subCategoryIds)
+                {
+                    seller.SellerSubCategories.Add(new SellerSubCategory
+                    {
+                        SellerId = id,
+                        SubCategoryId = subCategoryId
+                    });
+                }
+
+                seller.UpdatedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+
+                return Ok(new { message = "Subcategories updated successfully", subCategoryIds });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Error updating subcategories",
                     error = ex.Message
                 });
             }

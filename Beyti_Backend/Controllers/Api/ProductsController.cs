@@ -29,6 +29,7 @@ namespace Beyti_Backend.Controllers.Api
             public int SellerId { get; set; }
             public int SubCategoryId { get; set; }
             public int? GenderId { get; set; }
+            public decimal? DiscountPercentage { get; set; }
         }
 
         public class UpdateProductDto
@@ -39,6 +40,7 @@ namespace Beyti_Backend.Controllers.Api
             public int SellerId { get; set; }
             public int SubCategoryId { get; set; }
             public byte? GenderId { get; set; }
+            public decimal? DiscountPercentage { get; set; }
         }
 
 
@@ -73,24 +75,43 @@ namespace Beyti_Backend.Controllers.Api
         public async Task<ActionResult<object>> GetProduct(int id)
         {
             var product = await _context.Products
-                .Include(p => p.SubCategory)
-                    .ThenInclude(sc => sc.Category)
-                .Include(p => p.Reviews)
-                .FirstOrDefaultAsync(p => p.Id == id);
+            .Include(p => p.SubCategory)
+                .ThenInclude(sc => sc.Category)
+            .Include(p => p.Reviews)
+                .ThenInclude(r => r.Customer)
+                    .ThenInclude(c => c.UserProfile)
+            .FirstOrDefaultAsync(p => p.Id == id);
 
             if (product == null)
             {
                 return NotFound();
             }
 
-            // Calculate average rating
-            var productReviews = product.Reviews.Where(r => !r.IsCommentHiddenBySeller).ToList();
+            // Reviews logic
+            var allReviews = product.Reviews.ToList();
+
             decimal? averageRating = null;
 
-            if (productReviews.Count >= 5)
+            // Only show average if at least 5 reviews exist
+            if (allReviews.Count >= 5)
             {
-                averageRating = Math.Round((decimal)productReviews.Average(r => r.Rating), 1);
+                averageRating = Math.Round(
+                    (decimal)allReviews.Average(r => r.Rating),
+                    1
+                );
             }
+
+            // For customer-facing view: show all reviews but hide comments for hidden ones
+            var customerReviews = allReviews.Select(r => new
+            {
+                id = r.Id,
+                customerId = r.CustomerId,
+                customerName = r.Customer?.UserProfile?.DisplayName ?? "Anonymous",
+                rating = r.Rating,
+                comment = r.IsCommentHiddenBySeller ? null : r.Comment,
+                createdAt = r.CreatedAt,
+                isCommentHidden = r.IsCommentHiddenBySeller
+            }).OrderByDescending(r => r.createdAt).ToList();
 
             return Ok(new
             {
@@ -98,9 +119,11 @@ namespace Beyti_Backend.Controllers.Api
                 name = product.Name,
                 description = product.Description,
                 basePrice = product.BasePrice,
+                discountPercentage = product.DiscountPercentage,
                 isActive = product.IsActive,
                 averageRating,
-                reviewCount = productReviews.Count,
+                reviewCount = allReviews.Count,
+                reviews = customerReviews,
                 subCategory = product.SubCategory != null ? new
                 {
                     id = product.SubCategory.Id,
@@ -141,6 +164,7 @@ namespace Beyti_Backend.Controllers.Api
             product.SellerId = dto.SellerId;
             product.SubCategoryId = dto.SubCategoryId;
             product.GenderId = dto.GenderId;
+            product.DiscountPercentage = dto.DiscountPercentage;
             product.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
@@ -167,6 +191,7 @@ namespace Beyti_Backend.Controllers.Api
                 Name = dto.Name,
                 Description = dto.Description,
                 BasePrice = dto.BasePrice,
+                DiscountPercentage = dto.DiscountPercentage,
                 SellerId = dto.SellerId,
                 SubCategoryId = dto.SubCategoryId,
                 CreatedAt = DateTime.UtcNow,

@@ -6,10 +6,11 @@ import AnalyticsCard from "../../components/AnalyticsCard";
 import StatusChip from "../../components/StatusChip";
 import CRUDButton from "../../components/CRUDButton";
 import Snackbar from "../../components/Snackbar";
+import ProfilePage from '../../components/ProfilePage';
 
 import { Table, TableHeader, TableBody, TableRow } from "../../components/Table";
 
-import { getSellerOrders, getSellers, restoreStock } from "../../services/api";
+import { getSellerOrders, getSellers, restoreStock, getProducts } from "../../services/api";
 import OrderTimer from "./Components/OrderTimer";
 import Orders from "./Components/Orders"; 
 import Analytics from "./Components/Analytics";
@@ -90,7 +91,11 @@ const OrderDetailsModal = ({ order, onClose, onOrderUpdated, onOrderExpired, onS
   
   // Call parent's handler to trigger the API call
   if (onOrderExpired) {
-    await onOrderExpired(orderId);
+    setLocalOrder({ ...localOrder, status: "Cancelled" });
+
+    setTimeout(() => {
+      onClose();
+    }, 1500);
   }
   
   // Close modal after a brief delay
@@ -483,19 +488,22 @@ const OrderDetailsModal = ({ order, onClose, onOrderUpdated, onOrderExpired, onS
 // ---------- Main Component ----------
 const SellerDashboard = () => {
 
-    const getPageTitle = () => {
-    if (location.pathname.includes("/seller-dashboard/orders")) {
-      return "Order Management";
-    } else if (location.pathname.includes("/seller-dashboard/products")) {
-      return "Product Management";
-    } else if (location.pathname.includes("/seller-dashboard/analytics")) {
-      return "Analytics & Insights";
-    } else if (location.pathname.includes("/seller-dashboard/reviews")) {
-      return "Customer Reviews";
-    } else {
-      return "Seller Dashboard";
-    }
-  };
+
+const getPageTitle = () => {
+  if (location.pathname.includes("/seller-dashboard/orders")) {
+    return "Order Management";
+  } else if (location.pathname.includes("/seller-dashboard/products")) {
+    return "Product Management";
+  } else if (location.pathname.includes("/seller-dashboard/analytics")) {
+    return "Analytics & Insights";
+  } else if (location.pathname.includes("/seller-dashboard/reviews")) {
+    return "Customer Reviews";
+  } else if (location.pathname.includes("/seller-dashboard/profile")) {
+    return "My Profile";
+  } else {
+    return "Seller Dashboard";
+  } 
+};
 
 
   const navigate = useNavigate();
@@ -511,6 +519,8 @@ const SellerDashboard = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const [sellerProducts, setSellerProducts] = useState([]);
+
   const [searchRecent, setSearchRecent] = useState("");
 
   // order modal state
@@ -520,52 +530,21 @@ const SellerDashboard = () => {
   // snackbar state
   const [snackbar, setSnackbar] = useState({ show: false, message: '', type: 'error' });
 
-  const handleOrderExpired = async (orderId) => {
-  try {
-    // Double-check the order is still in placed/pending status
-    const order = orders.find(o => o.id === orderId);
-    const status = order?.status?.toLowerCase();
-    
-    if (!order || !['placed', 'pending'].includes(status)) {
-      console.log('⚠️ Order not in placed/pending status, skipping auto-cancel');
-      return;
-    }
+const handleOrderExpired = (orderId) => {
+  // FRONTEND DOES NOT CANCEL — BACKEND ALREADY DID
+  setOrders(prev =>
+    prev.map(o =>
+      o.id === orderId ? { ...o, status: "Cancelled" } : o
+    )
+  );
 
-    console.log('⏰ Auto-cancelling order:', orderId);
-    
-    const baseUrl = "https://localhost:7062/api/Orders";
-    const res = await fetch(`${baseUrl}/${orderId}/seller-response`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        Status: "Cancelled",
-        SellerNote: "Order auto-cancelled: No response within 10 minutes",
-      }),
-    });
-
-    if (res.ok) {
-      setOrders((prev) =>
-        prev.map((o) => (o.id === orderId ? { ...o, status: "Cancelled" } : o))
-      );
-      // Don't call restoreStock here - backend already handles it
-      console.log('✅ Order auto-cancelled (backend restored stock)');
-      
-      // Show snackbar
-      setSnackbar({
-        show: true,
-        message: 'Order expired and was automatically cancelled',
-        type: 'error'
-      });
-    }
-  } catch (err) {
-    console.error('Failed to auto-cancel order:', err);
-    setSnackbar({
-      show: true,
-      message: 'Failed to cancel expired order',
-      type: 'error'
-    });
-  }
+  setSnackbar({
+    show: true,
+    message: "Order expired and was automatically cancelled",
+    type: "error"
+  });
 };
+
 
   // Disable page scroll when modals are open
 useEffect(() => {
@@ -614,25 +593,38 @@ useEffect(() => {
     loadSellers();
   }, []);
 
-  // Load seller orders after selecting sellerId
-  useEffect(() => {
-    if (!sellerId) return;
+ // Load seller orders and products after selecting sellerId
+useEffect(() => {
+  if (!sellerId) return;
 
-    const loadOrders = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await getSellerOrders(sellerId);
-        setOrders(Array.isArray(data) ? data : []);
-      } catch (err) {
-        setError(err.message || "Failed to load orders");
-      } finally {
-        setLoading(false);
-      }
-    };
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Load orders
+      const ordersData = await getSellerOrders(sellerId);
+      const sorted = (Array.isArray(ordersData) ? ordersData : [])
+        .slice()
+        .sort((a, b) => {
+          return Date.parse(b.createdAt) - Date.parse(a.createdAt);
+        });
+      setOrders(sorted);
+      
+      // Load products to get accurate active count
+      const productsData = await getProducts();
+      const sellerProductsList = productsData.filter(p => p.sellerId === sellerId);
+      setSellerProducts(sellerProductsList);
+      
+    } catch (err) {
+      setError(err.message || "Failed to load data");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    loadOrders();
-  }, [sellerId]);
+  loadData();
+}, [sellerId]);
 
   // ---------- Derived metrics & views ----------
   const { metrics, recentOrders, topProducts, analyticsPreview } = useMemo(() => {
@@ -663,6 +655,7 @@ let last7DaysRevenue = 0;
 let last7DaysOrders = 0;
 
 const productMap = new Map();
+const activeProductIds = new Set(); // Track unique active products
 
 orders.forEach((order) => {
   const amount = order.totalAmount || 0;
@@ -695,25 +688,34 @@ orders.forEach((order) => {
             productImage: item.productImage || item.imageUrl || null,
             totalOrders: 0,
             totalQty: 0,
+            isActive: item.isActive !== false, // Track active status
           });
         }
         const record = productMap.get(key);
         record.totalOrders += 1;
         record.totalQty += item.qty || 0;
+        
+        // Track ONLY active products - check isActive explicitly
+        if (item.isActive === true && item.productId) {
+          activeProductIds.add(item.productId);
+        }
       });
     });
 
-    const totalOrders = orders.length;
-    const activeProducts = productMap.size;
+const totalOrders = orders.length;
+// Count active products from order items if sellerProducts isn't loaded yet
+const activeProducts = sellerProducts.length > 0 
+  ? sellerProducts.filter(p => p.isActive).length 
+  : activeProductIds.size;
 
-    const productsArr = Array.from(productMap.values()).sort(
-      (a, b) => b.totalOrders - a.totalOrders
-    );
+const productsArr = Array.from(productMap.values()).sort(
+  (a, b) => b.totalOrders - a.totalOrders
+);
+
     const topProducts = productsArr.slice(0, 3);
 
-    const recentOrders = [...orders]
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-      .slice(0, 5);
+    const recentOrders = orders.slice(0, 5);
+
 
     return {
       metrics: {
@@ -906,6 +908,20 @@ orders.forEach((order) => {
           >
             Reviews
           </NavigationButton>
+
+          {/* Profile */}
+          <NavigationButton
+            selected={location.pathname.includes("/seller-dashboard/profile")}
+            onClick={() => navigate("profile")}
+            icon={
+              <Icon.User
+                size={20}
+                weight={location.pathname.includes("/seller-dashboard/profile") ? "fill" : "regular"}
+              />
+            }
+          >
+            Profile
+          </NavigationButton>
         </nav>
 
         <div className="border-t border-sage-700 p-4">
@@ -946,6 +962,7 @@ orders.forEach((order) => {
           }}
           entityId={sellerId}
           userId={sellerId}
+          onProfileClick={() => navigate('profile')}
           onProfileUpdate={async (updates) => {
             try {
               console.log('Profile updates:', updates);
@@ -960,6 +977,7 @@ orders.forEach((order) => {
             }
           }}
         />
+        
         </div>
 
         <main className="flex-1 p-6 lg:p-8">
@@ -1098,8 +1116,10 @@ orders.forEach((order) => {
                           if (isRequest) {
                             const orderTime = new Date(order.createdAt);
                             const now = new Date();
-                            const diffMinutes = (now - orderTime) / (1000 * 60);
-                            isNew = diffMinutes <= 10;
+                            const diffMs = Date.now() - Date.parse(order.createdAt);
+                            const diffMinutes = diffMs / (1000 * 60);
+                            isNew = diffMinutes >= 0 && diffMinutes <= 10;
+
                           }
                           
                           return (
@@ -1351,7 +1371,47 @@ orders.forEach((order) => {
                         orders={orders}
                     />
                     ) : location.pathname.includes("/seller-dashboard/reviews") ? (
-                    <Reviews sellerId={sellerId} sellerName={sellerName} />
+                      <Reviews sellerId={sellerId} sellerName={sellerName} />
+                    ) : location.pathname.includes("/seller-dashboard/profile") ? (
+                      <ProfilePage
+                        userProfile={{
+                          userProfileId: sellerId,
+                          displayName: sellerName,
+                          phone: sellerList.find(s => s.id === sellerId)?.phone || '',
+                          street: sellerList.find(s => s.id === sellerId)?.street || '',
+                          city: sellerList.find(s => s.id === sellerId)?.city || '',
+                          region: sellerList.find(s => s.id === sellerId)?.region || '',
+                          postalCode: sellerList.find(s => s.id === sellerId)?.postalCode || '',
+                          country: sellerList.find(s => s.id === sellerId)?.country || 'Bahrain',
+                          address: sellerList.find(s => s.id === sellerId)?.address || '',
+                          status: 'Active',
+                          categoryId: sellerList.find(s => s.id === sellerId)?.categoryId,
+                          subCategoryIds: sellerList.find(s => s.id === sellerId)?.subCategoryIds || [],
+                          createdAt: sellerList.find(s => s.id === sellerId)?.createdAt,
+                          updatedAt: new Date().toISOString()
+                        }}
+                        userRole="Seller"
+                        entityId={sellerId}
+                        onProfileUpdate={async (updates) => {
+                          try {
+                            console.log('Profile updates:', updates);
+                            console.log('Current seller data:', sellerList.find(s => s.id === sellerId));
+                            
+                            const sellers = await getSellers();
+                            const updatedSeller = sellers.find(s => s.id === sellerId);
+                            if (updatedSeller) {
+                              setSellerName(updatedSeller.storeName || sellerName);
+                              setSellerList(prev => prev.map(s => 
+                                s.id === sellerId ? updatedSeller : s
+                              ));
+                            }
+                          } catch (error) {
+                            console.error('Error updating profile:', error);
+                            throw error;
+                          }
+                        }}
+                        readOnly={false}
+                      />
                     ) : null}
             </>
             )}
