@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using BeytiDB.Data;
+using Beyti_Backend.Services;
 
 namespace Beyti_Backend.Controllers.Api
 {
@@ -14,10 +15,12 @@ namespace Beyti_Backend.Controllers.Api
     public class OrdersController : ControllerBase
     {
         private readonly BeytiContext _context;
+        private readonly INotificationService _notificationService;
 
-        public OrdersController(BeytiContext context)
+        public OrdersController(BeytiContext context, INotificationService notificationService)
         {
             _context = context;
+            _notificationService = notificationService;
         }
 
         // DTO for creating orders 
@@ -340,6 +343,31 @@ namespace Beyti_Backend.Controllers.Api
             _context.Orders.Add(order);
             await _context.SaveChangesAsync();
 
+            // Send notification to seller about new order
+            var customer = await _context.Customers
+                .Include(c => c.UserProfile)
+                .FirstOrDefaultAsync(c => c.Id == dto.CustomerId);
+
+            var seller = await _context.Sellers
+                .Include(s => s.UserProfile)
+                .FirstOrDefaultAsync(s => s.Id == dto.SellerId);
+
+            if (seller?.UserProfile != null && customer?.UserProfile != null)
+            {
+                var customerName = customer.UserProfile.DisplayName ?? "A customer";
+                var notificationMessage = $"New order #{order.Id} received from {customerName}! Total: BHD {order.TotalAmount:F3}. Please respond within 10 minutes.";
+
+                await _notificationService.SendNotificationAsync(
+                    recipientUserId: seller.UserProfile.Id,
+                    senderUserId: customer.UserProfile.Id,
+                    type: "NewOrder",
+                    title: "New Order Received",
+                    body: notificationMessage,
+                    relatedEntityType: "Order",
+                    relatedEntityId: order.Id
+                );
+            }
+
             return CreatedAtAction("GetOrder", new { id = order.Id }, order);
         }
 
@@ -491,6 +519,10 @@ namespace Beyti_Backend.Controllers.Api
                     .Include(o => o.DeliveryTicket)
                     .Include(o => o.OrderItems)
                         .ThenInclude(oi => oi.ProductVariant)
+                    .Include(o => o.Customer)
+                        .ThenInclude(c => c.UserProfile)
+                    .Include(o => o.Seller)
+                        .ThenInclude(s => s.UserProfile)
                     .FirstOrDefaultAsync(o => o.Id == id);
 
                 if (order == null)
@@ -533,6 +565,24 @@ namespace Beyti_Backend.Controllers.Api
                 }
 
                 await _context.SaveChangesAsync();
+
+                // Send notification to customer about the status change
+                if (!string.IsNullOrEmpty(dto.Status) && order.Customer?.UserProfile != null)
+                {
+                    var sellerName = order.Seller?.UserProfile?.DisplayName ?? "seller";
+                    var notificationMessage = GetOrderStatusNotificationMessage(dto.Status, sellerName, order.Id);
+
+                    await _notificationService.SendNotificationAsync(
+                        recipientUserId: order.Customer.UserProfile.Id,
+                        senderUserId: order.Seller?.UserProfileId,
+                        type: "OrderUpdate",
+                        title: "Order Status Update",
+                        body: notificationMessage,
+                        relatedEntityType: "Order",
+                        relatedEntityId: id
+                    );
+                }
+
                 return NoContent();
             }
             catch (Exception ex)
@@ -549,10 +599,16 @@ namespace Beyti_Backend.Controllers.Api
             {
                 var order = await _context.Orders
                     .Include(o => o.DeliveryTicket)
+                    .Include(o => o.Customer)
+                        .ThenInclude(c => c.UserProfile)
+                    .Include(o => o.Seller)
+                        .ThenInclude(s => s.UserProfile)
                     .FirstOrDefaultAsync(o => o.Id == id);
 
                 if (order == null)
                     return NotFound();
+
+                string customerVisibleStatus = dto.Status;
 
                 // SPECIAL HANDLING FOR DELIVERY ORDERS
                 if (order.FulfillmentType == "Delivery" && dto.Status == "Ready for Pickup")
@@ -562,6 +618,7 @@ namespace Beyti_Backend.Controllers.Api
 
                     // Keep customer status at "Preparing"
                     order.Status = "Preparing";
+                    customerVisibleStatus = "Preparing";
 
                     // Update delivery ticket so drivers see it
                     if (order.DeliveryTicket != null)
@@ -578,6 +635,23 @@ namespace Beyti_Backend.Controllers.Api
 
                 order.UpdatedAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
+
+                // Send notification to customer about the status change
+                if (!string.IsNullOrEmpty(customerVisibleStatus) && order.Customer?.UserProfile != null)
+                {
+                    var sellerName = order.Seller?.UserProfile?.DisplayName ?? "seller";
+                    var notificationMessage = GetOrderStatusNotificationMessage(customerVisibleStatus, sellerName, order.Id);
+
+                    await _notificationService.SendNotificationAsync(
+                        recipientUserId: order.Customer.UserProfile.Id,
+                        senderUserId: order.Seller?.UserProfileId,
+                        type: "OrderUpdate",
+                        title: "Order Status Update",
+                        body: notificationMessage,
+                        relatedEntityType: "Order",
+                        relatedEntityId: id
+                    );
+                }
 
                 return NoContent();
             }
@@ -605,6 +679,20 @@ namespace Beyti_Backend.Controllers.Api
         private bool OrderExists(int id)
         {
             return _context.Orders.Any(e => e.Id == id);
+        }
+
+        // Helper method to generate notification messages based on order status
+        private string GetOrderStatusNotificationMessage(string status, string sellerName, int orderId)
+        {
+            return status switch
+            {
+                "Accepted" => $"Great news! {sellerName} has accepted your order #{orderId}. They will start preparing it soon.",
+                "Preparing" => $"{sellerName} is now preparing your order #{orderId}.",
+                "Ready for Pickup" => $"Your order #{orderId} from {sellerName} is ready for pickup!",
+                "Completed" => $"Your order #{orderId} from {sellerName} has been completed. Thank you for your purchase!",
+                "Cancelled" => $"Unfortunately, your order #{orderId} from {sellerName} has been cancelled. Please contact the seller for more information.",
+                _ => $"Your order #{orderId} status has been updated to: {status}"
+            };
         }
     }
 }

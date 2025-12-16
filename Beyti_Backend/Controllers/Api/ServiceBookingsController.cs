@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using BeytiDB.Data;
+using Beyti_Backend.Services;
 
 namespace Beyti_Backend.Controllers.Api
 {
@@ -14,10 +15,12 @@ namespace Beyti_Backend.Controllers.Api
     public class ServiceBookingsController : ControllerBase
     {
         private readonly BeytiContext _context;
+        private readonly INotificationService _notificationService;
 
-        public ServiceBookingsController(BeytiContext context)
+        public ServiceBookingsController(BeytiContext context, INotificationService notificationService)
         {
             _context = context;
+            _notificationService = notificationService;
         }
 
         // GET: api/ServiceBookings
@@ -189,6 +192,37 @@ namespace Beyti_Backend.Controllers.Api
 
                 // Update TimeSlot IsActive based on booking status
                 await UpdateTimeSlotAvailability(serviceBooking.TimeSlotId, serviceBooking.Status);
+
+                // Send notification to service provider about new booking
+                var customer = await _context.Customers
+                    .Include(c => c.UserProfile)
+                    .FirstOrDefaultAsync(c => c.Id == serviceBooking.CustomerId);
+
+                var serviceProvider = await _context.ServiceProviders
+                    .Include(sp => sp.UserProfile)
+                    .FirstOrDefaultAsync(sp => sp.Id == serviceBooking.ServiceProviderId);
+
+                var serviceCatalog = await _context.ServiceCatalogs
+                    .FirstOrDefaultAsync(sc => sc.Id == serviceBooking.ServiceCatalogId);
+
+                if (serviceProvider?.UserProfile != null && customer?.UserProfile != null)
+                {
+                    var customerName = customer.UserProfile.DisplayName ?? "A customer";
+                    var serviceName = serviceCatalog?.Name ?? "a service";
+                    var bookingDate = serviceBooking.BookingDateTime.ToString("MMM dd, yyyy") ?? "a scheduled date";
+
+                    var notificationMessage = $"New booking request #{serviceBooking.Id} from {customerName} for {serviceName} on {bookingDate}. Please review and respond.";
+
+                    await _notificationService.SendNotificationAsync(
+                        recipientUserId: serviceProvider.UserProfile.Id,
+                        senderUserId: customer.UserProfile.Id,
+                        type: "NewBooking",
+                        title: "New Service Booking",
+                        body: notificationMessage,
+                        relatedEntityType: "ServiceBooking",
+                        relatedEntityId: serviceBooking.Id
+                    );
+                }
 
                 return CreatedAtAction("GetServiceBooking", new { id = serviceBooking.Id }, serviceBooking);
             }
