@@ -360,10 +360,8 @@ const ServiceProviderStoresView = () => {
         setProviders(updatedProviders);
       }
 
-      // Set first category as default
-      if (categoriesData && categoriesData.length > 0) {
-        setSelectedCategory(categoriesData[0].id);
-      }
+      // Don't set any default category - show all providers initially
+      setSelectedCategory(null);
     } catch (error) {
       console.error("Failed to load initial data:", error);
       setProviders([]);
@@ -382,8 +380,15 @@ const ServiceProviderStoresView = () => {
     const displayName = provider.displayName || '';
     const businessName = provider.businessName || '';
 
-    return displayName.toLowerCase().includes(searchLower) ||
-           businessName.toLowerCase().includes(searchLower);
+    // Filter by search query
+    const matchesSearch = displayName.toLowerCase().includes(searchLower) ||
+                         businessName.toLowerCase().includes(searchLower);
+
+    // Filter by category if one is selected, otherwise show all
+    const matchesCategory = selectedCategory === null ||
+                          provider.serviceCategoryId === selectedCategory;
+
+    return matchesSearch && matchesCategory;
   });
 
   // Handle sidebar navigation
@@ -455,11 +460,15 @@ const ServiceProviderStoresView = () => {
           <div className="max-w-[1440px] mx-auto">
             <div className="flex justify-center">
               <CategoryTabs
-                categories={categories.map(cat => cat.name)}
-                selected={categories.find(cat => cat.id === selectedCategory)?.name || ''}
+                categories={['All', ...categories.map(cat => cat.name)]}
+                selected={selectedCategory === null ? 'All' : (categories.find(cat => cat.id === selectedCategory)?.name || '')}
                 onSelect={(name) => {
-                  const category = categories.find(cat => cat.name === name);
-                  if (category) handleCategorySelect(category.id);
+                  if (name === 'All') {
+                    handleCategorySelect(null);
+                  } else {
+                    const category = categories.find(cat => cat.name === name);
+                    if (category) handleCategorySelect(category.id);
+                  }
                 }}
               />
             </div>

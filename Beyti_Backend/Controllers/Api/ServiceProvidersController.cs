@@ -32,6 +32,7 @@ namespace Beyti_Backend.Controllers.Api
                 {
                     sp.Id,
                     sp.UserProfileId,
+                    sp.ServiceCategoryId,
                     sp.BusinessName,
                     sp.Phone,
                     sp.MinServicePrice,

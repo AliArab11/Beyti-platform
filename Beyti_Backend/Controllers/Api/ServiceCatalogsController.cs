@@ -22,11 +22,19 @@ namespace Beyti_Backend.Controllers.Api
 
         // GET: api/ServiceCatalogs
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<ServiceCatalog>>> GetServiceCatalogs()
+        public async Task<ActionResult<IEnumerable<ServiceCatalog>>> GetServiceCatalogs([FromQuery] int? categoryId = null)
         {
-            return await _context.ServiceCatalogs
+            var query = _context.ServiceCatalogs
                 .Include(sc => sc.ServiceCategory)
-                .ToListAsync();
+                .AsQueryable();
+
+            // Filter by categoryId if provided
+            if (categoryId.HasValue)
+            {
+                query = query.Where(sc => sc.ServiceCategoryId == categoryId.Value);
+            }
+
+            return await query.ToListAsync();
         }
 
         // GET: api/ServiceCatalogs/5

@@ -1508,6 +1508,10 @@ export const getServiceCategories = async () => {
   return await fetchAPI('/ServiceProviderDashboard/Categories');
 };
 
+export const getProviderCategories = async (serviceProviderId) => {
+  return await fetchAPI(`/ServiceProviderDashboard/ProviderCategories/${serviceProviderId}`);
+};
+
 export const getMyServices = async (serviceProviderId) => {
   return await fetchAPI(`/ServiceProviderDashboard/MyServices/${serviceProviderId}`);
 };

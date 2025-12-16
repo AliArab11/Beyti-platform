@@ -326,9 +326,9 @@ const ServiceProviderDetailView = () => {
         console.log('[ServiceProviderDetailView] Provider data:', providerData);
         setProvider(providerData);
 
-        // Fetch catalogs
-        const catalogsData = await getServiceCatalogs();
-        console.log('[ServiceProviderDetailView] Catalogs data:', catalogsData);
+        // Fetch catalogs filtered by the service provider's enrolled category
+        const catalogsData = await getServiceCatalogs(providerData.serviceCategoryId);
+        console.log('[ServiceProviderDetailView] Catalogs data (filtered by category):', catalogsData);
         setCatalogs(Array.isArray(catalogsData) ? catalogsData : []);
 
         // Fetch services for this provider

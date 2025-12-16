@@ -34,6 +34,7 @@ namespace Beyti_Backend.Controllers.Api
             {
                 var provider = await _context.ServiceProviders
                     .Include(sp => sp.UserProfile)
+                    .Include(sp => sp.ServiceCategory)
                     .Include(sp => sp.ServiceProviderAddresses)
                         .ThenInclude(spa => spa.Address)
                     .FirstOrDefaultAsync(sp => sp.UserProfileId == userProfileId);
@@ -73,6 +74,8 @@ namespace Beyti_Backend.Controllers.Api
                     provider.MaxServicePrice,
                     provider.Status,
                     provider.VerifiedAt,
+                    provider.ServiceCategoryId,
+                    ServiceCategoryName = provider.ServiceCategory?.Name,
                     DisplayName = provider.UserProfile.DisplayName,
                     RoleType = provider.UserProfile.RoleType,
                     Address = formattedAddress,
@@ -306,6 +309,52 @@ namespace Beyti_Backend.Controllers.Api
             }
         }
 
+        // GET: api/ServiceProviderDashboard/ProviderCategories/5
+        // Returns only the service catalogs for the provider's enrolled category
+        [HttpGet("ProviderCategories/{serviceProviderId}")]
+        public async Task<IActionResult> GetProviderCategories(int serviceProviderId)
+        {
+            try
+            {
+                // Get the provider's enrolled category
+                var provider = await _context.ServiceProviders
+                    .Include(sp => sp.ServiceCategory)
+                        .ThenInclude(sc => sc.ServiceCatalogs)
+                    .FirstOrDefaultAsync(sp => sp.Id == serviceProviderId);
+
+                if (provider == null)
+                    return NotFound("Service provider not found");
+
+                if (provider.ServiceCategory == null)
+                    return NotFound("Service provider is not enrolled in any category");
+
+                // Return only the catalogs from the provider's category
+                var category = new
+                {
+                    provider.ServiceCategory.Id,
+                    provider.ServiceCategory.Name,
+                    provider.ServiceCategory.Description,
+                    ServiceCatalogs = provider.ServiceCategory.ServiceCatalogs
+                        .Where(sc => sc.IsActive)
+                        .Select(sc => new
+                        {
+                            sc.Id,
+                            sc.Name,
+                            sc.Description,
+                            CategoryId = provider.ServiceCategory.Id,
+                            CategoryName = provider.ServiceCategory.Name
+                        })
+                        .ToList()
+                };
+
+                return Ok(category);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
+
         // GET: api/ServiceProviderDashboard/MyServices/5
         [HttpGet("MyServices/{serviceProviderId}")]
         public async Task<IActionResult> GetMyServices(int serviceProviderId)
@@ -367,6 +416,30 @@ namespace Beyti_Backend.Controllers.Api
                 int serviceCatalogId = body.GetProperty("serviceCategoryId").GetInt32(); // Frontend sends serviceCategoryId but it's actually serviceCatalogId
                 string name = body.GetProperty("name").GetString()!;
 
+                // Validate that the service catalog belongs to the provider's enrolled category
+                var provider = await _context.ServiceProviders
+                    .Include(sp => sp.ServiceCategory)
+                    .FirstOrDefaultAsync(sp => sp.Id == serviceProviderId);
+
+                if (provider == null)
+                    return NotFound("Service provider not found");
+
+                var serviceCatalog = await _context.ServiceCatalogs
+                    .FirstOrDefaultAsync(sc => sc.Id == serviceCatalogId);
+
+                if (serviceCatalog == null)
+                    return NotFound("Service catalog not found");
+
+                // Check if the catalog belongs to the provider's category
+                if (provider.ServiceCategoryId != serviceCatalog.ServiceCategoryId)
+                {
+                    return BadRequest(new
+                    {
+                        error = "Unauthorized category",
+                        message = $"You can only add services from your enrolled category: {provider.ServiceCategory?.Name}. This service catalog belongs to a different category."
+                    });
+                }
+
                 string? description = null;
                 if (body.TryGetProperty("description", out var desc) && desc.ValueKind != JsonValueKind.Null)
                     description = desc.GetString();
@@ -405,6 +478,35 @@ namespace Beyti_Backend.Controllers.Api
                             maxPrice = parsedMaxPrice;
                         }
                     }
+                }
+
+                // Validate price range
+                if (minPrice.HasValue && maxPrice.HasValue && minPrice.Value > maxPrice.Value)
+                {
+                    return BadRequest(new
+                    {
+                        error = "Invalid price range",
+                        message = "Minimum price must be less than or equal to maximum price."
+                    });
+                }
+
+                // Validate prices are not negative
+                if (minPrice.HasValue && minPrice.Value < 0)
+                {
+                    return BadRequest(new
+                    {
+                        error = "Invalid price",
+                        message = "Minimum price cannot be negative."
+                    });
+                }
+
+                if (maxPrice.HasValue && maxPrice.Value < 0)
+                {
+                    return BadRequest(new
+                    {
+                        error = "Invalid price",
+                        message = "Maximum price cannot be negative."
+                    });
                 }
 
                 // Handle estimatedDuration - can be null, number, or empty string
@@ -462,21 +564,44 @@ namespace Beyti_Backend.Controllers.Api
         {
             try
             {
-                var service = await _context.Services.FindAsync(serviceId);
+                var service = await _context.Services
+                    .Include(s => s.ServiceProvider)
+                        .ThenInclude(sp => sp.ServiceCategory)
+                    .FirstOrDefaultAsync(s => s.Id == serviceId);
+
                 if (service == null)
                     return NotFound("Service not found");
 
                 // Update ServiceCatalogId if provided (frontend sends this as serviceCategoryId)
                 if (body.TryGetProperty("serviceCategoryId", out var catProp))
                 {
+                    int newServiceCatalogId = 0;
                     if (catProp.ValueKind == JsonValueKind.Number)
                     {
-                        service.ServiceCatalogId = catProp.GetInt32();
+                        newServiceCatalogId = catProp.GetInt32();
                     }
                     else if (catProp.ValueKind == JsonValueKind.String)
                     {
-                        service.ServiceCatalogId = int.Parse(catProp.GetString()!);
+                        newServiceCatalogId = int.Parse(catProp.GetString()!);
                     }
+
+                    // Validate that the new catalog belongs to the provider's category
+                    var serviceCatalog = await _context.ServiceCatalogs
+                        .FirstOrDefaultAsync(sc => sc.Id == newServiceCatalogId);
+
+                    if (serviceCatalog == null)
+                        return NotFound("Service catalog not found");
+
+                    if (service.ServiceProvider.ServiceCategoryId != serviceCatalog.ServiceCategoryId)
+                    {
+                        return BadRequest(new
+                        {
+                            error = "Unauthorized category",
+                            message = $"You can only update services to catalogs from your enrolled category: {service.ServiceProvider.ServiceCategory?.Name}."
+                        });
+                    }
+
+                    service.ServiceCatalogId = newServiceCatalogId;
                 }
 
                 if (body.TryGetProperty("name", out var name))
@@ -494,12 +619,23 @@ namespace Beyti_Backend.Controllers.Api
                     }
                     else if (minP.ValueKind == JsonValueKind.Number)
                     {
-                        service.MinPrice = minP.GetDecimal();
+                        var minPriceValue = minP.GetDecimal();
+                        if (minPriceValue < 0)
+                        {
+                            return BadRequest(new { error = "Invalid price", message = "Minimum price cannot be negative." });
+                        }
+                        service.MinPrice = minPriceValue;
                     }
                     else if (minP.ValueKind == JsonValueKind.String)
                     {
                         if (decimal.TryParse(minP.GetString(), out var parsedMinPrice))
+                        {
+                            if (parsedMinPrice < 0)
+                            {
+                                return BadRequest(new { error = "Invalid price", message = "Minimum price cannot be negative." });
+                            }
                             service.MinPrice = parsedMinPrice;
+                        }
                     }
                 }
 
@@ -512,13 +648,34 @@ namespace Beyti_Backend.Controllers.Api
                     }
                     else if (maxP.ValueKind == JsonValueKind.Number)
                     {
-                        service.MaxPrice = maxP.GetDecimal();
+                        var maxPriceValue = maxP.GetDecimal();
+                        if (maxPriceValue < 0)
+                        {
+                            return BadRequest(new { error = "Invalid price", message = "Maximum price cannot be negative." });
+                        }
+                        service.MaxPrice = maxPriceValue;
                     }
                     else if (maxP.ValueKind == JsonValueKind.String)
                     {
                         if (decimal.TryParse(maxP.GetString(), out var parsedMaxPrice))
+                        {
+                            if (parsedMaxPrice < 0)
+                            {
+                                return BadRequest(new { error = "Invalid price", message = "Maximum price cannot be negative." });
+                            }
                             service.MaxPrice = parsedMaxPrice;
+                        }
                     }
+                }
+
+                // Validate price range after both prices are set
+                if (service.MinPrice.HasValue && service.MaxPrice.HasValue && service.MinPrice.Value > service.MaxPrice.Value)
+                {
+                    return BadRequest(new
+                    {
+                        error = "Invalid price range",
+                        message = "Minimum price must be less than or equal to maximum price."
+                    });
                 }
 
                 // Handle estimatedDuration

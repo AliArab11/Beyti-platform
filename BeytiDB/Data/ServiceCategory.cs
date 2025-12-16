@@ -13,6 +13,7 @@ public class ServiceCategory
         {
             // Initialize the list to prevent NullReferenceException
             ServiceCatalogs = new HashSet<ServiceCatalog>();
+            ServiceProviders = new HashSet<ServiceProvider>();
             CreatedAt = DateTime.Now;
             IsActive = true;
         }
@@ -31,6 +32,9 @@ public class ServiceCategory
 
         public DateTime CreatedAt { get; set; }
 
-        // Navigation Property: One Category has many Services
+        // Navigation Property: One Category has many Catalogs
         public virtual ICollection<ServiceCatalog> ServiceCatalogs { get; set; }
+
+        // Navigation Property: One Category has many Service Providers enrolled to it
+        public virtual ICollection<ServiceProvider> ServiceProviders { get; set; }
     }

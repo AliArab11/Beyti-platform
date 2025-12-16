@@ -428,6 +428,12 @@ public partial class BeytiContext : DbContext
             entity.HasOne(d => d.UserProfile).WithOne(p => p.ServiceProvider)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_ServiceProvider_UserProfile");
+
+            entity.HasOne(d => d.ServiceCategory)
+                .WithMany(p => p.ServiceProviders)
+                .HasForeignKey(d => d.ServiceCategoryId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ServiceProvider_ServiceCategory");
         });
 
         modelBuilder.Entity<ServiceProviderAddress>(entity =>

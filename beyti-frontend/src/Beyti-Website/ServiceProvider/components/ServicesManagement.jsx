@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   getMyServices,
-  getServiceCategories,
+  getProviderCategories,
   addService,
   updateService,
   toggleServiceStatus,
@@ -14,7 +14,7 @@ import { logProviderActivity } from '../../../utils/providerActivityLogger';
 
 export default function ServicesManagement({ serviceProviderId, searchTerm = '' }) {
   const [services, setServices] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [providerCategory, setProviderCategory] = useState(null);
   const [serviceCatalogs, setServiceCatalogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -27,10 +27,13 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
     description: '',
     minPrice: '',
     maxPrice: '',
-    estimatedDuration: ''
+    estimatedDuration: '',
+    durationHours: '',
+    durationMinutes: ''
   });
   const [flaggedKeywords, setFlaggedKeywords] = useState([]);
   const [showWarning, setShowWarning] = useState(false);
+  const [priceError, setPriceError] = useState('');
 
   const fetchServices = async () => {
     try {
@@ -46,19 +49,24 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
 
   const fetchCategories = async () => {
     try {
-      const data = await getServiceCategories();
-      setCategories(data);
-      // Flatten ServiceCatalogs for the dropdown
-      const allCatalogs = data.flatMap(cat =>
-        cat.serviceCatalogs?.map(sc => ({
-          id: sc.id,
-          name: sc.name,
-          categoryName: cat.name
-        })) || []
-      );
-      setServiceCatalogs(allCatalogs);
+      // Fetch only the catalogs for the provider's enrolled category
+      const data = await getProviderCategories(serviceProviderId);
+      setProviderCategory(data);
+
+      // Map ServiceCatalogs for the dropdown - only from provider's category
+      const catalogs = data.serviceCatalogs?.map(sc => ({
+        id: sc.id,
+        name: sc.name,
+        categoryName: data.name
+      })) || [];
+
+      setServiceCatalogs(catalogs);
     } catch (err) {
       console.error('Error fetching categories:', err);
+      // If provider is not enrolled in any category, show error
+      if (err.status === 404) {
+        alert('You are not enrolled in any service category. Please contact support.');
+      }
     }
   };
 
@@ -101,6 +109,24 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // Validate price range
+    const minPrice = formData.minPrice ? parseFloat(formData.minPrice) : null;
+    const maxPrice = formData.maxPrice ? parseFloat(formData.maxPrice) : null;
+
+    if (minPrice !== null && maxPrice !== null && minPrice > maxPrice) {
+      setPriceError('Minimum price must be less than or equal to maximum price');
+      alert('Error: Minimum price must be less than or equal to maximum price');
+      return;
+    }
+
+    // Clear price error if validation passes
+    setPriceError('');
+
+    // Calculate total duration in minutes from hours and minutes
+    const hours = formData.durationHours ? parseInt(formData.durationHours) : 0;
+    const minutes = formData.durationMinutes ? parseInt(formData.durationMinutes) : 0;
+    const totalMinutes = (hours * 60) + minutes;
+
     // Warn user if flagged keywords detected
     if (flaggedKeywords.length > 0) {
       const confirmSubmit = window.confirm(
@@ -119,9 +145,9 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
           serviceCategoryId: parseInt(formData.serviceCategoryId),
           name: formData.name,
           description: formData.description || null,
-          minPrice: formData.minPrice ? parseFloat(formData.minPrice) : null,
-          maxPrice: formData.maxPrice ? parseFloat(formData.maxPrice) : null,
-          estimatedDuration: formData.estimatedDuration ? parseInt(formData.estimatedDuration) : null
+          minPrice: minPrice,
+          maxPrice: maxPrice,
+          estimatedDuration: totalMinutes > 0 ? totalMinutes : null
         };
         await updateService(editingService.serviceId, updateData);
 
@@ -140,9 +166,9 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
           serviceCategoryId: parseInt(formData.serviceCategoryId),
           name: formData.name,
           description: formData.description || null,
-          minPrice: formData.minPrice ? parseFloat(formData.minPrice) : null,
-          maxPrice: formData.maxPrice ? parseFloat(formData.maxPrice) : null,
-          estimatedDuration: formData.estimatedDuration ? parseInt(formData.estimatedDuration) : null
+          minPrice: minPrice,
+          maxPrice: maxPrice,
+          estimatedDuration: totalMinutes > 0 ? totalMinutes : null
         };
         await addService(addData);
 
@@ -163,8 +189,11 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
         description: '',
         minPrice: '',
         maxPrice: '',
-        estimatedDuration: ''
+        estimatedDuration: '',
+        durationHours: '',
+        durationMinutes: ''
       });
+      setPriceError('');
       setShowForm(false);
       setEditingService(null);
       setFlaggedKeywords([]);
@@ -172,20 +201,35 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
       fetchServices();
     } catch (err) {
       console.error('Error saving service:', err);
-      alert('Error saving service. Check console for details.');
+
+      // Show specific error message if it's a category authorization error
+      if (err.error === 'Unauthorized category' || err.message?.includes('category')) {
+        alert(err.message || 'You can only add services from your enrolled category.');
+      } else {
+        alert('Error saving service. Check console for details.');
+      }
     }
   };
 
   const handleEdit = (service) => {
     setEditingService(service);
+
+    // Convert total minutes back to hours and minutes
+    const totalMinutes = service.estimatedDuration || 0;
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
     setFormData({
       name: service.name,
       serviceCategoryId: service.serviceCatalogId,
       description: service.description || '',
       minPrice: service.minPrice || '',
       maxPrice: service.maxPrice || '',
-      estimatedDuration: service.estimatedDuration || ''
+      estimatedDuration: service.estimatedDuration || '',
+      durationHours: hours > 0 ? hours : '',
+      durationMinutes: minutes > 0 ? minutes : ''
     });
+    setPriceError('');
     setShowForm(true);
   };
 
@@ -218,8 +262,11 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
       description: '',
       minPrice: '',
       maxPrice: '',
-      estimatedDuration: ''
+      estimatedDuration: '',
+      durationHours: '',
+      durationMinutes: ''
     });
+    setPriceError('');
     setFlaggedKeywords([]);
     setShowWarning(false);
   };
@@ -366,9 +413,14 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
       {/* Form */}
       {showForm && (
         <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none p-6 transition-colors">
-          <h3 className="text-card-h2 text-charcoal-600 dark:text-white mb-6">
+          <h3 className="text-card-h2 text-charcoal-600 dark:text-white mb-2">
             {editingService ? 'Edit Service' : 'Add New Service'}
           </h3>
+          {providerCategory && (
+            <p className="text-body-regular text-charcoal-400 dark:text-gray-400 mb-6">
+              Your enrolled category: <span className="font-semibold text-sage-600 dark:text-sage-400">{providerCategory.name}</span>
+            </p>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">Service Name *</label>
@@ -376,26 +428,36 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full border border-grey-stroke rounded-lg px-4 py-2 text-body-regular focus:ring-2 focus:ring-sage-500 focus:border-sage-500"
+                className="w-full border border-grey-stroke rounded-lg px-4 py-2 text-body-regular focus:ring-2 focus:ring-sage-500 focus:border-sage-500 bg-white dark:bg-[#1F1F1F] dark:text-white"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">Service Category *</label>
+              <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">
+                Service Type *
+                <span className="text-label-medium text-charcoal-400 dark:text-gray-400 ml-2">
+                  (Only from your category: {providerCategory?.name})
+                </span>
+              </label>
               <select
                 value={formData.serviceCategoryId}
                 onChange={(e) => setFormData({ ...formData, serviceCategoryId: e.target.value })}
                 className="w-full border border-grey-stroke rounded-lg px-4 py-2 text-body-regular focus:ring-2 focus:ring-sage-500 focus:border-sage-500 bg-white dark:bg-[#1F1F1F] dark:text-white"
                 required
               >
-                <option value="">Select a service category</option>
+                <option value="">Select a service type</option>
                 {serviceCatalogs.map((catalog) => (
                   <option key={catalog.id} value={catalog.id}>
-                    {catalog.categoryName} - {catalog.name}
+                    {catalog.name}
                   </option>
                 ))}
               </select>
+              {serviceCatalogs.length === 0 && (
+                <p className="text-label-medium text-red-600 dark:text-red-400 mt-2">
+                  No service types available for your category. Please contact support.
+                </p>
+              )}
             </div>
 
             <div>
@@ -443,15 +505,19 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">Min Price (BHD)</label>
                 <input
                   type="number"
                   step="0.01"
+                  min="0"
                   value={formData.minPrice}
-                  onChange={(e) => setFormData({ ...formData, minPrice: e.target.value })}
-                  className="w-full border border-grey-stroke rounded-lg px-4 py-2 text-body-regular focus:ring-2 focus:ring-sage-500 focus:border-sage-500"
+                  onChange={(e) => {
+                    setFormData({ ...formData, minPrice: e.target.value });
+                    setPriceError('');
+                  }}
+                  className={`w-full border ${priceError ? 'border-red-500' : 'border-grey-stroke'} rounded-lg px-4 py-2 text-body-regular focus:ring-2 focus:ring-sage-500 focus:border-sage-500 bg-white dark:bg-[#1F1F1F] dark:text-white`}
                 />
               </div>
 
@@ -460,21 +526,59 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
                 <input
                   type="number"
                   step="0.01"
+                  min="0"
                   value={formData.maxPrice}
-                  onChange={(e) => setFormData({ ...formData, maxPrice: e.target.value })}
-                  className="w-full border border-grey-stroke rounded-lg px-4 py-2 text-body-regular focus:ring-2 focus:ring-sage-500 focus:border-sage-500"
+                  onChange={(e) => {
+                    setFormData({ ...formData, maxPrice: e.target.value });
+                    setPriceError('');
+                  }}
+                  className={`w-full border ${priceError ? 'border-red-500' : 'border-grey-stroke'} rounded-lg px-4 py-2 text-body-regular focus:ring-2 focus:ring-sage-500 focus:border-sage-500 bg-white dark:bg-[#1F1F1F] dark:text-white`}
                 />
               </div>
+            </div>
 
-              <div>
-                <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">Duration (minutes)</label>
-                <input
-                  type="number"
-                  value={formData.estimatedDuration}
-                  onChange={(e) => setFormData({ ...formData, estimatedDuration: e.target.value })}
-                  className="w-full border border-grey-stroke rounded-lg px-4 py-2 text-body-regular focus:ring-2 focus:ring-sage-500 focus:border-sage-500"
-                />
+            {priceError && (
+              <p className="text-label-medium text-red-600 dark:text-red-400 mt-2">
+                {priceError}
+              </p>
+            )}
+
+            <div>
+              <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">
+                Estimated Duration
+              </label>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-label-medium text-charcoal-400 dark:text-gray-400 mb-2">Hours</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="24"
+                    value={formData.durationHours}
+                    onChange={(e) => setFormData({ ...formData, durationHours: e.target.value })}
+                    className="w-full border border-grey-stroke rounded-lg px-4 py-2 text-body-regular focus:ring-2 focus:ring-sage-500 focus:border-sage-500 bg-white dark:bg-[#1F1F1F] dark:text-white"
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-label-medium text-charcoal-400 dark:text-gray-400 mb-2">Minutes</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="59"
+                    value={formData.durationMinutes}
+                    onChange={(e) => setFormData({ ...formData, durationMinutes: e.target.value })}
+                    className="w-full border border-grey-stroke rounded-lg px-4 py-2 text-body-regular focus:ring-2 focus:ring-sage-500 focus:border-sage-500 bg-white dark:bg-[#1F1F1F] dark:text-white"
+                    placeholder="0"
+                  />
+                </div>
               </div>
+              {(formData.durationHours || formData.durationMinutes) && (
+                <p className="text-label-medium text-charcoal-400 dark:text-gray-400 mt-2">
+                  Total: {formData.durationHours || 0}h {formData.durationMinutes || 0}m
+                  ({((parseInt(formData.durationHours) || 0) * 60) + (parseInt(formData.durationMinutes) || 0)} minutes)
+                </p>
+              )}
             </div>
 
             <div className="flex gap-3 pt-4">
@@ -546,7 +650,7 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
                     ),
                     service.estimatedDuration ? (
                       <span className="text-body-regular text-charcoal-600 dark:text-white">
-                        {service.estimatedDuration} mins
+                        {Math.floor(service.estimatedDuration / 60)}h {service.estimatedDuration % 60}m
                       </span>
                     ) : (
                       <span className="text-body-regular text-charcoal-400 dark:text-gray-400">Not set</span>
