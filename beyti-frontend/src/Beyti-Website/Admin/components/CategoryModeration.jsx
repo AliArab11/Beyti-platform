@@ -329,11 +329,11 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
         const catalogData = {
           Name: subCategoryFormData.Name,
           Description: subCategoryFormData.Description || '',
-          ServiceCategoryId: subCategoryFormData.CategoryId,
+          ServiceCategoryId: parseInt(subCategoryFormData.CategoryId),
           IsActive: subCategoryFormData.IsActive,
-          MinPrice: subCategoryFormData.MinPrice || null,
-          MaxPrice: subCategoryFormData.MaxPrice || null,
-          EstimatedDuration: subCategoryFormData.EstimatedDuration || null
+          MinPrice: subCategoryFormData.MinPrice ? parseFloat(subCategoryFormData.MinPrice) : null,
+          MaxPrice: subCategoryFormData.MaxPrice ? parseFloat(subCategoryFormData.MaxPrice) : null,
+          EstimatedDuration: subCategoryFormData.EstimatedDuration ? parseInt(subCategoryFormData.EstimatedDuration) : null
         };
 
         if (editingSubCategory) {
@@ -415,11 +415,11 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
           await updateServiceCatalog(subCategory.id, {
             Name: subCategory.name,
             Description: subCategory.description || '',
-            ServiceCategoryId: category.id,
+            ServiceCategoryId: parseInt(category.id),
             IsActive: newStatus,
-            MinPrice: subCategory.minPrice || null,
-            MaxPrice: subCategory.maxPrice || null,
-            EstimatedDuration: subCategory.estimatedDuration || null
+            MinPrice: subCategory.minPrice ? parseFloat(subCategory.minPrice) : null,
+            MaxPrice: subCategory.maxPrice ? parseFloat(subCategory.maxPrice) : null,
+            EstimatedDuration: subCategory.estimatedDuration ? parseInt(subCategory.estimatedDuration) : null
           });
 
           // Log the admin activity

@@ -25,7 +25,7 @@ namespace Beyti_Backend.Controllers.Api
         public async Task<IActionResult> GetUsers([FromQuery] string? role = null)
         {
             var query = _context.UserProfiles.AsQueryable();
-            
+
             // Apply role filter if provided and not "All"
             if (!string.IsNullOrEmpty(role) && role != "All")
             {
@@ -40,7 +40,15 @@ namespace Beyti_Backend.Controllers.Api
                     u.RoleType,
                     u.Status,
                     u.CreatedAt,
-                    u.UpdatedAt
+                    u.UpdatedAt,
+                    // Include categoryId for Sellers
+                    CategoryId = u.RoleType == "Seller"
+                        ? _context.Sellers.Where(s => s.UserProfileId == u.Id).Select(s => (int?)s.CategoryId).FirstOrDefault()
+                        : null,
+                    // Include serviceCategoryId for ServiceProviders
+                    ServiceCategoryId = u.RoleType == "ServiceProvider"
+                        ? _context.ServiceProviders.Where(sp => sp.UserProfileId == u.Id).Select(sp => (int?)sp.ServiceCategoryId).FirstOrDefault()
+                        : null
                 })
                 .ToListAsync();
 
@@ -57,6 +65,8 @@ namespace Beyti_Backend.Controllers.Api
             string? newDisplayName = null;
             string? newRoleType = null;
             string? newStatus = null;
+            int? categoryId = null;
+            int? serviceCategoryId = null;
 
             if (body.TryGetProperty("displayName", out var displayNameProp))
                 newDisplayName = displayNameProp.GetString();
@@ -67,9 +77,54 @@ namespace Beyti_Backend.Controllers.Api
             if (body.TryGetProperty("status", out var statusProp))
                 newStatus = statusProp.GetString();
 
+            // Parse categoryId - handle both string and number formats
+            if (body.TryGetProperty("categoryId", out var catProp) && catProp.ValueKind != JsonValueKind.Null)
+            {
+                if (catProp.ValueKind == JsonValueKind.Number)
+                {
+                    categoryId = catProp.GetInt32();
+                }
+                else if (catProp.ValueKind == JsonValueKind.String)
+                {
+                    var catStr = catProp.GetString();
+                    if (!string.IsNullOrEmpty(catStr) && int.TryParse(catStr, out var catInt))
+                    {
+                        categoryId = catInt;
+                    }
+                }
+            }
+
+            // Parse serviceCategoryId - handle both string and number formats
+            if (body.TryGetProperty("serviceCategoryId", out var scatProp) && scatProp.ValueKind != JsonValueKind.Null)
+            {
+                if (scatProp.ValueKind == JsonValueKind.Number)
+                {
+                    serviceCategoryId = scatProp.GetInt32();
+                }
+                else if (scatProp.ValueKind == JsonValueKind.String)
+                {
+                    var scatStr = scatProp.GetString();
+                    if (!string.IsNullOrEmpty(scatStr) && int.TryParse(scatStr, out var scatInt))
+                    {
+                        serviceCategoryId = scatInt;
+                    }
+                }
+            }
+
             // Check if role is being changed
             if (!string.IsNullOrEmpty(newRoleType) && newRoleType != user.RoleType)
             {
+                // Validate required fields for role changes
+                if (newRoleType == "Seller" && !categoryId.HasValue)
+                {
+                    return BadRequest("Category is required when changing to Seller role. Please select a category.");
+                }
+
+                if (newRoleType == "ServiceProvider" && !serviceCategoryId.HasValue)
+                {
+                    return BadRequest("Service Category is required when changing to Service Provider role. Please select a service category.");
+                }
+
                 string oldRoleType = user.RoleType;
 
                 // Mark current user as "Role Changed"
@@ -95,7 +150,15 @@ namespace Beyti_Backend.Controllers.Api
                 switch (newRoleType)
                 {
                     case "Seller":
-                        _context.Sellers.Add(new Seller { UserProfileId = newUser.Id, StoreName = "Default Store", Phone = "N/A", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
+                        _context.Sellers.Add(new Seller
+                        {
+                            UserProfileId = newUser.Id,
+                            StoreName = "Default Store",
+                            Phone = "N/A",
+                            CategoryId = categoryId!.Value,
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        });
                         break;
                     case "Customer":
                         _context.Customers.Add(new Customer { UserProfileId = newUser.Id, Phone = "N/A", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
@@ -104,7 +167,16 @@ namespace Beyti_Backend.Controllers.Api
                         _context.Drivers.Add(new Driver { UserProfileId = newUser.Id, Phone = "N/A", Status = "Active", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
                         break;
                     case "ServiceProvider":
-                        _context.ServiceProviders.Add(new BeytiDB.Data.ServiceProvider { UserProfileId = newUser.Id, BusinessName = "Default Business", Phone = "N/A", Status = "Available", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
+                        _context.ServiceProviders.Add(new BeytiDB.Data.ServiceProvider
+                        {
+                            UserProfileId = newUser.Id,
+                            BusinessName = "Default Business",
+                            Phone = "N/A",
+                            ServiceCategoryId = serviceCategoryId!.Value,
+                            Status = "Available",
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        });
                         break;
                     case "Admin":
                         _context.AdminProfiles.Add(new AdminProfile { UserProfileId = newUser.Id, Title = newUser.DisplayName, Permissions = "All", CreatedAt = DateTime.UtcNow });
@@ -155,6 +227,32 @@ namespace Beyti_Backend.Controllers.Api
                     changes.Add($"Status changed from '{oldStatus}' to '{newStatus}'");
                 }
 
+                // Update category for Sellers
+                if (user.RoleType == "Seller" && categoryId.HasValue)
+                {
+                    var seller = await _context.Sellers.FirstOrDefaultAsync(s => s.UserProfileId == user.Id);
+                    if (seller != null && seller.CategoryId != categoryId.Value)
+                    {
+                        int oldCategoryId = seller.CategoryId;
+                        seller.CategoryId = categoryId.Value;
+                        seller.UpdatedAt = DateTime.UtcNow;
+                        changes.Add($"Category changed from ID {oldCategoryId} to ID {categoryId.Value}");
+                    }
+                }
+
+                // Update service category for Service Providers
+                if (user.RoleType == "ServiceProvider" && serviceCategoryId.HasValue)
+                {
+                    var serviceProvider = await _context.ServiceProviders.FirstOrDefaultAsync(sp => sp.UserProfileId == user.Id);
+                    if (serviceProvider != null && serviceProvider.ServiceCategoryId != serviceCategoryId.Value)
+                    {
+                        int oldServiceCategoryId = serviceProvider.ServiceCategoryId;
+                        serviceProvider.ServiceCategoryId = serviceCategoryId.Value;
+                        serviceProvider.UpdatedAt = DateTime.UtcNow;
+                        changes.Add($"Service Category changed from ID {oldServiceCategoryId} to ID {serviceCategoryId.Value}");
+                    }
+                }
+
                 user.UpdatedAt = DateTime.UtcNow;
 
                 await _context.SaveChangesAsync();
@@ -200,17 +298,77 @@ namespace Beyti_Backend.Controllers.Api
         }
 
         [HttpPost("Users")]
-        public async Task<ActionResult> AddUser([FromBody] UserProfile userProfile, [FromQuery] int? adminUserProfileId)
+        public async Task<ActionResult> AddUser([FromBody] JsonElement body, [FromQuery] int? adminUserProfileId)
         {
             try
             {
-                if (string.IsNullOrEmpty(userProfile.IdentityUserId))
-                    userProfile.IdentityUserId = Guid.NewGuid().ToString();
+                // Parse the incoming JSON
+                string? displayName = body.TryGetProperty("displayName", out var dnProp) ? dnProp.GetString() : null;
+                string? roleType = body.TryGetProperty("roleType", out var rtProp) ? rtProp.GetString() : null;
+                string? status = body.TryGetProperty("status", out var stProp) ? stProp.GetString() : "Active";
 
-                userProfile.CreatedAt = DateTime.UtcNow;
-                userProfile.UpdatedAt = DateTime.UtcNow;
-                if (string.IsNullOrEmpty(userProfile.Status))
-                    userProfile.Status = "Active";
+                // Parse categoryId - handle both string and number formats
+                int? categoryId = null;
+                if (body.TryGetProperty("categoryId", out var catProp) && catProp.ValueKind != JsonValueKind.Null)
+                {
+                    if (catProp.ValueKind == JsonValueKind.Number)
+                    {
+                        categoryId = catProp.GetInt32();
+                    }
+                    else if (catProp.ValueKind == JsonValueKind.String)
+                    {
+                        var catStr = catProp.GetString();
+                        if (!string.IsNullOrEmpty(catStr) && int.TryParse(catStr, out var catInt))
+                        {
+                            categoryId = catInt;
+                        }
+                    }
+                }
+
+                // Parse serviceCategoryId - handle both string and number formats
+                int? serviceCategoryId = null;
+                if (body.TryGetProperty("serviceCategoryId", out var scatProp) && scatProp.ValueKind != JsonValueKind.Null)
+                {
+                    if (scatProp.ValueKind == JsonValueKind.Number)
+                    {
+                        serviceCategoryId = scatProp.GetInt32();
+                    }
+                    else if (scatProp.ValueKind == JsonValueKind.String)
+                    {
+                        var scatStr = scatProp.GetString();
+                        if (!string.IsNullOrEmpty(scatStr) && int.TryParse(scatStr, out var scatInt))
+                        {
+                            serviceCategoryId = scatInt;
+                        }
+                    }
+                }
+
+                if (string.IsNullOrEmpty(displayName) || string.IsNullOrEmpty(roleType))
+                {
+                    return BadRequest("DisplayName and RoleType are required");
+                }
+
+                // Validate required fields for Seller and ServiceProvider
+                if (roleType == "Seller" && !categoryId.HasValue)
+                {
+                    return BadRequest("Category is required for Seller role. Please select a category.");
+                }
+
+                if (roleType == "ServiceProvider" && !serviceCategoryId.HasValue)
+                {
+                    return BadRequest("Service Category is required for Service Provider role. Please select a service category.");
+                }
+
+                // Create UserProfile
+                var userProfile = new UserProfile
+                {
+                    IdentityUserId = Guid.NewGuid().ToString(),
+                    DisplayName = displayName,
+                    RoleType = roleType,
+                    Status = status ?? "Active",
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
 
                 _context.UserProfiles.Add(userProfile);
                 await _context.SaveChangesAsync();
@@ -219,7 +377,15 @@ namespace Beyti_Backend.Controllers.Api
                 switch (userProfile.RoleType)
                 {
                     case "Seller":
-                        _context.Sellers.Add(new Seller { UserProfileId = userProfile.Id, StoreName = "Default Store", Phone = "N/A", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
+                        _context.Sellers.Add(new Seller
+                        {
+                            UserProfileId = userProfile.Id,
+                            StoreName = "Default Store",
+                            Phone = "N/A",
+                            CategoryId = categoryId!.Value,
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        });
                         break;
                     case "Customer":
                         _context.Customers.Add(new Customer { UserProfileId = userProfile.Id, Phone = "N/A", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
@@ -228,7 +394,16 @@ namespace Beyti_Backend.Controllers.Api
                         _context.Drivers.Add(new Driver { UserProfileId = userProfile.Id, Phone = "N/A", Status = "Active", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
                         break;
                     case "ServiceProvider":
-                        _context.ServiceProviders.Add(new BeytiDB.Data.ServiceProvider { UserProfileId = userProfile.Id, BusinessName = "Default Business", Phone = "N/A", Status = "Available", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
+                        _context.ServiceProviders.Add(new BeytiDB.Data.ServiceProvider
+                        {
+                            UserProfileId = userProfile.Id,
+                            BusinessName = "Default Business",
+                            Phone = "N/A",
+                            ServiceCategoryId = serviceCategoryId!.Value,
+                            Status = "Available",
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        });
                         break;
                     case "Admin":
                         _context.AdminProfiles.Add(new AdminProfile { UserProfileId = userProfile.Id, Title = userProfile.DisplayName, Permissions = "All", CreatedAt = DateTime.UtcNow });
