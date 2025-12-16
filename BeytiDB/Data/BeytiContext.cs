@@ -63,6 +63,8 @@ public partial class BeytiContext : DbContext
 
     public virtual DbSet<SellerAddress> SellerAddresses { get; set; }
 
+    public virtual DbSet<SellerSubCategory> SellerSubCategories { get; set; }
+
     public virtual DbSet<ServiceBooking> ServiceBookings { get; set; }
 
     public virtual DbSet<ServiceCatalog> ServiceCatalogs { get; set; }

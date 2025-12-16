@@ -27,12 +27,46 @@ const getCustomers = async () => {
   }
 };
 
+// Get categories function
+const getCategories = async () => {
+  try {
+    const response = await fetch('https://localhost:7062/api/Categories');
+    if (!response.ok) throw new Error('Failed to fetch categories');
+    const data = await response.json();
+    return Array.isArray(data) ? data.filter(cat => cat.isActive) : [];
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    return [];
+  }
+};
+
+// Mock getSellers function
+
 // Mock getSellers function
 const getSellers = async () => {
   try {
     const response = await fetch('https://localhost:7062/api/Sellers');
     if (!response.ok) throw new Error('Failed to fetch');
-    return await response.json();
+    const sellers = await response.json();
+    
+    // Fetch products for each seller to get discount info
+    const sellersWithProducts = await Promise.all(
+      sellers.map(async (seller) => {
+        try {
+          const productsRes = await fetch(`https://localhost:7062/api/Sellers/${seller.id}/products`);
+          if (productsRes.ok) {
+            const productsData = await productsRes.json();
+            return { ...seller, products: productsData.products || [] };
+          }
+          return { ...seller, products: [] };
+        } catch (err) {
+          console.error(`Failed to fetch products for seller ${seller.id}:`, err);
+          return { ...seller, products: [] };
+        }
+      })
+    );
+    
+    return sellersWithProducts;
   } catch (error) {
     console.error('Error fetching sellers:', error);
     return [];
@@ -97,16 +131,16 @@ const CategoryTabs = ({ categories, selected, onSelect }) => (
   <div className="flex justify-center items-center gap-5 mb-6 ml-32">
     {categories.map(category => (
       <button
-        key={category}
-        onClick={() => onSelect(category)}
+        key={category.id}
+        onClick={() => onSelect(category.id)}
         className={`px-20 py-4 rounded-full font-semibold text-[19px] transition-all ${
-          selected === category
+          selected === category.id
             ? 'bg-sage-500 text-white shadow-[0_2px_12px_rgba(85,107,92,0.25)]'
             : 'bg-cream-50 text-charcoal-600 border-2 border-grey-stroke hover:border-sage-500 shadow-[0_1px_3px_rgba(0,0,0,0.08)]'
         }`}
         style={{ fontFamily: 'Inter, sans-serif' }}
       >
-        {category}
+        {category.name}
       </button>
     ))}
   </div>
@@ -465,7 +499,8 @@ const MainStoreView = () => {
 
   const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState("Food & Drink");
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState(null); // Will be set after fetching
   const [selectedSubcategory, setSelectedSubcategory] = useState("sweets");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStoreId, setSelectedStoreId] = useState(null);
@@ -663,8 +698,6 @@ const [bannerDismissed, setBannerDismissed] = useState(() => {
   return localStorage.getItem(`beyti_bannerDismissed_${customerId}`) === 'true';
 });
 
-
-  const categories = ["Food & Drink", "Clothing & Accessories", "Self-Care & Beauty"];
   
   const subcategories = [
     { id: "sweets", label: "Sweets", icon: <Cake size={24} weight="regular" /> },
@@ -674,9 +707,17 @@ const [bannerDismissed, setBannerDismissed] = useState(() => {
     { id: "beverages", label: "Beverages", icon: <Coffee size={24} weight="regular" /> }
   ];
 
-  useEffect(() => {
-    fetchStores();
-  }, []);
+useEffect(() => {
+  const initialize = async () => {
+    const cats = await getCategories();
+    setCategories(cats);
+    if (cats.length > 0) {
+      setSelectedCategory(cats[0].id); // Select first category by default
+    }
+  };
+  initialize();
+  fetchStores();
+}, []);
 
 // Load customers on mount
   useEffect(() => {
@@ -870,6 +911,11 @@ const handleStoreNavigation = (targetStoreId) => {
 
 const filteredStores = stores
   .filter(store => {
+    // Category filter - MOST IMPORTANT
+    if (selectedCategory && store.categoryId !== selectedCategory) {
+      return false;
+    }
+    
     // Search filter
     if (searchQuery && !store.storeName?.toLowerCase().includes(searchQuery.toLowerCase())) {
       return false;

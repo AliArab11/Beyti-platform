@@ -158,6 +158,13 @@ const [activeOrder, setActiveOrder] = useState(null);
 const [orders, setOrders] = useState([]);
 
 
+// Helper function to calculate discounted price
+const calculateDiscountedPrice = (originalPrice, discountPercentage) => {
+  if (!discountPercentage || discountPercentage <= 0) return null;
+  return originalPrice - (originalPrice * (discountPercentage / 100));
+};
+
+
   useEffect(() => {
     if (productId) {
       fetchProductDetails();
@@ -172,41 +179,40 @@ useEffect(() => {
   }
 }, [customerId]);
 
-  const fetchProductDetails = async () => {
-    try {
-      setLoading(true);
+
+
+ const fetchProductDetails = async () => {
+  try {
+    setLoading(true);
+    
+    // Fetch product details
+    const productRes = await fetch(`https://localhost:7062/api/Products/${productId}`);
+    if (productRes.ok) {
+      const productData = await productRes.json();
+      setProduct(productData);
       
-      // Fetch product details
-      const productRes = await fetch(`https://localhost:7062/api/Products/${productId}`);
-      if (productRes.ok) {
-        const productData = await productRes.json();
-        setProduct(productData);
+      // Use reviews from product data (already filtered by backend)
+      if (productData.reviews) {
+        setReviews(Array.isArray(productData.reviews) ? productData.reviews : []);
       }
-
-      // Fetch variants
-      const variantsRes = await fetch(`https://localhost:7062/api/ProductVariants?productId=${productId}`);
-      if (variantsRes.ok) {
-        const variantsData = await variantsRes.json();
-        setVariants(variantsData);
-        if (variantsData.length > 0) {
-          setSelectedVariant(variantsData[0]);
-        }
-      }
-
-      // Fetch reviews
-      const reviewsRes = await fetch(`https://localhost:7062/api/Reviews?productId=${productId}`);
-      if (reviewsRes.ok) {
-        const reviewsData = await reviewsRes.json();
-        const visibleReviews = reviewsData.filter(r => !r.isCommentHiddenBySeller);
-        setReviews(visibleReviews);
-      }
-    } catch (err) {
-      console.error('Error loading product:', err);
-      showSnackbar('Failed to load product details', 'error');
-    } finally {
-      setLoading(false);
     }
-  };
+
+    // Fetch variants
+    const variantsRes = await fetch(`https://localhost:7062/api/ProductVariants?productId=${productId}`);
+    if (variantsRes.ok) {
+      const variantsData = await variantsRes.json();
+      setVariants(variantsData);
+      if (variantsData.length > 0) {
+        setSelectedVariant(variantsData[0]);
+      }
+    }
+  } catch (err) {
+    console.error('Error loading product:', err);
+    showSnackbar('Failed to load product details', 'error');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const calculateAverageRating = () => {
     if (reviews.length === 0) return 0;
@@ -261,12 +267,19 @@ const handleAddToCart = () => {
     // Check available stock
     const maxStock = selectedVariant?.stockQty || 0;
     
+    const originalPrice = selectedVariant?.price || product.basePrice;
+    const finalPrice = product.discountPercentage 
+      ? calculateDiscountedPrice(originalPrice, product.discountPercentage)
+      : originalPrice;
+
     const item = {
         id: product.id,
         name: product.name,
-        basePrice: selectedVariant?.price || product.basePrice,
+        basePrice: finalPrice,
+        originalPrice: originalPrice,
+        discountPercentage: product.discountPercentage,
         quantity: quantity,
-        totalPrice: (selectedVariant?.price || product.basePrice) * quantity,
+        totalPrice: finalPrice * quantity,
         selectedVariant: selectedVariant,
         storeName: storeName,
         sellerId: storeId
@@ -604,9 +617,36 @@ const handleTrackOrder = () => {
 
       {/* Price */}
       <div className="mb-8">
-        <p className="text-6xl font-black text-sage-700 mb-2" style={{ fontFamily: 'Inter, sans-serif' }}>
-          {(selectedVariant?.price || product.basePrice).toFixed(3)} BD
-        </p>
+        {(() => {
+          const originalPrice = selectedVariant?.price || product.basePrice;
+          const discountedPrice = product.discountPercentage 
+            ? calculateDiscountedPrice(originalPrice, product.discountPercentage)
+            : null;
+          
+          return (
+            <>
+              {discountedPrice ? (
+                <div className="flex items-baseline gap-4">
+                  <p className="text-6xl font-black text-sage-700" style={{ fontFamily: 'Inter, sans-serif' }}>
+                    {discountedPrice.toFixed(3)} BD
+                  </p>
+                  <div className="flex flex-col items-start">
+                    <p className="text-3xl font-semibold text-charcoal-400 line-through" style={{ fontFamily: 'Inter, sans-serif' }}>
+                      {originalPrice.toFixed(3)} BD
+                    </p>
+                    <span className="bg-error-btn text-white text-sm font-bold px-3 py-1 rounded-full">
+                      {product.discountPercentage}% OFF
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-6xl font-black text-sage-700 mb-2" style={{ fontFamily: 'Inter, sans-serif' }}>
+                  {originalPrice.toFixed(3)} BD
+                </p>
+              )}
+            </>
+          );
+        })()}
         {product.subCategory && (
           <div className="flex gap-2 mt-4">
             <span className="bg-sage-100 text-sage-700 text-sm font-semibold px-4 py-2 rounded-full">
@@ -642,11 +682,28 @@ const handleTrackOrder = () => {
                   {variant.colorValue && <div className="font-bold mb-1">{variant.colorValue}</div>}
                   {variant.sizeValue && <div className="font-bold mb-1">{variant.sizeValue}</div>}
                   {variant.price && (
-                    <div className={`text-xs font-semibold mt-2 ${
-                      selectedVariant?.id === variant.id ? 'text-white' : 'text-charcoal-500'
-                    }`}>
-                      {variant.price.toFixed(3)} BD
-                    </div>
+                    <>
+                      {product.discountPercentage ? (
+                        <div className={`text-xs mt-2 ${
+                          selectedVariant?.id === variant.id ? 'text-white' : 'text-charcoal-500'
+                        }`}>
+                          <div className="font-bold">
+                            {calculateDiscountedPrice(variant.price, product.discountPercentage).toFixed(3)} BD
+                          </div>
+                          <div className={`line-through text-xs ${
+                            selectedVariant?.id === variant.id ? 'text-white/70' : 'text-charcoal-400'
+                          }`}>
+                            {variant.price.toFixed(3)} BD
+                          </div>
+                        </div>
+                      ) : (
+                        <div className={`text-xs font-semibold mt-2 ${
+                          selectedVariant?.id === variant.id ? 'text-white' : 'text-charcoal-500'
+                        }`}>
+                          {variant.price.toFixed(3)} BD
+                        </div>
+                      )}
+                    </>
                   )}
                   {variant.stockQty !== undefined && (
                     <div className={`text-xs mt-1 ${
@@ -776,16 +833,16 @@ const handleTrackOrder = () => {
                     <div key={review.id} className="bg-cream-50 p-8 rounded-2xl border border-grey-stroke">
                         <div className="flex items-start justify-between mb-4">
                         <div className="flex items-center gap-4">
-                            <div className="w-16 h-16 rounded-full bg-sage-500 flex items-center justify-center flex-shrink-0">
-                            <span className="text-white font-bold text-2xl" style={{ fontFamily: 'Inter, sans-serif' }}>
-                                {(review.customerName || 'A')[0].toUpperCase()}
-                            </span>
-                            </div>
-                            
-                            <div>
-                            <div className="font-bold text-charcoal-600 text-xl mb-2" style={{ fontFamily: 'Inter, sans-serif' }}>
-                                {review.customerName || 'Anonymous Customer'}
-                            </div>
+                          <div className="w-16 h-16 rounded-full bg-sage-500 flex items-center justify-center flex-shrink-0">
+                          <span className="text-white font-bold text-2xl" style={{ fontFamily: 'Inter, sans-serif' }}>
+                              {review.isCommentHidden ? 'A' : (review.customerName || 'A')[0].toUpperCase()}
+                          </span>
+                          </div>
+                          
+                          <div>
+                          <div className="font-bold text-charcoal-600 text-xl mb-2" style={{ fontFamily: 'Inter, sans-serif' }}>
+                              {review.isCommentHidden ? 'Anonymous Customer' : (review.customerName || 'Anonymous Customer')}
+                          </div>
                             <div className="flex items-center gap-3">
                                 <div className="flex items-center gap-1">
                                   {[...Array(5)].map((_, i) => {
@@ -808,11 +865,15 @@ const handleTrackOrder = () => {
                         </div>
                         </div>
 
-                        {review.comment && (
-                        <p className="text-charcoal-600 text-lg leading-relaxed ml-20" style={{ fontFamily: 'Inter, sans-serif' }}>
-                            "{review.comment}"
-                        </p>
-                        )}
+                        {review.comment ? (
+                      <p className="text-charcoal-600 text-lg leading-relaxed ml-20" style={{ fontFamily: 'Inter, sans-serif' }}>
+                        "{review.comment}"
+                      </p>
+                    ) : review.isCommentHidden ? (
+                      <p className="text-charcoal-400 text-sm italic ml-20" style={{ fontFamily: 'Inter, sans-serif' }}>
+                        Comment hidden by seller
+                      </p>
+                    ) : null}
                     </div>
                     ))}
                 </div>

@@ -440,35 +440,40 @@ export const getSeller = async (id) => {
   return await fetchAPI(`/Sellers/${id}`);
 };
 
-/**
+
+ /**
  * Get seller profile by UserProfileId
- * WORKAROUND: Backend doesn't have a dedicated endpoint for this
- * This fetches all sellers and finds the one with matching UserProfileId
  * @param {number} userProfileId - User Profile ID
  * @returns {Promise<object|null>} - Seller object or null if not found
  */
 export const getSellerByUserProfileId = async (userProfileId) => {
   try {
-    // Backend doesn't have /Sellers/Profile/{userProfileId} endpoint
-    // Fetch all sellers and filter by UserProfileId
-    const sellers = await fetchAPI('/Sellers');
+    // Use the new Profile endpoint we created
+    return await fetchAPI(`/Sellers/Profile/${userProfileId}`);
+  } catch (error) {
+    console.warn('[API] Error fetching seller profile:', error);
+    
+    // Fallback to fetching all sellers if the endpoint fails
+    try {
+      const sellers = await fetchAPI('/Sellers');
 
-    if (!sellers || !Array.isArray(sellers)) {
+      if (!sellers || !Array.isArray(sellers)) {
+        return null;
+      }
+
+      // Find seller with matching UserProfileId
+      const seller = sellers.find(s =>
+        s.userProfileId === userProfileId ||
+        s.UserProfileId === userProfileId ||
+        s.userProfileId === parseInt(userProfileId) ||
+        s.UserProfileId === parseInt(userProfileId)
+      );
+
+      return seller || null;
+    } catch (fallbackError) {
+      console.warn('[API] Fallback also failed:', fallbackError);
       return null;
     }
-
-    // Find seller with matching UserProfileId (check both camelCase and PascalCase)
-    const seller = sellers.find(s =>
-      s.UserProfileId === userProfileId ||
-      s.userProfileId === userProfileId ||
-      s.UserProfileId === parseInt(userProfileId) ||
-      s.userProfileId === parseInt(userProfileId)
-    );
-
-    return seller || null;
-  } catch (error) {
-    console.warn('[API] Error fetching sellers:', error);
-    return null;
   }
 };
 

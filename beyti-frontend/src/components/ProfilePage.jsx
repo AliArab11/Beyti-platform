@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { User, Envelope, Phone, MapPin, Calendar, IdentificationCard, CheckCircle, XCircle, Buildings } from '@phosphor-icons/react';
+import { User, Envelope, Phone, MapPin, Calendar, IdentificationCard, CheckCircle, XCircle, Buildings, Tag, X  } from '@phosphor-icons/react';
 
 export default function ProfilePage({
   userProfile,
@@ -29,21 +29,50 @@ export default function ProfilePage({
     country: 'Bahrain'
   });
 
+  const [availableSubCategories, setAvailableSubCategories] = useState([]);
+  const [selectedSubCategories, setSelectedSubCategories] = useState([]);
+  const [loadingSubCategories, setLoadingSubCategories] = useState(false);
+  const [searchSubCategory, setSearchSubCategory] = useState('');
+
   // Initialize form data when userProfile changes
-  useEffect(() => {
-    if (userProfile) {
-      setFormData({
-        displayName: userProfile.displayName || '',
-        businessName: userProfile.businessName || '',
-        phone: userProfile.phone || '',
-        street: userProfile.street || '',
-        city: userProfile.city || '',
-        region: userProfile.region || '',
-        postalCode: userProfile.postalCode || '',
-        country: userProfile.country || 'Bahrain'
-      });
+useEffect(() => {
+  if (userProfile) {
+    setFormData({
+      displayName: userProfile.displayName || '',
+      businessName: userProfile.businessName || '',
+      phone: userProfile.phone || '',
+      street: userProfile.street || '',
+      city: userProfile.city || '',
+      region: userProfile.region || '',
+      postalCode: userProfile.postalCode || '',
+      country: userProfile.country || 'Bahrain'
+    });
+
+    // Load subcategories for sellers
+    if (userRole === 'Seller' && userProfile.categoryId) {
+      loadSubCategories(userProfile.categoryId);
+      if (userProfile.subCategoryIds) {
+        setSelectedSubCategories(userProfile.subCategoryIds);
+      }
     }
-  }, [userProfile]);
+  }
+}, [userProfile, userRole]);
+
+// Add this new function right after the useEffect:
+const loadSubCategories = async (categoryId) => {
+  setLoadingSubCategories(true);
+  try {
+    const response = await fetch(`https://localhost:7062/api/SubCategories/ByCategory/${categoryId}`);
+    if (response.ok) {
+      const data = await response.json();
+      setAvailableSubCategories(data);
+    }
+  } catch (error) {
+    console.error('Error loading subcategories:', error);
+  } finally {
+    setLoadingSubCategories(false);
+  }
+};
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -88,6 +117,25 @@ export default function ProfilePage({
         updates.entityId = entityId; // Include entity ID for address updates
       }
 
+     // Update subcategories for sellers
+      if (userRole === 'Seller' && entityId) {
+        try {
+          const subCatResponse = await fetch(`https://localhost:7062/api/Sellers/${entityId}/subcategories`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(selectedSubCategories)
+          });
+
+          if (!subCatResponse.ok) {
+            const errorData = await subCatResponse.json();
+            throw new Error(errorData.message || 'Failed to update subcategories');
+          }
+        } catch (error) {
+          console.error('Error updating subcategories:', error);
+          throw error;
+        }
+      }
+
       // Call the parent's update handler
       if (onProfileUpdate) {
         await onProfileUpdate(updates);
@@ -104,6 +152,13 @@ export default function ProfilePage({
   };
 
   const handleCancel = () => {
+
+     // Reset subcategories for sellers
+  if (userRole === 'Seller' && userProfile.subCategoryIds) {
+    setSelectedSubCategories(userProfile.subCategoryIds);
+  }
+  setSearchSubCategory('');
+
     // Reset form data to original values
     if (userProfile) {
       setFormData({
@@ -120,6 +175,23 @@ export default function ProfilePage({
     setIsEditing(false);
     setSaveMessage(null);
   };
+
+  const toggleSubCategory = (subCategoryId) => {
+  setSelectedSubCategories(prev => {
+    if (prev.includes(subCategoryId)) {
+      return prev.filter(id => id !== subCategoryId);
+    } else {
+      if (prev.length >= 3) {
+        return prev;
+      }
+      return [...prev, subCategoryId];
+    }
+  });
+};
+
+const filteredSubCategories = availableSubCategories.filter(sc =>
+  sc.name.toLowerCase().includes(searchSubCategory.toLowerCase())
+);
 
   if (!userProfile) {
     return (
@@ -442,6 +514,121 @@ export default function ProfilePage({
           </div>
         </div>
       </div>
+
+      {/* Store Categories Section - Only for Sellers */}
+        {userRole === 'Seller' && (
+          <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg border border-grey-stroke dark:border-charcoal-500 shadow-soft-lift dark:shadow-none p-6 transition-colors">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-display-h3 text-charcoal-600 dark:text-white font-semibold">Store Categories</h2>
+                <p className="text-label-medium text-charcoal-400 dark:text-gray-400 mt-1">
+                  Select up to 3 subcategories that best describe your store
+                </p>
+              </div>
+              {!isEditing && (
+                <div className="flex items-center gap-2">
+                  <Tag size={20} className="text-sage-600" />
+                  <span className="text-label-medium text-charcoal-500 dark:text-charcoal-300">
+                    {selectedSubCategories.length} / 3 selected
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {!isEditing ? (
+              /* View Mode - Show selected chips */
+              <div>
+                {selectedSubCategories.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {availableSubCategories
+                      .filter(sc => selectedSubCategories.includes(sc.id))
+                      .map(sc => (
+                        <div
+                          key={sc.id}
+                          className="inline-flex items-center px-4 py-2 rounded-full bg-sage-100 dark:bg-sage-900 text-sage-700 dark:text-sage-300 text-sm font-medium"
+                        >
+                          {sc.name}
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <p className="text-body-regular text-charcoal-400 dark:text-gray-400">
+                    No categories selected yet
+                  </p>
+                )}
+              </div>
+            ) : (
+              /* Edit Mode - Show searchable chips */
+              <div className="space-y-4">
+                {/* Search Input */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={searchSubCategory}
+                    onChange={(e) => setSearchSubCategory(e.target.value)}
+                    placeholder="Search categories..."
+                    className="w-full px-4 py-2 pl-10 border border-charcoal-400 dark:border-charcoal-500 dark:bg-charcoal-600 rounded-lg text-body-regular text-charcoal-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-sage-500"
+                  />
+                  <Tag size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal-400" />
+                </div>
+
+                {/* Selection Counter */}
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-charcoal-500 dark:text-charcoal-300">
+                    {selectedSubCategories.length} / 3 selected
+                  </span>
+                  {selectedSubCategories.length >= 3 && (
+                    <span className="text-orange-600 font-medium">
+                      Maximum reached
+                    </span>
+                  )}
+                </div>
+
+                {/* Chips Grid */}
+                {loadingSubCategories ? (
+                  <div className="text-center py-4">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sage-500 mx-auto"></div>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {filteredSubCategories.map(sc => {
+                      const isSelected = selectedSubCategories.includes(sc.id);
+                      const isDisabled = !isSelected && selectedSubCategories.length >= 3;
+                      
+                      return (
+                        <button
+                          key={sc.id}
+                          type="button"
+                          onClick={() => !isDisabled && toggleSubCategory(sc.id)}
+                          disabled={isDisabled}
+                          className={`
+                            inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium
+                            transition-all cursor-pointer
+                            ${isSelected
+                              ? 'bg-sage-500 text-white hover:bg-sage-600'
+                              : isDisabled
+                              ? 'bg-grey-200 dark:bg-charcoal-500 text-charcoal-400 cursor-not-allowed opacity-50'
+                              : 'bg-grey-200 dark:bg-charcoal-500 text-charcoal-600 dark:text-white hover:bg-sage-100 dark:hover:bg-sage-900'
+                            }
+                          `}
+                        >
+                          {sc.name}
+                          {isSelected && <X size={16} weight="bold" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {filteredSubCategories.length === 0 && (
+                  <p className="text-center text-charcoal-400 dark:text-gray-400 py-4">
+                    No categories found
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
       {/* Account Information Card */}
       <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg border border-grey-stroke dark:border-charcoal-500 shadow-soft-lift dark:shadow-none p-6 transition-colors">

@@ -50,6 +50,8 @@ import DashboardRouter from './components/DashboardRouter';
 import DriverDashboardPlaceholder from './Beyti-Website/Driver/DriverDashboardPlaceholder';
 import AccountSuspended from './Beyti-Website/Auth/AccountSuspended';
 
+import ProfilePage from './components/ProfilePage'
+
 // Placeholder components for pages that don't exist yet
 const PlaceholderPage = ({ pageName }) => (
   <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -59,6 +61,39 @@ const PlaceholderPage = ({ pageName }) => (
     </div>
   </div>
 );
+
+const ProfilePageWrapper = () => {
+  // You'll need to get the actual user data here
+  // This is a placeholder - adjust based on your auth/state management
+  const userProfile = {
+    userProfileId: 'user123',
+    displayName: 'John Doe',
+    phone: '+973 1234 5678',
+    address: 'Manama, Bahrain',
+    status: 'Active',
+    createdAt: '2024-01-15T00:00:00Z',
+    updatedAt: '2024-12-15T00:00:00Z'
+  };
+
+  const handleProfileUpdate = async (updates) => {
+    console.log('Profile update:', updates);
+    // Add your API call here
+  };
+
+  return (
+    <div className="min-h-screen bg-cream-50 p-6">
+      <div className="max-w-7xl mx-auto">
+        <ProfilePage
+          userProfile={userProfile}
+          userRole="Customer" // Change this based on actual user role
+          entityId={null}
+          onProfileUpdate={handleProfileUpdate}
+          readOnly={false}
+        />
+      </div>
+    </div>
+  );
+};
 
 export default function App() {
  const navItems = [
@@ -184,9 +219,16 @@ export default function App() {
               <Route path="products" element={<SellerProductsPage />} />
               <Route path="analytics" element={<SellerAnalyticsPage />} />
               <Route path="reviews" element={<SellerReviewsPage />} />
+              <Route path="profile" element={<div />} />
             </Route>
 
-            <Route path="/customer-dashboard" element={<CustomerDashboardPage />} />
+            <Route path="/customer-dashboard" element={<CustomerDashboardPage />}>
+              <Route index element={<div />} />
+              <Route path="orders" element={<div />} />
+              <Route path="addresses" element={<div />} />
+              <Route path="favorites" element={<div />} />
+              <Route path="profile" element={<div />} />
+            </Route>
 
             <Route path="/checkout" element={<Checkout />} />
 
@@ -211,6 +253,7 @@ export default function App() {
               <Route path="dashboard" element={<div />} />
               <Route path="orders" element={<div />} />
               <Route path="analytics" element={<div />} />
+              <Route path="profile" element={<div />} />
             </Route>
 
             <Route path="/admin" element={<AdminPage />} />
@@ -226,6 +269,7 @@ export default function App() {
             <Route path="/user-management" element={<AdminUserManagementNew />} />
             <Route path="/dashboard" element={<DashboardRouter />} />
             <Route path="/driver-placeholder" element={<DriverDashboardPlaceholder />} />
+            <Route path="/profile" element={<ProfilePageWrapper />} />
           </Routes>
         </main>
       </div>
