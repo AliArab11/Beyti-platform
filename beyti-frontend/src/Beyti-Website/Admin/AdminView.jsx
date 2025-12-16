@@ -20,12 +20,11 @@ import {
   getFlaggedUsers,
   getUserProfile,
   updateUserProfile,
+  createAnnouncement,
 } from '../../services/api';
 
 // Import design system components
 import AnalyticsCard from '../../components/AnalyticsCard';
-import { Table, TableHeader, TableBody, TableRow } from '../../components/Table';
-import StatusChip from '../../components/StatusChip';
 import CRUDButton from '../../components/CRUDButton';
 import PageHeader from '../../components/PageHeader';
 
@@ -40,6 +39,7 @@ import NotificationsPage from '../ServiceProvider/components/NotificationsPage';
 import AuditLogs from './components/AuditLogs';
 import AdminSidebar from './components/AdminSidebar';
 import ProfilePage from '../../components/ProfilePage';
+import AnnouncementManagement from './components/AnnouncementManagement';
 
 const AdminView = () => {
   // View state for navigation
@@ -50,9 +50,6 @@ const AdminView = () => {
     pendingApprovals: 0,
     flaggedUsersCount: 0,
   });
-
-  // State for approval queue
-  const [approvalQueue, setApprovalQueue] = useState([]);
 
   // State for growth data
   const [growthData, setGrowthData] = useState({
@@ -74,6 +71,22 @@ const AdminView = () => {
   // User profile state
   const [userProfile, setUserProfile] = useState(null);
   const [displayName, setDisplayName] = useState("Admin User");
+
+  // Announcement modal state
+  const [announcementModalOpen, setAnnouncementModalOpen] = useState(false);
+  const [announcementForm, setAnnouncementForm] = useState({
+    title: '',
+    body: '',
+    recipients: {
+      customers: false,
+      sellers: false,
+      serviceProviders: false,
+      drivers: false,
+    },
+  });
+  const [announcementLoading, setAnnouncementLoading] = useState(false);
+  const [announcementError, setAnnouncementError] = useState(null);
+  const [announcementSuccess, setAnnouncementSuccess] = useState(false);
 
   // ========================================
   // ADMIN CREDENTIALS - CONFIGURED HERE
@@ -226,13 +239,6 @@ const AdminView = () => {
           drivers,
         });
 
-        // Set approval queue (top 5 pending)
-        setApprovalQueue(
-          pendingRequests
-            .filter(r => r.status === 'Pending')
-            .slice(0, 5)
-        );
-
         // Calculate notification count (pending approvals + flagged users)
         setNotificationCount(pendingApprovals + flaggedUsersCount);
 
@@ -260,6 +266,135 @@ const AdminView = () => {
     return past.toLocaleDateString();
   };
 
+  // Handle opening announcement modal
+  const handleOpenAnnouncementModal = () => {
+    setAnnouncementModalOpen(true);
+    setAnnouncementError(null);
+    setAnnouncementSuccess(false);
+  };
+
+  // Handle closing announcement modal
+  const handleCloseAnnouncementModal = () => {
+    setAnnouncementModalOpen(false);
+    setAnnouncementForm({
+      title: '',
+      body: '',
+      recipients: {
+        customers: false,
+        sellers: false,
+        serviceProviders: false,
+        drivers: false,
+      },
+    });
+    setAnnouncementError(null);
+    setAnnouncementSuccess(false);
+  };
+
+  // Handle form input changes
+  const handleAnnouncementInputChange = (e) => {
+    const { name, value } = e.target;
+    setAnnouncementForm(prev => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  // Handle recipient checkbox changes
+  const handleRecipientChange = (e) => {
+    const { name, checked } = e.target;
+    setAnnouncementForm(prev => ({
+      ...prev,
+      recipients: {
+        ...prev.recipients,
+        [name]: checked,
+      },
+    }));
+  };
+
+  // Handle select all recipients
+  const handleSelectAllRecipients = () => {
+    const allSelected = Object.values(announcementForm.recipients).every(v => v);
+    setAnnouncementForm(prev => ({
+      ...prev,
+      recipients: {
+        customers: !allSelected,
+        sellers: !allSelected,
+        serviceProviders: !allSelected,
+        drivers: !allSelected,
+      },
+    }));
+  };
+
+  // Handle sending announcement
+  const handleSendAnnouncement = async () => {
+    // Validation
+    if (!announcementForm.title.trim()) {
+      setAnnouncementError('Please enter a title for the announcement');
+      return;
+    }
+
+    if (!announcementForm.body.trim()) {
+      setAnnouncementError('Please enter a message for the announcement');
+      return;
+    }
+
+    const hasRecipients = Object.values(announcementForm.recipients).some(v => v);
+    if (!hasRecipients) {
+      setAnnouncementError('Please select at least one recipient group');
+      return;
+    }
+
+    try {
+      setAnnouncementLoading(true);
+      setAnnouncementError(null);
+
+      // Build audience array from recipients object
+      const audiences = [];
+      if (announcementForm.recipients.customers) audiences.push('Customer');
+      if (announcementForm.recipients.sellers) audiences.push('Seller');
+      if (announcementForm.recipients.serviceProviders) audiences.push('ServiceProvider');
+      if (announcementForm.recipients.drivers) audiences.push('Driver');
+
+      // Prepare announcement data matching backend DTO structure
+      const announcementData = {
+        adminUserId: adminProfileId,  // Use adminProfileId (1) not userProfileId (4)
+        title: announcementForm.title.trim(),
+        message: announcementForm.body.trim(),  // Changed from "body" to "message"
+        audiences: audiences,  // Changed from recipients object to array
+        expiresAt: null  // Optional: can add expiration date later
+      };
+
+      await createAnnouncement(announcementData);
+
+      // Show success
+      setAnnouncementSuccess(true);
+
+      // Log activity
+      const newActivity = {
+        type: 'announcement',
+        action: 'Sent Announcement',
+        details: announcementForm.title,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Update recent activity
+      const updatedActivity = [newActivity, ...recentActivity].slice(0, 3);
+      setRecentActivity(updatedActivity);
+      localStorage.setItem('adminRecentActivity', JSON.stringify(updatedActivity));
+
+      // Close modal after a delay
+      setTimeout(() => {
+        handleCloseAnnouncementModal();
+      }, 2000);
+
+    } catch (error) {
+      console.error('Error sending announcement:', error);
+      setAnnouncementError(error.message || 'Failed to send announcement');
+    } finally {
+      setAnnouncementLoading(false);
+    }
+  };
+
   // Navigation handlers
   const handleNavigate = (path) => {
     console.log('Navigating to:', path);
@@ -272,6 +407,7 @@ const AdminView = () => {
       '/admin/product-moderation': 'product-moderation',
       '/admin/service-moderation': 'service-moderation',
       '/admin/category-moderation': 'category-moderation',
+      '/admin/announcements': 'announcements',
       '/admin/notifications': 'notifications',
       '/admin/audit-logs': 'audit-logs',
     };
@@ -290,6 +426,7 @@ const AdminView = () => {
       'product-moderation': 'Product Moderation',
       'service-moderation': 'Service Moderation',
       'category-moderation': 'Category Moderation',
+      'announcements': 'Announcements',
       'notifications': 'Notifications',
       'audit-logs': 'Audit Logs',
       'profile': 'My Profile',
@@ -305,6 +442,7 @@ const AdminView = () => {
       'product-moderation': 'Search products, sellers, categories...',
       'service-moderation': 'Search services, categories...',
       'category-moderation': 'Search categories or subcategories...',
+      'announcements': 'Search announcements by title or message...',
       'notifications': 'Search notifications by title, content, or type...',
       'audit-logs': 'Search by event type, description, or table...',
     };
@@ -313,7 +451,7 @@ const AdminView = () => {
 
   // Check if current view should have search
   const hasSearch = () => {
-    return ['users', 'approvals', 'product-moderation', 'service-moderation', 'category-moderation', 'notifications', 'audit-logs'].includes(currentView);
+    return ['users', 'approvals', 'product-moderation', 'service-moderation', 'category-moderation', 'announcements', 'notifications', 'audit-logs'].includes(currentView);
   };
 
   // Render the content for each view (without sidebar and header)
@@ -331,6 +469,8 @@ const AdminView = () => {
         return <ServiceModeration onNavigate={handleNavigate} adminUserProfileId={userProfileId} renderContentOnly={true} />;
       case 'category-moderation':
         return <CategoryModeration onNavigate={handleNavigate} adminUserProfileId={userProfileId} renderContentOnly={true} />;
+      case 'announcements':
+        return <AnnouncementManagement onNavigate={handleNavigate} adminUserProfileId={userProfileId} renderContentOnly={true} onOpenAnnouncementModal={handleOpenAnnouncementModal} />;
       case 'notifications':
         return <NotificationsPage userId={userProfileId} />;
       case 'audit-logs':
@@ -347,6 +487,193 @@ const AdminView = () => {
       default:
         return renderDashboardContent();
     }
+  };
+
+  // Render announcement modal
+  const renderAnnouncementModal = () => {
+    if (!announcementModalOpen) return null;
+
+    const allSelected = Object.values(announcementForm.recipients).every(v => v);
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+        <div className="bg-cream-50 dark:bg-[#2A2A2A] rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col border border-grey-stroke">
+          {/* Header */}
+          <div className="px-6 py-4 border-b border-grey-stroke flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-charcoal-700 dark:text-white">
+              Send Announcement
+            </h2>
+            <button
+              type="button"
+              onClick={handleCloseAnnouncementModal}
+              className="text-charcoal-400 hover:text-charcoal-600 dark:text-gray-400 dark:hover:text-gray-200 text-2xl leading-none"
+            >
+              ×
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+            {/* Success Message */}
+            {announcementSuccess && (
+              <div className="bg-success-bg border-l-4 border-success-btn px-4 py-3 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <CheckCircle size={24} className="text-success-btn flex-shrink-0" weight="fill" />
+                  <div>
+                    <p className="text-sm font-semibold text-success-text">
+                      Announcement Sent Successfully!
+                    </p>
+                    <p className="text-sm text-charcoal-600">
+                      Your announcement has been sent to the selected recipients.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Error Message */}
+            {announcementError && (
+              <div className="bg-error-bg border-l-4 border-error-btn px-4 py-3 rounded-lg">
+                <p className="text-sm text-error-text">{announcementError}</p>
+              </div>
+            )}
+
+            {/* Title Input */}
+            <div>
+              <label className="block text-sm font-medium text-charcoal-600 dark:text-gray-300 mb-2">
+                Announcement Title
+              </label>
+              <input
+                type="text"
+                name="title"
+                value={announcementForm.title}
+                onChange={handleAnnouncementInputChange}
+                placeholder="Enter announcement title..."
+                className="w-full px-4 py-2.5 rounded-lg border border-grey-stroke bg-white dark:bg-[#1F1F1F] dark:border-gray-600 text-charcoal-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-sage-400"
+                disabled={announcementLoading || announcementSuccess}
+              />
+            </div>
+
+            {/* Message Body */}
+            <div>
+              <label className="block text-sm font-medium text-charcoal-600 dark:text-gray-300 mb-2">
+                Message
+              </label>
+              <textarea
+                name="body"
+                value={announcementForm.body}
+                onChange={handleAnnouncementInputChange}
+                placeholder="Enter your announcement message..."
+                rows={6}
+                className="w-full px-4 py-2.5 rounded-lg border border-grey-stroke bg-white dark:bg-[#1F1F1F] dark:border-gray-600 text-charcoal-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-sage-400 resize-none"
+                disabled={announcementLoading || announcementSuccess}
+              />
+            </div>
+
+            {/* Recipients */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-charcoal-600 dark:text-gray-300">
+                  Select Recipients
+                </label>
+                <button
+                  type="button"
+                  onClick={handleSelectAllRecipients}
+                  className="text-sm text-sage-600 hover:text-sage-700 dark:text-sage-400 dark:hover:text-sage-300 font-medium"
+                  disabled={announcementLoading || announcementSuccess}
+                >
+                  {allSelected ? 'Deselect All' : 'Select All'}
+                </button>
+              </div>
+
+              <div className="space-y-3 bg-grey-100 dark:bg-[#1F1F1F] rounded-lg p-4 border border-grey-stroke dark:border-gray-600">
+                {/* Customers */}
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="customers"
+                    checked={announcementForm.recipients.customers}
+                    onChange={handleRecipientChange}
+                    className="w-5 h-5 rounded border-grey-stroke text-sage-500 focus:ring-sage-400"
+                    disabled={announcementLoading || announcementSuccess}
+                  />
+                  <span className="text-body-medium text-charcoal-600 dark:text-gray-200">
+                    Customers
+                  </span>
+                </label>
+
+                {/* Sellers */}
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="sellers"
+                    checked={announcementForm.recipients.sellers}
+                    onChange={handleRecipientChange}
+                    className="w-5 h-5 rounded border-grey-stroke text-sage-500 focus:ring-sage-400"
+                    disabled={announcementLoading || announcementSuccess}
+                  />
+                  <span className="text-body-medium text-charcoal-600 dark:text-gray-200">
+                    Sellers
+                  </span>
+                </label>
+
+                {/* Service Providers */}
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="serviceProviders"
+                    checked={announcementForm.recipients.serviceProviders}
+                    onChange={handleRecipientChange}
+                    className="w-5 h-5 rounded border-grey-stroke text-sage-500 focus:ring-sage-400"
+                    disabled={announcementLoading || announcementSuccess}
+                  />
+                  <span className="text-body-medium text-charcoal-600 dark:text-gray-200">
+                    Service Providers
+                  </span>
+                </label>
+
+                {/* Drivers */}
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="drivers"
+                    checked={announcementForm.recipients.drivers}
+                    onChange={handleRecipientChange}
+                    className="w-5 h-5 rounded border-grey-stroke text-sage-500 focus:ring-sage-400"
+                    disabled={announcementLoading || announcementSuccess}
+                  />
+                  <span className="text-body-medium text-charcoal-600 dark:text-gray-200">
+                    Drivers
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="px-6 py-4 border-t border-grey-stroke bg-grey-100 dark:bg-[#1F1F1F]">
+            <div className="flex flex-col md:flex-row gap-3">
+              <button
+                type="button"
+                onClick={handleSendAnnouncement}
+                disabled={announcementLoading || announcementSuccess}
+                className="flex-1 bg-sage-500 hover:bg-sage-600 disabled:bg-sage-300 text-cream-50 py-2.5 rounded-lg font-semibold transition-colors"
+              >
+                {announcementLoading ? 'Sending...' : announcementSuccess ? 'Sent!' : 'Send Announcement'}
+              </button>
+              <button
+                type="button"
+                onClick={handleCloseAnnouncementModal}
+                disabled={announcementLoading}
+                className="flex-1 bg-grey-300 hover:bg-grey-400 disabled:bg-grey-200 text-charcoal-700 dark:text-charcoal-600 py-2.5 rounded-lg font-semibold transition-colors"
+              >
+                {announcementSuccess ? 'Close' : 'Cancel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   // Render dashboard content
@@ -523,99 +850,10 @@ const AdminView = () => {
               </div>
             )}
 
-            {/* Approval Queue */}
-            <div>
-              <Table
-                title="Approval Queue"
-                actionButton={
-                  <CRUDButton 
-                    variant="success"
-                    onClick={() => handleNavigate('/admin/approvals')}
-                  >
-                    View All
-                  </CRUDButton>
-                }
-              >
-                <TableHeader
-                  columns={[
-                    'Business Name',
-                    'Service Type',
-                    'Submitted',
-                    'Status',
-                    'Action'
-                  ]}
-                />
-                <TableBody>
-                  {loading ? (
-                    <TableRow
-                      data={['Loading...', '', '', '', '']}
-                    />
-                  ) : approvalQueue.length === 0 ? (
-                    <TableRow
-                      data={['No pending approvals', '', '', '', '']}
-                    />
-                  ) : (
-                    approvalQueue.map((request) => (
-                      <TableRow
-                        key={request.id}
-                        data={[
-                          request.businessName || 'N/A',
-                          request.serviceType || 'General',
-                          new Date(request.submittedAt).toLocaleDateString(),
-                          <StatusChip variant="danger">
-                            {request.status}
-                          </StatusChip>,
-                        ]}
-                        actions={
-                          <>
-                            <CRUDButton
-                              variant="success"
-                              onClick={() => handleNavigate('/admin/approvals')}
-                            >
-                              Review
-                            </CRUDButton>
-                          </>
-                        }
-                      />
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-
-            {/* Quick Stats Summary */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none p-6 transition-colors">
-                <h3 className="text-card-h2 text-charcoal-600 dark:text-white mb-4">Platform Overview</h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-body-regular text-charcoal-400 dark:text-gray-400">Total Users</span>
-                    <span className="text-body-medium text-charcoal-600 dark:text-white font-semibold">
-                      {loading ? '...' : stats.totalUsers}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-body-regular text-charcoal-400">Active Sellers</span>
-                    <span className="text-body-medium text-charcoal-600 font-semibold">
-                      {loading ? '...' : growthData.sellers}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-body-regular text-charcoal-400">Service Providers</span>
-                    <span className="text-body-medium text-charcoal-600 font-semibold">
-                      {loading ? '...' : growthData.serviceProviders}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-body-regular text-charcoal-400">Active Drivers</span>
-                    <span className="text-body-medium text-charcoal-600 font-semibold">
-                      {loading ? '...' : growthData.drivers}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none p-6 transition-colors">
+            {/* Recent Activity + Quick Actions */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Recent Activity */}
+              <div className="lg:col-span-2 bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none p-6 transition-colors">
                 <h3 className="text-card-h2 text-charcoal-600 dark:text-white mb-4">Recent Activity</h3>
                 {loading ? (
                   <div className="flex items-center justify-center py-8">
@@ -638,12 +876,14 @@ const AdminView = () => {
                           activity.type === 'approval' ? 'bg-success-bg' :
                           activity.type === 'user_created' ? 'bg-sage-100' :
                           activity.type === 'suspension' ? 'bg-error-bg' :
+                          activity.type === 'announcement' ? 'bg-sage-100' :
                           'bg-cream-100'
                         }`}>
                           {activity.type === 'approval' && <CheckCircle size={20} className="text-success-btn" weight="fill" />}
                           {activity.type === 'user_created' && <UserPlus size={20} className="text-sage-600" weight="fill" />}
                           {activity.type === 'suspension' && <Warning size={20} className="text-error-btn" weight="fill" />}
                           {activity.type === 'moderation' && <ShieldCheck size={20} className="text-sage-600" weight="fill" />}
+                          {activity.type === 'announcement' && <ShieldCheck size={20} className="text-sage-600" weight="fill" />}
                         </div>
 
                         {/* Activity details */}
@@ -665,6 +905,38 @@ const AdminView = () => {
                   </div>
                 )}
               </div>
+
+              {/* Quick Actions */}
+              <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none p-6 transition-colors space-y-4">
+                <h3 className="text-card-h2 text-charcoal-600 dark:text-white">Quick Actions</h3>
+                <p className="text-body-regular text-charcoal-400 dark:text-gray-400">
+                  Common tasks you might want to do next.
+                </p>
+
+                <div className="space-y-3">
+                  <button
+                    type="button"
+                    className="w-full py-2.5 rounded-full bg-sage-500 hover:bg-sage-600 text-cream-50 font-semibold text-sm shadow-soft-lift transition-colors"
+                    onClick={handleOpenAnnouncementModal}
+                  >
+                    Send Announcement
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full py-2.5 rounded-full bg-sage-100 hover:bg-sage-200 text-sage-700 font-semibold text-sm transition-colors"
+                    onClick={() => handleNavigate('/admin/users')}
+                  >
+                    View Users
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full py-2.5 rounded-full bg-grey-300 hover:bg-grey-400 text-charcoal-600 dark:text-charcoal-700 font-semibold text-sm transition-colors"
+                    onClick={() => handleNavigate('/admin/category-moderation')}
+                  >
+                    View Categories
+                  </button>
+                </div>
+              </div>
             </div>
     </>
   );
@@ -672,6 +944,9 @@ const AdminView = () => {
   // Main render - Always render sidebar and header, switch content based on view
   return (
     <div className="flex min-h-screen bg-cream-50">
+      {/* Announcement Modal */}
+      {renderAnnouncementModal()}
+
       {/* Sidebar - Always visible */}
       <AdminSidebar currentPage={currentView} onNavigate={handleNavigate} />
 

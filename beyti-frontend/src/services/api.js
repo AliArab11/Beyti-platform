@@ -2028,6 +2028,31 @@ export const getSentNotifications = async (userId) => {
   return await fetchAPI(`/Notifications/user/${userId}/sent`);
 };
 
+// Create announcement
+export const createAnnouncement = async (announcementData) => {
+  return await fetchAPI('/Announcements', {
+    method: 'POST',
+    body: JSON.stringify(announcementData),
+  });
+};
+
+// Get all announcements
+export const getAnnouncements = async () => {
+  return await fetchAPI('/Announcements');
+};
+
+// Get single announcement by ID
+export const getAnnouncement = async (id) => {
+  return await fetchAPI(`/Announcements/${id}`);
+};
+
+// Delete announcement
+export const deleteAnnouncement = async (id) => {
+  return await fetchAPI(`/Announcements/${id}`, {
+    method: 'DELETE',
+  });
+};
+
 // --- Service Category APIs ---
 
 /**
