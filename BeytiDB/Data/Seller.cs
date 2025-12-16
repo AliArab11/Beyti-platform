@@ -42,7 +42,6 @@ public partial class Seller
     public virtual ICollection<SellerSubCategory> SellerSubCategories { get; set; }
         = new List<SellerSubCategory>();
 
-
     [InverseProperty("Seller")]
     public virtual ICollection<Order> Orders { get; set; } = new List<Order>();
 

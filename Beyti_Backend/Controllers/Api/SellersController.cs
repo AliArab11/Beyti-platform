@@ -27,11 +27,14 @@ namespace Beyti_Backend.Controllers.Api
         public async Task<ActionResult<IEnumerable<object>>> GetSellers()
         {
             var sellers = await _context.Sellers
-                .Include(s => s.UserProfile)
-                .Include(s => s.SellerAddresses)
-                    .ThenInclude(sa => sa.Address)
-                .Include(s => s.Products) // ← NEW: Include products
-                .ToListAsync();
+            .Include(s => s.UserProfile)
+            .Include(s => s.SellerAddresses)
+             .ThenInclude(sa => sa.Address)
+            .Include(s => s.Products)
+            .Include(s => s.Category)  // ← ADD THIS LINE - loads Category
+            .Include(s => s.SellerSubCategories)  // ← Already there
+             .ThenInclude(ssc => ssc.SubCategory)  // ← ADD THIS LINE - loads SubCategory names
+            .ToListAsync();
 
             var result = new List<object>();
 
@@ -55,8 +58,12 @@ namespace Beyti_Backend.Controllers.Api
                     seller.Phone,
                     seller.CreatedAt,
                     averageRating,
-                    categoryId = seller.CategoryId,  // ← ADD THIS
-                    categoryName = seller.Category?.Name,  // ← ADD THIS
+                    categoryId = seller.CategoryId,  
+                    categoryName = seller.Category?.Name,
+                    subCategoryIds = seller.SellerSubCategories.Select(ssc => ssc.SubCategoryId).ToList(),
+                    subCategoryNames = seller.SellerSubCategories
+                    .Select(ssc => ssc.SubCategory.Name)
+                    .ToList(),
                     sellerAddresses = seller.SellerAddresses.Select(sa => new
                     {
                         sa.Id,
@@ -144,15 +151,17 @@ namespace Beyti_Backend.Controllers.Api
             try
             {
                 var seller = await _context.Sellers
-                    .Include(s => s.UserProfile)
-                    .Include(s => s.SellerAddresses)
-                        .ThenInclude(sa => sa.Address)
-                    .Include(s => s.Products)
-                        .ThenInclude(p => p.SubCategory)
-                            .ThenInclude(sc => sc.Category)
-                    .Include(s => s.Products) // ← Make sure products are loaded
-                        .ThenInclude(p => p.Reviews) // ← NEW: Include reviews
-                    .FirstOrDefaultAsync(s => s.Id == id);
+                .Include(s => s.UserProfile)
+                .Include(s => s.SellerAddresses)
+                    .ThenInclude(sa => sa.Address)
+                .Include(s => s.Products)
+                    .ThenInclude(p => p.SubCategory)
+                        .ThenInclude(sc => sc.Category)
+                .Include(s => s.Products)
+                    .ThenInclude(p => p.Reviews)
+                .Include(s => s.SellerSubCategories)  // ← ADD THIS LINE
+                    .ThenInclude(ssc => ssc.SubCategory)  // ← ADD THIS LINE
+                .FirstOrDefaultAsync(s => s.Id == id);
 
                 if (seller == null)
                     return NotFound(new { message = $"Seller with id {id} not found" });
@@ -177,7 +186,9 @@ namespace Beyti_Backend.Controllers.Api
                     storeName = seller.UserProfile.DisplayName,
                     phone = seller.Phone,
                     createdAt = seller.CreatedAt,
-                    averageRating, // ← NEW: Add rating to response
+                    averageRating, // ← Already there
+                    subCategoryIds = seller.SellerSubCategories.Select(ssc => ssc.SubCategoryId).ToList(),  // ← ADD THIS LINE
+                    subCategoryNames = seller.SellerSubCategories.Select(ssc => ssc.SubCategory.Name).ToList(),  // ← ADD THIS LINE
                     sellerAddresses = seller.SellerAddresses.Select(sa => new
                     {
                         id = sa.Id,
@@ -282,7 +293,8 @@ namespace Beyti_Backend.Controllers.Api
                     storeName = seller.UserProfile.DisplayName,
                     seller.Phone,
                     seller.CreatedAt,
-                    averageRating // ← NEW: Add rating to response
+                    seller.CategoryId,  // Add this line
+                    averageRating
                 });
             }
             catch (Exception ex)

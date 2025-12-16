@@ -24,6 +24,7 @@ namespace Beyti_Backend.Controllers.Api
         public class CreateProductVariantDto
         {
             public int ProductId { get; set; }
+            public string VariantName { get; set; } = null!;
             public string? ColorValue { get; set; }
             public string? SizeValue { get; set; }
             public string? SKU { get; set; }
@@ -36,6 +37,7 @@ namespace Beyti_Backend.Controllers.Api
         {
             public int Id { get; set; }
             public int ProductId { get; set; }
+            public string VariantName { get; set; } = null!;
             public int? ColorValueId { get; set; }
             public int? SizeValueId { get; set; }
             public string? ColorValue { get; set; }
@@ -67,6 +69,7 @@ namespace Beyti_Backend.Controllers.Api
                 {
                     Id = v.Id,
                     ProductId = v.ProductId,
+                    VariantName = v.VariantName,
                     ColorValueId = v.ColorValueId,
                     SizeValueId = v.SizeValueId,
                     SKU = v.SKU,
@@ -154,6 +157,7 @@ namespace Beyti_Backend.Controllers.Api
             {
                 Id = v.Id,
                 ProductId = v.ProductId,
+                VariantName = v.VariantName,
                 ColorValueId = v.ColorValueId,
                 SizeValueId = v.SizeValueId,
                 SKU = v.SKU,
@@ -247,6 +251,7 @@ namespace Beyti_Backend.Controllers.Api
             var productVariant = new ProductVariant
             {
                 ProductId = dto.ProductId,
+                VariantName = dto.VariantName,
                 ColorValueId = colorValueId,
                 SizeValueId = sizeValueId,
                 SKU = dto.SKU,
@@ -263,6 +268,7 @@ namespace Beyti_Backend.Controllers.Api
             {
                 Id = productVariant.Id,
                 ProductId = productVariant.ProductId,
+                VariantName = productVariant.VariantName,
                 ColorValueId = productVariant.ColorValueId,
                 SizeValueId = productVariant.SizeValueId,
                 ColorValue = dto.ColorValue,
@@ -341,6 +347,7 @@ namespace Beyti_Backend.Controllers.Api
                 sizeValueId = sizeValue.Id;
             }
 
+            productVariant.VariantName = dto.VariantName;
             productVariant.ColorValueId = colorValueId;
             productVariant.SizeValueId = sizeValueId;
             productVariant.SKU = dto.SKU;

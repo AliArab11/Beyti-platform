@@ -220,8 +220,10 @@ const StoreInfo = ({ store }) => (
                 
                 {/* Categories */}
                 <p className="text-[15px] text-charcoal-500" 
-                   style={{ fontFamily: "Inter, sans-serif" }}>
-                  Cakes • Cookies • Desserts
+                  style={{ fontFamily: "Inter, sans-serif" }}>
+                  {store?.subCategoryNames?.length > 0 
+                    ? store.subCategoryNames.join(' • ') 
+                    : 'No categories'}
                 </p>
               </div>
             </div>

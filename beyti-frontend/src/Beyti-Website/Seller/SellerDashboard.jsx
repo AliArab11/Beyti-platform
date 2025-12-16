@@ -580,18 +580,19 @@ useEffect(() => {
   };
 
   // Load sellers for modal
-  useEffect(() => {
-    const loadSellers = async () => {
-      try {
-        const data = await getSellers();
-        setSellerList(Array.isArray(data) ? data : []);
-      } catch (err) {
-        console.error("Failed to load sellers", err);
-      }
-    };
+useEffect(() => {
+  const loadSellers = async () => {
+    try {
+      const data = await getSellers();
+      console.log('📦 Loaded sellers:', data);
+      setSellerList(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to load sellers", err);
+    }
+  };
 
-    loadSellers();
-  }, []);
+  loadSellers();
+}, []);
 
  // Load seller orders and products after selecting sellerId
 useEffect(() => {
@@ -1374,6 +1375,7 @@ const productsArr = Array.from(productMap.values()).sort(
                       <Reviews sellerId={sellerId} sellerName={sellerName} />
                     ) : location.pathname.includes("/seller-dashboard/profile") ? (
                       <ProfilePage
+                        key={`profile-${sellerId}`}
                         userProfile={{
                           userProfileId: sellerId,
                           displayName: sellerName,
@@ -1392,21 +1394,56 @@ const productsArr = Array.from(productMap.values()).sort(
                         }}
                         userRole="Seller"
                         entityId={sellerId}
+                        shouldFetchProfile={true}
                         onProfileUpdate={async (updates) => {
                           try {
-                            console.log('Profile updates:', updates);
-                            console.log('Current seller data:', sellerList.find(s => s.id === sellerId));
+                            console.log('💾 Profile updates:', updates);
                             
-                            const sellers = await getSellers();
-                            const updatedSeller = sellers.find(s => s.id === sellerId);
-                            if (updatedSeller) {
-                              setSellerName(updatedSeller.storeName || sellerName);
-                              setSellerList(prev => prev.map(s => 
-                                s.id === sellerId ? updatedSeller : s
-                              ));
+                            const currentSeller = sellerList.find(s => s.id === sellerId);
+                            console.log('📌 Current seller before update:', currentSeller);
+                            
+                            // Reload seller profile data
+                            const response = await fetch(`https://localhost:7062/api/Sellers/Profile/${currentSeller?.userProfileId}`);
+                            
+                            if (response.ok) {
+                              const updatedSellerData = await response.json();
+                              console.log('✅ Updated seller data from API:', updatedSellerData);
+                              
+                              setSellerName(updatedSellerData.storeName || updatedSellerData.displayName || sellerName);
+                              
+                              setSellerList(prev => {
+                                const updated = prev.map(s => 
+                                  s.id === sellerId ? {
+                                    ...s,
+                                    id: updatedSellerData.id || updatedSellerData.sellerId,
+                                    userProfileId: updatedSellerData.userProfileId,
+                                    storeName: updatedSellerData.storeName || updatedSellerData.displayName,
+                                    displayName: updatedSellerData.displayName || updatedSellerData.storeName,
+                                    phone: updatedSellerData.phone,
+                                    categoryId: updatedSellerData.categoryId,
+                                    subCategoryIds: updatedSellerData.subCategoryIds || [],
+                                    street: updatedSellerData.address?.street,
+                                    city: updatedSellerData.address?.city,
+                                    region: updatedSellerData.address?.region,
+                                    postalCode: updatedSellerData.address?.postalCode,
+                                    country: updatedSellerData.address?.country,
+                                    address: [
+                                      updatedSellerData.address?.street,
+                                      updatedSellerData.address?.city,
+                                      updatedSellerData.address?.region,
+                                      updatedSellerData.address?.postalCode,
+                                      updatedSellerData.address?.country
+                                    ].filter(Boolean).join(', '),
+                                    createdAt: updatedSellerData.createdAt,
+                                    updatedAt: new Date().toISOString()
+                                  } : s
+                                );
+                                console.log('🔄 Updated seller list:', updated.find(s => s.id === sellerId));
+                                return updated;
+                              });
                             }
                           } catch (error) {
-                            console.error('Error updating profile:', error);
+                            console.error('💥 Error updating profile:', error);
                             throw error;
                           }
                         }}
