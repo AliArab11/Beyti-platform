@@ -39,6 +39,7 @@ import ServiceModeration from './components/ServiceModeration';
 import NotificationsPage from '../ServiceProvider/components/NotificationsPage';
 import AuditLogs from './components/AuditLogs';
 import AdminSidebar from './components/AdminSidebar';
+import ProfilePage from '../../components/ProfilePage';
 
 const AdminView = () => {
   // View state for navigation
@@ -291,6 +292,7 @@ const AdminView = () => {
       'category-moderation': 'Category Moderation',
       'notifications': 'Notifications',
       'audit-logs': 'Audit Logs',
+      'profile': 'My Profile',
     };
     return titles[currentView] || 'Admin Dashboard';
   };
@@ -333,6 +335,15 @@ const AdminView = () => {
         return <NotificationsPage userId={userProfileId} />;
       case 'audit-logs':
         return <AuditLogs onNavigate={handleNavigate} adminUserProfileId={userProfileId} renderContentOnly={true} />;
+      case 'profile':
+        return (
+          <ProfilePage
+            userProfile={userProfile}
+            userRole="Admin"
+            entityId={adminProfileId}
+            onProfileUpdate={handleProfileUpdate}
+          />
+        );
       default:
         return renderDashboardContent();
     }
@@ -677,6 +688,7 @@ const AdminView = () => {
           userProfile={userProfile}
           entityId={null}
           userId={userProfileId}
+          onProfileClick={() => setCurrentView('profile')}
           onProfileUpdate={handleProfileUpdate}
         />
 

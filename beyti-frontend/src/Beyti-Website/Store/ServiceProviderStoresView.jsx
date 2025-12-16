@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Scissors } from "@phosphor-icons/react";
+import { Scissors, Star } from "@phosphor-icons/react";
 import { getServiceProviders, getServiceCategoryList, getUserProfile, updateUserProfile, getServiceProviderServices, getProviderServiceReviews } from "../../services/api";
 import { isAuthenticated, getUserId, handleSuspensionError } from "../../utils/authUtils";
 import PageHeader from "../../components/PageHeader";
@@ -27,7 +27,7 @@ const CategoryTabs = ({ categories, selected, onSelect }) => (
 );
 
 // Search Bar Component
-const SearchBar = ({ value, onChange }) => (
+const SearchBar = ({ value, onChange, showFilterDropdown, setShowFilterDropdown, activeFilters, handleFilterChange, clearAllFilters, getActiveFilterCount }) => (
   <div className="flex gap-4 items-center mb-8">
     <div className="flex-1 relative">
       <input
@@ -42,15 +42,111 @@ const SearchBar = ({ value, onChange }) => (
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
       </svg>
     </div>
-    <button className="flex items-center gap-3 px-6 py-3.5 bg-white rounded-full border border-grey-stroke hover:border-sage-500 transition-all shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
-      <svg className="w-5 h-5 text-sage-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-      </svg>
-      <span className="text-charcoal-600 font-semibold text-[14px]" style={{ fontFamily: 'Inter, sans-serif' }}>Filter</span>
-      <svg className="w-4 h-4 text-charcoal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-      </svg>
-    </button>
+
+    {/* Filter Button with Dropdown */}
+    <div className="relative">
+      <button
+        onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+        className="flex items-center gap-3 px-6 py-3.5 bg-white rounded-full border border-grey-stroke hover:border-sage-500 transition-all shadow-[0_2px_8px_rgba(0,0,0,0.06)] relative"
+      >
+        <svg className="w-5 h-5 text-sage-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+        </svg>
+        <span className="text-charcoal-600 font-semibold text-[14px]" style={{ fontFamily: 'Inter, sans-serif' }}>
+          Filter
+        </span>
+        {getActiveFilterCount() > 0 && (
+          <span className="absolute -top-1 -right-1 w-5 h-5 bg-sage-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+            {getActiveFilterCount()}
+          </span>
+        )}
+        <svg className="w-4 h-4 text-charcoal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {/* Filter Dropdown */}
+      {showFilterDropdown && (
+        <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-grey-stroke z-50">
+          <div className="p-6 space-y-6">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-grey-stroke">
+              <h3 className="text-lg font-bold text-charcoal-600" style={{ fontFamily: 'Merriweather, serif' }}>
+                Filters
+              </h3>
+              {getActiveFilterCount() > 0 && (
+                <button
+                  onClick={clearAllFilters}
+                  className="text-sm text-sage-600 hover:text-sage-700 font-semibold"
+                  style={{ fontFamily: 'Inter, sans-serif' }}
+                >
+                  Clear All
+                </button>
+              )}
+            </div>
+
+            {/* Rating Slider */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-semibold text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>
+                  Minimum Rating
+                </p>
+                <div className="flex items-center gap-1 bg-sage-100 px-3 py-1 rounded-full">
+                  <Star size={14} weight="fill" className="text-sage-600" />
+                  <span className="text-sm font-bold text-sage-700" style={{ fontFamily: 'Inter, sans-serif' }}>
+                    {activeFilters.rating ? `${activeFilters.rating}+` : 'Any'}
+                  </span>
+                </div>
+              </div>
+              <div className="relative">
+                <input
+                  type="range"
+                  min="0"
+                  max="5"
+                  step="1"
+                  value={activeFilters.rating || 0}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value);
+                    handleFilterChange('rating', value === 0 ? null : value);
+                  }}
+                  className="w-full h-2 bg-grey-200 rounded-full appearance-none cursor-pointer
+                           [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5
+                           [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-sage-500
+                           [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md
+                           [&::-webkit-slider-thumb]:hover:bg-sage-600 [&::-webkit-slider-thumb]:transition-colors
+                           [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:rounded-full
+                           [&::-moz-range-thumb]:bg-sage-500 [&::-moz-range-thumb]:border-0
+                           [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-md
+                           [&::-moz-range-thumb]:hover:bg-sage-600 [&::-moz-range-thumb]:transition-colors"
+                  style={{
+                    background: activeFilters.rating
+                      ? `linear-gradient(to right, #556B5C 0%, #556B5C ${((activeFilters.rating || 0) / 5) * 100}%, #E5E7EB ${((activeFilters.rating || 0) / 5) * 100}%, #E5E7EB 100%)`
+                      : '#E5E7EB'
+                  }}
+                />
+                <div className="flex justify-between mt-2 text-xs text-charcoal-400" style={{ fontFamily: 'Inter, sans-serif' }}>
+                  <span>Any</span>
+                  <span>1</span>
+                  <span>2</span>
+                  <span>3</span>
+                  <span>4</span>
+                  <span>5</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Apply Button */}
+            <button
+              onClick={() => setShowFilterDropdown(false)}
+              className="w-full bg-sage-500 hover:bg-sage-600 text-white font-bold py-3 rounded-xl transition-all shadow-soft-lift"
+              style={{ fontFamily: 'Inter, sans-serif' }}
+            >
+              Apply Filters
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   </div>
 );
 
@@ -224,6 +320,12 @@ const ServiceProviderStoresView = () => {
   const [providerServices, setProviderServices] = useState({}); // Map of providerId -> services array
   const [activeView, setActiveView] = useState('services'); // Current view: stores, services, notifications, history
 
+  // Filter state
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [activeFilters, setActiveFilters] = useState({
+    rating: null, // null, 1, 2, 3, 4, 5
+  });
+
   // Check authentication on mount
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -375,6 +477,36 @@ const ServiceProviderStoresView = () => {
     setSelectedCategory(categoryId);
   };
 
+  // Filter helper functions
+  const handleFilterChange = (filterType, value) => {
+    setActiveFilters(prev => ({
+      ...prev,
+      [filterType]: prev[filterType] === value ? null : value
+    }));
+  };
+
+  const clearAllFilters = () => {
+    setActiveFilters({
+      rating: null,
+    });
+  };
+
+  const getActiveFilterCount = () => {
+    return Object.values(activeFilters).filter(v => v !== null).length;
+  };
+
+  // Close filter dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showFilterDropdown && !event.target.closest('.relative')) {
+        setShowFilterDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showFilterDropdown]);
+
   const filteredProviders = providers.filter(provider => {
     const searchLower = searchQuery.toLowerCase();
     const displayName = provider.displayName || '';
@@ -388,7 +520,42 @@ const ServiceProviderStoresView = () => {
     const matchesCategory = selectedCategory === null ||
                           provider.serviceCategoryId === selectedCategory;
 
+    // Rating filter - providers with no rating are always included
+    if (activeFilters.rating) {
+      const rating = provider.averageRating;
+      // If provider has no rating (null/undefined), include it
+      if (rating !== null && rating !== undefined) {
+        // Only filter out providers that have ratings below the threshold
+        if (rating < activeFilters.rating) return false;
+      }
+    }
+
     return matchesSearch && matchesCategory;
+  }).sort((a, b) => {
+    // Sort providers: rated providers first (by rating desc), then providers without ratings
+    const ratingA = a.averageRating;
+    const ratingB = b.averageRating;
+
+    const hasRatingA = ratingA !== null && ratingA !== undefined;
+    const hasRatingB = ratingB !== null && ratingB !== undefined;
+
+    // Both have ratings - sort by rating (highest first)
+    if (hasRatingA && hasRatingB) {
+      return ratingB - ratingA;
+    }
+
+    // Only A has rating - A comes first
+    if (hasRatingA && !hasRatingB) {
+      return -1;
+    }
+
+    // Only B has rating - B comes first
+    if (!hasRatingA && hasRatingB) {
+      return 1;
+    }
+
+    // Neither has rating - maintain original order
+    return 0;
   });
 
   // Handle sidebar navigation
@@ -474,7 +641,16 @@ const ServiceProviderStoresView = () => {
             </div>
 
             <div className="mt-8">
-              <SearchBar value={searchQuery} onChange={setSearchQuery} />
+              <SearchBar
+                value={searchQuery}
+                onChange={setSearchQuery}
+                showFilterDropdown={showFilterDropdown}
+                setShowFilterDropdown={setShowFilterDropdown}
+                activeFilters={activeFilters}
+                handleFilterChange={handleFilterChange}
+                clearAllFilters={clearAllFilters}
+                getActiveFilterCount={getActiveFilterCount}
+              />
 
               {loading ? (
                 <div className="flex items-center justify-center py-16">
