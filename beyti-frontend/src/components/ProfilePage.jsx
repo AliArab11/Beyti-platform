@@ -34,9 +34,11 @@ export default function ProfilePage({
   const [loadingSubCategories, setLoadingSubCategories] = useState(false);
   const [searchSubCategory, setSearchSubCategory] = useState('');
 
-  // Initialize form data when userProfile changes
+// Initialize form data when userProfile changes
 useEffect(() => {
   if (userProfile) {
+    console.log('👤 ProfilePage received userProfile:', userProfile);
+    
     setFormData({
       displayName: userProfile.displayName || '',
       businessName: userProfile.businessName || '',
@@ -51,8 +53,13 @@ useEffect(() => {
     // Load subcategories for sellers
     if (userRole === 'Seller' && userProfile.categoryId) {
       loadSubCategories(userProfile.categoryId);
-      if (userProfile.subCategoryIds) {
+      
+      // Set the selected subcategories from props
+      if (userProfile.subCategoryIds && Array.isArray(userProfile.subCategoryIds)) {
+        console.log('🏷️ Setting subcategories:', userProfile.subCategoryIds);
         setSelectedSubCategories(userProfile.subCategoryIds);
+      } else {
+        console.log('⚠️ No subcategories found in userProfile');
       }
     }
   }
@@ -501,10 +508,10 @@ const filteredSubCategories = availableSubCategories.filter(sc =>
         </div>
       </div>
 
-      {/* Store Categories Section - Only for Sellers */}
+        {/* Store Categories Section - Only for Sellers */}
         {userRole === 'Seller' && (
           <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg border border-grey-stroke dark:border-charcoal-500 shadow-soft-lift dark:shadow-none p-6 transition-colors">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="text-display-h3 text-charcoal-600 dark:text-white font-semibold">Store Categories</h2>
                 <p className="text-label-medium text-charcoal-400 dark:text-gray-400 mt-1">
@@ -512,40 +519,49 @@ const filteredSubCategories = availableSubCategories.filter(sc =>
                 </p>
               </div>
               {!isEditing && (
-                <div className="flex items-center gap-2">
-                  <Tag size={20} className="text-sage-600" />
-                  <span className="text-label-medium text-charcoal-500 dark:text-charcoal-300">
-                    {selectedSubCategories.length} / 3 selected
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-sage-50 dark:bg-sage-900/20 border border-sage-200 dark:border-sage-800">
+                  <Tag size={18} className="text-sage-600 dark:text-sage-400" />
+                  <span className="text-sm font-semibold text-sage-700 dark:text-sage-300">
+                    {selectedSubCategories.length} / 3
                   </span>
                 </div>
               )}
             </div>
 
             {!isEditing ? (
-              /* View Mode - Show selected chips */
+              /* View Mode - Show selected chips with beautiful styling */
               <div>
                 {selectedSubCategories.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-3">
                     {availableSubCategories
                       .filter(sc => selectedSubCategories.includes(sc.id))
                       .map(sc => (
                         <div
                           key={sc.id}
-                          className="inline-flex items-center px-4 py-2 rounded-full bg-sage-100 dark:bg-sage-900 text-sage-700 dark:text-sage-300 text-sm font-medium"
+                          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-sage-500 dark:bg-sage-600 text-white text-sm font-semibold shadow-md border-2 border-sage-600 dark:border-sage-700"
                         >
+                          <Tag size={16} weight="fill" />
                           {sc.name}
                         </div>
                       ))}
                   </div>
                 ) : (
-                  <p className="text-body-regular text-charcoal-400 dark:text-gray-400">
-                    No categories selected yet
-                  </p>
+                  <div className="flex flex-col items-center justify-center py-12 px-4 bg-grey-100 dark:bg-charcoal-600 rounded-lg border-2 border-dashed border-grey-stroke dark:border-charcoal-500">
+                    <div className="w-16 h-16 rounded-full bg-grey-200 dark:bg-charcoal-500 flex items-center justify-center mb-4">
+                      <Tag size={32} className="text-charcoal-400 dark:text-charcoal-300" />
+                    </div>
+                    <p className="text-body-medium text-charcoal-500 dark:text-charcoal-300 font-medium mb-1">
+                      No categories selected yet
+                    </p>
+                    <p className="text-label-small text-charcoal-400 dark:text-gray-400">
+                      Click "Edit Profile" to add categories
+                    </p>
+                  </div>
                 )}
               </div>
             ) : (
-              /* Edit Mode - Show searchable chips */
-              <div className="space-y-4">
+              /* Edit Mode - Show searchable chips with enhanced interactivity */
+              <div className="space-y-5">
                 {/* Search Input */}
                 <div className="relative">
                   <input
@@ -553,30 +569,43 @@ const filteredSubCategories = availableSubCategories.filter(sc =>
                     value={searchSubCategory}
                     onChange={(e) => setSearchSubCategory(e.target.value)}
                     placeholder="Search categories..."
-                    className="w-full px-4 py-2 pl-10 border border-charcoal-400 dark:border-charcoal-500 dark:bg-charcoal-600 rounded-lg text-body-regular text-charcoal-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-sage-500"
+                    className="w-full px-4 py-3 pl-11 border-2 border-grey-stroke dark:border-charcoal-500 dark:bg-charcoal-600 rounded-lg text-body-regular text-charcoal-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-sage-500 transition-all"
                   />
-                  <Tag size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal-400" />
+                  <Tag size={20} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-charcoal-400 dark:text-charcoal-300" />
                 </div>
 
-                {/* Selection Counter */}
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-charcoal-500 dark:text-charcoal-300">
-                    {selectedSubCategories.length} / 3 selected
-                  </span>
-                  {selectedSubCategories.length >= 3 && (
-                    <span className="text-orange-600 font-medium">
-                      Maximum reached
+                {/* Selection Counter with Progress Bar */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-charcoal-600 dark:text-charcoal-200 font-medium">
+                      {selectedSubCategories.length} of 3 selected
                     </span>
-                  )}
+                    {selectedSubCategories.length >= 3 && (
+                      <span className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400 font-semibold">
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        Maximum reached
+                      </span>
+                    )}
+                  </div>
+                  {/* Progress bar */}
+                  <div className="w-full h-2 bg-grey-200 dark:bg-charcoal-500 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-sage-500 dark:bg-sage-600 transition-all duration-300 ease-out"
+                      style={{ width: `${(selectedSubCategories.length / 3) * 100}%` }}
+                    />
+                  </div>
                 </div>
 
-                {/* Chips Grid */}
+                {/* Chips Grid with Enhanced Styling */}
                 {loadingSubCategories ? (
-                  <div className="text-center py-4">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sage-500 mx-auto"></div>
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-10 w-10 border-3 border-sage-500 border-t-transparent mx-auto"></div>
+                    <p className="text-sm text-charcoal-400 dark:text-charcoal-300 mt-3">Loading categories...</p>
                   </div>
                 ) : (
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2.5">
                     {filteredSubCategories.map(sc => {
                       const isSelected = selectedSubCategories.includes(sc.id);
                       const isDisabled = !isSelected && selectedSubCategories.length >= 3;
@@ -588,28 +617,36 @@ const filteredSubCategories = availableSubCategories.filter(sc =>
                           onClick={() => !isDisabled && toggleSubCategory(sc.id)}
                           disabled={isDisabled}
                           className={`
-                            inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium
-                            transition-all cursor-pointer
+                            inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold
+                            transition-all duration-200 transform
                             ${isSelected
-                              ? 'bg-sage-500 text-white hover:bg-sage-600'
+                              ? 'bg-sage-500 dark:bg-sage-600 text-white shadow-md border-2 border-sage-600 dark:border-sage-700 scale-105'
                               : isDisabled
-                              ? 'bg-grey-200 dark:bg-charcoal-500 text-charcoal-400 cursor-not-allowed opacity-50'
-                              : 'bg-grey-200 dark:bg-charcoal-500 text-charcoal-600 dark:text-white hover:bg-sage-100 dark:hover:bg-sage-900'
+                              ? 'bg-grey-100 dark:bg-charcoal-500/50 text-charcoal-300 dark:text-charcoal-400 cursor-not-allowed opacity-50 border-2 border-transparent'
+                              : 'bg-white dark:bg-charcoal-500 text-charcoal-600 dark:text-white hover:bg-sage-50 dark:hover:bg-sage-900/30 hover:border-sage-300 dark:hover:border-sage-700 hover:scale-105 border-2 border-grey-stroke dark:border-charcoal-400 shadow-sm'
                             }
                           `}
                         >
+                          {isSelected && <Tag size={16} weight="fill" />}
                           {sc.name}
-                          {isSelected && <X size={16} weight="bold" />}
+                          {isSelected && (
+                            <X size={16} weight="bold" className="ml-0.5" />
+                          )}
                         </button>
                       );
                     })}
                   </div>
                 )}
 
-                {filteredSubCategories.length === 0 && (
-                  <p className="text-center text-charcoal-400 dark:text-gray-400 py-4">
-                    No categories found
-                  </p>
+                {filteredSubCategories.length === 0 && !loadingSubCategories && (
+                  <div className="text-center py-8 bg-grey-100 dark:bg-charcoal-600 rounded-lg border border-grey-stroke dark:border-charcoal-500">
+                    <p className="text-charcoal-500 dark:text-charcoal-300 font-medium">
+                      No categories match your search
+                    </p>
+                    <p className="text-sm text-charcoal-400 dark:text-gray-400 mt-1">
+                      Try a different search term
+                    </p>
+                  </div>
                 )}
               </div>
             )}

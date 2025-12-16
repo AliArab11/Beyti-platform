@@ -17,6 +17,9 @@ public partial class ProductVariant
 
     public int ProductId { get; set; }
 
+    [StringLength(120)]
+    public string VariantName { get; set; } = null!;
+
     public int? ColorValueId { get; set; }
 
     public int? SizeValueId { get; set; }
