@@ -53,7 +53,7 @@ namespace Beyti_Backend.Controllers.Api
         [HttpGet]
         public async Task<ActionResult<IEnumerable<ProductVariantResponse>>> GetProductVariants([FromQuery] int? productId)
         {
-            var query = _context.ProductVariants.AsQueryable();
+            var query = _context.ProductVariants.Where(pv => pv.IsActive).AsQueryable();
 
             if (productId.HasValue)
             {
@@ -360,7 +360,7 @@ namespace Beyti_Backend.Controllers.Api
             return NoContent();
         }
 
-        // DELETE: api/ProductVariants/5
+        // DELETE: api/ProductVariants/5 - Toggle IsActive status
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteProductVariant(int id)
         {
@@ -370,7 +370,10 @@ namespace Beyti_Backend.Controllers.Api
                 return NotFound();
             }
 
-            _context.ProductVariants.Remove(productVariant);
+            // Toggle active status instead of deleting
+            productVariant.IsActive = false;
+            productVariant.UpdatedAt = DateTime.UtcNow;
+
             await _context.SaveChangesAsync();
 
             return NoContent();

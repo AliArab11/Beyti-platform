@@ -5,6 +5,7 @@ import { Cake, Heart, Star, MagnifyingGlass, ArrowLeft, Bread, ShoppingCartSimpl
 import ActiveOrderBanner from './ActiveOrderBanner';
 import Snackbar from './../../../components/Snackbar';
 import CustomerHeader from './../../../components/CustomerHeader';
+import { isStoreOpen } from '../../Seller/Components/storeStatus';
 
 
 
@@ -18,6 +19,7 @@ const customerId = location.state?.customerId;
 const customerName = location.state?.customerName;
 const storeName = location.state?.storeName;
 const customerAddresses = location.state?.customerAddresses || [];
+const selectedStore = location.state?.selectedStore;
 
 // Get cart from localStorage
 const [localCart, setLocalCart] = useState(() => {
@@ -256,6 +258,11 @@ const formatDate = (dateString) => {
 
 
 const handleAddToCart = () => {
+  // CHECK STORE STATUS 
+    if (selectedStore && !isStoreOpen(selectedStore)) {
+        showSnackbar('Store is currently closed and cannot accept orders', 'error');
+        return;
+    }
     // ✅ CHECK LOGIN STATUS FIRST - BEFORE ANYTHING ELSE
     if (!customerId) {
         showSnackbar('Please login to add items to cart', 'warning');
@@ -273,17 +280,18 @@ const handleAddToCart = () => {
       : originalPrice;
 
     const item = {
-        id: product.id,
-        name: product.name,
-        basePrice: finalPrice,
-        originalPrice: originalPrice,
-        discountPercentage: product.discountPercentage,
-        quantity: quantity,
-        totalPrice: finalPrice * quantity,
-        selectedVariant: selectedVariant,
-        storeName: storeName,
-        sellerId: storeId
-    };
+      id: product.id,
+      name: product.name,
+      variantName: selectedVariant?.variantName || null, // ← ADD THIS LINE
+      basePrice: finalPrice,
+      originalPrice: originalPrice,
+      discountPercentage: product.discountPercentage,
+      quantity: quantity,
+      totalPrice: finalPrice * quantity,
+      selectedVariant: selectedVariant,
+      storeName: storeName,
+      sellerId: storeId
+  };
     
     console.log('🛒 ProductPage: Creating cart item with quantity:', quantity);
     console.log('📦 Full item:', item);

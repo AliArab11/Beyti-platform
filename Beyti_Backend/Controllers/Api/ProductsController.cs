@@ -27,7 +27,8 @@ namespace Beyti_Backend.Controllers.Api
             public string? Description { get; set; }
             public decimal BasePrice { get; set; }
             public int SellerId { get; set; }
-            public int SubCategoryId { get; set; }
+            public int? SubCategoryId { get; set; }  // ← Made nullable
+            public int? StoreSectionId { get; set; }  // ← NEW
             public int? GenderId { get; set; }
             public decimal? DiscountPercentage { get; set; }
         }
@@ -38,7 +39,8 @@ namespace Beyti_Backend.Controllers.Api
             public string? Description { get; set; }
             public decimal BasePrice { get; set; }
             public int SellerId { get; set; }
-            public int SubCategoryId { get; set; }
+            public int? SubCategoryId { get; set; }  // ← Made nullable
+            public int? StoreSectionId { get; set; }  // ← NEW
             public byte? GenderId { get; set; }
             public decimal? DiscountPercentage { get; set; }
         }
@@ -154,8 +156,11 @@ namespace Beyti_Backend.Controllers.Api
             if (!_context.Sellers.Any(s => s.Id == dto.SellerId))
                 return BadRequest("Invalid SellerId");
 
-            if (!_context.SubCategories.Any(sc => sc.Id == dto.SubCategoryId))
+            if (dto.SubCategoryId.HasValue && !_context.SubCategories.Any(sc => sc.Id == dto.SubCategoryId))
                 return BadRequest("Invalid SubCategoryId");
+
+            if (dto.StoreSectionId.HasValue && !_context.StoreSections.Any(ss => ss.Id == dto.StoreSectionId))
+                return BadRequest("Invalid StoreSectionId");
 
             // Apply updates
             product.Name = dto.Name;
@@ -163,6 +168,7 @@ namespace Beyti_Backend.Controllers.Api
             product.BasePrice = dto.BasePrice;
             product.SellerId = dto.SellerId;
             product.SubCategoryId = dto.SubCategoryId;
+            product.StoreSectionId = dto.StoreSectionId;  // ← NEW
             product.GenderId = dto.GenderId;
             product.DiscountPercentage = dto.DiscountPercentage;
             product.UpdatedAt = DateTime.UtcNow;
@@ -183,8 +189,11 @@ namespace Beyti_Backend.Controllers.Api
             if (!_context.Sellers.Any(s => s.Id == dto.SellerId))
                 return BadRequest("Invalid SellerId");
 
-            if (!_context.SubCategories.Any(sc => sc.Id == dto.SubCategoryId))
+            if (dto.SubCategoryId.HasValue && !_context.SubCategories.Any(sc => sc.Id == dto.SubCategoryId))
                 return BadRequest("Invalid SubCategoryId");
+
+            if (dto.StoreSectionId.HasValue && !_context.StoreSections.Any(ss => ss.Id == dto.StoreSectionId))
+                return BadRequest("Invalid StoreSectionId");
 
             var product = new Product
             {
@@ -194,6 +203,7 @@ namespace Beyti_Backend.Controllers.Api
                 DiscountPercentage = dto.DiscountPercentage,
                 SellerId = dto.SellerId,
                 SubCategoryId = dto.SubCategoryId,
+                StoreSectionId = dto.StoreSectionId,  // ← NEW
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
                 IsActive = true

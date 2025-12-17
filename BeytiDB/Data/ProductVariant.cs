@@ -38,6 +38,8 @@ public partial class ProductVariant
     [Precision(3)]
     public DateTime UpdatedAt { get; set; }
 
+    public bool IsActive { get; set; }
+
     [ForeignKey("ColorValueId")]
     [InverseProperty("ProductVariantColorValues")]
     public virtual VariantValue? ColorValue { get; set; }

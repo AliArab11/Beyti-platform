@@ -10,7 +10,7 @@ import ProfilePage from '../../components/ProfilePage';
 
 import { Table, TableHeader, TableBody, TableRow } from "../../components/Table";
 
-import { getSellerOrders, getSellers, restoreStock, getProducts } from "../../services/api";
+import { getSellerOrders, getSellers, restoreStock, getProducts, getProductVariants } from "../../services/api";
 import OrderTimer from "./Components/OrderTimer";
 import Orders from "./Components/Orders"; 
 import Analytics from "./Components/Analytics";
@@ -18,6 +18,8 @@ import Products from "./Components/Products";
 import Reviews from "./Components/Reviews";
 
 import './Components/modalAnimations.css';
+
+import { isStoreOpen, formatTime } from './Components/storeStatus';
 
 import { Outlet, useNavigate } from "react-router-dom";
 import { useLocation } from "react-router-dom";
@@ -188,6 +190,8 @@ const OrderDetailsModal = ({ order, onClose, onOrderUpdated, onOrderExpired, onS
     setActionLoading(false);
   }
 };
+
+
 
   const handleAdvanceStatus = async () => {
   let nextStatus = null;
@@ -505,6 +509,8 @@ const getPageTitle = () => {
   } 
 };
 
+  const [isOpen, setIsOpen] = useState(false);
+  const [isTogglingStore, setIsTogglingStore] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -530,6 +536,8 @@ const getPageTitle = () => {
   // snackbar state
   const [snackbar, setSnackbar] = useState({ show: false, message: '', type: 'error' });
 
+  const [currentTime, setCurrentTime] = useState(new Date());
+
 const handleOrderExpired = (orderId) => {
   // FRONTEND DOES NOT CANCEL — BACKEND ALREADY DID
   setOrders(prev =>
@@ -543,6 +551,61 @@ const handleOrderExpired = (orderId) => {
     message: "Order expired and was automatically cancelled",
     type: "error"
   });
+};
+
+const handleToggleStoreStatus = async () => {
+  setIsTogglingStore(true);
+  
+  try {
+    const response = await fetch(`https://localhost:7062/api/Sellers/${sellerId}/toggle-store-status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log('✅ Toggle response:', data);
+      
+      // Update local state
+      setIsOpen(data.isOpen);
+      
+      // Reload seller data to sync everything
+      await reloadSellerData();
+      
+      // Show success message
+      setSnackbar({
+        show: true,
+        message: data.message || (data.isOpen ? 'Store opened successfully' : 'Store closed successfully'),
+        type: 'success'
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error toggling store status:', error);
+    setSnackbar({
+      show: true,
+      message: 'Failed to update store status',
+      type: 'error'
+    });
+  } finally {
+    setIsTogglingStore(false);
+  }
+};
+
+// Helper function to reload seller data
+const reloadSellerData = async () => {
+  try {
+    const data = await getSellers();
+    console.log('🔄 Reloaded sellers:', data);
+    setSellerList(Array.isArray(data) ? data : []);
+    
+    // Update current seller name if needed
+    const currentSeller = data.find(s => s.id === sellerId);
+    if (currentSeller) {
+      setSellerName(currentSeller.storeName || "My Store");
+    }
+  } catch (err) {
+    console.error("Failed to reload sellers", err);
+  }
 };
 
 
@@ -594,7 +657,8 @@ useEffect(() => {
   loadSellers();
 }, []);
 
- // Load seller orders and products after selecting sellerId
+
+// Load seller orders and products after selecting sellerId
 useEffect(() => {
   if (!sellerId) return;
 
@@ -615,7 +679,25 @@ useEffect(() => {
       // Load products to get accurate active count
       const productsData = await getProducts();
       const sellerProductsList = productsData.filter(p => p.sellerId === sellerId);
+      
+      // Attach variants to each product (same logic as Products.jsx)
+      for (const product of sellerProductsList) {
+        try {
+          const variants = await getProductVariants(product.id);
+          // Filter only active variants
+          product.variants = variants.filter(v => v.isActive !== false);
+        } catch {
+          product.variants = [];
+        }
+      }
+      
       setSellerProducts(sellerProductsList);
+
+      // Set initial store open/closed state
+      const currentSeller = sellerList.find(s => s.id === sellerId);
+      if (currentSeller) {
+        setIsOpen(currentSeller.isOpen === true);
+      }
       
     } catch (err) {
       setError(err.message || "Failed to load data");
@@ -705,8 +787,10 @@ orders.forEach((order) => {
 
 const totalOrders = orders.length;
 // Count active products from order items if sellerProducts isn't loaded yet
+// Always use sellerProducts as source of truth for active products count
+// Only fall back to activeProductIds if sellerProducts hasn't loaded yet
 const activeProducts = sellerProducts.length > 0 
-  ? sellerProducts.filter(p => p.isActive).length 
+  ? sellerProducts.filter(p => p.isActive === true).length 
   : activeProductIds.size;
 
 const productsArr = Array.from(productMap.values()).sort(
@@ -732,7 +816,7 @@ const productsArr = Array.from(productMap.values()).sort(
         last7DaysOrders,
       },
     };
-  }, [orders]);
+  }, [orders, sellerProducts]);
 
   const filteredRecentOrders = useMemo(() => {
     if (!searchRecent.trim()) return recentOrders;
@@ -1008,11 +1092,33 @@ const productsArr = Array.from(productMap.values()).sort(
               </div>
             )}
 
-             {/* DASHBOARD CONTENT */}
             {sellerId && !loading && !error && (
               <>
                 {location.pathname === "/seller-dashboard" || location.pathname === "/seller-dashboard/dashboard" ? (
                 <>
+                {/* Store Status Toggle - Only on Dashboard */}
+                <div className="flex justify-end mb-6">
+                  <div className="bg-grey-200 border border-grey-stroke rounded-lg px-4 py-2 shadow-soft-lift inline-flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2.5 h-2.5 rounded-full ${isOpen ? 'bg-success-btn' : 'bg-grey-400'} ${isOpen ? 'animate-pulse' : ''}`}></span>
+                      <span className={`text-sm font-semibold ${isOpen ? 'text-success-text' : 'text-charcoal-400'}`}>
+                        {isOpen ? 'Store Open' : 'Store Closed'}
+                      </span>
+                    </div>
+                    <button
+                      onClick={handleToggleStoreStatus}
+                      disabled={isTogglingStore}
+                      className={`px-4 py-1.5 rounded-lg font-semibold text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
+                        isOpen 
+                          ? 'bg-error-btn hover:bg-error-text text-white' 
+                          : 'bg-success-btn hover:bg-success-text text-white'
+                      }`}
+                    >
+                      {isTogglingStore ? 'Updating...' : (isOpen ? 'Close Store' : 'Open Store')}
+                    </button>
+                  </div>
+                </div>
+
                 {/* TOP METRIC CARDS */}
                 <section className="space-y-4">
                   <h2 className="text-card-h2 text-charcoal-600">Overview</h2>
@@ -1374,81 +1480,73 @@ const productsArr = Array.from(productMap.values()).sort(
                     ) : location.pathname.includes("/seller-dashboard/reviews") ? (
                       <Reviews sellerId={sellerId} sellerName={sellerName} />
                     ) : location.pathname.includes("/seller-dashboard/profile") ? (
-                      <ProfilePage
-                        key={`profile-${sellerId}`}
-                        userProfile={{
-                          userProfileId: sellerId,
-                          displayName: sellerName,
-                          phone: sellerList.find(s => s.id === sellerId)?.phone || '',
-                          street: sellerList.find(s => s.id === sellerId)?.street || '',
-                          city: sellerList.find(s => s.id === sellerId)?.city || '',
-                          region: sellerList.find(s => s.id === sellerId)?.region || '',
-                          postalCode: sellerList.find(s => s.id === sellerId)?.postalCode || '',
-                          country: sellerList.find(s => s.id === sellerId)?.country || 'Bahrain',
-                          address: sellerList.find(s => s.id === sellerId)?.address || '',
-                          status: 'Active',
-                          categoryId: sellerList.find(s => s.id === sellerId)?.categoryId,
-                          subCategoryIds: sellerList.find(s => s.id === sellerId)?.subCategoryIds || [],
-                          createdAt: sellerList.find(s => s.id === sellerId)?.createdAt,
-                          updatedAt: new Date().toISOString()
-                        }}
-                        userRole="Seller"
-                        entityId={sellerId}
-                        shouldFetchProfile={true}
-                        onProfileUpdate={async (updates) => {
-                          try {
-                            console.log('💾 Profile updates:', updates);
-                            
-                            const currentSeller = sellerList.find(s => s.id === sellerId);
-                            console.log('📌 Current seller before update:', currentSeller);
-                            
-                            // Reload seller profile data
-                            const response = await fetch(`https://localhost:7062/api/Sellers/Profile/${currentSeller?.userProfileId}`);
-                            
-                            if (response.ok) {
-                              const updatedSellerData = await response.json();
-                              console.log('✅ Updated seller data from API:', updatedSellerData);
-                              
-                              setSellerName(updatedSellerData.storeName || updatedSellerData.displayName || sellerName);
-                              
-                              setSellerList(prev => {
-                                const updated = prev.map(s => 
-                                  s.id === sellerId ? {
-                                    ...s,
-                                    id: updatedSellerData.id || updatedSellerData.sellerId,
-                                    userProfileId: updatedSellerData.userProfileId,
-                                    storeName: updatedSellerData.storeName || updatedSellerData.displayName,
-                                    displayName: updatedSellerData.displayName || updatedSellerData.storeName,
-                                    phone: updatedSellerData.phone,
-                                    categoryId: updatedSellerData.categoryId,
-                                    subCategoryIds: updatedSellerData.subCategoryIds || [],
-                                    street: updatedSellerData.address?.street,
-                                    city: updatedSellerData.address?.city,
-                                    region: updatedSellerData.address?.region,
-                                    postalCode: updatedSellerData.address?.postalCode,
-                                    country: updatedSellerData.address?.country,
-                                    address: [
-                                      updatedSellerData.address?.street,
-                                      updatedSellerData.address?.city,
-                                      updatedSellerData.address?.region,
-                                      updatedSellerData.address?.postalCode,
-                                      updatedSellerData.address?.country
-                                    ].filter(Boolean).join(', '),
-                                    createdAt: updatedSellerData.createdAt,
-                                    updatedAt: new Date().toISOString()
-                                  } : s
-                                );
-                                console.log('🔄 Updated seller list:', updated.find(s => s.id === sellerId));
-                                return updated;
-                              });
-                            }
-                          } catch (error) {
-                            console.error('💥 Error updating profile:', error);
-                            throw error;
-                          }
-                        }}
-                        readOnly={false}
-                      />
+                      (() => {
+                        const currentSeller = sellerList.find(s => s.id === sellerId);
+                        console.log('🔍 Current seller from sellerList:', currentSeller);
+                        console.log('🔍 isForceOpen in sellerList:', currentSeller?.isForceOpen);
+                        console.log('🔍 isManuallyClosed in sellerList:', currentSeller?.isManuallyClosed);
+                        
+                        return (
+                          <ProfilePage
+                            key={`profile-${sellerId}-${currentSeller?.isForceOpen}-${currentSeller?.isManuallyClosed}`}
+                            userProfile={{
+                              userProfileId: sellerId,
+                              displayName: sellerName,
+                              phone: currentSeller?.phone || '',
+                              street: currentSeller?.street || '',
+                              city: currentSeller?.city || '',
+                              region: currentSeller?.region || '',
+                              postalCode: currentSeller?.postalCode || '',
+                              country: currentSeller?.country || 'Bahrain',
+                              address: currentSeller?.address || '',
+                              status: 'Active',
+                              categoryId: currentSeller?.categoryId,
+                              subCategoryIds: currentSeller?.subCategoryIds || [],
+                              openTime: currentSeller?.openTime || '',  
+                              closeTime: currentSeller?.closeTime || '',  
+                              isManuallyClosed: currentSeller?.isManuallyClosed || false,
+                              isForceOpen: currentSeller?.isForceOpen || false, 
+                              createdAt: currentSeller?.createdAt,
+                              updatedAt: new Date().toISOString()
+                            }}
+                            userRole="Seller"
+                            entityId={sellerId}
+                            shouldFetchProfile={true}
+                            onProfileUpdate={async (updates) => {
+                              try {
+                                console.log('💾 Profile updates:', updates);
+                                
+                                // If this is a store toggle, update immediately
+                                if (updates.forceRefresh || updates.isManuallyClosed !== undefined || updates.isForceOpen !== undefined) {
+                                  console.log('🔄 Force refresh triggered');
+                                  
+                                  // Wait for backend
+                                  await new Promise(resolve => setTimeout(resolve, 500));
+                                  
+                                  // Reload all seller data TWICE to ensure fresh data
+                                  await reloadSellerData();
+                                  await new Promise(resolve => setTimeout(resolve, 200));
+                                  
+                                  // Force reload again
+                                  const freshData = await getSellers();
+                                  console.log('🔍 Fresh data after toggle:', freshData);
+                                  console.log('🔍 Current seller in fresh data:', freshData.find(s => s.id === sellerId));
+                                  setSellerList(Array.isArray(freshData) ? freshData : []);
+                                } else {
+                                  // Normal profile update
+                                  await new Promise(resolve => setTimeout(resolve, 300));
+                                  await reloadSellerData();
+                                }
+                                
+                              } catch (error) {
+                                console.error('💥 Error updating profile:', error);
+                                throw error;
+                              }
+                            }}
+                            readOnly={false}
+                          />
+                        );
+                      })()
                     ) : null}
             </>
             )}

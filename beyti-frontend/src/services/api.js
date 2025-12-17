@@ -533,6 +533,42 @@ export const deleteSeller = async (id) => {
   });
 };
 
+
+// Store Sections APIS
+
+export const getStoreSections = async (sellerId) => {
+  const res = await fetch(`${BASE_URL}/StoreSections/seller/${sellerId}`);
+  if (!res.ok) throw new Error("Failed to fetch store sections");
+  return res.json();
+};
+
+export const createStoreSection = async (sellerId, data) => {
+  const res = await fetch(`${BASE_URL}/StoreSections?sellerId=${sellerId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to create section");
+  return res.json();
+};
+
+export const updateStoreSection = async (id, data) => {
+  const res = await fetch(`${BASE_URL}/StoreSections/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to update section");
+  return res.json();
+};
+
+export const deleteStoreSection = async (id) => {
+  const res = await fetch(`${BASE_URL}/StoreSections/${id}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error("Failed to delete section");
+};
+
 // --- Product APIs ---
 
 /**

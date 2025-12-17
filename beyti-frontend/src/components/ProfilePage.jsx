@@ -8,6 +8,9 @@
 import { useState, useEffect } from 'react';
 import { User, Envelope, Phone, MapPin, Calendar, IdentificationCard, CheckCircle, XCircle, Buildings, Tag, X  } from '@phosphor-icons/react';
 
+import ConfirmModal from './ConfirmModal'; 
+import { formatTime } from '../Beyti-Website/Seller/Components/storeStatus';
+
 export default function ProfilePage({
   userProfile,
   userRole = 'User',
@@ -29,6 +32,7 @@ export default function ProfilePage({
     country: 'Bahrain'
   });
 
+
   const [availableSubCategories, setAvailableSubCategories] = useState([]);
   const [selectedSubCategories, setSelectedSubCategories] = useState([]);
   const [loadingSubCategories, setLoadingSubCategories] = useState(false);
@@ -39,6 +43,13 @@ useEffect(() => {
   if (userProfile) {
     console.log('👤 ProfilePage received userProfile:', userProfile);
     
+    // Helper to convert "HH:MM:SS" to "HH:MM" for input
+    const formatTimeForInput = (timeStr) => {
+      if (!timeStr) return '';
+      const parts = timeStr.split(':');
+      return parts.length >= 2 ? `${parts[0]}:${parts[1]}` : timeStr;
+    };
+
     setFormData({
       displayName: userProfile.displayName || '',
       businessName: userProfile.businessName || '',
@@ -49,6 +60,8 @@ useEffect(() => {
       postalCode: userProfile.postalCode || '',
       country: userProfile.country || 'Bahrain'
     });
+
+    console.log('🔄 Updated states - isManuallyClosed:', userProfile.isManuallyClosed, 'isForceOpen:', userProfile.isForceOpen);
 
     // Load subcategories for sellers
     if (userRole === 'Seller' && userProfile.categoryId) {
@@ -199,6 +212,37 @@ const loadSubCategories = async (categoryId) => {
 const filteredSubCategories = availableSubCategories.filter(sc =>
   sc.name.toLowerCase().includes(searchSubCategory.toLowerCase())
 );
+
+const handleToggleStoreStatus = async () => {
+  setIsTogglingStore(true);
+  
+  try {
+    const response = await fetch(`https://localhost:7062/api/Sellers/${entityId}/toggle-store-status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log('✅ Toggle response:', data);
+      
+      // Update local state
+      setIsOpen(data.isOpen);
+      
+      // Trigger parent reload
+      if (onProfileUpdate) {
+        await onProfileUpdate({ 
+          forceRefresh: true,
+          isOpen: data.isOpen
+        });
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error toggling store status:', error);
+  } finally {
+    setIsTogglingStore(false);
+  }
+};
 
   if (!userProfile) {
     return (
@@ -652,6 +696,7 @@ const filteredSubCategories = availableSubCategories.filter(sc =>
             )}
           </div>
         )}
+
 
       {/* Account Information Card */}
       <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg border border-grey-stroke dark:border-charcoal-500 shadow-soft-lift dark:shadow-none p-6 transition-colors">

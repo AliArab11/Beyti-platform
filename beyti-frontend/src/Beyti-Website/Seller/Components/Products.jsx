@@ -3,6 +3,7 @@ import AnalyticsCard from "../../../components/AnalyticsCard";
 import StatusChip from "../../../components/StatusChip";
 import Button from "../../../components/Button";
 import ConfirmModal from "../../../components/ConfirmModal";
+import SectionsManager from './SectionsManager';
 
 import {
   getProducts,
@@ -17,6 +18,10 @@ import {
   getSellerById,
   getColorValues,
   getSizeValues,
+  getStoreSections,  
+  createStoreSection,  
+  updateStoreSection,  
+  deleteStoreSection,  
 } from "../../../services/api";
 
 const formatCurrency = (value) => {
@@ -31,6 +36,9 @@ const Products = ({ sellerId }) => {
   const [sellerCategory, setSellerCategory] = useState(null);
   const [colorOptions, setColorOptions] = useState([]);
   const [sizeOptions, setSizeOptions] = useState([]); 
+
+  const [storeSections, setStoreSections] = useState([]);
+  const [showSectionsModal, setShowSectionsModal] = useState(false);
 
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -47,6 +55,7 @@ const [form, setForm] = useState({
   basePrice: "",
   discountPercentage: "",
   subCategoryId: "",
+  storeSectionId: "",
   stockQty: "",
   sku: "",
   variantName: "",
@@ -78,11 +87,12 @@ const [variantForm, setVariantForm] = useState({
   const sid = Number(sellerId);
   const sellerProducts = prodData.filter((p) => p.sellerId === sid);
 
-  // attach variants
+  // attach variants (only active ones)
   for (const p of sellerProducts) {
     try {
       const v = await getProductVariants(p.id);
-      p.variants = v;
+      // Filter only active variants
+      p.variants = v.filter(variant => variant.isActive !== false);
     } catch {
       p.variants = [];
     }
@@ -177,7 +187,8 @@ useEffect(() => {
 
       const promises = [
         loadSellerProducts(),
-        getSubCategoryDropdown()
+        getSubCategoryDropdown(),
+        getStoreSections(sellerId)
       ];
 
       // Only load colors and sizes if seller is in Clothing category (ID = 2)
@@ -190,6 +201,7 @@ useEffect(() => {
       
       setProducts(results[0]);
       setSubCategories(results[1]);
+      setStoreSections(results[2] || []);
       
       if (sellerData.categoryId === 2) {
         setColorOptions(results[2] || []);
@@ -257,6 +269,7 @@ const openNew = () => {
     basePrice: "",
     discountPercentage: "",
     subCategoryId: "",
+    storeSectionId: "",
     stockQty: "",
     sku: "",
     variantName: "",
@@ -273,7 +286,8 @@ const openEdit = (p) => {
     description: p.description || "",
     basePrice: p.basePrice,
     discountPercentage: p.discountPercentage || "",
-    subCategoryId: p.subCategoryId,
+    subCategoryId: p.subCategoryId || "",
+    storeSectionId: p.storeSectionId || "",  // ← ADD THIS
     stockQty: "",
     sku: "",
     variantName: "",
@@ -293,13 +307,14 @@ const saveProduct = async (e) => {
 
   // Step 1: Prepare the basic product data
   const payload = {
-  Name: form.name.trim(),
-  Description: form.description.trim(),
-  BasePrice: parseFloat(form.basePrice),
-  DiscountPercentage: form.discountPercentage ? parseFloat(form.discountPercentage) : null,
-  SellerId: sellerId,
-  SubCategoryId: parseInt(form.subCategoryId),
-};
+    Name: form.name.trim(),
+    Description: form.description.trim(),
+    BasePrice: parseFloat(form.basePrice),
+    DiscountPercentage: form.discountPercentage ? parseFloat(form.discountPercentage) : null,
+    SellerId: sellerId,
+    SubCategoryId: form.subCategoryId ? parseInt(form.subCategoryId) : null,  // ← MADE OPTIONAL
+    StoreSectionId: form.storeSectionId ? parseInt(form.storeSectionId) : null,  // ← ADD THIS
+  };
 
   try {
     // Step 2: Check if we're EDITING or CREATING
@@ -548,8 +563,8 @@ const removeVariant = async (variantId) => {
   await new Promise((resolve) => {
     setConfirmModal({
       isOpen: true,
-      title: 'Delete Variant',
-      message: 'Are you sure you want to delete this variant? This action cannot be undone.',
+      title: 'Deactivate Variant',
+      message: 'Are you sure you want to deactivate this variant? It will be hidden from your product listings.',
       onConfirm: () => {
         setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null });
         resolve(true);
@@ -587,10 +602,12 @@ const removeVariant = async (variantId) => {
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       {/* ADD PRODUCT BUTTON */}
-      <div className="flex justify-end">
-
+      <div className="flex justify-end gap-3">
+        <Button variant="secondary" size="large" onClick={() => setShowSectionsModal(true)}>
+          Manage Sections
+        </Button>
         <Button variant="primary" size="large" onClick={openNew}>
-        Add Product
+          Add Product
         </Button>
       </div>
 
@@ -865,23 +882,28 @@ const removeVariant = async (variantId) => {
 
                 <div>
                   <label className="block text-label-medium text-charcoal-600 mb-2 font-semibold">
-                    Category *
+                    Store Section (Optional)
                   </label>
                   <select
-                    required
-                    value={form.subCategoryId}
+                    value={form.storeSectionId}
                     onChange={(e) =>
-                      setForm({ ...form, subCategoryId: e.target.value })
+                      setForm({ ...form, storeSectionId: e.target.value })
                     }
                     className="w-full border-2 border-grey-stroke rounded-lg p-3 bg-white text-body-regular text-charcoal-600 focus:outline-none focus:border-sage-500 focus:ring-2 focus:ring-sage-100 transition-all"
                   >
-                    <option value="">Select category</option>
-                    {subCategories.map((sc) => (
-                      <option key={sc.id} value={sc.id}>
-                        {sc.name}
-                      </option>
-                    ))}
+                    <option value="">No section</option>
+                    {storeSections
+                      .filter(s => s.isActive)
+                      .sort((a, b) => a.sortOrder - b.sortOrder)
+                      .map((section) => (
+                        <option key={section.id} value={section.id}>
+                          {section.name}
+                        </option>
+                      ))}
                   </select>
+                  <p className="text-xs text-charcoal-400 mt-1">
+                    Organize products into custom sections
+                  </p>
                 </div>
               </div>
 
@@ -1378,6 +1400,47 @@ const removeVariant = async (variantId) => {
   confirmText={confirmModal.confirmText || "Confirm"}
   variant={confirmModal.variant || "danger"}
 />
+
+          {/* SECTIONS MANAGEMENT MODAL */}
+          {showSectionsModal && (
+            <div className="fixed inset-0 bg-charcoal-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 modal-backdrop-enter">
+              <div className="bg-cream-50 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto modal-content-enter">
+                <div className="bg-sage-500 p-8 rounded-t-2xl">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h2 className="text-display-h2 text-white font-bold">
+                        Manage Store Sections
+                      </h2>
+                      <p className="text-body-medium text-white/80 mt-2">
+                        Organize your products into custom sections
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowSectionsModal(false)}
+                      className="text-white hover:text-cream-50 transition-colors"
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-6">
+                  <SectionsManager
+                    sellerId={sellerId}
+                    sections={storeSections}
+                    onSectionsChange={async () => {
+                      const updated = await getStoreSections(sellerId);
+                      setStoreSections(updated);
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+
     </div>
   );
 };
