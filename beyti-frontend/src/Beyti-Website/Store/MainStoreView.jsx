@@ -6,7 +6,7 @@ import OrderDetails from './Components/OrderDetails';
 import ActiveOrderBanner from './Components/ActiveOrderBanner';
 import Snackbar from './../../components/Snackbar';
 import CustomerHeader from '../../components/CustomerHeader';
-
+import { isStoreOpen } from '../Seller/Components/storeStatus';
 
 
 // Get customers function
@@ -314,6 +314,17 @@ const FeaturedCarousel = ({ stores, onStoreClick, subcategories = [], selectedCa
                   </div>
                   <div className="absolute top-3 right-4 w-12 h-12 rounded-full opacity-15"
                       style={{ background: `radial-gradient(circle, ${colors.accent} 0%, transparent 70%)` }}></div>
+                      {/* Store Status Badge*/}
+                        <div className="absolute top-3 left-3">
+                          <div className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 ${
+                            isStoreOpen(store)
+                              ? 'bg-success-btn text-white'
+                              : 'bg-error-btn text-white'
+                          }`}>
+                            <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                            {isStoreOpen(store) ? 'OPEN' : 'CLOSED'}
+                          </div>
+                        </div>
                   
                   <div className="absolute -bottom-8 left-4">
                     <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${colors.gradient} border-4 border-white flex items-center justify-center`}
@@ -440,6 +451,18 @@ const StoreCard = ({ store, subcategories = [] }) => {
         </div>
         <div className="absolute top-3 right-4 w-12 h-12 rounded-full opacity-15"
              style={{ background: `radial-gradient(circle, ${colors.accent} 0%, transparent 70%)` }}></div>
+
+             {/* Store Status Badge */}
+              <div className="absolute top-3 left-3">
+                <div className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 ${
+                  isStoreOpen(store)
+                    ? 'bg-success-btn text-white'
+                    : 'bg-error-btn text-white'
+                }`}>
+                  <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                  {isStoreOpen(store) ? 'OPEN' : 'CLOSED'}
+                </div>
+              </div>
         
         <div className="absolute -bottom-8 left-4">
           <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${colors.gradient} border-4 border-white flex items-center justify-center`}

@@ -4,6 +4,7 @@ using BeytiDB.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BeytiDB.Migrations
 {
     [DbContext(typeof(BeytiContext))]
-    partial class BeytiContextModelSnapshot : ModelSnapshot
+    [Migration("20251216153607_AddStoreSectionsAndVariantIsActive")]
+    partial class AddStoreSectionsAndVariantIsActive
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -774,7 +777,7 @@ namespace BeytiDB.Migrations
                     b.Property<int?>("StoreSectionId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("SubCategoryId")
+                    b.Property<int>("SubCategoryId")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("UpdatedAt")
@@ -1018,29 +1021,11 @@ namespace BeytiDB.Migrations
                     b.Property<int>("CategoryId")
                         .HasColumnType("int");
 
-                    b.Property<TimeSpan?>("CloseTime")
-                        .HasColumnType("time");
-
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(3)
                         .HasColumnType("datetime2(3)")
                         .HasDefaultValueSql("(sysutcdatetime())");
-
-                    b.Property<DateTime?>("ForceOpenStartTime")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool?>("IsForceOpen")
-                        .HasColumnType("bit");
-
-                    b.Property<bool?>("IsManuallyClosed")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsOpen")
-                        .HasColumnType("bit");
-
-                    b.Property<TimeSpan?>("OpenTime")
-                        .HasColumnType("time");
 
                     b.Property<string>("Phone")
                         .HasMaxLength(30)
@@ -2294,6 +2279,7 @@ namespace BeytiDB.Migrations
                     b.HasOne("BeytiDB.Data.SubCategory", "SubCategory")
                         .WithMany("Products")
                         .HasForeignKey("SubCategoryId")
+                        .IsRequired()
                         .HasConstraintName("FK_Product_SubCategory");
 
                     b.Navigation("Gender");

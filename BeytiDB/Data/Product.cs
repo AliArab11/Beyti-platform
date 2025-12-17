@@ -17,7 +17,7 @@ public partial class Product
 
     public int SellerId { get; set; }
 
-    public int SubCategoryId { get; set; }
+    public int? SubCategoryId { get; set; }
 
     public byte? GenderId { get; set; }
 
@@ -42,6 +42,12 @@ public partial class Product
 
     [Precision(3)]
     public DateTime UpdatedAt { get; set; }
+
+    public int? StoreSectionId { get; set; }
+
+    [ForeignKey(nameof(StoreSectionId))]
+    [InverseProperty("Products")]
+    public virtual StoreSection? StoreSection { get; set; }
 
     [ForeignKey("GenderId")]
     [InverseProperty("Products")]

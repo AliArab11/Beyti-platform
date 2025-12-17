@@ -11,6 +11,7 @@ namespace Beyti_Backend.Controllers.Api
         public string? UserId { get; set; }  // For onboarding flow
     }
 
+
     [Route("api/[controller]")]
     [ApiController]
     public class SellersController : ControllerBase
@@ -51,6 +52,7 @@ namespace Beyti_Backend.Controllers.Api
                     averageRating = Math.Round((decimal)allReviews.Average(r => r.Rating), 1);
                 }
 
+
                 result.Add(new
                 {
                     seller.Id,
@@ -58,8 +60,9 @@ namespace Beyti_Backend.Controllers.Api
                     seller.Phone,
                     seller.CreatedAt,
                     averageRating,
-                    categoryId = seller.CategoryId,  
+                    categoryId = seller.CategoryId,
                     categoryName = seller.Category?.Name,
+                    isOpen = seller.IsOpen,
                     subCategoryIds = seller.SellerSubCategories.Select(ssc => ssc.SubCategoryId).ToList(),
                     subCategoryNames = seller.SellerSubCategories
                     .Select(ssc => ssc.SubCategory.Name)
@@ -88,6 +91,12 @@ namespace Beyti_Backend.Controllers.Api
                 });
             }
 
+            // Save any auto-cleared force open flags
+            if (_context.ChangeTracker.HasChanges())
+            {
+                await _context.SaveChangesAsync();
+            }
+
             return result;
         }
 
@@ -107,11 +116,14 @@ namespace Beyti_Backend.Controllers.Api
                 if (seller == null)
                     return NotFound("Seller not found");
 
+               
+
                 // Get primary address if available
                 var primaryAddress = seller.SellerAddresses
                     .Select(sa => sa.Address)
                     .FirstOrDefault();
 
+                
                 return Ok(new
                 {
                     SellerId = seller.Id,
@@ -124,6 +136,7 @@ namespace Beyti_Backend.Controllers.Api
                     RoleType = seller.UserProfile.RoleType,
                     CategoryId = seller.CategoryId,
                     SubCategoryIds = seller.SellerSubCategories.Select(ssc => ssc.SubCategoryId).ToList(),
+                    isOpen = seller.IsOpen,
                     Address = primaryAddress != null ? new
                     {
                         Street = primaryAddress.Street,
@@ -154,6 +167,7 @@ namespace Beyti_Backend.Controllers.Api
                 .Include(s => s.UserProfile)
                 .Include(s => s.SellerAddresses)
                     .ThenInclude(sa => sa.Address)
+                    .Include(s => s.StoreSections)
                 .Include(s => s.Products)
                     .ThenInclude(p => p.SubCategory)
                         .ThenInclude(sc => sc.Category)
@@ -168,6 +182,8 @@ namespace Beyti_Backend.Controllers.Api
 
                 if (seller.UserProfile == null)
                     return StatusCode(500, new { message = "Seller profile data is missing" });
+
+                
 
                 // ← NEW: Calculate average rating
                 var allReviews = await _context.Reviews
@@ -186,9 +202,18 @@ namespace Beyti_Backend.Controllers.Api
                     storeName = seller.UserProfile.DisplayName,
                     phone = seller.Phone,
                     createdAt = seller.CreatedAt,
-                    averageRating, // ← Already there
+                    isOpen = seller.IsOpen,
                     subCategoryIds = seller.SellerSubCategories.Select(ssc => ssc.SubCategoryId).ToList(),  // ← ADD THIS LINE
                     subCategoryNames = seller.SellerSubCategories.Select(ssc => ssc.SubCategory.Name).ToList(),  // ← ADD THIS LINE
+                    storeSections = seller.StoreSections  
+                    .OrderBy(ss => ss.SortOrder)
+                    .Select(ss => new
+                    {
+                        ss.Id,
+                        ss.Name,
+                        ss.SortOrder,
+                        ss.IsActive
+                    }).ToList(),
                     sellerAddresses = seller.SellerAddresses.Select(sa => new
                     {
                         id = sa.Id,
@@ -223,7 +248,8 @@ namespace Beyti_Backend.Controllers.Api
                             description = p.Description,
                             basePrice = p.BasePrice,
                             discountPercentage = p.DiscountPercentage,
-                            isActive = p.IsActive, // ← ADD THIS LINE
+                            isActive = p.IsActive,
+                            storeSectionId = p.StoreSectionId,
                             averageRating = productAverageRating,
                             reviewCount = productReviews.Count,
                             subCategory = p.SubCategory != null ? new
@@ -478,6 +504,40 @@ namespace Beyti_Backend.Controllers.Api
                 return StatusCode(500, new
                 {
                     message = "Error updating subcategories",
+                    error = ex.Message
+                });
+            }
+        }
+
+
+
+        // PUT: api/Sellers/{id}/toggle-store-status
+        [HttpPut("{id}/toggle-store-status")]
+        public async Task<IActionResult> ToggleStoreStatus(int id)
+        {
+            try
+            {
+                var seller = await _context.Sellers.FindAsync(id);
+                if (seller == null)
+                    return NotFound(new { message = "Seller not found" });
+
+                // Simple toggle
+                seller.IsOpen = !seller.IsOpen;
+                seller.UpdatedAt = DateTime.UtcNow;
+
+                await _context.SaveChangesAsync();
+
+                return Ok(new
+                {
+                    message = seller.IsOpen ? "Store opened" : "Store closed",
+                    isOpen = seller.IsOpen
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Error toggling store status",
                     error = ex.Message
                 });
             }

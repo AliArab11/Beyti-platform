@@ -4,6 +4,7 @@ using BeytiDB.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BeytiDB.Migrations
 {
     [DbContext(typeof(BeytiContext))]
-    partial class BeytiContextModelSnapshot : ModelSnapshot
+    [Migration("20251217005721_AddForceOpenStartTime")]
+    partial class AddForceOpenStartTime
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1030,13 +1033,10 @@ namespace BeytiDB.Migrations
                     b.Property<DateTime?>("ForceOpenStartTime")
                         .HasColumnType("datetime2");
 
-                    b.Property<bool?>("IsForceOpen")
+                    b.Property<bool>("IsForceOpen")
                         .HasColumnType("bit");
 
-                    b.Property<bool?>("IsManuallyClosed")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsOpen")
+                    b.Property<bool>("IsManuallyClosed")
                         .HasColumnType("bit");
 
                     b.Property<TimeSpan?>("OpenTime")
