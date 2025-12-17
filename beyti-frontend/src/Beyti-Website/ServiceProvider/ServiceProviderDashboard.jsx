@@ -29,14 +29,15 @@ export default function ServiceProviderDashboard() {
   const [serviceProviderId, setServiceProviderId] = useState(null);
 
   // Check authentication on mount
-  useEffect(() => {
-    if (!isAuthenticated()) {
-      navigate('/login');
-    }
-  }, [navigate]);
+  // useEffect(() => {
+  //   if (!isAuthenticated()) {
+  //     navigate('/login');
+  //   }
+  // }, [navigate]);
 
   // Get user ID from localStorage (will be replaced with context in future)
-  const userProfileId = parseInt(getUserId()) || 1;
+  // const userProfileId = parseInt(getUserId()) || 1;
+  const userProfileId = 1; // Hardcoded for testing
 
   // Fetch user profile details
   const fetchUserProfile = async () => {

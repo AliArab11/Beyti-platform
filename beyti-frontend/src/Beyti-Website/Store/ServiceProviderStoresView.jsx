@@ -327,11 +327,11 @@ const ServiceProviderStoresView = () => {
   });
 
   // Check authentication on mount
-  useEffect(() => {
-    if (!isAuthenticated()) {
-      navigate('/login');
-    }
-  }, [navigate]);
+  // useEffect(() => {
+  //   if (!isAuthenticated()) {
+  //     navigate('/login');
+  //   }
+  // }, [navigate]);
 
   // Get user ID from localStorage (Customer: UserProfileId = 2, CustomerId = 1)
   const userProfileId = parseInt(getUserId()) || 1002;

@@ -306,11 +306,11 @@ const ServiceProviderDetailView = () => {
   const [bookingData, setBookingData] = useState(null);
 
   // Check authentication on mount
-  useEffect(() => {
-    if (!isAuthenticated()) {
-      navigate('/login');
-    }
-  }, [navigate]);
+  // useEffect(() => {
+  //   if (!isAuthenticated()) {
+  //     navigate('/login');
+  //   }
+  // }, [navigate]);
 
   useEffect(() => {
     // Scroll to top when component mounts or providerId changes

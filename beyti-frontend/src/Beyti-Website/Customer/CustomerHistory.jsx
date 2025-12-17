@@ -34,11 +34,11 @@ export default function CustomerHistory() {
   const [reviewModal, setReviewModal] = useState({ isOpen: false, booking: null });
 
   // Check authentication on mount
-  useEffect(() => {
-    if (!isAuthenticated()) {
-      navigate('/login');
-    }
-  }, [navigate]);
+  // useEffect(() => {
+  //   if (!isAuthenticated()) {
+  //     navigate('/login');
+  //   }
+  // }, [navigate]);
 
   // Get user ID from localStorage
   const userProfileId = parseInt(getUserId()) || 1002;

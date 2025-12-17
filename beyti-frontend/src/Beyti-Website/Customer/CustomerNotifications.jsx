@@ -19,11 +19,11 @@ export default function CustomerNotifications() {
   const [notificationSearchQuery, setNotificationSearchQuery] = useState('');
 
   // Check authentication on mount
-  useEffect(() => {
-    if (!isAuthenticated()) {
-      navigate('/login');
-    }
-  }, [navigate]);
+  // useEffect(() => {
+  //   if (!isAuthenticated()) {
+  //     navigate('/login');
+  //   }
+  // }, [navigate]);
 
   // Get user ID from localStorage
   const userProfileId = parseInt(getUserId()) || 1002;
