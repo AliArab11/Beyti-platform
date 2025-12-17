@@ -320,6 +320,13 @@ const showSnackbar = (message, type = 'success') => {
       return;
     }
 
+    // ✅ NEW: Require coordinates for delivery addresses
+    if (!savedLocation || !savedLocation.lat || !savedLocation.lng) {
+      setAddressError('Please pick a location on the map to enable delivery tracking');
+      showSnackbar('📍 Map location required for delivery addresses', 'warning');
+      return;
+    }
+
     if (!customerId) {
       setAddressError('Customer ID is missing');
       return;
@@ -375,6 +382,13 @@ const showSnackbar = (message, type = 'success') => {
   const handleUpdateAddress = async (addressId) => {
     if (!newAddress.street || !newAddress.city || !newAddress.country) {
       setAddressError('Please fill required fields: Street, City, and Country');
+      return;
+    }
+
+    // ✅ NEW: Require coordinates when updating addresses
+    if (!savedLocation || !savedLocation.lat || !savedLocation.lng) {
+      setAddressError('Please pick a location on the map to enable delivery tracking');
+      showSnackbar('📍 Map location required for delivery addresses', 'warning');
       return;
     }
 
@@ -529,8 +543,7 @@ const showSnackbar = (message, type = 'success') => {
 const handlePlaceOrder = async () => {
 
   // CHECK STORE STATUS
-  const currentStore = stores.find(s => s.id === parseInt(storeId));
-  if (currentStore && !isStoreOpen(currentStore)) {
+  if (selectedStore && !isStoreOpen(selectedStore)) {
     showSnackbar('Store is currently closed and cannot accept orders', 'error');
     return;
   }
@@ -1446,12 +1459,21 @@ const handlePlaceOrder = async () => {
               <button
                 type="button"
                 onClick={() => setShowMapModal(true)}
-                className="w-full bg-sage-500 hover:bg-sage-600 text-white px-4 py-3 rounded-xl font-bold flex items-center justify-center gap-2"
+                className={`w-full px-4 py-3 rounded-xl font-bold flex items-center justify-center gap-2 ${
+                  savedLocation 
+                    ? 'bg-success-btn hover:bg-success-text text-white' 
+                    : 'bg-sage-500 hover:bg-sage-600 text-white ring-2 ring-amber-400 animate-pulse'
+                }`}
               >
                 <MapPin size={20} weight="fill" />
-                📍 Pick Location from Map
-                {savedLocation && <span className="ml-2 text-xs">✓ Location Set</span>}
+                {savedLocation ? '✓ Location Set' : '📍 Pick Location from Map (Required)'}
               </button>
+
+              {!savedLocation && (
+                <p className="text-xs text-amber-600 font-semibold text-center">
+                  ⚠️ Location coordinates are required for delivery tracking
+                </p>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-charcoal-600 mb-1">

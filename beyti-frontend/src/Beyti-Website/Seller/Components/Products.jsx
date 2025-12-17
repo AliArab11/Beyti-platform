@@ -369,6 +369,17 @@ const saveProduct = async (e) => {
     const refreshed = await loadSellerProducts();
     setProducts(refreshed);
     
+    // Step 3.5: If variant modal is open, update selectedProduct with fresh data
+    if (showVariantModal && selectedProduct && editing) {
+      const updatedProduct = refreshed.find(p => p.id === editing.id);
+      if (updatedProduct) {
+        setSelectedProduct(updatedProduct);
+        // Refresh variants list in modal
+        const freshVariants = await getProductVariants(updatedProduct.id);
+        setVariants(freshVariants.filter(v => v.isActive !== false));
+      }
+    }
+    
     // Step 4: Close modal and reset form
     closeModal();
     setForm({
@@ -1364,8 +1375,11 @@ const removeVariant = async (variantId) => {
                         <p className="text-charcoal-600 font-medium">
                           {variant.price 
                             ? formatCurrency(variant.price) 
-                            : `${formatCurrency(selectedProduct.basePrice)} (base)`}
+                            : formatCurrency(selectedProduct.basePrice)}
                         </p>
+                        {!variant.price && (
+                          <p className="text-xs text-charcoal-400 mt-0.5">(using base price)</p>
+                        )}
                       </div>
                     </div>
                   </div>

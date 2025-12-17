@@ -554,35 +554,93 @@ namespace Beyti_Backend.Controllers.Api
                 if (order == null)
                     return NotFound();
 
+                var currentStatus = order.Status?.ToLower();
+                var newStatus = dto.Status?.ToLower();
+
+                // Status progression order
+                var statusOrder = new Dictionary<string, int>
+        {
+            { "placed", 1 },
+            { "pending", 1 },
+            { "accepted", 2 },
+            { "preparing", 3 },
+            { "ready for pickup", 4 },
+            { "picked up", 5 },
+            { "completed", 6 },
+            { "delivered", 6 },
+            { "cancelled", 7 }
+        };
+
+                // CRITICAL FIX: Block refresh attempts - if status hasn't changed, ignore
+                if (currentStatus == newStatus && newStatus != "cancelled")
+                {
+                    Console.WriteLine($"⚠️ Order {id} - Ignoring duplicate status update: {newStatus}");
+                    return NoContent();
+                }
+
+                // CRITICAL FIX: Prevent going backwards (except to cancelled)
+                if (statusOrder.ContainsKey(currentStatus) && statusOrder.ContainsKey(newStatus))
+                {
+                    if (newStatus != "cancelled" && statusOrder[newStatus] < statusOrder[currentStatus])
+                    {
+                        Console.WriteLine($"❌ Order {id} - Cannot revert from {currentStatus} to {newStatus}");
+                        return BadRequest(new { message = $"Cannot revert status from {currentStatus} to {newStatus}" });
+                    }
+                }
+
                 // SPECIAL HANDLING FOR DELIVERY ORDERS
                 if (order.FulfillmentType == "Delivery" && dto.Status == "Ready for Pickup")
                 {
-                    // Customer should NOT see "Ready for Pickup"
-                    // So DO NOT update order.Status to "Ready for Pickup"
-
-                    // Keep customer status at "Preparing"
-                    order.Status = "Preparing";
-
-                    // Update delivery ticket so drivers see it
+                    // CRITICAL: Check if delivery ticket exists and is still in offering phase
                     if (order.DeliveryTicket != null)
                     {
-                        order.DeliveryTicket.Status = "Available";
-                        order.DeliveryTicket.UpdatedAt = DateTime.UtcNow;
+                        var ticketStatus = order.DeliveryTicket.Status?.ToLower();
+
+                        // Only trigger offering if ticket is pending (not yet offered to any driver)
+                        if (ticketStatus == "pending" || ticketStatus == null)
+                        {
+                            // Update order status to "Ready for Pickup" (seller can't click again)
+                            order.Status = "Ready for Pickup";
+
+                            // Update delivery ticket to start offering to drivers
+                            order.DeliveryTicket.Status = "Pending";
+                            order.DeliveryTicket.UpdatedAt = DateTime.UtcNow;
+                            await _context.SaveChangesAsync();
+
+                            // Trigger the offering process
+                            await OfferToNextClosestDriver(order.DeliveryTicket.Id);
+
+                            Console.WriteLine($"✅ Order {id} marked Ready for Pickup - offering to drivers started");
+                        }
+                        else
+                        {
+                            // Ticket already being offered/accepted - don't allow status change
+                            Console.WriteLine($"⚠️ Order {id} - Delivery ticket already in progress ({ticketStatus}), ignoring refresh");
+                            return NoContent();
+                        }
+                    }
+                    else
+                    {
+                        // No delivery ticket yet - set status but don't trigger drivers
+                        order.Status = "Ready for Pickup";
+                        Console.WriteLine($"⚠️ Order {id} - No delivery ticket found, status updated but drivers not triggered");
                     }
                 }
                 else
                 {
-                    // Normal flow for pickup orders
+                    // Normal status progression for non-delivery or other statuses
                     order.Status = dto.Status;
                 }
 
                 order.UpdatedAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
 
+                Console.WriteLine($"✅ Order {id} - Status updated: {currentStatus} → {newStatus}");
                 return NoContent();
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"❌ Order {id} - Error: {ex.Message}");
                 return StatusCode(500, new { message = "Error updating status", error = ex.Message });
             }
         }
@@ -602,9 +660,130 @@ namespace Beyti_Backend.Controllers.Api
             return NoContent();
         }
 
+        // GET: api/Orders/{orderId}/tracking
+        [HttpGet("{orderId}/tracking")]
+        public async Task<ActionResult<object>> GetOrderTracking(int orderId)
+        {
+            var order = await _context.Orders
+                .Include(o => o.DeliveryTicket)
+                .Include(o => o.PickupAddress)
+                .Include(o => o.DeliveryAddress)
+                .FirstOrDefaultAsync(o => o.Id == orderId);
+
+            if (order == null)
+                return NotFound();
+
+            // Only show map when driver has picked up the order
+            if (order.Status != "Picked Up")
+            {
+                return Ok(new
+                {
+                    showMap = false,
+                    status = order.Status
+                });
+            }
+
+            // Get the delivery ticket to find when it was picked up
+            var ticket = order.DeliveryTicket;
+            if (ticket == null || order.PickupAddress == null || order.DeliveryAddress == null)
+            {
+                return Ok(new { showMap = false, status = order.Status });
+            }
+
+            // Calculate simulated driver position
+            var pickupLat = (double)(order.PickupAddress.Latitude ?? 0);
+            var pickupLng = (double)(order.PickupAddress.Longitude ?? 0);
+            var deliveryLat = (double)(order.DeliveryAddress.Latitude ?? 0);
+            var deliveryLng = (double)(order.DeliveryAddress.Longitude ?? 0);
+
+            // Calculate time since pickup (use UpdatedAt as proxy for pickup time)
+            var timeSincePickup = DateTime.UtcNow - ticket.UpdatedAt;
+            var totalMinutes = timeSincePickup.TotalMinutes;
+
+            // Simulate 15-minute delivery time
+            var deliveryDuration = 15.0;
+            var progress = Math.Min(totalMinutes / deliveryDuration, 1.0);
+
+            // Linear interpolation between pickup and delivery
+            var currentLat = pickupLat + (deliveryLat - pickupLat) * progress;
+            var currentLng = pickupLng + (deliveryLng - pickupLng) * progress;
+
+            return Ok(new
+            {
+                showMap = true,
+                status = order.Status,
+                driverLocation = new
+                {
+                    latitude = currentLat,
+                    longitude = currentLng
+                },
+                pickupLocation = new
+                {
+                    latitude = pickupLat,
+                    longitude = pickupLng
+                },
+                deliveryLocation = new
+                {
+                    latitude = deliveryLat,
+                    longitude = deliveryLng
+                },
+                estimatedArrival = deliveryDuration - totalMinutes // minutes remaining
+            });
+        }
+
         private bool OrderExists(int id)
         {
             return _context.Orders.Any(e => e.Id == id);
+        }
+
+        private async Task<bool> OfferToNextClosestDriver(int ticketId)
+        {
+            try
+            {
+                var ticket = await _context.DeliveryTickets
+                    .Include(dt => dt.PickupAddress)
+                    .Include(dt => dt.Order)
+                        .ThenInclude(o => o.Seller)
+                            .ThenInclude(s => s.SellerAddresses)
+                                .ThenInclude(sa => sa.Address)
+                    .FirstOrDefaultAsync(dt => dt.Id == ticketId);
+
+                if (ticket == null) return false;
+
+                decimal? pickupLat = ticket.PickupAddress?.Latitude
+                    ?? ticket.Order?.Seller?.SellerAddresses?.FirstOrDefault()?.Address?.Latitude;
+                decimal? pickupLng = ticket.PickupAddress?.Longitude
+                    ?? ticket.Order?.Seller?.SellerAddresses?.FirstOrDefault()?.Address?.Longitude;
+
+                if (pickupLat == null || pickupLng == null) return false;
+
+                var availableDrivers = await _context.Drivers
+                    .Where(d => d.Status == "Active" && d.CurrentLat != null && d.CurrentLng != null)
+                    .Where(d => !_context.DeliveryTickets
+                        .Any(dt => dt.DriverId == d.Id && (dt.Status == "Accepted" || dt.Status == "Picked Up")))
+                    .ToListAsync();
+
+                if (!availableDrivers.Any()) return false;
+
+                var closest = availableDrivers
+                    .OrderBy(d => Math.Sqrt(
+                        Math.Pow((double)(d.CurrentLat.Value - pickupLat.Value), 2) +
+                        Math.Pow((double)(d.CurrentLng.Value - pickupLng.Value), 2)))
+                    .FirstOrDefault();
+
+                if (closest == null) return false;
+
+                ticket.CurrentOfferedDriverId = closest.Id;
+                ticket.OfferExpiresAt = DateTime.UtcNow.AddSeconds(45);
+                ticket.Status = "Offered";
+
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 }

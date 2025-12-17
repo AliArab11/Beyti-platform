@@ -73,6 +73,9 @@ const fetchAPI = async (endpoint, options = {}) => {
   }
 };
 
+const getDriverProfile = async (userProfileId) => 
+  fetchAPI(`/Drivers/Profile/${userProfileId}`);
+
 const getDrivers = async () => fetchAPI("/Drivers");
 const getDeliveryTickets = async (params = {}) => {
   const queryString = new URLSearchParams(params).toString();
@@ -197,6 +200,79 @@ const CRUDButton = ({ variant, onClick, children, disabled }) => {
   );
 };
 
+
+const OfferTimer = ({ job, onExpire, onAccept, onDecline }) => {
+  const [timeLeft, setTimeLeft] = useState(null);
+
+  useEffect(() => {
+    if (!job.offerExpiresAt) return;
+
+    const calculateTimeLeft = () => {
+      const now = new Date();
+      const expiresRaw = job.offerExpiresAt;
+      const expiresStr = expiresRaw.endsWith('Z') ? expiresRaw : expiresRaw + 'Z';
+      const expires = new Date(expiresStr);
+      const diff = expires - now;
+      
+      if (diff <= 0) {
+        if (onExpire) onExpire(job.id);
+        return 0;
+      }
+      
+      return Math.floor(diff / 1000);
+    };
+
+    setTimeLeft(calculateTimeLeft());
+
+    const interval = setInterval(() => {
+      const remaining = calculateTimeLeft();
+      setTimeLeft(remaining);
+      
+      if (remaining <= 0) {
+        clearInterval(interval);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [job.offerExpiresAt, job.id, onExpire]);
+
+  if (timeLeft === null || timeLeft <= 0) return null;
+
+  const minutes = Math.floor(timeLeft / 60);
+  const seconds = timeLeft % 60;
+  const timeDisplay = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  const isUrgent = timeLeft <= 15;
+
+  return (
+    <div className={`rounded-lg p-4 border-2 transition-colors ${
+      isUrgent 
+        ? 'bg-red-50 border-red-500 animate-pulse' 
+        : 'bg-amber-50 border-amber-500'
+    }`}>
+      <div className="flex items-center gap-3 mb-3">
+        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+          isUrgent ? 'bg-red-500' : 'bg-amber-500'
+        }`}>
+          <Icon.Clock size={24} weight="fill" className="text-white" />
+        </div>
+        <div className="flex-1">
+          <p className={`font-bold text-sm ${isUrgent ? 'text-red-900' : 'text-amber-900'}`}>
+            🚨 New Delivery Request
+          </p>
+          <div className="flex items-baseline gap-2">
+            <span className="text-xs text-charcoal-600">Expires in:</span>
+            <span className={`font-mono font-bold text-2xl ${
+              isUrgent ? 'text-red-600' : 'text-amber-600'
+            }`}>
+              {timeDisplay}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ---------------------------------------------------------------------
 // Main Driver Dashboard
 // ---------------------------------------------------------------------
@@ -206,12 +282,13 @@ const DriverDashboard = () => {
   const location = useLocation();
 
 
-
+  const [lastRefresh, setLastRefresh] = useState(Date.now()); 
   // inline tabs inside main dashboard
   const [dashTab, setDashTab] = useState("requests");
 
   // driver selection
   const [driverId, setDriverId] = useState(null);
+  const [userProfileId, setUserProfileId] = useState(null);
   const [driverName, setDriverName] = useState("My Profile");
   const [driverList, setDriverList] = useState([]);
   const [selectModalOpen, setSelectModalOpen] = useState(true);
@@ -279,6 +356,31 @@ const handleProfileUpdate = async (updates) => {
     loadDrivers();
   }, []);
 
+
+// Load driver profile when selected (this triggers location assignment)
+useEffect(() => {
+  if (!userProfileId) return;
+
+  const loadDriverProfile = async () => {
+    try {
+      console.log('🔍 Fetching driver profile for UserProfileId:', userProfileId);
+
+      const profileData = await getDriverProfile(userProfileId);
+
+      console.log('✅ Driver profile fetched:', profileData);
+      console.log('📍 Driver location:', {
+        lat: profileData.currentLat,
+        lng: profileData.currentLng
+      });
+    } catch (err) {
+      console.error('❌ Failed to load driver profile:', err);
+    }
+  };
+
+  loadDriverProfile();
+}, [userProfileId]);
+
+
   const openJobModal = (job) => {
     setSelectedJob(job);
     setJobModalOpen(true);
@@ -298,13 +400,13 @@ const handleProfileUpdate = async (updates) => {
     );
   };
 
-  const handleDeclineJob = (jobId) => {
-    setTickets((prev) => prev.filter((t) => t.id !== jobId));
-    setSelectedJob((prev) => (prev && prev.id === jobId ? null : prev));
-    if (selectedJob && selectedJob.id === jobId) {
-      setJobModalOpen(false);
-    }
-  };
+  // const handleDeclineJob = (jobId) => {
+  //   setTickets((prev) => prev.filter((t) => t.id !== jobId));
+  //   setSelectedJob((prev) => (prev && prev.id === jobId ? null : prev));
+  //   if (selectedJob && selectedJob.id === jobId) {
+  //     setJobModalOpen(false);
+  //   }
+  // };
 
   const handleAcceptJob = async (job) => {
     if (!driverId) return;
@@ -325,17 +427,67 @@ const handleProfileUpdate = async (updates) => {
     }
 };
 
-  // Fetch tickets (all) - filtered by driver in frontend
-  const fetchTickets = async () => {
-    try {
-      const data = await getDeliveryTickets();
-      setTickets(Array.isArray(data) ? data : []);
-      setError(null);
-    } catch (err) {
-      console.error("Failed to load tickets", err);
-      setError(err.message || "Failed to load delivery tickets");
+const handleDeclineJob = async (job) => {
+  if (!driverId) return;
+  
+  try {
+    await fetchAPI(`/DeliveryTickets/${job.id}/decline`, {
+      method: "PUT"
+    });
+    
+    // IMMEDIATELY remove from local state
+    setTickets((prev) => prev.filter((t) => t.id !== job.id));
+    
+    // Close modal if open
+    if (selectedJob && selectedJob.id === job.id) {
+      setJobModalOpen(false);
+      setSelectedJob(null);
     }
-  };
+    
+    // Force refresh after brief delay to get updated list
+    setTimeout(() => {
+      fetchTickets();
+    }, 500);
+    
+  } catch (err) {
+    console.error(err);
+    alert(err.message || "Failed to decline job");
+  }
+};
+
+const handleJobExpired = async (jobId) => {
+  // Remove expired job from local state
+  setTickets((prev) => prev.filter((t) => t.id !== jobId));
+  
+  // Close modal if it's open for this job
+  if (selectedJob && selectedJob.id === jobId) {
+    setJobModalOpen(false);
+    setSelectedJob(null);
+  }
+};
+
+  // Fetch tickets (all) - filtered by driver in frontend
+const fetchTickets = async () => {
+  const now = Date.now();
+  const timeSinceLastRefresh = now - lastRefresh;
+  
+  // Prevent refreshing more than once per 2 seconds
+  if (timeSinceLastRefresh < 2000) {
+    console.log('⚠️ Refresh cooldown active, please wait...');
+    return;
+  }
+  
+  setLastRefresh(now);
+  
+  try {
+    const data = await getDeliveryTickets();
+    setTickets(Array.isArray(data) ? data : []);
+    setError(null);
+  } catch (err) {
+    console.error("Failed to load tickets", err);
+    setError(err.message || "Failed to load delivery tickets");
+  }
+};
 
   // Load tickets once when a driver is selected
   useEffect(() => {
@@ -368,9 +520,15 @@ if (!tickets || tickets.length === 0) {
   }
 
   const availableJobs = tickets.filter(
-    (t) => t.status === "Available" && !t.driverId
+    (t) => {
+      // Only show tickets offered specifically to this driver
+      if (t.status === "Offered" && t.currentOfferedDriverId === driverId) {
+        return true;
+      }
+      // Don't show pending tickets - they're being offered to other drivers
+      return false;
+    }
   );
-
   const currentJobs = tickets.filter(
     (t) =>
       t.driverId === driverId &&
@@ -772,10 +930,27 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
                 <p className="text-xs text-charcoal-400 uppercase tracking-wide">
                   Delivery Status
                 </p>
-                <StatusChip variant={getStatusVariant(localJob.status)}>
-                  {localJob.status || "Unknown"}
-                </StatusChip>
+
+                <div className="flex items-center gap-3">
+                  <StatusChip variant={getStatusVariant(localJob.status)}>
+                    {localJob.status || "Unknown"}
+                  </StatusChip>
+
+                  {localJob.status === "Offered" &&
+                    localJob.currentOfferedDriverId === driverId && (
+                      <OfferTimer
+                        job={localJob}
+                        onExpire={() => handleJobExpired(localJob.id)}
+                        onAccept={handleAcceptModal}
+                        onDecline={() => {
+                          handleDeclineJob(localJob);
+                          onClose();
+                        }}
+                      />
+                    )}
+                </div>
               </div>
+
               <div className="space-y-1">
                 <p className="text-xs text-charcoal-400 uppercase tracking-wide">
                   Delivery Fee
@@ -785,6 +960,7 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
                 </p>
               </div>
             </div>
+
 
                 {/* Contact Information */}
                 <div className="space-y-3">
@@ -1010,6 +1186,7 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
               const selected = driverList.find((d) => d.id === id);
               setDriverName(selected?.fullName || "My Profile");
               setDriverId(id);
+              setUserProfileId(selected?.userProfileId); // ✅ ADD THIS LINE
               setSelectModalOpen(false);
             }}
           >
@@ -1034,7 +1211,7 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
   // -------------------------------------------------------------------
   // Job table with left arrow + expand row + A-style details + buttons
   // -------------------------------------------------------------------
-  const JobTable = ({ jobs }) => {
+  const JobTable = ({ jobs, onJobExpired, onAcceptJob, onDeclineJob }) => {
     const [expandedId, setExpandedId] = useState(null);
 
     const toggleRow = (id) => {
@@ -1114,16 +1291,27 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
 
                     {/* order + "New" ping */}
                     <td className="px-2 py-3 align-top">
-                      <div className="flex items-center gap-2">
-                        {newJob && (
-                          <span className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-danger-btn opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-danger-btn"></span>
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          {newJob && (
+                            <span className="relative flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-danger-btn opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-danger-btn"></span>
+                            </span>
+                          )}
+                          <span className="font-semibold text-charcoal-700">
+                            #{job.orderId}
                           </span>
+                        </div>
+                        
+                        {job.status === "Offered" && job.currentOfferedDriverId === driverId && (
+                          <OfferTimer
+                            job={job}
+                            onExpire={onJobExpired}
+                            onAccept={onAcceptJob}
+                            onDecline={onDeclineJob}
+                          />
                         )}
-                        <span className="font-semibold text-charcoal-700">
-                          #{job.orderId}
-                        </span>
                       </div>
                     </td>
 
@@ -1404,7 +1592,7 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
             selected={location.pathname === "/driver-dashboard" || location.pathname === "/driver-dashboard/" || location.pathname === "/driver-dashboard/dashboard"}
             onClick={() => {
               navigate("/driver-dashboard/dashboard");
-              setActiveTab('dashboard');
+              setDashTab('requests');
             }}
             icon={
               <Icon.House
@@ -1767,48 +1955,164 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
                                 </div>
 
                                 {/* Tab Content - TABLES */}
-                                <div className="mt-4 space-y-3">
-                                {dashTab === "requests" && (
+                                  <div className="mt-4 space-y-3">
+                                  {dashTab === "requests" && (
                                     <>
-                                        {!isOnline ? (
+                                      {!isOnline ? (
                                         <div className="bg-error-bg border-l-4 border-error-btn p-4 rounded-lg">
-                                            <p className="text-body-medium text-error-text font-semibold">
+                                          <p className="text-body-medium text-error-text font-semibold">
                                             ⚠️ You are currently offline. Go online to view and accept delivery requests.
-                                            </p>
+                                          </p>
                                         </div>
-                                        ) : availableJobs.length === 0 ? (
-                                        <p className="text-body-regular text-charcoal-400">
-                                            No available jobs at the moment.
-                                        </p>
-                                        ) : (
-                                        <JobTable jobs={availableJobs.slice(0, 5)} />
-                                        )}
+                                      ) : availableJobs.length === 0 ? (
+                                        <div className="text-center py-12">
+                                          <Icon.Package size={48} className="text-charcoal-300 mx-auto mb-3" />
+                                          <p className="text-body-regular text-charcoal-400">
+                                            No delivery requests at the moment.
+                                          </p>
+                                        </div>
+                                      ) : (
+                                        <div className="space-y-4">
+                                          {availableJobs.slice(0, 5).map(job => {
+                                            const isOffered = job.status === "Offered" && job.currentOfferedDriverId === driverId;
+                                            
+                                            return (
+                                              <div 
+                                                key={job.id}
+                                                className={`rounded-lg p-6 shadow-soft-lift border-2 ${
+                                                  isOffered 
+                                                    ? 'bg-gradient-to-br from-orange-50 to-orange-50/50 border-orange-500' 
+                                                    : 'bg-grey-200 border-grey-stroke'
+                                                }`}
+                                              >
+                                                {/* Order info header */}
+                                                <div className="flex items-start justify-between mb-4">
+                                                  <div className="flex-1">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                      {isOffered && (
+                                                        <span className="relative flex h-3 w-3">
+                                                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-500 opacity-75"></span>
+                                                          <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-500"></span>
+                                                        </span>
+                                                      )}
+                                                      <h3 className={`text-card-h2 ${isOffered ? 'text-orange-900 font-bold' : 'text-charcoal-700'}`}>
+                                                        {isOffered ? '🚨 New Delivery Request' : 'Delivery Request'}
+                                                      </h3>
+                                                    </div>
+                                                    <p className="text-body-medium text-charcoal-600">
+                                                      Order #{job.orderId}
+                                                    </p>
+                                                  </div>
+                                                  <StatusChip variant={getStatusVariant(job.status)}>
+                                                    {job.status}
+                                                  </StatusChip>
+                                                </div>
+                                                
+                                                {/* Timer if offered */}
+                                                {isOffered && (
+                                                  <div className="mb-4">
+                                                    <OfferTimer
+                                                      job={job}
+                                                      onExpire={handleJobExpired}
+                                                      onAccept={handleAcceptJob}
+                                                      onDecline={handleDeclineJob}
+                                                    />
+                                                  </div>
+                                                )}
+                                                
+                                                {/* Details grid */}
+                                                <div className="grid grid-cols-2 gap-4 mb-4">
+                                                  <div className="bg-white/60 rounded-lg p-3">
+                                                    <p className="text-xs text-charcoal-400 uppercase mb-1">Customer</p>
+                                                    <p className="text-sm font-semibold text-charcoal-700">
+                                                      {job.order?.customerName || "N/A"}
+                                                    </p>
+                                                  </div>
+                                                  <div className="bg-white/60 rounded-lg p-3">
+                                                    <p className="text-xs text-charcoal-400 uppercase mb-1">Restaurant</p>
+                                                    <p className="text-sm font-semibold text-charcoal-700">
+                                                      {job.order?.sellerName || "N/A"}
+                                                    </p>
+                                                  </div>
+                                                  <div className="bg-white/60 rounded-lg p-3">
+                                                    <p className="text-xs text-charcoal-400 uppercase mb-1">Your Earnings</p>
+                                                    <p className="text-lg font-bold text-sage-700">
+                                                      BHD {(job.order?.deliveryFee || 0).toFixed(3)}
+                                                    </p>
+                                                  </div>
+                                                  <div className="bg-white/60 rounded-lg p-3">
+                                                    <p className="text-xs text-charcoal-400 uppercase mb-1">Total Order</p>
+                                                    <p className="text-lg font-bold text-charcoal-700">
+                                                      BHD {(job.order?.totalAmount || 0).toFixed(3)}
+                                                    </p>
+                                                  </div>
+                                                </div>
+                                                
+                                                {/* Action buttons */}
+                                                <div className="flex gap-2">
+                                                  <button
+                                                    onClick={() => handleAcceptJob(job)}
+                                                    disabled={!isOnline || !!metrics.activeDelivery}
+                                                    className="flex-1 bg-success-btn hover:bg-success-text disabled:bg-success-btn/60 text-white py-2.5 rounded-lg font-semibold text-sm transition-colors"
+                                                    title={metrics.activeDelivery ? 'Complete your active delivery first' : (!isOnline ? 'You are offline' : 'Accept this delivery')}
+                                                  >
+                                                    {metrics.activeDelivery ? '🚫 Complete Active First' : '✓ Accept'}
+                                                  </button>
+                                                  <button
+                                                    onClick={() => handleDeclineJob(job)}
+                                                    disabled={!isOnline}
+                                                    className="flex-1 bg-error-btn hover:bg-error-text text-white py-2.5 rounded-lg font-semibold text-sm transition-colors"
+                                                  >
+                                                    ✕ Decline
+                                                  </button>
+                                                  <button
+                                                    onClick={() => openJobModal(job)}
+                                                    className="px-4 bg-grey-300 hover:bg-grey-400 text-charcoal-700 py-2.5 rounded-lg font-semibold text-sm transition-colors"
+                                                  >
+                                                    Details
+                                                  </button>
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
                                     </>
-                                    )}
+                                  )}
 
                                 {dashTab === "ongoing" && (
-                                    <>
-                                    {currentJobs.length === 0 ? (
-                                        <p className="text-body-regular text-charcoal-400">
-                                        No active deliveries.
-                                        </p>
-                                    ) : (
-                                        <JobTable jobs={currentJobs.slice(0, 5)} />
-                                    )}
-                                    </>
-                                )}
+    <>
+    {currentJobs.length === 0 ? (
+        <p className="text-body-regular text-charcoal-400">
+        No active deliveries.
+        </p>
+    ) : (
+        <JobTable 
+          jobs={currentJobs.slice(0, 5)}  // ✅ FIXED
+          onJobExpired={handleJobExpired}
+          onAcceptJob={handleAcceptJob}
+          onDeclineJob={handleDeclineJob}
+        />
+    )}
+    </>
+)}
 
-                                {dashTab === "history" && (
-                                    <>
-                                    {historyJobs.length === 0 ? (
-                                        <p className="text-body-regular text-charcoal-400">
-                                        No delivery history yet.
-                                        </p>
-                                    ) : (
-                                        <JobTable jobs={historyJobs.slice(0, 5)} />
-                                    )}
-                                    </>
-                                )}
+{dashTab === "history" && (
+    <>
+    {historyJobs.length === 0 ? (
+        <p className="text-body-regular text-charcoal-400">
+        No delivery history yet.
+        </p>
+    ) : (
+        <JobTable 
+          jobs={historyJobs.slice(0, 5)}  // ✅ FIXED
+          onJobExpired={handleJobExpired}
+          onAcceptJob={handleAcceptJob}
+          onDeclineJob={handleDeclineJob}
+        />
+    )}
+    </>
+)}
                                 </div>
                             </div>
                             )}
@@ -1910,41 +2214,174 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
 
                             {/* Tab Content - TABLES */}
                             <div className="mt-4 space-y-3">
-                            {dashTab === "requests" && (
-                                <>
-                                {availableJobs.length === 0 ? (
-                                    <p className="text-body-regular text-charcoal-400">
-                                    No available jobs at the moment.
-                                    </p>
-                                ) : (
-                                    <JobTable jobs={availableJobs.slice(0, 5)} />
-                                )}
-                                </>
-                            )}
+                           {dashTab === "requests" && (
+  <>
+    {!isOnline ? (
+      <div className="bg-error-bg border-l-4 border-error-btn p-4 rounded-lg">
+        <p className="text-body-medium text-error-text font-semibold">
+          ⚠️ You are currently offline. Go online to view and accept delivery requests.
+        </p>
+      </div>
+    ) : availableJobs.length === 0 ? (
+      <div className="text-center py-12">
+        <Icon.Package size={48} className="text-charcoal-300 mx-auto mb-3" />
+        <p className="text-body-regular text-charcoal-400">
+          No delivery requests at the moment.
+        </p>
+      </div>
+    ) : (
+      <div className="space-y-4">
+        {availableJobs.map(job => {
+          const isOffered = job.status === "Offered" && job.currentOfferedDriverId === driverId;
+          
+          return (
+            <div 
+              key={job.id}
+              className={`rounded-lg p-6 shadow-soft-lift border-2 ${
+                isOffered 
+                  ? 'bg-gradient-to-br from-orange-50 to-orange-50/50 border-orange-500' 
+                  : 'bg-grey-200 border-grey-stroke'
+              }`}
+            >
+              {/* Header */}
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    {isOffered && (
+                      <span className="relative flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-500 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-500"></span>
+                      </span>
+                    )}
+                    <h3 className={`text-card-h2 ${isOffered ? 'text-orange-900 font-bold' : 'text-charcoal-700'}`}>
+                      {isOffered ? '🚨 New Delivery Request' : 'Delivery Request'}
+                    </h3>
+                  </div>
+                  <p className="text-body-medium text-charcoal-600">
+                    Order #{job.orderId}
+                  </p>
+                </div>
+                <StatusChip variant={getStatusVariant(job.status)}>
+                  {job.status}
+                </StatusChip>
+              </div>
+              
+              {/* Timer - ONLY if offered */}
+              {isOffered && job.offerExpiresAt && (
+                <div className="mb-4">
+                  <OfferTimer
+                    job={job}
+                    onExpire={handleJobExpired}
+                    onAccept={handleAcceptJob}
+                    onDecline={handleDeclineJob}
+                  />
+                </div>
+              )}
+              
+              {/* Info Grid */}
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="bg-white/60 rounded-lg p-3">
+                  <p className="text-xs text-charcoal-400 uppercase mb-1">Customer</p>
+                  <p className="text-sm font-semibold text-charcoal-700">
+                    {job.order?.customerName || "N/A"}
+                  </p>
+                </div>
+                <div className="bg-white/60 rounded-lg p-3">
+                  <p className="text-xs text-charcoal-400 uppercase mb-1">Restaurant</p>
+                  <p className="text-sm font-semibold text-charcoal-700">
+                    {job.order?.sellerName || "N/A"}
+                  </p>
+                </div>
+                <div className="bg-white/60 rounded-lg p-3">
+                  <p className="text-xs text-charcoal-400 uppercase mb-1">Your Earnings</p>
+                  <p className="text-lg font-bold text-sage-700">
+                    BHD {(job.order?.deliveryFee || 0).toFixed(3)}
+                  </p>
+                </div>
+                <div className="bg-white/60 rounded-lg p-3">
+                  <p className="text-xs text-charcoal-400 uppercase mb-1">Total Order</p>
+                  <p className="text-lg font-bold text-charcoal-700">
+                    BHD {(job.order?.totalAmount || 0).toFixed(3)}
+                  </p>
+                </div>
+              </div>
+              
+              {/* Action Buttons - ONLY if NOT inside OfferTimer */}
+              {!(isOffered && job.offerExpiresAt) && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleAcceptJob(job)}
+                    disabled={!isOnline || !!metrics.activeDelivery}
+                    className="flex-1 bg-success-btn hover:bg-success-text disabled:bg-success-btn/60 text-white py-2.5 rounded-lg font-semibold text-sm transition-colors"
+                  >
+                    {metrics.activeDelivery ? '🚫 Complete Active First' : '✓ Accept'}
+                  </button>
+                  <button
+                    onClick={() => handleDeclineJob(job)}
+                    disabled={!isOnline}
+                    className="flex-1 bg-error-btn hover:bg-error-text text-white py-2.5 rounded-lg font-semibold text-sm transition-colors"
+                  >
+                    ✕ Decline
+                  </button>
+                  <button
+                    onClick={() => openJobModal(job)}
+                    className="px-4 bg-grey-300 hover:bg-grey-400 text-charcoal-700 py-2.5 rounded-lg font-semibold text-sm transition-colors"
+                  >
+                    Details
+                  </button>
+                </div>
+              )}
+              
+              {/* Details button for offered jobs (always show) */}
+              {isOffered && job.offerExpiresAt && (
+                <button
+                  onClick={() => openJobModal(job)}
+                  className="w-full bg-grey-300 hover:bg-grey-400 text-charcoal-700 py-2.5 rounded-lg font-semibold text-sm transition-colors mt-3"
+                >
+                  View Full Details
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    )}
+  </>
+)}
 
                             {dashTab === "ongoing" && (
-                                <>
-                                {currentJobs.length === 0 ? (
-                                    <p className="text-body-regular text-charcoal-400">
-                                    No active deliveries.
-                                    </p>
-                                ) : (
-                                    <JobTable jobs={currentJobs.slice(0, 5)} />
-                                )}
-                                </>
-                            )}
+    <>
+    {currentJobs.length === 0 ? (
+        <p className="text-body-regular text-charcoal-400">
+        No active deliveries.
+        </p>
+    ) : (
+        <JobTable 
+          jobs={currentJobs.slice(0, 5)}  // ✅ FIXED
+          onJobExpired={handleJobExpired}
+          onAcceptJob={handleAcceptJob}
+          onDeclineJob={handleDeclineJob}
+        />
+    )}
+    </>
+)}
 
-                            {dashTab === "history" && (
-                                <>
-                                {historyJobs.length === 0 ? (
-                                    <p className="text-body-regular text-charcoal-400">
-                                    No delivery history yet.
-                                    </p>
-                                ) : (
-                                    <JobTable jobs={historyJobs.slice(0, 5)} />
-                                )}
-                                </>
-                            )}
+{dashTab === "history" && (
+    <>
+    {historyJobs.length === 0 ? (
+        <p className="text-body-regular text-charcoal-400">
+        No delivery history yet.
+        </p>
+    ) : (
+        <JobTable 
+          jobs={historyJobs.slice(0, 5)}  // ✅ FIXED
+          onJobExpired={handleJobExpired}
+          onAcceptJob={handleAcceptJob}
+          onDeclineJob={handleDeclineJob}
+        />
+    )}
+    </>
+)}
                             </div>
                         </div>
                         )}

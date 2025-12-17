@@ -196,44 +196,98 @@ namespace Beyti_Backend.Controllers.Api
                     averageRating = Math.Round((decimal)allReviews.Average(r => r.Rating), 1);
                 }
 
-                return Ok(new
+                // Calculate system sections
+                var now = DateTime.UtcNow;
+                var thirtyDaysAgo = now.AddDays(-30);
+
+                // Get orders from last 30 days for this seller
+                var recentOrders = await _context.Orders
+                    .Where(o => o.SellerId == id &&
+                                o.CreatedAt >= thirtyDaysAgo &&
+                                (o.Status == "completed" || o.Status == "delivered"))
+                    .Include(o => o.OrderItems)
+                    .ToListAsync();
+
+                // Calculate product popularity (only if 5+ orders)
+                List<object> mostPopularProducts = new List<object>();
+                if (recentOrders.Count >= 5)
                 {
-                    id = seller.Id,
-                    storeName = seller.UserProfile.DisplayName,
-                    phone = seller.Phone,
-                    createdAt = seller.CreatedAt,
-                    isOpen = seller.IsOpen,
-                    subCategoryIds = seller.SellerSubCategories.Select(ssc => ssc.SubCategoryId).ToList(),  // ← ADD THIS LINE
-                    subCategoryNames = seller.SellerSubCategories.Select(ssc => ssc.SubCategory.Name).ToList(),  // ← ADD THIS LINE
-                    storeSections = seller.StoreSections  
-                    .OrderBy(ss => ss.SortOrder)
-                    .Select(ss => new
-                    {
-                        ss.Id,
-                        ss.Name,
-                        ss.SortOrder,
-                        ss.IsActive
-                    }).ToList(),
-                    sellerAddresses = seller.SellerAddresses.Select(sa => new
-                    {
-                        id = sa.Id,
-                        addressId = sa.AddressId,
-                        address = new
+                    // First, load order items with their variants and products
+                    var orderItemsWithProducts = await _context.OrderItems
+                        .Where(oi => recentOrders.Select(o => o.Id).Contains(oi.OrderId))
+                        .Include(oi => oi.ProductVariant)
+                            .ThenInclude(pv => pv.Product)
+                        .ToListAsync();
+
+                    var productSales = orderItemsWithProducts
+                        .GroupBy(oi => oi.ProductVariant.ProductId)
+                        .Select(g => new
                         {
-                            id = sa.Address.Id,
-                            street = sa.Address.Street,
-                            city = sa.Address.City,
-                            region = sa.Address.Region,
-                            postalCode = sa.Address.PostalCode,
-                            country = sa.Address.Country,
-                            latitude = sa.Address.Latitude,
-                            longitude = sa.Address.Longitude
+                            ProductId = g.Key,
+                            TotalQuantity = g.Sum(oi => oi.Qty)  // ✅ Also fixed: Qty not Quantity
+                        })
+                        .OrderByDescending(x => x.TotalQuantity)
+                        .Take(3)
+                        .Select(x => x.ProductId)
+                        .ToList();
+
+                    var popularProducts = seller.Products
+                        .Where(p => p.IsActive && productSales.Contains(p.Id))
+                        .ToList();
+
+                    foreach (var productId in productSales)
+                    {
+                        var p = popularProducts.FirstOrDefault(x => x.Id == productId);
+                        if (p != null)
+                        {
+                            var productReviews = p.Reviews.Where(r => !r.IsCommentHiddenBySeller).ToList();
+                            decimal? productAverageRating = null;
+
+                            if (productReviews.Count >= 5)
+                            {
+                                productAverageRating = Math.Round((decimal)productReviews.Average(r => r.Rating), 1);
+                            }
+
+                            mostPopularProducts.Add(new
+                            {
+                                id = p.Id,
+                                name = p.Name,
+                                description = p.Description,
+                                basePrice = p.BasePrice,
+                                discountPercentage = p.DiscountPercentage,
+                                isActive = p.IsActive,
+                                storeSectionId = p.StoreSectionId,
+                                averageRating = productAverageRating,
+                                reviewCount = productReviews.Count,
+                                subCategory = p.SubCategory != null ? new
+                                {
+                                    id = p.SubCategory.Id,
+                                    name = p.SubCategory.Name,
+                                    category = p.SubCategory.Category != null ? new
+                                    {
+                                        id = p.SubCategory.Category.Id,
+                                        name = p.SubCategory.Category.Name
+                                    } : null
+                                } : null,
+                                createdAt = p.CreatedAt,
+                                reviews = productReviews.Select(r => new
+                                {
+                                    r.Id,
+                                    r.Rating,
+                                    r.Comment,
+                                    r.CreatedAt,
+                                    r.IsCommentHiddenBySeller
+                                }).ToList()
+                            });
                         }
-                    }).ToList(),
-                    products = seller.Products
-                    .Where(p => p.IsActive) // ← ADD THIS LINE to filter only active products
+                    }
+                }
+
+                // Get discounted products
+                var discountedProducts = seller.Products
+                    .Where(p => p.IsActive && p.DiscountPercentage.HasValue && p.DiscountPercentage > 0)
                     .Select(p => {
-                     var productReviews = p.Reviews.Where(r => !r.IsCommentHiddenBySeller).ToList();
+                        var productReviews = p.Reviews.Where(r => !r.IsCommentHiddenBySeller).ToList();
                         decimal? productAverageRating = null;
 
                         if (productReviews.Count >= 5)
@@ -272,7 +326,107 @@ namespace Beyti_Backend.Controllers.Api
                                 r.IsCommentHiddenBySeller
                             }).ToList()
                         };
-                    }).ToList()
+                    }).ToList();
+
+                return Ok(new
+                {
+                    id = seller.Id,
+                    storeName = seller.UserProfile.DisplayName,
+                    phone = seller.Phone,
+                    createdAt = seller.CreatedAt,
+                    isOpen = seller.IsOpen,
+                    averageRating = averageRating,
+                    subCategoryIds = seller.SellerSubCategories.Select(ssc => ssc.SubCategoryId).ToList(),
+                    subCategoryNames = seller.SellerSubCategories.Select(ssc => ssc.SubCategory.Name).ToList(),
+                    storeSections = seller.StoreSections
+                        .OrderBy(ss => ss.SortOrder)
+                        .Select(ss => new
+                        {
+                            ss.Id,
+                            ss.Name,
+                            ss.SortOrder,
+                            ss.IsActive
+                        }).ToList(),
+                    systemSections = new
+                    {
+                        discounts = discountedProducts.Count > 0 ? new
+                        {
+                            id = "system-discounts",
+                            name = "Discounts",
+                            isSystemSection = true,
+                            isActive = true,
+                            sortOrder = -2,  // Will appear first
+                            products = discountedProducts
+                        } : null,
+                        mostPopular = (recentOrders.Count >= 5 && mostPopularProducts.Count > 0) ? new
+                        {
+                            id = "system-popular",
+                            name = "Most Popular",
+                            isSystemSection = true,
+                            isActive = true,
+                            sortOrder = -1,  // Will appear second
+                            products = mostPopularProducts
+                        } : null
+                    },
+                    sellerAddresses = seller.SellerAddresses.Select(sa => new
+                    {
+                        id = sa.Id,
+                        addressId = sa.AddressId,
+                        address = new
+                        {
+                            id = sa.Address.Id,
+                            street = sa.Address.Street,
+                            city = sa.Address.City,
+                            region = sa.Address.Region,
+                            postalCode = sa.Address.PostalCode,
+                            country = sa.Address.Country,
+                            latitude = sa.Address.Latitude,
+                            longitude = sa.Address.Longitude
+                        }
+                    }).ToList(),
+                    products = seller.Products
+                        .Where(p => p.IsActive)
+                        .Select(p => {
+                            var productReviews = p.Reviews.Where(r => !r.IsCommentHiddenBySeller).ToList();
+                            decimal? productAverageRating = null;
+
+                            if (productReviews.Count >= 5)
+                            {
+                                productAverageRating = Math.Round((decimal)productReviews.Average(r => r.Rating), 1);
+                            }
+
+                            return new
+                            {
+                                id = p.Id,
+                                name = p.Name,
+                                description = p.Description,
+                                basePrice = p.BasePrice,
+                                discountPercentage = p.DiscountPercentage,
+                                isActive = p.IsActive,
+                                storeSectionId = p.StoreSectionId,
+                                averageRating = productAverageRating,
+                                reviewCount = productReviews.Count,
+                                subCategory = p.SubCategory != null ? new
+                                {
+                                    id = p.SubCategory.Id,
+                                    name = p.SubCategory.Name,
+                                    category = p.SubCategory.Category != null ? new
+                                    {
+                                        id = p.SubCategory.Category.Id,
+                                        name = p.SubCategory.Category.Name
+                                    } : null
+                                } : null,
+                                createdAt = p.CreatedAt,
+                                reviews = productReviews.Select(r => new
+                                {
+                                    r.Id,
+                                    r.Rating,
+                                    r.Comment,
+                                    r.CreatedAt,
+                                    r.IsCommentHiddenBySeller
+                                }).ToList()
+                            };
+                        }).ToList()
                 });
             }
             catch (Exception ex)

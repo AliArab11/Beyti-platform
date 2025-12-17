@@ -75,9 +75,10 @@ const OrderDetailsModal = ({ order, onClose, onOrderUpdated, onOrderExpired, onS
    useEffect(() => {
     setLocalOrder(order);
   }, [order]);
+  
 
   // Handle timer expiration - update UI and close modal
- const handleTimerExpired = async (orderId) => {
+const handleTimerExpired = async (orderId) => {
   console.log('⏰ Timer expired in modal for order:', orderId);
   
   // Check if already cancelled to prevent duplicate calls
@@ -91,13 +92,10 @@ const OrderDetailsModal = ({ order, onClose, onOrderUpdated, onOrderExpired, onS
   const cancelledOrder = { ...localOrder, status: "Cancelled" };
   setLocalOrder(cancelledOrder);
   
-  // Call parent's handler to trigger the API call
+  // DON'T call the API - backend auto-cancel already handled it
+  // Just notify parent to update UI
   if (onOrderExpired) {
-    setLocalOrder({ ...localOrder, status: "Cancelled" });
-
-    setTimeout(() => {
-      onClose();
-    }, 1500);
+    onOrderExpired(orderId);
   }
   
   // Close modal after a brief delay

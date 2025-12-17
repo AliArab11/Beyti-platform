@@ -1079,31 +1079,38 @@ const filteredStores = stores
     return true;
   })
   .sort((a, b) => {
-    // Sort stores: rated stores first (by rating desc), then NEW stores
-    const ratingA = a.averageRating;
-    const ratingB = b.averageRating;
-    
-    const hasRatingA = ratingA !== null && ratingA !== undefined;
-    const hasRatingB = ratingB !== null && ratingB !== undefined;
-    
-    // Both have ratings - sort by rating (highest first)
-    if (hasRatingA && hasRatingB) {
-      return ratingB - ratingA;
-    }
-    
-    // Only A has rating - A comes first
-    if (hasRatingA && !hasRatingB) {
-      return -1;
-    }
-    
-    // Only B has rating - B comes first
-    if (!hasRatingA && hasRatingB) {
-      return 1;
-    }
-    
-    // Neither has rating - maintain original order
-    return 0;
-  });
+  // FIRST PRIORITY: Open stores before closed stores
+  const aIsOpen = isStoreOpen(a);
+  const bIsOpen = isStoreOpen(b);
+  
+  if (aIsOpen && !bIsOpen) return -1; // a is open, b is closed -> a comes first
+  if (!aIsOpen && bIsOpen) return 1;  // a is closed, b is open -> b comes first
+  
+  // SECOND PRIORITY: Sort by rating within same open/closed group
+  const ratingA = a.averageRating;
+  const ratingB = b.averageRating;
+  
+  const hasRatingA = ratingA !== null && ratingA !== undefined;
+  const hasRatingB = ratingB !== null && ratingB !== undefined;
+  
+  // Both have ratings - sort by rating (highest first)
+  if (hasRatingA && hasRatingB) {
+    return ratingB - ratingA;
+  }
+  
+  // Only A has rating - A comes first
+  if (hasRatingA && !hasRatingB) {
+    return -1;
+  }
+  
+  // Only B has rating - B comes first
+  if (!hasRatingA && hasRatingB) {
+    return 1;
+  }
+  
+  // Neither has rating - maintain original order
+  return 0;
+});
 
 
   

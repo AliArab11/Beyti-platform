@@ -158,7 +158,7 @@ const showSnackbar = (message, type = 'success') => {
 const [activeOrder, setActiveOrder] = useState(null);
 
 const [orders, setOrders] = useState([]);
-
+const [systemSections, setSystemSections] = useState({ discounts: null, mostPopular: null });
 
 // Helper function to calculate discounted price
 const calculateDiscountedPrice = (originalPrice, discountPercentage) => {

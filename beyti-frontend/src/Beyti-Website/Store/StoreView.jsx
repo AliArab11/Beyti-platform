@@ -14,17 +14,20 @@ import OrderDetails from './Components/OrderDetails';
 import { createOrder, createOrderItem, getProductVariants, getOrder, getOrders } from '../../services/api';
 
 
-// Mock API call - replace with your actual API
+
 const getStoreDetails = async (storeId) => {
   try {
-    const response = await fetch(`https://localhost:7062/api/Sellers/${storeId}/products`);
-    if (!response.ok) throw new Error('Failed to fetch');
+    const response = await fetch(
+      `https://localhost:7062/api/Sellers/${storeId}/products`
+    );
+    if (!response.ok) throw new Error("Failed to fetch");
     return await response.json();
   } catch (error) {
-    console.error('Error fetching store:', error);
+    console.error("Error fetching store:", error);
     return null;
   }
 };
+
 
 
 // Store Info Section
@@ -289,10 +292,35 @@ const StoreInfo = ({ store }) => (
     </div>
 );
 
-const CategorySidebar = ({ selected, onSelect, sections = [] }) => {
+const CategorySidebar = ({ selected, onSelect, sections = [], systemSections }) => {
   const defaultCategories = [
     { id: "all", label: "All Products", icon: <Package size={24} weight="regular" /> },
   ];
+
+  // Add system sections
+  const systemCategories = [];
+  
+  if (systemSections?.mostPopular?.products?.length > 0) {
+    systemCategories.push({
+      id: "system-popular",
+      label: "Most Popular",
+      icon: <Star size={24} weight="fill" />,
+      sortOrder: -1,
+      isSystemSection: true
+    });
+  }
+  
+  if (systemSections?.discounts?.products?.length > 0) {
+    systemCategories.push({
+      id: "system-discounts",
+      label: "Discounts",
+      icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/>
+      </svg>,
+      sortOrder: -2,
+      isSystemSection: true
+    });
+  }
 
   const sectionCategories = sections
     .filter(s => s.isActive)
@@ -304,7 +332,7 @@ const CategorySidebar = ({ selected, onSelect, sections = [] }) => {
       sectionId: section.id
     }));
 
-  const allCategories = [...defaultCategories, ...sectionCategories];
+  const allCategories = [...defaultCategories, ...systemCategories, ...sectionCategories];
 
   return (
     <aside className="w-[280px] flex-shrink-0 sticky top-[88px] h-[calc(100vh-88px)] overflow-y-auto">
@@ -465,6 +493,8 @@ const StoreView = () => {
 
   const [showDifferentStoreModal, setShowDifferentStoreModal] = useState(false);
   const [pendingCartItem, setPendingCartItem] = useState(null);
+
+  const [systemSections, setSystemSections] = useState({ discounts: null, mostPopular: null });
 
   const [store, setStore] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -873,6 +903,12 @@ useEffect(() => {
       setError(null);
       const data = await getStoreDetails(storeId);
       setStore(data);
+      // ✅ store system sections separately
+        if (data?.systemSections) {
+          setSystemSections(data.systemSections);
+        } else {
+          setSystemSections({ discounts: null, mostPopular: null });
+        }
     } catch (err) {
       setError(err.message || "Failed to load store");
     } finally {
@@ -948,77 +984,90 @@ useEffect(() => {
   }, [customerId]);
 
 
-  // Get category title
-    const getCategoryTitle = (categoryId) => {
-    if (categoryId === "all") return "All Products";
-    
-    if (categoryId.startsWith("section-")) {
-      const sectionId = parseInt(categoryId.replace("section-", ""));
-      const section = store?.storeSections?.find(s => s.id === sectionId);
-      return section ? section.name : "Products";
-    }
-    
-    return "Products";
-  };
+const getCategoryTitle = (categoryId) => {
+  if (categoryId === "all") return "All Products";
+  
+  if (categoryId === "system-popular") return "Most Popular";
+  if (categoryId === "system-discounts") return "Discounts";
+  
+  if (categoryId.startsWith("section-")) {
+    const sectionId = parseInt(categoryId.replace("section-", ""));
+    const section = store?.storeSections?.find(s => s.id === sectionId);
+    return section ? section.name : "Products";
+  }
+  
+  return "Products";
+};
 
-const filteredProducts = (store?.products || [])
-  .filter(product => {
-    // Filter out inactive products
-    if (product.isActive === false) {
-      return false;
-    }
-    
-    // Search filter
-    if (searchQuery && !product.name?.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false;
-    }
-    
-    // Section filter
-    if (selectedCategory !== "all") {
-      if (selectedCategory.startsWith("section-")) {
-        const sectionId = parseInt(selectedCategory.replace("section-", ""));
-        if (product.storeSectionId !== sectionId) {
-          return false;
+const filteredProducts = (() => {
+  // Handle system sections
+  if (selectedCategory === "system-popular") {
+    return systemSections.mostPopular?.products || [];
+  }
+  
+  if (selectedCategory === "system-discounts") {
+    return systemSections.discounts?.products || [];
+  }
+  
+  // Handle regular sections
+  return (store?.products || [])
+    .filter(product => {
+      // Filter out inactive products
+      if (product.isActive === false) {
+        return false;
+      }
+      
+      // Search filter
+      if (searchQuery && !product.name?.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false;
+      }
+      
+      // Section filter
+      if (selectedCategory !== "all") {
+        if (selectedCategory.startsWith("section-")) {
+          const sectionId = parseInt(selectedCategory.replace("section-", ""));
+          if (product.storeSectionId !== sectionId) {
+            return false;
+          }
         }
       }
-    }
-    
-    return true;
-  })
-
-  .sort((a, b) => {
-    // Helper function to check if product is new (less than 5 reviews)
-    const isNewProduct = (product) => {
-      const reviewCount = product.reviews?.filter(r => !r.isCommentHiddenBySeller)?.length || 0;
-      return reviewCount < 5;
-    };
-    
-    const aIsNew = isNewProduct(a);
-    const bIsNew = isNewProduct(b);
-    const aRating = a.averageRating || 0;
-    const bRating = b.averageRating || 0;
-    
-    // Apply sorting
-    if (sortBy === 'price-low') return (a.basePrice || 0) - (b.basePrice || 0);
-    if (sortBy === 'price-high') return (b.basePrice || 0) - (a.basePrice || 0);
-    if (sortBy === 'newest') return new Date(b.createdAt) - new Date(a.createdAt);
-    
-    if (sortBy === 'rating-high') {
-      // New products go last when sorting high to low
-      if (aIsNew && !bIsNew) return 1;
-      if (!aIsNew && bIsNew) return -1;
-      return bRating - aRating;
-    }
-    
-    if (sortBy === 'rating-low') {
-      // New products go first when sorting low to high
-      if (aIsNew && !bIsNew) return -1;
-      if (!aIsNew && bIsNew) return 1;
-      return aRating - bRating;
-    }
-    
-    return 0; // Default: popular (no sorting)
-  });
+      
+      return true;
+    })
+    .sort((a, b) => {
+      // Helper function to check if product is new (less than 5 reviews)
+      const isNewProduct = (product) => {
+        const reviewCount = product.reviews?.filter(r => !r.isCommentHiddenBySeller)?.length || 0;
+        return reviewCount < 5;
+      };
+      
+      const aIsNew = isNewProduct(a);
+      const bIsNew = isNewProduct(b);
+      const aRating = a.averageRating || 0;
+      const bRating = b.averageRating || 0;
+      
+      // Apply sorting
+      if (sortBy === 'price-low') return (a.basePrice || 0) - (b.basePrice || 0);
+      if (sortBy === 'price-high') return (b.basePrice || 0) - (a.basePrice || 0);
+      if (sortBy === 'newest') return new Date(b.createdAt) - new Date(a.createdAt);
+      
+      if (sortBy === 'rating-high') {
+        // New products go last when sorting high to low
+        if (aIsNew && !bIsNew) return 1;
+        if (!aIsNew && bIsNew) return -1;
+        return bRating - aRating;
+      }
+      
+      if (sortBy === 'rating-low') {
+        // New products go first when sorting low to high
+        if (aIsNew && !bIsNew) return -1;
+        if (!aIsNew && bIsNew) return 1;
+        return aRating - bRating;
+      }
+      
+      return 0; // Default: popular (no sorting)
+    });
+})();
 
   if (loading) {
     return (
@@ -1093,6 +1142,7 @@ const filteredProducts = (store?.products || [])
             selected={selectedCategory} 
             onSelect={setSelectedCategory}
             sections={store?.storeSections || []}
+            systemSections={systemSections}
           />
           
           <div className="flex-1">

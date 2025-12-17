@@ -31,6 +31,9 @@ public partial class DeliveryTicket
     [Precision(3)]
     public DateTime UpdatedAt { get; set; }
 
+    public int? CurrentOfferedDriverId { get; set; }
+    public DateTime? OfferExpiresAt { get; set; }
+
     [ForeignKey("DeliveryAddressId")]
     [InverseProperty("DeliveryTicketDeliveryAddresses")]
     public virtual Address? DeliveryAddress { get; set; }
