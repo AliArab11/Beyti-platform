@@ -8,12 +8,12 @@
 import React, { useEffect, useState } from 'react';
 import {
   Plus,
-  X,
   PencilSimple,
   CheckCircle,
   ProhibitInset,
   CaretRight,
-  Tag
+  Tag,
+  X
 } from '@phosphor-icons/react';
 import {
   getCategories,
@@ -54,9 +54,9 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
   const [userProfile, setUserProfile] = useState(null);
   const [displayName, setDisplayName] = useState("Admin User");
 
-  // Form states
-  const [showCategoryForm, setShowCategoryForm] = useState(false);
-  const [showSubCategoryForm, setShowSubCategoryForm] = useState(false);
+  // Modal states
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showSubCategoryModal, setShowSubCategoryModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [editingSubCategory, setEditingSubCategory] = useState(null);
   const [selectedCategoryForSubCategory, setSelectedCategoryForSubCategory] = useState(null);
@@ -236,7 +236,7 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
       }
       setCategoryFormData({ Name: '', Description: '', IsActive: true });
       setEditingCategory(null);
-      setShowCategoryForm(false);
+      setShowCategoryModal(false);
       fetchCategories();
     } catch (err) {
       console.error('Error saving category:', err);
@@ -251,7 +251,7 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
       Description: category.description || '',
       IsActive: category.isActive
     });
-    setShowCategoryForm(true);
+    setShowCategoryModal(true);
   };
 
   const handleToggleCategoryStatus = async (category) => {
@@ -288,7 +288,7 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
   const handleCancelCategoryForm = () => {
     setEditingCategory(null);
     setCategoryFormData({ Name: '', Description: '', IsActive: true });
-    setShowCategoryForm(false);
+    setShowCategoryModal(false);
   };
 
   // SubCategory/Catalog handlers
@@ -363,7 +363,7 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
       setSubCategoryFormData({ Name: '', CategoryId: null, IsActive: true });
       setEditingSubCategory(null);
       setSelectedCategoryForSubCategory(null);
-      setShowSubCategoryForm(false);
+      setShowSubCategoryModal(false);
       fetchCategories();
     } catch (err) {
       console.error('Error saving subcategory/catalog:', err);
@@ -374,7 +374,7 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
   const handleAddSubCategory = (category) => {
     setSelectedCategoryForSubCategory(category);
     setSubCategoryFormData({ Name: '', CategoryId: category.id, IsActive: true });
-    setShowSubCategoryForm(true);
+    setShowSubCategoryModal(true);
   };
 
   const handleEditSubCategory = (category, subCategory) => {
@@ -389,7 +389,7 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
       MaxPrice: subCategory.maxPrice || '',
       EstimatedDuration: subCategory.estimatedDuration || ''
     });
-    setShowSubCategoryForm(true);
+    setShowSubCategoryModal(true);
   };
 
   const handleToggleSubCategoryStatus = async (category, subCategory) => {
@@ -442,7 +442,7 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
     setEditingSubCategory(null);
     setSelectedCategoryForSubCategory(null);
     setSubCategoryFormData({ Name: '', CategoryId: null });
-    setShowSubCategoryForm(false);
+    setShowSubCategoryModal(false);
   };
 
   // Toggle category expansion
@@ -551,188 +551,15 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
                   </h2>
                   <CRUDButton
                     variant="success"
-                    onClick={() => setShowCategoryForm(!showCategoryForm)}
+                    onClick={() => setShowCategoryModal(true)}
                   >
-                    {showCategoryForm ? (
-                      <>
-                        <X size={16} className="inline mr-1" />
-                        Close Form
-                      </>
-                    ) : (
-                      <>
-                        <Plus size={16} className="inline mr-1" />
-                        Add New {viewMode === 'products' ? 'Category' : 'Service Category'}
-                      </>
-                    )}
+                    <Plus size={16} className="inline mr-1" />
+                    Add New {viewMode === 'products' ? 'Category' : 'Service Category'}
                   </CRUDButton>
                 </div>
               </div>
 
               <div className="p-6">
-                {/* Category Form */}
-                {showCategoryForm && (
-                  <div className="bg-cream-50 rounded-lg border border-grey-stroke p-6 mb-6">
-                    <h3 className="text-card-h2 text-charcoal-600 mb-4">
-                      {editingCategory ? 'Edit Category' : 'Add New Category'}
-                    </h3>
-                    <form onSubmit={handleCategorySubmit} className="space-y-4">
-                      <div>
-                        <label className="block text-body-regular text-charcoal-600 font-semibold mb-2">
-                          Category Name
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Enter category name"
-                          value={categoryFormData.Name}
-                          onChange={(e) => setCategoryFormData({ ...categoryFormData, Name: e.target.value })}
-                          className="w-full border border-grey-stroke rounded-lg px-4 py-2 focus:ring-2 focus:ring-sage-500 focus:border-sage-500 text-body-regular bg-white"
-                          required
-                        />
-                      </div>
-
-                      {viewMode === 'services' && (
-                        <div>
-                          <label className="block text-body-regular text-charcoal-600 font-semibold mb-2">
-                            Description
-                          </label>
-                          <textarea
-                            placeholder="Enter category description"
-                            value={categoryFormData.Description}
-                            onChange={(e) => setCategoryFormData({ ...categoryFormData, Description: e.target.value })}
-                            className="w-full border border-grey-stroke rounded-lg px-4 py-2 focus:ring-2 focus:ring-sage-500 focus:border-sage-500 text-body-regular bg-white"
-                            rows="3"
-                          />
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          id="categoryActive"
-                          checked={categoryFormData.IsActive}
-                          onChange={(e) => setCategoryFormData({ ...categoryFormData, IsActive: e.target.checked })}
-                          className="w-4 h-4 text-sage-500 focus:ring-sage-500 border-grey-stroke rounded"
-                        />
-                        <label htmlFor="categoryActive" className="text-body-regular text-charcoal-600">
-                          Active
-                        </label>
-                      </div>
-
-                      <div className="flex gap-3 pt-2">
-                        <CRUDButton type="submit" variant="success">
-                          {editingCategory ? 'Update Category' : 'Create Category'}
-                        </CRUDButton>
-                        <CRUDButton type="button" variant="error" onClick={handleCancelCategoryForm}>
-                          Cancel
-                        </CRUDButton>
-                      </div>
-                    </form>
-                  </div>
-                )}
-
-                {/* SubCategory/Catalog Form */}
-                {showSubCategoryForm && (
-                  <div className="bg-cream-50 rounded-lg border border-grey-stroke p-6 mb-6">
-                    <h3 className="text-card-h2 text-charcoal-600 mb-4">
-                      {editingSubCategory
-                        ? `Edit ${viewMode === 'products' ? 'SubCategory' : 'Service Catalog'}`
-                        : `Add New ${viewMode === 'products' ? 'SubCategory' : 'Service Catalog'}`}
-                      {selectedCategoryForSubCategory && (
-                        <span className="text-body-regular text-charcoal-400 ml-2">
-                          - {selectedCategoryForSubCategory.name}
-                        </span>
-                      )}
-                    </h3>
-                    <form onSubmit={handleSubCategorySubmit} className="space-y-4">
-                      <div>
-                        <label className="block text-body-regular text-charcoal-600 font-semibold mb-2">
-                          {viewMode === 'products' ? 'SubCategory' : 'Service Catalog'} Name
-                        </label>
-                        <input
-                          type="text"
-                          placeholder={`Enter ${viewMode === 'products' ? 'subcategory' : 'service catalog'} name`}
-                          value={subCategoryFormData.Name}
-                          onChange={(e) => setSubCategoryFormData({ ...subCategoryFormData, Name: e.target.value })}
-                          className="w-full border border-grey-stroke rounded-lg px-4 py-2 focus:ring-2 focus:ring-sage-500 focus:border-sage-500 text-body-regular bg-white"
-                          required
-                        />
-                      </div>
-
-                      {viewMode === 'services' && (
-                        <>
-                          <div>
-                            <label className="block text-body-regular text-charcoal-600 font-semibold mb-2">
-                              Description
-                            </label>
-                            <textarea
-                              placeholder="Enter service description"
-                              value={subCategoryFormData.Description || ''}
-                              onChange={(e) => setSubCategoryFormData({ ...subCategoryFormData, Description: e.target.value })}
-                              className="w-full border border-grey-stroke rounded-lg px-4 py-2 focus:ring-2 focus:ring-sage-500 focus:border-sage-500 text-body-regular bg-white"
-                              rows="3"
-                            />
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-body-regular text-charcoal-600 font-semibold mb-2">
-                                Min Price (BHD)
-                              </label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                placeholder="0.00"
-                                value={subCategoryFormData.MinPrice || ''}
-                                onChange={(e) => setSubCategoryFormData({ ...subCategoryFormData, MinPrice: e.target.value })}
-                                className="w-full border border-grey-stroke rounded-lg px-4 py-2 focus:ring-2 focus:ring-sage-500 focus:border-sage-500 text-body-regular bg-white"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-body-regular text-charcoal-600 font-semibold mb-2">
-                                Max Price (BHD)
-                              </label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                placeholder="0.00"
-                                value={subCategoryFormData.MaxPrice || ''}
-                                onChange={(e) => setSubCategoryFormData({ ...subCategoryFormData, MaxPrice: e.target.value })}
-                                className="w-full border border-grey-stroke rounded-lg px-4 py-2 focus:ring-2 focus:ring-sage-500 focus:border-sage-500 text-body-regular bg-white"
-                              />
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className="block text-body-regular text-charcoal-600 font-semibold mb-2">
-                              Estimated Duration (minutes)
-                            </label>
-                            <input
-                              type="number"
-                              placeholder="60"
-                              value={subCategoryFormData.EstimatedDuration || ''}
-                              onChange={(e) => setSubCategoryFormData({ ...subCategoryFormData, EstimatedDuration: e.target.value })}
-                              className="w-full border border-grey-stroke rounded-lg px-4 py-2 focus:ring-2 focus:ring-sage-500 focus:border-sage-500 text-body-regular bg-white"
-                            />
-                          </div>
-                        </>
-                      )}
-
-                      <div className="flex gap-3 pt-2">
-                        <CRUDButton type="submit" variant="success">
-                          {editingSubCategory
-                            ? `Update ${viewMode === 'products' ? 'SubCategory' : 'Service Catalog'}`
-                            : `Create ${viewMode === 'products' ? 'SubCategory' : 'Service Catalog'}`}
-                        </CRUDButton>
-                        <CRUDButton type="button" variant="error" onClick={handleCancelSubCategoryForm}>
-                          Cancel
-                        </CRUDButton>
-                      </div>
-                    </form>
-                  </div>
-                )}
-
-                {/* Categories List */}
                 {filteredCategories.length === 0 ? (
                   <div className="text-center py-12">
                     <Tag size={64} className="text-charcoal-300 mx-auto mb-4" weight="fill" />
@@ -871,6 +698,230 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
             </div>
           </div>
         </div>
+
+        {/* Category Modal */}
+        {showCategoryModal && (
+          <div className="fixed inset-0 bg-charcoal-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-soft-lift max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              {/* Modal Header */}
+              <div className="p-6 border-b border-grey-stroke">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="text-display-h2 text-charcoal-600">
+                      {editingCategory ? 'Edit Category' : 'Add New Category'}
+                    </h3>
+                    <p className="text-body-regular text-charcoal-400 mt-1">
+                      {viewMode === 'products' ? 'Product Category' : 'Service Category'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleCancelCategoryForm}
+                    className="text-charcoal-400 hover:text-charcoal-600 transition-colors p-2"
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Body - Category Form */}
+              <form onSubmit={handleCategorySubmit}>
+                <div className="p-6">
+                  <div className="space-y-4">
+                    {/* Category Name */}
+                    <div className="bg-cream-50 rounded-lg p-4">
+                      <label className="block text-body-medium text-charcoal-600 font-semibold mb-2">
+                        Category Name
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Enter category name"
+                        value={categoryFormData.Name}
+                        onChange={(e) => setCategoryFormData({ ...categoryFormData, Name: e.target.value })}
+                        className="w-full border border-grey-stroke rounded-lg px-4 py-2 focus:ring-2 focus:ring-sage-500 focus:border-sage-500 text-body-regular bg-white"
+                        required
+                      />
+                    </div>
+
+                    {/* Description (for services only) */}
+                    {viewMode === 'services' && (
+                      <div className="bg-cream-50 rounded-lg p-4">
+                        <label className="block text-body-medium text-charcoal-600 font-semibold mb-2">
+                          Description
+                        </label>
+                        <textarea
+                          placeholder="Enter category description"
+                          value={categoryFormData.Description}
+                          onChange={(e) => setCategoryFormData({ ...categoryFormData, Description: e.target.value })}
+                          className="w-full border border-grey-stroke rounded-lg px-4 py-2 focus:ring-2 focus:ring-sage-500 focus:border-sage-500 text-body-regular bg-white"
+                          rows="3"
+                        />
+                      </div>
+                    )}
+
+                    {/* Active Status */}
+                    <div className="bg-cream-50 rounded-lg p-4">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="categoryActive"
+                          checked={categoryFormData.IsActive}
+                          onChange={(e) => setCategoryFormData({ ...categoryFormData, IsActive: e.target.checked })}
+                          className="w-4 h-4 text-sage-500 focus:ring-sage-500 border-grey-stroke rounded"
+                        />
+                        <label htmlFor="categoryActive" className="text-body-regular text-charcoal-600">
+                          Active
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Modal Footer */}
+                <div className="p-6 border-t border-grey-stroke flex justify-end gap-3">
+                  <CRUDButton type="button" variant="error" onClick={handleCancelCategoryForm}>
+                    Cancel
+                  </CRUDButton>
+                  <CRUDButton type="submit" variant="success">
+                    {editingCategory ? 'Update Category' : 'Create Category'}
+                  </CRUDButton>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* SubCategory/Catalog Modal */}
+        {showSubCategoryModal && (
+          <div className="fixed inset-0 bg-charcoal-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-soft-lift max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              {/* Modal Header */}
+              <div className="p-6 border-b border-grey-stroke">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="text-display-h2 text-charcoal-600">
+                      {editingSubCategory
+                        ? `Edit ${viewMode === 'products' ? 'SubCategory' : 'Service Catalog'}`
+                        : `Add New ${viewMode === 'products' ? 'SubCategory' : 'Service Catalog'}`}
+                    </h3>
+                    {selectedCategoryForSubCategory && (
+                      <p className="text-body-regular text-charcoal-400 mt-1">
+                        Parent: {selectedCategoryForSubCategory.name}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleCancelSubCategoryForm}
+                    className="text-charcoal-400 hover:text-charcoal-600 transition-colors p-2"
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Body - SubCategory/Catalog Form */}
+              <form onSubmit={handleSubCategorySubmit}>
+                <div className="p-6">
+                  <div className="space-y-4">
+                    {/* Name */}
+                    <div className="bg-cream-50 rounded-lg p-4">
+                      <label className="block text-body-medium text-charcoal-600 font-semibold mb-2">
+                        {viewMode === 'products' ? 'SubCategory' : 'Service Catalog'} Name
+                      </label>
+                      <input
+                        type="text"
+                        placeholder={`Enter ${viewMode === 'products' ? 'subcategory' : 'service catalog'} name`}
+                        value={subCategoryFormData.Name}
+                        onChange={(e) => setSubCategoryFormData({ ...subCategoryFormData, Name: e.target.value })}
+                        className="w-full border border-grey-stroke rounded-lg px-4 py-2 focus:ring-2 focus:ring-sage-500 focus:border-sage-500 text-body-regular bg-white"
+                        required
+                      />
+                    </div>
+
+                    {/* Service-specific fields */}
+                    {viewMode === 'services' && (
+                      <>
+                        {/* Description */}
+                        <div className="bg-cream-50 rounded-lg p-4">
+                          <label className="block text-body-medium text-charcoal-600 font-semibold mb-2">
+                            Description
+                          </label>
+                          <textarea
+                            placeholder="Enter service description"
+                            value={subCategoryFormData.Description || ''}
+                            onChange={(e) => setSubCategoryFormData({ ...subCategoryFormData, Description: e.target.value })}
+                            className="w-full border border-grey-stroke rounded-lg px-4 py-2 focus:ring-2 focus:ring-sage-500 focus:border-sage-500 text-body-regular bg-white"
+                            rows="3"
+                          />
+                        </div>
+
+                        {/* Price Range */}
+                        <div className="bg-cream-50 rounded-lg p-4">
+                          <label className="block text-body-medium text-charcoal-600 font-semibold mb-3">
+                            Price Range (BHD)
+                          </label>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-body-small text-charcoal-500 mb-1">
+                                Min Price
+                              </label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                placeholder="0.00"
+                                value={subCategoryFormData.MinPrice || ''}
+                                onChange={(e) => setSubCategoryFormData({ ...subCategoryFormData, MinPrice: e.target.value })}
+                                className="w-full border border-grey-stroke rounded-lg px-4 py-2 focus:ring-2 focus:ring-sage-500 focus:border-sage-500 text-body-regular bg-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-body-small text-charcoal-500 mb-1">
+                                Max Price
+                              </label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                placeholder="0.00"
+                                value={subCategoryFormData.MaxPrice || ''}
+                                onChange={(e) => setSubCategoryFormData({ ...subCategoryFormData, MaxPrice: e.target.value })}
+                                className="w-full border border-grey-stroke rounded-lg px-4 py-2 focus:ring-2 focus:ring-sage-500 focus:border-sage-500 text-body-regular bg-white"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Estimated Duration */}
+                        <div className="bg-cream-50 rounded-lg p-4">
+                          <label className="block text-body-medium text-charcoal-600 font-semibold mb-2">
+                            Estimated Duration (minutes)
+                          </label>
+                          <input
+                            type="number"
+                            placeholder="60"
+                            value={subCategoryFormData.EstimatedDuration || ''}
+                            onChange={(e) => setSubCategoryFormData({ ...subCategoryFormData, EstimatedDuration: e.target.value })}
+                            className="w-full border border-grey-stroke rounded-lg px-4 py-2 focus:ring-2 focus:ring-sage-500 focus:border-sage-500 text-body-regular bg-white"
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Modal Footer */}
+                <div className="p-6 border-t border-grey-stroke flex justify-end gap-3">
+                  <CRUDButton type="button" variant="error" onClick={handleCancelSubCategoryForm}>
+                    Cancel
+                  </CRUDButton>
+                  <CRUDButton type="submit" variant="success">
+                    {editingSubCategory
+                      ? `Update ${viewMode === 'products' ? 'SubCategory' : 'Service Catalog'}`
+                      : `Create ${viewMode === 'products' ? 'SubCategory' : 'Service Catalog'}`}
+                  </CRUDButton>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
     </>
   );
 };

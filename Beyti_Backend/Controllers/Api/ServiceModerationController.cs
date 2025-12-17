@@ -25,11 +25,11 @@ namespace Beyti_Backend.Controllers.Api
         {
             try
             {
-                var totalServices = await _context.ServiceCatalogs.CountAsync();
-                var activeServices = await _context.ServiceCatalogs.CountAsync(s => s.IsActive);
+                var totalServices = await _context.Services.CountAsync();
+                var activeServices = await _context.Services.CountAsync(s => s.IsActive);
                 var inactiveServices = totalServices - activeServices;
 
-                var recentServices = await _context.ServiceCatalogs
+                var recentServices = await _context.Services
                     .Where(s => s.CreatedAt >= DateTime.UtcNow.AddDays(-7))
                     .CountAsync();
 
@@ -65,10 +65,18 @@ namespace Beyti_Backend.Controllers.Api
                     "porn", "adult", "xxx", "explicit", "sex"
                 };
 
-                var query = from s in _context.ServiceCatalogs
-                            join sc in _context.ServiceCategories on s.ServiceCategoryId equals sc.Id into categoryGroup
-                            from category in categoryGroup.DefaultIfEmpty()
-                            select new { Service = s, CategoryName = category != null ? category.Name : "Uncategorized" };
+                var query = from s in _context.Services
+                            join catalog in _context.ServiceCatalogs on s.ServiceCatalogId equals catalog.Id
+                            join category in _context.ServiceCategories on catalog.ServiceCategoryId equals category.Id
+                            join provider in _context.ServiceProviders on s.ServiceProviderId equals provider.Id
+                            join userProfile in _context.UserProfiles on provider.UserProfileId equals userProfile.Id
+                            select new {
+                                Service = s,
+                                CategoryName = category.Name,
+                                SubCategoryName = catalog.Name,
+                                ProviderName = userProfile.DisplayName,
+                                ProviderId = provider.Id
+                            };
 
                 // Filter by active status
                 if (isActive.HasValue)
@@ -78,7 +86,8 @@ namespace Beyti_Backend.Controllers.Api
                 if (!string.IsNullOrEmpty(search))
                     query = query.Where(x =>
                         x.Service.Name.Contains(search) ||
-                        (x.Service.Description != null && x.Service.Description.Contains(search)));
+                        (x.Service.Description != null && x.Service.Description.Contains(search)) ||
+                        x.ProviderName.Contains(search));
 
                 var services = await query
                     .OrderByDescending(x => x.Service.CreatedAt)
@@ -92,7 +101,9 @@ namespace Beyti_Backend.Controllers.Api
                         estimatedDuration = x.Service.EstimatedDuration,
                         isActive = x.Service.IsActive,
                         category = x.CategoryName,
-                        subCategory = "", // Add subCategory field for frontend compatibility
+                        subCategory = x.SubCategoryName,
+                        providerName = x.ProviderName,
+                        providerId = x.ProviderId,
                         createdAt = x.Service.CreatedAt,
                         flaggedKeywords = prohibitedKeywords
                             .Where(keyword =>
@@ -134,9 +145,11 @@ namespace Beyti_Backend.Controllers.Api
                     "porn", "adult", "xxx", "explicit", "sex"
                 };
 
-                var service = await (from s in _context.ServiceCatalogs
-                                     join sc in _context.ServiceCategories on s.ServiceCategoryId equals sc.Id into categoryGroup
-                                     from category in categoryGroup.DefaultIfEmpty()
+                var service = await (from s in _context.Services
+                                     join catalog in _context.ServiceCatalogs on s.ServiceCatalogId equals catalog.Id
+                                     join category in _context.ServiceCategories on catalog.ServiceCategoryId equals category.Id
+                                     join provider in _context.ServiceProviders on s.ServiceProviderId equals provider.Id
+                                     join userProfile in _context.UserProfiles on provider.UserProfileId equals userProfile.Id
                                      where s.Id == id
                                      select new
                                      {
@@ -147,8 +160,10 @@ namespace Beyti_Backend.Controllers.Api
                                          maxPrice = s.MaxPrice,
                                          estimatedDuration = s.EstimatedDuration,
                                          isActive = s.IsActive,
-                                         category = category != null ? category.Name : "Uncategorized",
-                                         subCategory = "", // Add subCategory field for frontend compatibility
+                                         category = category.Name,
+                                         subCategory = catalog.Name,
+                                         providerName = userProfile.DisplayName,
+                                         providerId = provider.Id,
                                          createdAt = s.CreatedAt,
                                          flaggedKeywords = prohibitedKeywords
                                              .Where(keyword =>
@@ -181,7 +196,9 @@ namespace Beyti_Backend.Controllers.Api
         {
             try
             {
-                var service = await _context.ServiceCatalogs
+                var service = await _context.Services
+                    .Include(s => s.ServiceProvider)
+                        .ThenInclude(sp => sp.UserProfile)
                     .FirstOrDefaultAsync(s => s.Id == id);
 
                 if (service == null) return NotFound();
@@ -189,15 +206,6 @@ namespace Beyti_Backend.Controllers.Api
                 service.IsActive = true;
 
                 await _context.SaveChangesAsync();
-
-                // Find all service providers that offer this service
-                var serviceProviderIds = await _context.ProviderApplicationServices
-                    .Where(pas => pas.ServiceCatalogId == id)
-                    .Include(pas => pas.ProviderApplication)
-                        .ThenInclude(pa => pa.ServiceProvider)
-                    .Select(pas => pas.ProviderApplication.ServiceProvider.UserProfileId)
-                    .Distinct()
-                    .ToListAsync();
 
                 // Get admin name for notification
                 string adminInfo = "";
@@ -210,19 +218,16 @@ namespace Beyti_Backend.Controllers.Api
                     }
                 }
 
-                // Send notification to each service provider
-                foreach (var userProfileId in serviceProviderIds)
-                {
-                    await _notificationService.SendNotificationAsync(
-                        recipientUserId: userProfileId,
-                        senderUserId: adminUserProfileId,
-                        type: "service_approved",
-                        title: "Service Approved",
-                        body: $"The service '{service.Name}' has been approved{adminInfo} and is now active. Customers can now book this service from you.",
-                        relatedEntityType: "ServiceCatalog",
-                        relatedEntityId: service.Id
-                    );
-                }
+                // Send notification to the service provider
+                await _notificationService.SendNotificationAsync(
+                    recipientUserId: service.ServiceProvider.UserProfileId,
+                    senderUserId: adminUserProfileId,
+                    type: "service_approved",
+                    title: "Service Approved",
+                    body: $"Your service '{service.Name}' has been approved{adminInfo} and is now active. Customers can now book this service.",
+                    relatedEntityType: "Service",
+                    relatedEntityId: service.Id
+                );
 
                 return Ok(new { message = "Service approved successfully", service });
             }
@@ -238,7 +243,9 @@ namespace Beyti_Backend.Controllers.Api
         {
             try
             {
-                var service = await _context.ServiceCatalogs
+                var service = await _context.Services
+                    .Include(s => s.ServiceProvider)
+                        .ThenInclude(sp => sp.UserProfile)
                     .FirstOrDefaultAsync(s => s.Id == id);
 
                 if (service == null) return NotFound();
@@ -252,15 +259,6 @@ namespace Beyti_Backend.Controllers.Api
 
                 await _context.SaveChangesAsync();
 
-                // Find all service providers that offer this service
-                var serviceProviderIds = await _context.ProviderApplicationServices
-                    .Where(pas => pas.ServiceCatalogId == id)
-                    .Include(pas => pas.ProviderApplication)
-                        .ThenInclude(pa => pa.ServiceProvider)
-                    .Select(pas => pas.ProviderApplication.ServiceProvider.UserProfileId)
-                    .Distinct()
-                    .ToListAsync();
-
                 // Get admin name for notification
                 string adminInfo = "";
                 if (adminUserProfileId.HasValue)
@@ -272,25 +270,22 @@ namespace Beyti_Backend.Controllers.Api
                     }
                 }
 
-                // Send notification to each service provider
-                string notificationBody = $"The service '{service.Name}' has been suspended{adminInfo} and is no longer available for booking.";
+                // Send notification to the service provider
+                string notificationBody = $"Your service '{service.Name}' has been suspended{adminInfo} and is no longer available for booking.";
                 if (!string.IsNullOrEmpty(reason))
                 {
                     notificationBody += $" Reason: {reason}";
                 }
 
-                foreach (var userProfileId in serviceProviderIds)
-                {
-                    await _notificationService.SendNotificationAsync(
-                        recipientUserId: userProfileId,
-                        senderUserId: adminUserProfileId,
-                        type: "service_suspended",
-                        title: "Service Suspended",
-                        body: notificationBody,
-                        relatedEntityType: "ServiceCatalog",
-                        relatedEntityId: service.Id
-                    );
-                }
+                await _notificationService.SendNotificationAsync(
+                    recipientUserId: service.ServiceProvider.UserProfileId,
+                    senderUserId: adminUserProfileId,
+                    type: "service_suspended",
+                    title: "Service Suspended",
+                    body: notificationBody,
+                    relatedEntityType: "Service",
+                    relatedEntityId: service.Id
+                );
 
                 return Ok(new
                 {
@@ -311,11 +306,11 @@ namespace Beyti_Backend.Controllers.Api
         {
             try
             {
-                var service = await _context.ServiceCatalogs.FindAsync(id);
+                var service = await _context.Services.FindAsync(id);
 
                 if (service == null) return NotFound();
 
-                _context.ServiceCatalogs.Remove(service);
+                _context.Services.Remove(service);
                 await _context.SaveChangesAsync();
 
                 return Ok(new { message = "Service deleted successfully" });

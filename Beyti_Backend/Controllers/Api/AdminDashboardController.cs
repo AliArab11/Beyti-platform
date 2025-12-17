@@ -1106,14 +1106,20 @@ namespace Beyti_Backend.Controllers.Api
                 else if (user.RoleType == "ServiceProvider")
                 {
                     var serviceProvider = await _context.ServiceProviders
+                        .Include(sp => sp.Services)
                         .FirstOrDefaultAsync(sp => sp.UserProfileId == userId);
 
                     if (serviceProvider != null)
                     {
-                        // Keep availability status separate - mark as Suspended in a note
-                        // Or you could add a IsSuspended boolean field
+                        // Mark service provider as unavailable
                         serviceProvider.Status = "Unavailable";
                         serviceProvider.UpdatedAt = DateTime.UtcNow;
+
+                        // Deactivate all their services
+                        foreach (var service in serviceProvider.Services)
+                        {
+                            service.IsActive = false;
+                        }
                     }
                 }
                 else if (user.RoleType == "Driver")
@@ -1180,9 +1186,28 @@ namespace Beyti_Backend.Controllers.Api
                 user.UpdatedAt = DateTime.UtcNow;
 
                 // Handle role-specific reactivations
-                if (user.RoleType == "ServiceProvider")
+                if (user.RoleType == "Seller")
+                {
+                    var seller = await _context.Sellers
+                        .Include(s => s.Products)
+                        .FirstOrDefaultAsync(s => s.UserProfileId == userId);
+
+                    if (seller != null)
+                    {
+                        seller.UpdatedAt = DateTime.UtcNow;
+
+                        // Reactivate all their products
+                        foreach (var product in seller.Products)
+                        {
+                            product.IsActive = true;
+                            product.UpdatedAt = DateTime.UtcNow;
+                        }
+                    }
+                }
+                else if (user.RoleType == "ServiceProvider")
                 {
                     var serviceProvider = await _context.ServiceProviders
+                        .Include(sp => sp.Services)
                         .FirstOrDefaultAsync(sp => sp.UserProfileId == userId);
 
                     if (serviceProvider != null)
@@ -1190,6 +1215,12 @@ namespace Beyti_Backend.Controllers.Api
                         // Set back to Available
                         serviceProvider.Status = "Available";
                         serviceProvider.UpdatedAt = DateTime.UtcNow;
+
+                        // Reactivate all their services
+                        foreach (var service in serviceProvider.Services)
+                        {
+                            service.IsActive = true;
+                        }
                     }
                 }
                 else if (user.RoleType == "Driver")

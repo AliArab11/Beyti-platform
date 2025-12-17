@@ -44,9 +44,9 @@ const UserManagement = ({ onNavigate, adminUserProfileId, renderContentOnly = fa
   const [originalRole, setOriginalRole] = useState(null);
   const [activeSection, setActiveSection] = useState('all'); // all, customers, sellers, service-providers, drivers
   const [searchTerm, setSearchTerm] = useState('');
-  const [showForm, setShowForm] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [notificationCount] = useState(0);
 
@@ -216,8 +216,8 @@ const UserManagement = ({ onNavigate, adminUserProfileId, renderContentOnly = fa
         alert('User created successfully!');
       }
       setFormData({ displayName: '', roleType: '', status: 'Active', categoryId: '', serviceCategoryId: '' });
-      setShowForm(false);
       setShowEditModal(false);
+      setShowAddModal(false);
       setSelectedUser(null);
       fetchUsersList();
     } catch (err) {
@@ -246,8 +246,8 @@ const UserManagement = ({ onNavigate, adminUserProfileId, renderContentOnly = fa
     setEditingId(null);
     setOriginalRole(null);
     setFormData({ displayName: '', roleType: '', status: 'Active', categoryId: '', serviceCategoryId: '' });
-    setShowForm(false);
     setShowEditModal(false);
+    setShowAddModal(false);
     setSelectedUser(null);
   };
 
@@ -418,149 +418,16 @@ const UserManagement = ({ onNavigate, adminUserProfileId, renderContentOnly = fa
             <div className="px-6 py-2">
               <CRUDButton
                 variant="success"
-                onClick={() => setShowForm(!showForm)}
+                onClick={() => setShowAddModal(true)}
               >
-                {showForm ? (
-                  <>
-                    <X size={16} className="inline mr-1" />
-                    Close Form
-                  </>
-                ) : (
-                  <>
-                    <Plus size={16} className="inline mr-1" />
-                    Add New User
-                  </>
-                )}
+                <Plus size={16} className="inline mr-1" />
+                Add New User
               </CRUDButton>
             </div>
           </div>
 
           {/* Tab Content */}
           <div className="p-6">
-            {/* Add/Edit Form */}
-            {showForm && (
-              <div className="bg-cream-50 rounded-lg border border-grey-stroke p-6 mb-6">
-                <h3 className="text-card-h2 text-charcoal-600 mb-4">
-                  {editingId ? 'Edit User' : 'Add New User'}
-                </h3>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-body-regular text-charcoal-600 font-semibold mb-2">
-                      Display Name
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Enter display name"
-                      value={formData.displayName}
-                      onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
-                      className="w-full border border-grey-stroke rounded-lg px-4 py-2 focus:ring-2 focus:ring-sage-500 focus:border-sage-500 text-body-regular bg-white"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-body-regular text-charcoal-600 font-semibold mb-2">
-                      Role
-                    </label>
-                    <select
-                      value={formData.roleType}
-                      onChange={(e) => {
-                        const newRole = e.target.value;
-                        setFormData({
-                          ...formData,
-                          roleType: newRole,
-                          categoryId: '',
-                          serviceCategoryId: ''
-                        });
-                      }}
-                      className="w-full border border-grey-stroke rounded-lg px-4 py-2 focus:ring-2 focus:ring-sage-500 focus:border-sage-500 text-body-regular bg-white"
-                      required
-                    >
-                      <option value="">Select Role</option>
-                      <option value="Customer">Customer</option>
-                      <option value="Seller">Seller</option>
-                      <option value="ServiceProvider">Service Provider</option>
-                      <option value="Driver">Driver</option>
-                      <option value="Admin">Admin</option>
-                    </select>
-                  </div>
-
-                  {/* Category selection for Sellers */}
-                  {formData.roleType === 'Seller' && (
-                    <div>
-                      <label className="block text-body-regular text-charcoal-600 font-semibold mb-2">
-                        Category <span className="text-danger-text">*</span>
-                      </label>
-                      <select
-                        value={formData.categoryId}
-                        onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-                        className="w-full border border-grey-stroke rounded-lg px-4 py-2 focus:ring-2 focus:ring-sage-500 focus:border-sage-500 text-body-regular bg-white"
-                        required
-                      >
-                        <option value="">Select Category</option>
-                        {categories
-                          .filter(cat => cat.isActive || cat.IsActive)
-                          .map((category) => (
-                            <option key={category.id || category.Id} value={category.id || category.Id}>
-                              {category.name || category.Name}
-                            </option>
-                          ))}
-                      </select>
-                      <p className="text-body-small text-charcoal-400 mt-1">
-                        Choose the main category for this seller's store
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Service Category selection for Service Providers */}
-                  {formData.roleType === 'ServiceProvider' && (
-                    <div>
-                      <label className="block text-body-regular text-charcoal-600 font-semibold mb-2">
-                        Service Category <span className="text-danger-text">*</span>
-                      </label>
-                      <select
-                        value={formData.serviceCategoryId}
-                        onChange={(e) => setFormData({ ...formData, serviceCategoryId: e.target.value })}
-                        className="w-full border border-grey-stroke rounded-lg px-4 py-2 focus:ring-2 focus:ring-sage-500 focus:border-sage-500 text-body-regular bg-white"
-                        required
-                      >
-                        <option value="">Select Service Category</option>
-                        {serviceCategories
-                          .filter(cat => cat.isActive || cat.IsActive)
-                          .map((category) => (
-                            <option key={category.id || category.Id} value={category.id || category.Id}>
-                              {category.name || category.Name}
-                            </option>
-                          ))}
-                      </select>
-                      <p className="text-body-small text-charcoal-400 mt-1">
-                        Choose the service category for this service provider
-                      </p>
-                    </div>
-                  )}
-
-                  {isRoleChanging && (
-                    <div className="bg-danger-bg border border-danger-btn text-danger-text px-4 py-3 rounded-lg">
-                      <p className="text-body-medium font-semibold">⚠️ Warning: Role Change</p>
-                      <p className="text-body-regular mt-1">
-                        Changing role from <strong>{originalRole}</strong> to <strong>{formData.roleType}</strong> will
-                        mark the current user as "Role Changed" and create a new user with the new role.
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="flex gap-3 pt-2">
-                    <CRUDButton type="submit" variant="success">
-                      {editingId ? (isRoleChanging ? 'Change Role & Create New User' : 'Update User') : 'Create User'}
-                    </CRUDButton>
-                    <CRUDButton type="button" variant="error" onClick={handleCancelEdit}>
-                      Cancel
-                    </CRUDButton>
-                  </div>
-                </form>
-              </div>
-            )}
-
             {/* Users Table */}
             {filteredUsers.length === 0 ? (
               <div className="text-center py-12">
@@ -956,6 +823,145 @@ const UserManagement = ({ onNavigate, adminUserProfileId, renderContentOnly = fa
                 </CRUDButton>
                 <CRUDButton type="submit" variant="success">
                   {isRoleChanging ? 'Change Role & Create New User' : 'Update User'}
+                </CRUDButton>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add User Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-charcoal-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-soft-lift max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-grey-stroke">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="text-display-h2 text-charcoal-600">Add New User</h3>
+                  <p className="text-body-regular text-charcoal-400 mt-1">
+                    Create a new user account
+                  </p>
+                </div>
+                <button
+                  onClick={handleCancelEdit}
+                  className="text-charcoal-400 hover:text-charcoal-600 transition-colors p-2"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body - Add Form */}
+            <form onSubmit={handleSubmit}>
+              <div className="p-6">
+                <div className="space-y-4">
+                  {/* Display Name */}
+                  <div className="bg-cream-50 rounded-lg p-4">
+                    <label className="block text-body-medium text-charcoal-600 font-semibold mb-2">
+                      Display Name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Enter display name"
+                      value={formData.displayName}
+                      onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
+                      className="w-full border border-grey-stroke rounded-lg px-4 py-2 focus:ring-2 focus:ring-sage-500 focus:border-sage-500 text-body-regular bg-white"
+                      required
+                    />
+                  </div>
+
+                  {/* Role Type */}
+                  <div className="bg-cream-50 rounded-lg p-4">
+                    <label className="block text-body-medium text-charcoal-600 font-semibold mb-2">
+                      Role Type
+                    </label>
+                    <select
+                      value={formData.roleType}
+                      onChange={(e) => {
+                        const newRole = e.target.value;
+                        setFormData({
+                          ...formData,
+                          roleType: newRole,
+                          categoryId: '',
+                          serviceCategoryId: ''
+                        });
+                      }}
+                      className="w-full border border-grey-stroke rounded-lg px-4 py-2 focus:ring-2 focus:ring-sage-500 focus:border-sage-500 text-body-regular bg-white"
+                      required
+                    >
+                      <option value="">Select Role</option>
+                      <option value="Customer">Customer</option>
+                      <option value="Seller">Seller</option>
+                      <option value="ServiceProvider">Service Provider</option>
+                      <option value="Driver">Driver</option>
+                      <option value="Admin">Admin</option>
+                    </select>
+                  </div>
+
+                  {/* Category selection for Sellers */}
+                  {formData.roleType === 'Seller' && (
+                    <div className="bg-cream-50 rounded-lg p-4">
+                      <label className="block text-body-medium text-charcoal-600 font-semibold mb-2">
+                        Category <span className="text-danger-text">*</span>
+                      </label>
+                      <select
+                        value={formData.categoryId}
+                        onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+                        className="w-full border border-grey-stroke rounded-lg px-4 py-2 focus:ring-2 focus:ring-sage-500 focus:border-sage-500 text-body-regular bg-white"
+                        required
+                      >
+                        <option value="">Select Category</option>
+                        {categories
+                          .filter(cat => cat.isActive || cat.IsActive)
+                          .map((category) => (
+                            <option key={category.id || category.Id} value={category.id || category.Id}>
+                              {category.name || category.Name}
+                            </option>
+                          ))}
+                      </select>
+                      <p className="text-body-small text-charcoal-400 mt-2">
+                        Choose the main category for this seller's store
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Service Category selection for Service Providers */}
+                  {formData.roleType === 'ServiceProvider' && (
+                    <div className="bg-cream-50 rounded-lg p-4">
+                      <label className="block text-body-medium text-charcoal-600 font-semibold mb-2">
+                        Service Category <span className="text-danger-text">*</span>
+                      </label>
+                      <select
+                        value={formData.serviceCategoryId}
+                        onChange={(e) => setFormData({ ...formData, serviceCategoryId: e.target.value })}
+                        className="w-full border border-grey-stroke rounded-lg px-4 py-2 focus:ring-2 focus:ring-sage-500 focus:border-sage-500 text-body-regular bg-white"
+                        required
+                      >
+                        <option value="">Select Service Category</option>
+                        {serviceCategories
+                          .filter(cat => cat.isActive || cat.IsActive)
+                          .map((category) => (
+                            <option key={category.id || category.Id} value={category.id || category.Id}>
+                              {category.name || category.Name}
+                            </option>
+                          ))}
+                      </select>
+                      <p className="text-body-small text-charcoal-400 mt-2">
+                        Choose the service category for this service provider
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-6 border-t border-grey-stroke flex justify-end gap-3">
+                <CRUDButton type="button" variant="error" onClick={handleCancelEdit}>
+                  Cancel
+                </CRUDButton>
+                <CRUDButton type="submit" variant="success">
+                  Create User
                 </CRUDButton>
               </div>
             </form>

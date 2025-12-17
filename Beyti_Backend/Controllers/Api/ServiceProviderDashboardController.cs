@@ -10,9 +10,6 @@ namespace Beyti_Backend.Controllers.Api
 {
     [Route("api/[controller]")]
     [ApiController]
-    // TODO: Uncomment these when proper authentication is implemented
-    // [Authorize] // Require authentication
-    // [NotSuspended] // Require account not suspended
     public class ServiceProviderDashboardController : ControllerBase
     {
         private readonly BeytiContext _context;
@@ -73,6 +70,7 @@ namespace Beyti_Backend.Controllers.Api
                     provider.MinServicePrice,
                     provider.MaxServicePrice,
                     provider.Status,
+                    AccountStatus = provider.UserProfile.Status, // Include UserProfile.Status (Active/Suspended)
                     provider.VerifiedAt,
                     provider.ServiceCategoryId,
                     ServiceCategoryName = provider.ServiceCategory?.Name,
