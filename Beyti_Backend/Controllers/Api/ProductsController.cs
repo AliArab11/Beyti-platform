@@ -45,6 +45,11 @@ namespace Beyti_Backend.Controllers.Api
             public decimal? DiscountPercentage { get; set; }
         }
 
+        public class UpdateProductImageDto
+        {
+            public string? ImageBase64 { get; set; }
+        }
+
 
         [HttpGet("sellers-dropdown")]
         public async Task<ActionResult<IEnumerable<object>>> GetSellerDropdown()
@@ -123,6 +128,7 @@ namespace Beyti_Backend.Controllers.Api
                 basePrice = product.BasePrice,
                 discountPercentage = product.DiscountPercentage,
                 isActive = product.IsActive,
+                imageUrl = product.ImageUrl,  // ← ADD THIS LINE
                 averageRating,
                 reviewCount = allReviews.Count,
                 reviews = customerReviews,
@@ -233,6 +239,104 @@ namespace Beyti_Backend.Controllers.Api
             await _context.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        // PUT: api/Products/{id}/image
+        [HttpPut("{id}/image")]
+        public async Task<IActionResult> UpdateProductImage(int id, [FromBody] UpdateProductImageDto dto)
+        {
+            try
+            {
+                var product = await _context.Products.FindAsync(id);
+                if (product == null)
+                    return NotFound(new { message = "Product not found" });
+
+                string? imagePath = null;
+
+                // If removing image
+                if (string.IsNullOrEmpty(dto.ImageBase64))
+                {
+                    // Delete old image file if exists
+                    if (!string.IsNullOrEmpty(product.ImageUrl))
+                    {
+                        var oldFilePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", product.ImageUrl.TrimStart('/'));
+                        if (System.IO.File.Exists(oldFilePath))
+                        {
+                            System.IO.File.Delete(oldFilePath);
+                        }
+                    }
+                    imagePath = null;
+                }
+                else
+                {
+                    // Parse base64 data
+                    var base64Data = dto.ImageBase64;
+                    if (base64Data.Contains(","))
+                    {
+                        base64Data = base64Data.Split(',')[1];
+                    }
+
+                    var imageBytes = Convert.FromBase64String(base64Data);
+
+                    // Generate unique filename
+                    var fileName = $"product_{id}_{Guid.NewGuid()}.jpg";
+                    var folderPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "products");
+
+                    // Create directory if it doesn't exist
+                    if (!Directory.Exists(folderPath))
+                    {
+                        Directory.CreateDirectory(folderPath);
+                    }
+
+                    var filePath = Path.Combine(folderPath, fileName);
+
+                    // Delete old image if exists
+                    if (!string.IsNullOrEmpty(product.ImageUrl))
+                    {
+                        var oldFilePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", product.ImageUrl.TrimStart('/'));
+                        if (System.IO.File.Exists(oldFilePath))
+                        {
+                            System.IO.File.Delete(oldFilePath);
+                        }
+                    }
+
+                    // Save new image
+                    await System.IO.File.WriteAllBytesAsync(filePath, imageBytes);
+
+                    // Store relative path
+                    imagePath = $"/images/products/{fileName}";
+                }
+
+                product.ImageUrl = imagePath;
+                product.UpdatedAt = DateTime.UtcNow;
+
+                _context.Entry(product).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+
+                return Ok(new
+                {
+                    message = "Product image updated successfully",
+                    imageUrl = product.ImageUrl
+                });
+            }
+            catch (DbUpdateException dbEx)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Database error updating product image",
+                    error = dbEx.Message,
+                    innerError = dbEx.InnerException?.Message
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Error updating product image",
+                    error = ex.Message,
+                    innerError = ex.InnerException?.Message
+                });
+            }
         }
 
         private bool ProductExists(int id)

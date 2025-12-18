@@ -40,6 +40,8 @@ const Checkout = () => {
   const [addingAddress, setAddingAddress] = useState(false);
   const [addressError, setAddressError] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('');
+  const [orderComments, setOrderComments] = useState('');
+  const [deliveryComments, setDeliveryComments] = useState('');
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
   const [mapLocation, setMapLocation] = useState(null);
@@ -707,6 +709,8 @@ const handlePlaceOrder = async () => {
       SubtotalAmount: subtotalAmount,
       DeliveryFee: deliveryFee,
       TotalAmount: totalAmount,
+      OrderNote: orderComments || null,
+      DeliveryNote: fulfillmentType === 'Delivery' ? (deliveryComments || null) : null,
       CreatedAt: Date.now(),
       UpdatedAt: Date.now()
     };
@@ -1000,6 +1004,25 @@ const handlePlaceOrder = async () => {
                         ))}
                     </>
                     )}
+                    {/* Order Comments Field */}
+                      {localCart.length > 0 && (
+                        <div className="mt-6 bg-white rounded-xl border border-grey-stroke shadow-sm p-5">
+                          <label className="block text-base font-semibold text-charcoal-600 mb-2">
+                            Order Comments <span className="text-sm font-normal text-charcoal-400">(Optional)</span>
+                          </label>
+                          <textarea
+                            value={orderComments}
+                            onChange={(e) => setOrderComments(e.target.value)}
+                            placeholder="Add any special instructions for your order..."
+                            className="w-full border-2 border-grey-stroke rounded-lg p-3 text-sm focus:border-sage-500 focus:outline-none resize-none"
+                            rows={3}
+                            maxLength={500}
+                          />
+                          <p className="text-xs text-charcoal-400 mt-1 text-right">
+                            {orderComments.length}/500 characters
+                          </p>
+                        </div>
+                      )}
                 </section>
 
                 {/* RIGHT: ORDER SUMMARY PANEL */}
@@ -1321,6 +1344,26 @@ const handlePlaceOrder = async () => {
                         </button>
                       ))}
                     </div>
+
+                    {/* Delivery Comments - Only show for delivery orders */}
+                      {fulfillmentType === 'Delivery' && (
+                        <div className="mt-5 bg-cream-50 rounded-xl border border-grey-stroke p-4">
+                          <label className="block text-base font-semibold text-charcoal-600 mb-2">
+                            Delivery Instructions <span className="text-sm font-normal text-charcoal-400">(Optional)</span>
+                          </label>
+                          <textarea
+                            value={deliveryComments}
+                            onChange={(e) => setDeliveryComments(e.target.value)}
+                            placeholder="E.g., Leave at door, call upon arrival, building/apartment number..."
+                            className="w-full border-2 border-grey-stroke rounded-lg p-3 text-sm focus:border-sage-500 focus:outline-none resize-none"
+                            rows={3}
+                            maxLength={500}
+                          />
+                          <p className="text-xs text-charcoal-400 mt-1 text-right">
+                            {deliveryComments.length}/500 characters
+                          </p>
+                        </div>
+                      )}
 
                     {orderError && (
                       <div className="mt-4 bg-error-bg border-l-4 border-error-btn p-3 rounded">

@@ -25,6 +25,9 @@ public partial class DeliveryTicket
     [StringLength(20)]
     public string Status { get; set; } = null!;
 
+    [StringLength(500)]
+    public string? DeliveryNote { get; set; }
+
     [Precision(3)]
     public DateTime CreatedAt { get; set; }
 

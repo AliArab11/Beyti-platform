@@ -75,7 +75,7 @@ const OrderDetailsModal = ({ order, onClose, onOrderUpdated, onOrderExpired, onS
    useEffect(() => {
     setLocalOrder(order);
   }, [order]);
-  
+
 
   // Handle timer expiration - update UI and close modal
 const handleTimerExpired = async (orderId) => {
@@ -469,6 +469,23 @@ const handleTimerExpired = async (orderId) => {
               </p>
             )}
           </div>
+
+          {/* Order Comments */}
+            {localOrder.orderNote && (
+              <div className="bg-amber-50 border-l-4 border-amber-500 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-amber-800 mb-1">Customer's Order Comments</p>
+                    <p className="text-sm text-charcoal-700 bg-white rounded px-3 py-2">
+                      {localOrder.orderNote}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
           {/* Error message */}
           {actionError && (

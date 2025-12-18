@@ -5,8 +5,8 @@
  * Works for all user types: Admin, ServiceProvider, Seller, Driver, Customer
  */
 
-import { useState, useEffect } from 'react';
-import { User, Envelope, Phone, MapPin, Calendar, IdentificationCard, CheckCircle, XCircle, Buildings, Tag, X  } from '@phosphor-icons/react';
+import { useState, useEffect, useRef } from 'react';
+import { User, Envelope, Phone, MapPin, Calendar, IdentificationCard, CheckCircle, XCircle, Buildings, Tag, X, Camera, Upload  } from '@phosphor-icons/react';
 
 import ConfirmModal from './ConfirmModal'; 
 import { formatTime } from '../Beyti-Website/Seller/Components/storeStatus';
@@ -31,6 +31,11 @@ export default function ProfilePage({
     postalCode: '',
     country: 'Bahrain'
   });
+
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imagePreview, setImagePreview] = useState(null);
+  const fileInputRef = useRef(null);
 
 
   const [availableSubCategories, setAvailableSubCategories] = useState([]);
@@ -60,6 +65,11 @@ useEffect(() => {
       postalCode: userProfile.postalCode || '',
       country: userProfile.country || 'Bahrain'
     });
+
+    // Set image preview if exists
+    if (userRole === 'Seller' && userProfile.storeImageUrl) {
+      setImagePreview(userProfile.storeImageUrl);
+    }
 
     console.log('🔄 Updated states - isManuallyClosed:', userProfile.isManuallyClosed, 'isForceOpen:', userProfile.isForceOpen);
 
@@ -196,6 +206,96 @@ const loadSubCategories = async (categoryId) => {
     setSaveMessage(null);
   };
 
+  const handleImageUpload = (event) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  // Validate file type
+  if (!file.type.startsWith('image/')) {
+    alert('Please select an image file (PNG or JPG)');
+    return;
+  }
+
+  // Validate file size (max 5MB)
+  if (file.size > 5 * 1024 * 1024) {
+    alert('Image size must be less than 5MB');
+    return;
+  }
+
+  // Create preview
+  const reader = new FileReader();
+  reader.onloadend = () => {
+    setImagePreview(reader.result);
+  };
+  reader.readAsDataURL(file);
+};
+
+const handleSaveImage = async () => {
+  if (!imagePreview || !entityId) {
+    alert('No image to save');
+    return;
+  }
+
+  setUploadingImage(true);
+
+  try {
+    const response = await fetch(`https://localhost:7062/api/Sellers/${entityId}/store-image`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageBase64: imagePreview })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to upload image');
+    }
+
+    setSaveMessage({ type: 'success', text: 'Store logo updated successfully!' });
+    setShowImageModal(false);
+
+    // Trigger parent refresh
+    if (onProfileUpdate) {
+      await onProfileUpdate({ forceRefresh: true });
+    }
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    setSaveMessage({ type: 'error', text: 'Failed to upload image. Please try again.' });
+  } finally {
+    setUploadingImage(false);
+  }
+};
+
+const handleRemoveImage = async () => {
+  if (!entityId) return;
+
+  setUploadingImage(true);
+
+  try {
+    const response = await fetch(`https://localhost:7062/api/Sellers/${entityId}/store-image`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageBase64: null })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to remove image');
+    }
+
+    setImagePreview(null);
+    setSaveMessage({ type: 'success', text: 'Store logo removed successfully!' });
+    setShowImageModal(false);
+
+    // Trigger parent refresh
+    if (onProfileUpdate) {
+      await onProfileUpdate({ forceRefresh: true });
+    }
+  } catch (error) {
+    console.error('Error removing image:', error);
+    setSaveMessage({ type: 'error', text: 'Failed to remove image. Please try again.' });
+  } finally {
+    setUploadingImage(false);
+  }
+};
+
   const toggleSubCategory = (subCategoryId) => {
   setSelectedSubCategories(prev => {
     if (prev.includes(subCategoryId)) {
@@ -291,10 +391,29 @@ const handleToggleStoreStatus = async () => {
         <div className="px-8 pb-8">
           <div className="flex items-end justify-between -mt-16 mb-6">
             <div className="flex items-end gap-6">
-              <div className="w-32 h-32 rounded-full bg-grey-200 dark:bg-[#2A2A2A] border-4 border-grey-200 dark:border-[#2A2A2A] shadow-soft-lift dark:shadow-none flex items-center justify-center transition-colors">
-                <div className="w-full h-full rounded-full bg-sage-500 flex items-center justify-center">
-                  <User size={64} weight="fill" className="text-sage-100" />
+              <div className="relative">
+                <div className="w-32 h-32 rounded-full bg-grey-200 dark:bg-[#2A2A2A] border-4 border-grey-200 dark:border-[#2A2A2A] shadow-soft-lift dark:shadow-none flex items-center justify-center transition-colors overflow-hidden">
+                  {userRole === 'Seller' && imagePreview ? (
+                    <img 
+                      src={imagePreview.startsWith('data:') ? imagePreview : `https://localhost:7062${imagePreview}`} 
+                      alt="Store Logo" 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full rounded-full bg-sage-500 flex items-center justify-center">
+                      <User size={64} weight="fill" className="text-sage-100" />
+                    </div>
+                  )}
                 </div>
+                {userRole === 'Seller' && !readOnly && (
+                  <button
+                    onClick={() => setShowImageModal(true)}
+                    className="absolute bottom-0 right-0 w-10 h-10 bg-sage-500 hover:bg-sage-600 text-white rounded-full flex items-center justify-center shadow-lg transition-colors"
+                    title={imagePreview ? "Edit Logo" : "Add Logo"}
+                  >
+                    <Camera size={20} weight="bold" />
+                  </button>
+                )}
               </div>
               <div className="pb-2">
                 <h1 className="text-display-h2 text-charcoal-600 dark:text-white font-semibold">
@@ -776,6 +895,96 @@ const handleToggleStoreStatus = async () => {
           </div>
         </div>
       )}
+
+      {/* Store Image Upload Modal - Only for Sellers */}
+        {userRole === 'Seller' && showImageModal && (
+          <div className="fixed inset-0 bg-black/70 z-[70] flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-[#2A2A2A] rounded-2xl w-full max-w-md overflow-hidden">
+              <div className="p-6 border-b border-grey-stroke dark:border-charcoal-500">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-bold text-charcoal-600 dark:text-white">
+                    {imagePreview ? 'Edit Store Logo' : 'Add Store Logo'}
+                  </h3>
+                  <button
+                    onClick={() => setShowImageModal(false)}
+                    className="p-2 hover:bg-grey-100 dark:hover:bg-charcoal-600 rounded-full transition-colors"
+                  >
+                    <X size={20} weight="bold" className="text-charcoal-600 dark:text-white" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6">
+                {/* Image Preview */}
+                <div className="mb-6">
+                  <div className="w-full aspect-square rounded-xl border-2 border-dashed border-grey-stroke dark:border-charcoal-500 flex items-center justify-center overflow-hidden bg-grey-100 dark:bg-charcoal-600">
+                    {imagePreview ? (
+                      <img 
+                        src={imagePreview} 
+                        alt="Preview" 
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="text-center p-8">
+                        <Upload size={48} className="mx-auto mb-3 text-charcoal-400 dark:text-charcoal-300" />
+                        <p className="text-sm text-charcoal-400 dark:text-charcoal-300">
+                          No image selected
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Upload Button */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full mb-3 px-4 py-3 bg-sage-100 dark:bg-sage-900 hover:bg-sage-200 dark:hover:bg-sage-800 text-sage-700 dark:text-sage-300 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+                >
+                  <Upload size={20} weight="bold" />
+                  {imagePreview ? 'Change Image' : 'Upload Image'}
+                </button>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3">
+                  {imagePreview && (
+                    <button
+                      onClick={handleRemoveImage}
+                      disabled={uploadingImage}
+                      className="flex-1 px-4 py-3 bg-error-bg hover:bg-error-bg/80 text-error-text rounded-lg font-semibold transition-colors disabled:opacity-50"
+                    >
+                      Remove Image
+                    </button>
+                  )}
+                  <button
+                    onClick={handleSaveImage}
+                    disabled={!imagePreview || uploadingImage}
+                    className="flex-1 px-4 py-3 bg-sage-500 hover:bg-sage-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {uploadingImage ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Logo'
+                    )}
+                  </button>
+                </div>
+
+                <p className="text-xs text-charcoal-400 dark:text-charcoal-300 mt-3 text-center">
+                  Supported formats: PNG, JPG • Max size: 5MB
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 }

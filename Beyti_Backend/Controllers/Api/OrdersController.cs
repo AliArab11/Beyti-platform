@@ -34,6 +34,8 @@ namespace Beyti_Backend.Controllers.Api
             public decimal SubtotalAmount { get; set; }
             public decimal DeliveryFee { get; set; }
             public decimal? TotalAmount { get; set; }
+            public string? OrderNote { get; set; }
+            public string? DeliveryNote { get; set; }
         }
         public class UpdateOrderDto
         {
@@ -110,6 +112,7 @@ namespace Beyti_Backend.Controllers.Api
                 o.TotalAmount,
                 o.CreatedAt,
                 o.UpdatedAt,
+                o.OrderNote,
                 customerName = o.Customer.UserProfile.DisplayName,
                 sellerName = o.Seller.UserProfile.DisplayName,
                 sellerPhone = o.Seller.Phone,
@@ -230,7 +233,7 @@ namespace Beyti_Backend.Controllers.Api
                 o.TotalAmount,
                 o.CreatedAt,
                 o.UpdatedAt,
-
+                o.OrderNote,
                 customerName = o.Customer?.UserProfile?.DisplayName,
                 sellerName = o.Seller?.UserProfile?.DisplayName,
                 sellerPhone = o.Seller?.Phone,
@@ -333,12 +336,30 @@ namespace Beyti_Backend.Controllers.Api
                 SubtotalAmount = dto.SubtotalAmount,
                 DeliveryFee = dto.DeliveryFee,
                 TotalAmount = dto.TotalAmount,
+                OrderNote = dto.OrderNote, 
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
 
             _context.Orders.Add(order);
             await _context.SaveChangesAsync();
+
+            // Create delivery ticket immediately if delivery order
+            if (order.FulfillmentType == "Delivery")
+            {
+                var deliveryTicket = new DeliveryTicket
+                {
+                    OrderId = order.Id,
+                    PickupAddressId = order.PickupAddressId,
+                    DeliveryAddressId = order.DeliveryAddressId,
+                    Status = "Pending",
+                    DeliveryNote = dto.DeliveryNote,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+                _context.DeliveryTickets.Add(deliveryTicket);
+                await _context.SaveChangesAsync();
+            }
 
             return CreatedAtAction("GetOrder", new { id = order.Id }, order);
         }
@@ -517,19 +538,22 @@ namespace Beyti_Backend.Controllers.Api
                     }
                 }
 
-                // If order is accepted and it's a delivery, create a delivery ticket
+                // If order is accepted and it's a delivery, ticket already exists - just keep it pending
                 if (dto.Status == "Accepted" && order.FulfillmentType == "Delivery")
                 {
-                    var deliveryTicket = new DeliveryTicket
+                    // Ticket already exists from order creation, stays in Pending status
+                    if (order.DeliveryTicket != null)
                     {
-                        OrderId = order.Id,
-                        PickupAddressId = order.PickupAddressId,
-                        DeliveryAddressId = order.DeliveryAddressId,
-                        Status = "Pending",
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
-                    };
-                    _context.DeliveryTickets.Add(deliveryTicket);
+                        order.DeliveryTicket.Status = "Pending";
+                        order.DeliveryTicket.UpdatedAt = DateTime.UtcNow;
+                    }
+                }
+
+                // If order is cancelled, cancel the delivery ticket too
+                if (dto.Status == "Cancelled" && order.DeliveryTicket != null)
+                {
+                    order.DeliveryTicket.Status = "Cancelled";
+                    order.DeliveryTicket.UpdatedAt = DateTime.UtcNow;
                 }
 
                 await _context.SaveChangesAsync();
@@ -660,6 +684,16 @@ namespace Beyti_Backend.Controllers.Api
             return NoContent();
         }
 
+        // In-memory cache for route data (keyed by orderId)
+        private static readonly Dictionary<int, RouteData> _routeCache = new();
+
+        private class RouteData
+        {
+            public List<double[]> RoutePoints { get; set; } = new();
+            public double TotalDuration { get; set; } // seconds
+            public DateTime PickupTime { get; set; }
+        }
+
         // GET: api/Orders/{orderId}/tracking
         [HttpGet("{orderId}/tracking")]
         public async Task<ActionResult<object>> GetOrderTracking(int orderId)
@@ -683,30 +717,60 @@ namespace Beyti_Backend.Controllers.Api
                 });
             }
 
-            // Get the delivery ticket to find when it was picked up
             var ticket = order.DeliveryTicket;
             if (ticket == null || order.PickupAddress == null || order.DeliveryAddress == null)
             {
                 return Ok(new { showMap = false, status = order.Status });
             }
 
-            // Calculate simulated driver position
             var pickupLat = (double)(order.PickupAddress.Latitude ?? 0);
             var pickupLng = (double)(order.PickupAddress.Longitude ?? 0);
             var deliveryLat = (double)(order.DeliveryAddress.Latitude ?? 0);
             var deliveryLng = (double)(order.DeliveryAddress.Longitude ?? 0);
 
-            // Calculate time since pickup (use UpdatedAt as proxy for pickup time)
-            var timeSincePickup = DateTime.UtcNow - ticket.UpdatedAt;
-            var totalMinutes = timeSincePickup.TotalMinutes;
+            // Check if we have route cached, if not fetch from OSRM
+            if (!_routeCache.ContainsKey(orderId))
+            {
+                try
+                {
+                    var route = await FetchOSRMRoute(pickupLng, pickupLat, deliveryLng, deliveryLat);
+                    _routeCache[orderId] = new RouteData
+                    {
+                        RoutePoints = route.RoutePoints,
+                        TotalDuration = route.Duration,
+                        PickupTime = ticket.UpdatedAt
+                    };
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ OSRM Error: {ex.Message}");
+                    // Fallback to straight line if OSRM fails
+                    _routeCache[orderId] = new RouteData
+                    {
+                        RoutePoints = new List<double[]>
+                {
+                    new[] { pickupLng, pickupLat },
+                    new[] { deliveryLng, deliveryLat }
+                },
+                        TotalDuration = 900, // 15 min default
+                        PickupTime = ticket.UpdatedAt
+                    };
+                }
+            }
 
-            // Simulate 15-minute delivery time
-            var deliveryDuration = 15.0;
-            var progress = Math.Min(totalMinutes / deliveryDuration, 1.0);
+            var routeData = _routeCache[orderId];
+            var timeSincePickup = (DateTime.UtcNow - routeData.PickupTime).TotalSeconds;
+            var progress = Math.Min(timeSincePickup / routeData.TotalDuration, 1.0);
 
-            // Linear interpolation between pickup and delivery
-            var currentLat = pickupLat + (deliveryLat - pickupLat) * progress;
-            var currentLng = pickupLng + (deliveryLng - pickupLng) * progress;
+            // Find driver position along route
+            var totalPoints = routeData.RoutePoints.Count;
+            var targetIndex = (int)(progress * (totalPoints - 1));
+            targetIndex = Math.Min(targetIndex, totalPoints - 1);
+
+            var driverPoint = routeData.RoutePoints[targetIndex];
+
+            // Calculate remaining time
+            var remainingSeconds = Math.Max(0, routeData.TotalDuration - timeSincePickup);
 
             return Ok(new
             {
@@ -714,8 +778,8 @@ namespace Beyti_Backend.Controllers.Api
                 status = order.Status,
                 driverLocation = new
                 {
-                    latitude = currentLat,
-                    longitude = currentLng
+                    latitude = driverPoint[1],
+                    longitude = driverPoint[0]
                 },
                 pickupLocation = new
                 {
@@ -727,8 +791,38 @@ namespace Beyti_Backend.Controllers.Api
                     latitude = deliveryLat,
                     longitude = deliveryLng
                 },
-                estimatedArrival = deliveryDuration - totalMinutes // minutes remaining
+                estimatedArrival = remainingSeconds / 60.0, // convert to minutes
+                routePolyline = routeData.RoutePoints.Select(p => new[] { p[1], p[0] }).ToList() // [lat, lng] for frontend
             });
+        }
+
+        private async Task<(List<double[]> RoutePoints, double Duration)> FetchOSRMRoute(
+            double startLng, double startLat, double endLng, double endLat)
+        {
+            using var client = new HttpClient();
+            var url = $"https://router.project-osrm.org/route/v1/driving/{startLng},{startLat};{endLng},{endLat}?overview=full&geometries=geojson";
+
+            var response = await client.GetStringAsync(url);
+            var json = System.Text.Json.JsonDocument.Parse(response);
+
+            var coordinates = json.RootElement
+                .GetProperty("routes")[0]
+                .GetProperty("geometry")
+                .GetProperty("coordinates")
+                .EnumerateArray()
+                .Select(coord => new[]
+                {
+            coord[0].GetDouble(), // lng
+            coord[1].GetDouble()  // lat
+                })
+                .ToList();
+
+            var duration = json.RootElement
+                .GetProperty("routes")[0]
+                .GetProperty("duration")
+                .GetDouble();
+
+            return (coordinates, duration);
         }
 
         private bool OrderExists(int id)

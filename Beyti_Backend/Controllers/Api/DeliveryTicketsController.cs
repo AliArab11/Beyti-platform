@@ -322,6 +322,7 @@ namespace Beyti_Backend.Controllers.Api
                     dt.UpdatedAt,
                     dt.CurrentOfferedDriverId,
                     dt.OfferExpiresAt,
+                    dt.DeliveryNote,
                     order = new
                     {
                         dt.Order.Id,
@@ -333,7 +334,8 @@ namespace Beyti_Backend.Controllers.Api
                         customerName = dt.Order.Customer.UserProfile.DisplayName,
                         customerPhone = dt.Order.Customer.Phone,
                         sellerName = dt.Order.Seller.UserProfile.DisplayName,
-                        sellerPhone = dt.Order.Seller.Phone
+                        sellerPhone = dt.Order.Seller.Phone,
+                         orderNote = dt.Order.OrderNote
                     },
 
                     pickupAddress = dt.PickupAddress != null ? new
@@ -401,6 +403,7 @@ namespace Beyti_Backend.Controllers.Api
                     dt.Status,
                     dt.CreatedAt,
                     dt.UpdatedAt,
+                    dt.DeliveryNote,
                     order = new
                     {
                         dt.Order.Id,
@@ -411,6 +414,7 @@ namespace Beyti_Backend.Controllers.Api
                         dt.Order.PaymentStatus,
                         dt.Order.Status,
                         customerName = dt.Order.Customer.UserProfile.DisplayName,
+                        orderNote = dt.Order.OrderNote,
                         customerPhone = dt.Order.Customer.Phone,
                         sellerName = dt.Order.Seller.UserProfile.DisplayName,
                         orderItems = dt.Order.OrderItems.Select(oi => new

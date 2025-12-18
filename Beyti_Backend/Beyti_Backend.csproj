@@ -28,4 +28,8 @@
     <ProjectReference Include="..\BeytiDB\BeytiDB.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="wwwroot\images\stores\" />
+  </ItemGroup>
+
 </Project>

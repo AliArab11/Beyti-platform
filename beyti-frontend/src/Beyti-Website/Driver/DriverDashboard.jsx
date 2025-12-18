@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import * as Icon from "@phosphor-icons/react";
 
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from 'leaflet'
 
@@ -624,7 +624,7 @@ return {
 // -------------------------------------------------------------------
 // Map Modal Component
 // -------------------------------------------------------------------
-const ViewMapModal = ({ pickup, delivery, onClose }) => {
+const ViewMapModal = ({ pickup, delivery, routePolyline, onClose }) => {
   const mapRef = React.useRef(null);
 
   if (!pickup?.latitude || !delivery?.latitude) return null;
@@ -663,53 +663,115 @@ const ViewMapModal = ({ pickup, delivery, onClose }) => {
         <div className="flex-1 p-6 bg-white" style={{ minHeight: '600px' }}>
          <div className="rounded-lg overflow-hidden border-2 border-grey-stroke shadow-lg" style={{ height: '550px', width: '100%' }}>
             <MapContainer
-                center={[
-                    (pickup.latitude + delivery.latitude) / 2,
-                    (pickup.longitude + delivery.longitude) / 2
-                ]}
-                zoom={13}
-                scrollWheelZoom={true}
-                dragging={true}
-                doubleClickZoom={true}
-                zoomControl={true}
-                style={{ height: '500px', width: '100%', minHeight: '500px' }}
-                ref={mapRef}
-                >
-              <TileLayer 
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              center={[
+                  (pickup.latitude + delivery.latitude) / 2,
+                  (pickup.longitude + delivery.longitude) / 2
+              ]}
+              zoom={13}
+              scrollWheelZoom={true}
+              dragging={true}
+              doubleClickZoom={true}
+              zoomControl={true}
+              style={{ height: '550px', width: '100%', minHeight: '550px' }}
+              ref={mapRef}
+          >
+            <TileLayer 
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            />
+            
+            {/* Draw Route Polyline */}
+            {routePolyline && routePolyline.length > 0 && (
+              <Polyline
+                positions={routePolyline}
+                pathOptions={{
+                  color: '#556B5C',
+                  weight: 4,
+                  opacity: 0.7
+                }}
               />
-              
-              {/* Pickup Marker */}
-              <Marker position={[pickup.latitude, pickup.longitude]}>
-                <Popup>
-                  <div className="p-2">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Icon.Package size={20} className="text-sage-600" />
-                      <strong className="text-sage-700">Pickup Location</strong>
-                    </div>
-                    {pickup.street && <p className="text-sm mb-1"><strong>Street:</strong> {pickup.street}</p>}
-                    {pickup.city && <p className="text-sm mb-1"><strong>City:</strong> {pickup.city}</p>}
-                    {pickup.building && <p className="text-sm"><strong>Building:</strong> {pickup.building}</p>}
+            )}
+
+            {/* Pickup Marker - Custom Storefront Icon */}
+            <Marker 
+              position={[pickup.latitude, pickup.longitude]}
+              icon={L.divIcon({
+                className: 'custom-store-marker',
+                html: `
+                  <div style="
+                    width: 40px; 
+                    height: 40px; 
+                    background: #556B5C; 
+                    border: 4px solid white; 
+                    border-radius: 50%; 
+                    display: flex; 
+                    align-items: center; 
+                    justify-content: center;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                  ">
+                    <svg width="20" height="20" viewBox="0 0 256 256" fill="white">
+                      <path d="M232,96a7.89,7.89,0,0,0-.3-2.2L217.35,43.6A16.07,16.07,0,0,0,202,32H54A16.07,16.07,0,0,0,38.65,43.6L24.31,93.8A7.89,7.89,0,0,0,24,96v16a40,40,0,0,0,16,32v64a16,16,0,0,0,16,16H200a16,16,0,0,0,16-16V144a40,40,0,0,0,16-32V96ZM54,48H202l11.42,40H42.61Zm50,56h48v8a24,24,0,0,1-48,0Zm-16,0v8a24,24,0,0,1-48,0v-8ZM200,208H56V151.2a40.57,40.57,0,0,0,8,.8,40,40,0,0,0,32-16,40,40,0,0,0,64,0,40,40,0,0,0,32,16,40.57,40.57,0,0,0,8-.8Zm-8-72a24,24,0,0,1-24-24v-8h48v8A24,24,0,0,1,192,136Z"/>
+                    </svg>
                   </div>
-                </Popup>
-              </Marker>
-              
-              {/* Delivery Marker */}
-              <Marker position={[delivery.latitude, delivery.longitude]}>
-                <Popup>
-                  <div className="p-2">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Icon.MapPin size={20} className="text-danger-btn" />
-                      <strong className="text-danger-text">Delivery Location</strong>
-                    </div>
-                    {delivery.street && <p className="text-sm mb-1"><strong>Street:</strong> {delivery.street}</p>}
-                    {delivery.city && <p className="text-sm mb-1"><strong>City:</strong> {delivery.city}</p>}
-                    {delivery.building && <p className="text-sm"><strong>Building:</strong> {delivery.building}</p>}
+                `,
+                iconSize: [40, 40],
+                iconAnchor: [20, 20],
+                popupAnchor: [0, -18]
+              })}
+            >
+              <Popup>
+                <div className="p-2">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Icon.Package size={20} className="text-sage-600" />
+                    <strong className="text-sage-700">Pickup Location</strong>
                   </div>
-                </Popup>
-              </Marker>
-            </MapContainer>
+                  {pickup.street && <p className="text-sm mb-1"><strong>Street:</strong> {pickup.street}</p>}
+                  {pickup.city && <p className="text-sm mb-1"><strong>City:</strong> {pickup.city}</p>}
+                  {pickup.building && <p className="text-sm"><strong>Building:</strong> {pickup.building}</p>}
+                </div>
+              </Popup>
+            </Marker>
+            
+            {/* Delivery Marker - Custom House Icon */}
+            <Marker 
+              position={[delivery.latitude, delivery.longitude]}
+              icon={L.divIcon({
+                className: 'custom-house-marker',
+                html: `
+                  <div style="
+                    width: 40px; 
+                    height: 40px; 
+                    background: #556B5C; 
+                    border: 4px solid white; 
+                    border-radius: 50%; 
+                    display: flex; 
+                    align-items: center; 
+                    justify-content: center;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                  ">
+                    <svg width="20" height="20" viewBox="0 0 16 16" fill="white">
+                      <path d="M1 6V15H6V11C6 9.89543 6.89543 9 8 9C9.10457 9 10 9.89543 10 11V15H15V6L8 0L1 6Z"/>
+                    </svg>
+                  </div>
+                `,
+                iconSize: [40, 40],
+                iconAnchor: [20, 20],
+                popupAnchor: [0, -18]
+              })}
+            >
+              <Popup>
+                <div className="p-2">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Icon.MapPin size={20} className="text-danger-btn" />
+                    <strong className="text-danger-text">Delivery Location</strong>
+                  </div>
+                  {delivery.street && <p className="text-sm mb-1"><strong>Street:</strong> {delivery.street}</p>}
+                  {delivery.city && <p className="text-sm mb-1"><strong>City:</strong> {delivery.city}</p>}
+                  {delivery.building && <p className="text-sm"><strong>Building:</strong> {delivery.building}</p>}
+                </div>
+              </Popup>
+            </Marker>
+          </MapContainer>
           </div>
         </div>
 
@@ -719,6 +781,10 @@ const ViewMapModal = ({ pickup, delivery, onClose }) => {
             <div className="flex items-center gap-2">
               <Icon.Package size={20} className="text-sage-600" />
               <span className="text-charcoal-600 font-medium">Pickup Location</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-1 bg-sage-600 rounded"></div>
+              <span className="text-charcoal-600 font-medium">Route</span>
             </div>
             <div className="flex items-center gap-2">
               <Icon.MapPin size={20} className="text-danger-btn" />
@@ -747,7 +813,6 @@ const ViewMapModal = ({ pickup, delivery, onClose }) => {
   );
 };
 
-
 // -------------------------------------------------------------------
 // Delivery Details Modal (kept for full-screen "Manage")
 // -------------------------------------------------------------------
@@ -755,6 +820,60 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
     const [actionLoading, setActionLoading] = useState(false);
     const [actionError, setActionError] = useState(null);
     const [localJob, setLocalJob] = useState(job);
+
+    const [routeInfo, setRouteInfo] = useState(null);
+    const [loadingRoute, setLoadingRoute] = useState(false);
+
+    // Fetch OSRM route when modal opens
+    useEffect(() => {
+        const fetchRoute = async () => {
+            if (!localJob.pickupAddress?.latitude || !localJob.deliveryAddress?.latitude) {
+                return;
+            }
+
+            setLoadingRoute(true);
+            try {
+                const pickupLng = localJob.pickupAddress.longitude;
+                const pickupLat = localJob.pickupAddress.latitude;
+                const deliveryLng = localJob.deliveryAddress.longitude;
+                const deliveryLat = localJob.deliveryAddress.latitude;
+
+                const url = `https://router.project-osrm.org/route/v1/driving/${pickupLng},${pickupLat};${deliveryLng},${deliveryLat}?overview=full&geometries=geojson`;
+                
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.routes && data.routes[0]) {
+                    const route = data.routes[0];
+                    const coordinates = route.geometry.coordinates.map(coord => [coord[1], coord[0]]); // Convert to [lat, lng]
+                    const durationMinutes = Math.ceil(route.duration / 60);
+                    const distanceKm = (route.distance / 1000).toFixed(2);
+
+                    setRouteInfo({
+                        polyline: coordinates,
+                        duration: durationMinutes,
+                        distance: distanceKm
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to fetch route:', error);
+                // Fallback to straight line
+                setRouteInfo({
+                    polyline: [
+                        [localJob.pickupAddress.latitude, localJob.pickupAddress.longitude],
+                        [localJob.deliveryAddress.latitude, localJob.deliveryAddress.longitude]
+                    ],
+                    duration: 15, // default
+                    distance: 'N/A'
+                });
+            } finally {
+                setLoadingRoute(false);
+            }
+        };
+
+        fetchRoute();
+    }, [localJob]);
+
 
     const status = (localJob.status || "").toLowerCase();
     const isAvailable = status === "available";
@@ -1052,6 +1171,23 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
                 </div>
                 </div>
 
+                {/* Delivery Instructions */}
+                  {localJob.deliveryNote && (
+                    <div className="bg-blue-50 border-l-4 border-blue-500 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-blue-800 mb-1">Delivery Instructions</p>
+                          <p className="text-sm text-charcoal-700 bg-white rounded px-3 py-2">
+                            {localJob.deliveryNote}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
             {/* Route Information */}
                 <div className="space-y-3">
                 <h3 className="text-sm font-semibold text-charcoal-700 flex items-center gap-2">
@@ -1111,40 +1247,60 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
                 </div>
                 </div>
 
-            {/* Special Instructions */}
-                {localJob.order?.specialInstructions && (
-                <div className="bg-amber-50 border-l-4 border-amber-500 rounded-lg p-4">
-                    <div className="flex items-start gap-2">
-                    <Icon.Note size={20} className="text-amber-600 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                        <p className="text-xs text-amber-700 uppercase tracking-wide mb-2 font-semibold">
-                        📝 SPECIAL INSTRUCTIONS
-                        </p>
-                        <p className="text-sm text-charcoal-700 leading-relaxed">
-                        {localJob.order.specialInstructions}
-                        </p>
-                    </div>
+            {/* Route Information Card */}
+            {routeInfo && (
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-300 rounded-lg p-4">
+                    <div className="flex items-center gap-3 mb-3">
+                        <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
+                            <Icon.MapTrifold size={24} weight="fill" className="text-white" />
+                        </div>
+                        <div className="flex-1">
+                            <p className="text-xs text-blue-700 uppercase tracking-wide mb-1 font-semibold">
+                                📍 Route Information
+                            </p>
+                            <div className="flex items-center gap-4">
+                                <div>
+                                    <p className="text-xs text-charcoal-500">Distance</p>
+                                    <p className="text-base font-bold text-charcoal-700">
+                                        {routeInfo.distance} km
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-charcoal-500">Est. Time</p>
+                                    <p className="text-base font-bold text-sage-700">
+                                        ~{routeInfo.duration} min
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                )}
+            )}
 
             {/* View Route Map Button */}
-                {localJob.pickupAddress?.latitude && localJob.deliveryAddress?.latitude && (
+            {localJob.pickupAddress?.latitude && localJob.deliveryAddress?.latitude && (
                 <button
                     type="button"
                     onClick={() => {
-                    setViewMapModal({
-                        show: true,
-                        pickup: localJob.pickupAddress,
-                        delivery: localJob.deliveryAddress
-                    });
+                        setViewMapModal({
+                            show: true,
+                            pickup: localJob.pickupAddress,
+                            delivery: localJob.deliveryAddress,
+                            routePolyline: routeInfo?.polyline || null
+                        });
                     }}
                     className="w-full bg-sage-500 hover:bg-sage-600 text-cream-50 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 cursor-pointer"
                 >
                     <Icon.MapTrifold size={20} weight="fill" />
                     <span>🗺️ View Route on Map</span>
                 </button>
-                )}
+            )}
+
+            {loadingRoute && (
+                <div className="text-center py-2">
+                    <p className="text-xs text-charcoal-400">Loading route...</p>
+                </div>
+            )}
 
             {/* Error message */}
             {actionError && (
@@ -1567,9 +1723,10 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
             <ViewMapModal
                 pickup={viewMapModal.pickup}
                 delivery={viewMapModal.delivery}
-                onClose={() => setViewMapModal({ show: false, pickup: null, delivery: null })}
+                routePolyline={viewMapModal.routePolyline}
+                onClose={() => setViewMapModal({ show: false, pickup: null, delivery: null, routePolyline: null })}
             />
-            )}
+          )}
 
       {jobModalOpen && selectedJob && (
         <DeliveryDetailsModal

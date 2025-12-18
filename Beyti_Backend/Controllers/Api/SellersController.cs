@@ -10,6 +10,10 @@ namespace Beyti_Backend.Controllers.Api
         public string Phone { get; set; }
         public string? UserId { get; set; }  // For onboarding flow
     }
+    public class UpdateStoreImageDto
+    {
+        public string? ImageBase64 { get; set; }
+    }
 
 
     [Route("api/[controller]")]
@@ -123,7 +127,7 @@ namespace Beyti_Backend.Controllers.Api
                     .Select(sa => sa.Address)
                     .FirstOrDefault();
 
-                
+
                 return Ok(new
                 {
                     SellerId = seller.Id,
@@ -137,6 +141,7 @@ namespace Beyti_Backend.Controllers.Api
                     CategoryId = seller.CategoryId,
                     SubCategoryIds = seller.SellerSubCategories.Select(ssc => ssc.SubCategoryId).ToList(),
                     isOpen = seller.IsOpen,
+                    StoreImageUrl = seller.StoreImageUrl,  // ← ADD THIS LINE
                     Address = primaryAddress != null ? new
                     {
                         Street = primaryAddress.Street,
@@ -693,6 +698,104 @@ namespace Beyti_Backend.Controllers.Api
                 {
                     message = "Error toggling store status",
                     error = ex.Message
+                });
+            }
+        }
+
+        // PUT: api/Sellers/{id}/store-image
+        [HttpPut("{id}/store-image")]
+        public async Task<IActionResult> UpdateStoreImage(int id, [FromBody] UpdateStoreImageDto dto)
+        {
+            try
+            {
+                var seller = await _context.Sellers.FindAsync(id);
+                if (seller == null)
+                    return NotFound(new { message = "Seller not found" });
+
+                string? imagePath = null;
+
+                // If removing image
+                if (string.IsNullOrEmpty(dto.ImageBase64))
+                {
+                    // Delete old image file if exists
+                    if (!string.IsNullOrEmpty(seller.StoreImageUrl))
+                    {
+                        var oldFilePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", seller.StoreImageUrl.TrimStart('/'));
+                        if (System.IO.File.Exists(oldFilePath))
+                        {
+                            System.IO.File.Delete(oldFilePath);
+                        }
+                    }
+                    imagePath = null;
+                }
+                else
+                {
+                    // Parse base64 data
+                    var base64Data = dto.ImageBase64;
+                    if (base64Data.Contains(","))
+                    {
+                        base64Data = base64Data.Split(',')[1];
+                    }
+
+                    var imageBytes = Convert.FromBase64String(base64Data);
+
+                    // Generate unique filename
+                    var fileName = $"store_{id}_{Guid.NewGuid()}.jpg";
+                    var folderPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "stores");
+
+                    // Create directory if it doesn't exist
+                    if (!Directory.Exists(folderPath))
+                    {
+                        Directory.CreateDirectory(folderPath);
+                    }
+
+                    var filePath = Path.Combine(folderPath, fileName);
+
+                    // Delete old image if exists
+                    if (!string.IsNullOrEmpty(seller.StoreImageUrl))
+                    {
+                        var oldFilePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", seller.StoreImageUrl.TrimStart('/'));
+                        if (System.IO.File.Exists(oldFilePath))
+                        {
+                            System.IO.File.Delete(oldFilePath);
+                        }
+                    }
+
+                    // Save new image
+                    await System.IO.File.WriteAllBytesAsync(filePath, imageBytes);
+
+                    // Store relative path
+                    imagePath = $"/images/stores/{fileName}";
+                }
+
+                seller.StoreImageUrl = imagePath;
+                seller.UpdatedAt = DateTime.UtcNow;
+
+                _context.Entry(seller).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+
+                return Ok(new
+                {
+                    message = "Store image updated successfully",
+                    storeImageUrl = seller.StoreImageUrl
+                });
+            }
+            catch (DbUpdateException dbEx)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Database error updating store image",
+                    error = dbEx.Message,
+                    innerError = dbEx.InnerException?.Message
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Error updating store image",
+                    error = ex.Message,
+                    innerError = ex.InnerException?.Message
                 });
             }
         }

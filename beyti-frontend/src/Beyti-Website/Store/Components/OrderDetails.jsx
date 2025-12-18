@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, MapPin, Package, CheckCircle, Clock, Storefront, Phone, User } from '@phosphor-icons/react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -270,6 +270,23 @@ return (
             </div>
           </div>
 
+          {/* Order Comments */}
+            {order.orderNote && (
+              <div className="bg-amber-50 border-l-4 border-amber-500 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-amber-800 mb-1">Your Order Comments</p>
+                    <p className="text-sm text-charcoal-700 bg-white/60 rounded px-3 py-2">
+                      {order.orderNote}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
           {/* Pickup Location - ONLY for pickup orders */}
           {isPickup && order.pickupAddress && (
             <div className="bg-white rounded-2xl p-6 border-2 border-grey-stroke">
@@ -369,7 +386,32 @@ return (
                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                       />
 
-                      <Marker position={[lat, lng]}>
+                      <Marker 
+                        position={[lat, lng]}
+                        icon={L.divIcon({
+                          className: 'custom-store-marker',
+                          html: `
+                            <div style="
+                              width: 36px; 
+                              height: 36px; 
+                              background: #556B5C; 
+                              border: 3px solid white; 
+                              border-radius: 50%; 
+                              display: flex; 
+                              align-items: center; 
+                              justify-content: center;
+                              box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                            ">
+                              <svg width="20" height="20" viewBox="0 0 256 256" fill="white">
+                                <path d="M232,96a7.89,7.89,0,0,0-.3-2.2L217.35,43.6A16.07,16.07,0,0,0,202,32H54A16.07,16.07,0,0,0,38.65,43.6L24.31,93.8A7.89,7.89,0,0,0,24,96v16a40,40,0,0,0,16,32v64a16,16,0,0,0,16,16H200a16,16,0,0,0,16-16V144a40,40,0,0,0,16-32ZM54,48H202l11.42,40H42.61Zm50,56h48v8a24,24,0,0,1-48,0Zm-16,0v8a24,24,0,0,1-48,0v-8ZM200,208H56V151.2a40.57,40.57,0,0,0,8,.8,40,40,0,0,0,32-16,40,40,0,0,0,64,0,40,40,0,0,0,32,16,40.57,40.57,0,0,0,8-.8Zm-8-72a24,24,0,0,1-24-24v-8h48v8A24,24,0,0,1,192,136Z"/>
+                              </svg>
+                            </div>
+                          `,
+                          iconSize: [36, 36],
+                          iconAnchor: [18, 18],
+                          popupAnchor: [0, -18]
+                        })}
+                      >
                         <Popup>
                           <div className="p-2">
                             <div className="flex items-center gap-2 mb-2">
@@ -545,116 +587,180 @@ return (
                   // ✅ Valid coordinates - render map with markers
                   return (
                     <MapContainer
-                      center={[centerLat, centerLng]}
-                      zoom={13}
-                      scrollWheelZoom={true}
-                      style={{ height: "100%", width: "100%" }}
-                      key={tracking?.showMap ? 'tracking' : 'static'} // Force re-render when tracking starts
-                    >
-                      <TileLayer 
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                      />
+  center={[centerLat, centerLng]}
+  zoom={13}
+  scrollWheelZoom={true}
+  style={{ height: "100%", width: "100%" }}
+  key={tracking?.showMap ? 'tracking' : 'static'}
+>
+  <TileLayer 
+    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+  />
 
-                      {/* Pickup Marker */}
-                      <Marker position={[pickupLat, pickupLng]}>
-                        <Popup>
-                          <div className="p-2">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Storefront size={20} className="text-sage-600" />
-                              <strong className="text-sage-700">Pickup Location</strong>
-                            </div>
-                            <p className="text-sm mb-1">
-                              <strong>{order.sellerName || "Store"}</strong>
-                            </p>
-                            {order.pickupAddress.street && (
-                              <p className="text-sm mb-1">
-                                {order.pickupAddress.street}
-                              </p>
-                            )}
-                            {order.pickupAddress.city && (
-                              <p className="text-sm">
-                                {order.pickupAddress.city}
-                              </p>
-                            )}
-                          </div>
-                        </Popup>
-                      </Marker>
+  {/* DRAW ROUTE POLYLINE */}
+  {tracking?.routePolyline && tracking.routePolyline.length > 0 && (
+    <Polyline
+      positions={tracking.routePolyline}
+      pathOptions={{
+        color: '#556B5C',
+        weight: 4,
+        opacity: 0.7
+      }}
+    />
+  )}
 
-                      {/* Driver Marker - ONLY show when tracking is active */}
-                      {tracking?.showMap && tracking.driverLocation && (
-                        <Marker 
-                          position={[
-                            tracking.driverLocation.latitude, 
-                            tracking.driverLocation.longitude
-                          ]}
-                          icon={L.divIcon({
-                            className: 'custom-driver-marker',
-                            html: `
-                              <div style="
-                                width: 40px; 
-                                height: 40px; 
-                                background: #22C55E; 
-                                border: 4px solid white; 
-                                border-radius: 50%; 
-                                display: flex; 
-                                align-items: center; 
-                                justify-content: center;
-                                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                              ">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
-                                  <path d="M12 2L4 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-8-3z"/>
-                                </svg>
-                              </div>
-                            `,
-                            iconSize: [40, 40],
-                            iconAnchor: [20, 20]
-                          })}
-                        >
-                          <Popup>
-                            <div className="p-2">
-                              <div className="flex items-center gap-2 mb-2">
-                                <Package size={20} className="text-green-600" />
-                                <strong className="text-green-700">Driver Location</strong>
-                              </div>
-                              <p className="text-sm text-green-700 font-semibold">
-                                On the way to you!
-                              </p>
-                              {tracking.estimatedArrival > 0 && (
-                                <p className="text-xs text-charcoal-600 mt-1">
-                                  ETA: {Math.ceil(tracking.estimatedArrival)} min
-                                </p>
-                              )}
-                            </div>
-                          </Popup>
-                        </Marker>
-                      )}
+  {/* Pickup Marker */}
+  <Marker 
+    position={[pickupLat, pickupLng]}
+    icon={L.divIcon({
+      className: 'custom-store-marker',
+      html: `
+        <div style="
+          width: 40px; 
+          height: 40px; 
+          background: #556B5C; 
+          border: 4px solid white; 
+          border-radius: 50%; 
+          display: flex; 
+          align-items: center; 
+          justify-content: center;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        ">
+          <svg width="20" height="20" viewBox="0 0 256 256" fill="white">
+            <path d="M232,96a7.89,7.89,0,0,0-.3-2.2L217.35,43.6A16.07,16.07,0,0,0,202,32H54A16.07,16.07,0,0,0,38.65,43.6L24.31,93.8A7.89,7.89,0,0,0,24,96v16a40,40,0,0,0,16,32v64a16,16,0,0,0,16,16H200a16,16,0,0,0,16-16V144a40,40,0,0,0,16-32V96ZM54,48H202l11.42,40H42.61Zm50,56h48v8a24,24,0,0,1-48,0Zm-16,0v8a24,24,0,0,1-48,0v-8ZM200,208H56V151.2a40.57,40.57,0,0,0,8,.8,40,40,0,0,0,32-16,40,40,0,0,0,64,0,40,40,0,0,0,32,16,40.57,40.57,0,0,0,8-.8Zm-8-72a24,24,0,0,1-24-24v-8h48v8A24,24,0,0,1,192,136Z"/>
+          </svg>
+        </div>
+      `,
+      iconSize: [40, 40],
+      iconAnchor: [20, 20],
+      popupAnchor: [0, -18]
+    })}
+  >
+    <Popup>
+      <div className="p-2">
+        <div className="flex items-center gap-2 mb-2">
+          <Storefront size={20} className="text-sage-600" />
+          <strong className="text-sage-700">Pickup Location</strong>
+        </div>
+        <p className="text-sm mb-1">
+          <strong>{order.sellerName || "Store"}</strong>
+        </p>
+        {order.pickupAddress.street && (
+          <p className="text-sm mb-1">
+            {order.pickupAddress.street}
+          </p>
+        )}
+        {order.pickupAddress.city && (
+          <p className="text-sm">
+            {order.pickupAddress.city}
+          </p>
+        )}
+      </div>
+    </Popup>
+  </Marker>
 
-                      {/* Delivery Marker */}
-                      <Marker position={[deliveryLat, deliveryLng]}>
-                        <Popup>
-                          <div className="p-2">
-                            <div className="flex items-center gap-2 mb-2">
-                              <User size={20} className="text-danger-btn" />
-                              <strong className="text-danger-text">Delivery Location</strong>
-                            </div>
-                            <p className="text-sm mb-1">
-                              <strong>{order.customerName || "Customer"}</strong>
-                            </p>
-                            {order.deliveryAddress.street && (
-                              <p className="text-sm mb-1">
-                                {order.deliveryAddress.street}
-                              </p>
-                            )}
-                            {order.deliveryAddress.city && (
-                              <p className="text-sm">
-                                {order.deliveryAddress.city}
-                              </p>
-                            )}
-                          </div>
-                        </Popup>
-                      </Marker>
-                    </MapContainer>
+  {/* Driver Marker - ONLY show when tracking is active */}
+    {tracking?.showMap && tracking.driverLocation && (
+    <Marker 
+      position={[
+        tracking.driverLocation.latitude, 
+        tracking.driverLocation.longitude
+      ]}
+      icon={L.divIcon({
+        className: 'custom-driver-marker',
+        html: `
+          <div style="
+            width: 50px; 
+            height: 50px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            filter: drop-shadow(0 4px 12px rgba(0,0,0,0.4));
+          ">
+            <svg width="40" height="40" viewBox="0 0 512 512" fill="#000000ff">
+              <polygon points="168.548,269.165 196.66,275.239 213.052,199.29 184.94,193.216" />
+              <path d="M449.358,358.86c2.01,3.679,3.164,7.933,3.164,12.485c0,14.492-11.735,26.224-26.236,26.224c-14.496,0-26.232-11.732-26.232-26.224c0-4.552,1.153-8.806,3.165-12.485h-32.157c-3.284,0-6.444,0.515-9.433,1.44c-0.578,3.567-0.922,7.247-0.922,11.046c0,36.239,29.336,65.583,65.579,65.583c36.247,0,65.583-29.344,65.583-65.583c0-4.262-0.402-8.464-1.205-12.485H449.358z" />
+              <path d="M103.55,358.86h-2.818c2.015,3.679,3.161,7.933,3.161,12.485c0,14.492-11.735,26.224-26.228,26.224c-14.497,0-26.232-11.732-26.232-26.224c0-4.552,1.146-8.806,3.164-12.485h-41.31c-0.806,4.022-1.209,8.223-1.209,12.485c0,36.239,29.344,65.583,65.587,65.583c31.694,0,58.161-22.434,64.258-52.359v-4.597C141.924,360.412,112.524,358.86,103.55,358.86z" />
+              <path d="M512,347.374s0.008-101.643-67.113-101.643H304.564c1.877,4.418,4.53,8.47,8.008,11.515c15.336,13.426,26.847,61.359-5.754,70.949H176.416l-24.926-24.926l36.434-168.757h57.333c5.403,0,9.784-4.38,9.784-9.783v-9.963c0-5.404-4.381-9.784-9.784-9.784h-51.583c0,0-15.336-29.911-84.371-29.911v63.285h32.221l-1.541,9.582L97.8,236.149S0,259.157,0,347.374c0,0,80.539,0,103.55,0c23.012,0,49.863,7.672,49.863,32.598h174.991l1.134-3.224c6.213-17.597,22.855-29.374,41.524-29.374H512z" />
+              <path d="M444.887,232.313v-11.687c0-12.604-10.22-22.821-22.832-22.821H314.486c-13.343,0-16.325,19.463-9.922,34.508H444.887z" />
+            </svg>
+          </div>
+        `,
+        iconSize: [50, 50],
+        iconAnchor: [25, 25],
+        popupAnchor: [0, -20]
+      })}
+    >
+      <Popup>
+        <div className="p-2">
+          <div className="flex items-center gap-2 mb-2">
+            <Package size={20} className="text-green-600" />
+            <strong className="text-green-700">Driver Location</strong>
+          </div>
+          <p className="text-sm text-green-700 font-semibold">
+            On the way to you!
+          </p>
+          {tracking.estimatedArrival > 0 && (
+            <p className="text-xs text-charcoal-600 mt-1">
+              ETA: {Math.ceil(tracking.estimatedArrival)} min
+            </p>
+          )}
+        </div>
+      </Popup>
+    </Marker>
+  )}
+
+  {/* Delivery Marker */}
+  <Marker 
+    position={[deliveryLat, deliveryLng]}
+    icon={L.divIcon({
+      className: 'custom-house-marker',
+      html: `
+        <div style="
+          width: 40px; 
+          height: 40px; 
+          background: #556B5C; 
+          border: 4px solid white; 
+          border-radius: 50%; 
+          display: flex; 
+          align-items: center; 
+          justify-content: center;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        ">
+          <svg width="20" height="20" viewBox="0 0 16 16" fill="white">
+            <path d="M1 6V15H6V11C6 9.89543 6.89543 9 8 9C9.10457 9 10 9.89543 10 11V15H15V6L8 0L1 6Z"/>
+          </svg>
+        </div>
+      `,
+      iconSize: [40, 40],
+      iconAnchor: [20, 20],
+      popupAnchor: [0, -18]
+    })}
+  >
+    <Popup>
+      <div className="p-2">
+        <div className="flex items-center gap-2 mb-2">
+          <User size={20} className="text-danger-btn" />
+          <strong className="text-danger-text">Delivery Location</strong>
+        </div>
+        <p className="text-sm mb-1">
+          <strong>{order.customerName || "Customer"}</strong>
+        </p>
+        {order.deliveryAddress.street && (
+          <p className="text-sm mb-1">
+            {order.deliveryAddress.street}
+          </p>
+        )}
+        {order.deliveryAddress.city && (
+          <p className="text-sm">
+            {order.deliveryAddress.city}
+          </p>
+        )}
+      </div>
+    </Popup>
+  </Marker>
+</MapContainer>
                   );
                 })()}
               </div>

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import AnalyticsCard from "../../../components/AnalyticsCard";
 import StatusChip from "../../../components/StatusChip";
 import Button from "../../../components/Button";
@@ -62,6 +62,12 @@ const [form, setForm] = useState({
   colorValue: "",
   sizeValue: "",
 });
+
+    const [productImage, setProductImage] = useState(null);
+    const [showImageModal, setShowImageModal] = useState(false);
+    const [uploadingImage, setUploadingImage] = useState(false);
+    const [currentProductForImage, setCurrentProductForImage] = useState(null);
+    const productFileInputRef = useRef(null);
 
     const [showVariantModal, setShowVariantModal] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null);
@@ -598,6 +604,107 @@ const removeVariant = async (variantId) => {
   }
 };
 
+const handleProductImageUpload = (event) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  // Validate file type
+  if (!file.type.startsWith('image/')) {
+    alert('Please select an image file (PNG or JPG)');
+    return;
+  }
+
+  // Validate file size (max 5MB)
+  if (file.size > 5 * 1024 * 1024) {
+    alert('Image size must be less than 5MB');
+    return;
+  }
+
+  // Create preview
+  const reader = new FileReader();
+  reader.onloadend = () => {
+    setProductImage(reader.result);
+  };
+  reader.readAsDataURL(file);
+};
+
+const handleSaveProductImage = async () => {
+  if (!productImage || !currentProductForImage) {
+    alert('No image to save');
+    return;
+  }
+
+  setUploadingImage(true);
+
+  try {
+    const response = await fetch(`https://localhost:7062/api/Products/${currentProductForImage.id}/image`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageBase64: productImage })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to upload image');
+    }
+
+    const result = await response.json();
+
+    // Refresh products list
+    const refreshed = await loadSellerProducts();
+    setProducts(refreshed);
+
+    setShowImageModal(false);
+    setProductImage(null);
+    setCurrentProductForImage(null);
+
+    alert('Product image updated successfully!');
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    alert('Failed to upload image. Please try again.');
+  } finally {
+    setUploadingImage(false);
+  }
+};
+
+const handleRemoveProductImage = async () => {
+  if (!currentProductForImage) return;
+
+  setUploadingImage(true);
+
+  try {
+    const response = await fetch(`https://localhost:7062/api/Products/${currentProductForImage.id}/image`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageBase64: null })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to remove image');
+    }
+
+    // Refresh products list
+    const refreshed = await loadSellerProducts();
+    setProducts(refreshed);
+
+    setProductImage(null);
+    setShowImageModal(false);
+    setCurrentProductForImage(null);
+
+    alert('Product image removed successfully!');
+  } catch (error) {
+    console.error('Error removing image:', error);
+    alert('Failed to remove image. Please try again.');
+  } finally {
+    setUploadingImage(false);
+  }
+};
+
+const openImageModal = (product) => {
+  setCurrentProductForImage(product);
+  setProductImage(product.imageUrl ? `https://localhost:7062${product.imageUrl}` : null);
+  setShowImageModal(true);
+};
+
   // ========================
   // UI
   // ========================
@@ -717,20 +824,44 @@ const removeVariant = async (variantId) => {
                 key={p.id}
                 className="bg-white rounded-xl overflow-hidden border border-grey-stroke shadow-soft-lift hover:shadow-lg transition-all hover:scale-[1.02] duration-200"
             >
-              <div className="bg-gradient-to-br from-sage-100 to-sage-200 h-48 flex items-center justify-center relative">
-              <svg
-                className="w-20 h-20 text-sage-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                />
-              </svg>
+              <div className="bg-gradient-to-br from-sage-100 to-sage-200 h-48 flex items-center justify-center relative overflow-hidden group">
+                {p.imageUrl ? (
+                  <img 
+                    src={`https://localhost:7062${p.imageUrl}`}
+                    alt={p.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <svg
+                    className="w-20 h-20 text-sage-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                    />
+                  </svg>
+                )}
+                
+                {/* Image Edit Button */}
+                <button
+                  onClick={() => openImageModal(p)}
+                  className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                >
+                  <div className="bg-white rounded-lg px-4 py-2 flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span className="text-sm font-semibold text-charcoal-700">
+                      {p.imageUrl ? 'Edit Image' : 'Add Image'}
+                    </span>
+                  </div>
+                </button>
 
               {/* Status badges */}
               <div className="absolute top-3 right-3 flex flex-col gap-2">
@@ -1453,6 +1584,113 @@ const removeVariant = async (variantId) => {
               </div>
             </div>
           )}
+
+
+          {/* Product Image Upload Modal */}
+{showImageModal && currentProductForImage && (
+  <div className="fixed inset-0 bg-black/70 z-[70] flex items-center justify-center p-4">
+    <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden">
+      <div className="p-6 border-b border-grey-stroke">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-bold text-charcoal-600">
+            {productImage ? 'Edit Product Image' : 'Add Product Image'}
+          </h3>
+          <button
+            onClick={() => {
+              setShowImageModal(false);
+              setProductImage(null);
+              setCurrentProductForImage(null);
+            }}
+            className="p-2 hover:bg-grey-100 rounded-full transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div className="p-6">
+        {/* Product Name */}
+        <div className="mb-4 p-3 bg-sage-50 rounded-lg">
+          <p className="text-sm text-charcoal-500 mb-1">Product</p>
+          <p className="text-base font-bold text-charcoal-700">{currentProductForImage.name}</p>
+        </div>
+
+        {/* Image Preview */}
+        <div className="mb-6">
+          <div className="w-full aspect-square rounded-xl border-2 border-dashed border-grey-stroke flex items-center justify-center overflow-hidden bg-grey-100">
+            {productImage ? (
+              <img 
+                src={productImage.startsWith('data:') ? productImage : productImage}
+                alt="Preview" 
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="text-center p-8">
+                <svg className="w-12 h-12 mx-auto mb-3 text-charcoal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <p className="text-sm text-charcoal-400">
+                  No image selected
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Upload Button */}
+        <input
+          ref={productFileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/jpg"
+          onChange={handleProductImageUpload}
+          className="hidden"
+        />
+        <button
+          onClick={() => productFileInputRef.current?.click()}
+          className="w-full mb-3 px-4 py-3 bg-sage-100 hover:bg-sage-200 text-sage-700 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+          </svg>
+          {productImage ? 'Change Image' : 'Upload Image'}
+        </button>
+
+        {/* Action Buttons */}
+        <div className="flex gap-3">
+          {productImage && (
+            <button
+              onClick={handleRemoveProductImage}
+              disabled={uploadingImage}
+              className="flex-1 px-4 py-3 bg-error-bg hover:bg-error-bg/80 text-error-text rounded-lg font-semibold transition-colors disabled:opacity-50"
+            >
+              Remove Image
+            </button>
+          )}
+          <button
+            onClick={handleSaveProductImage}
+            disabled={!productImage || uploadingImage}
+            className="flex-1 px-4 py-3 bg-sage-500 hover:bg-sage-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {uploadingImage ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Saving...
+              </>
+            ) : (
+              'Save Image'
+            )}
+          </button>
+        </div>
+
+        <p className="text-xs text-charcoal-400 mt-3 text-center">
+          Supported formats: PNG, JPG • Max size: 5MB
+        </p>
+      </div>
+    </div>
+  </div>
+)}
 
 
     </div>
