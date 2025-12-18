@@ -951,8 +951,16 @@ const handlePlaceOrder = async () => {
                                 className="bg-white rounded-xl border border-grey-stroke shadow-sm hover:shadow-md transition-shadow p-5 flex items-center justify-between"
                             >
                             <div className="flex items-center gap-4 flex-1">
-                            <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-sage-100 to-sage-200 flex items-center justify-center flex-shrink-0">
+                            <div className="w-20 h-20 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden bg-gradient-to-br from-sage-100 to-sage-200">
+                              {item.imageUrl ? (
+                                <img 
+                                  src={`https://localhost:7062${item.imageUrl}`}
+                                  alt={item.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
                                 <ShoppingCart size={28} className="text-sage-600" />
+                              )}
                             </div>
                             
                             <div className="flex-1 min-w-0">

@@ -4,6 +4,7 @@ import StatusChip from "../../../components/StatusChip";
 import Button from "../../../components/Button";
 import ConfirmModal from "../../../components/ConfirmModal";
 import SectionsManager from './SectionsManager';
+import Cropper from 'react-easy-crop';
 
 import {
   getProducts,
@@ -68,6 +69,49 @@ const [form, setForm] = useState({
     const [uploadingImage, setUploadingImage] = useState(false);
     const [currentProductForImage, setCurrentProductForImage] = useState(null);
     const productFileInputRef = useRef(null);
+
+    const [showProductCropper, setShowProductCropper] = useState(false);
+    const [productCrop, setProductCrop] = useState({ x: 0, y: 0 });
+    const [productZoom, setProductZoom] = useState(1);
+    const [productCroppedAreaPixels, setProductCroppedAreaPixels] = useState(null);
+
+    const onProductCropComplete = (croppedArea, croppedAreaPixels) => {
+  setProductCroppedAreaPixels(croppedAreaPixels);
+};
+
+const createCroppedProductImage = async () => {
+  try {
+    const image = new Image();
+    image.src = productImage;
+    
+    await new Promise((resolve) => {
+      image.onload = resolve;
+    });
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    canvas.width = productCroppedAreaPixels.width;
+    canvas.height = productCroppedAreaPixels.height;
+
+    ctx.drawImage(
+      image,
+      productCroppedAreaPixels.x,
+      productCroppedAreaPixels.y,
+      productCroppedAreaPixels.width,
+      productCroppedAreaPixels.height,
+      0,
+      0,
+      productCroppedAreaPixels.width,
+      productCroppedAreaPixels.height
+    );
+
+    return canvas.toDataURL('image/jpeg');
+  } catch (error) {
+    console.error('Error cropping image:', error);
+    return null;
+  }
+};
 
     const [showVariantModal, setShowVariantModal] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null);
@@ -624,6 +668,7 @@ const handleProductImageUpload = (event) => {
   const reader = new FileReader();
   reader.onloadend = () => {
     setProductImage(reader.result);
+    setShowProductCropper(true);
   };
   reader.readAsDataURL(file);
 };
@@ -637,10 +682,22 @@ const handleSaveProductImage = async () => {
   setUploadingImage(true);
 
   try {
+    let finalImage = productImage;
+    
+    // If cropper was used, get the cropped image
+    if (showProductCropper && productCroppedAreaPixels) {
+      finalImage = await createCroppedProductImage();
+      if (!finalImage) {
+        alert('Failed to crop image');
+        setUploadingImage(false);
+        return;
+      }
+    }
+
     const response = await fetch(`https://localhost:7062/api/Products/${currentProductForImage.id}/image`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ imageBase64: productImage })
+      body: JSON.stringify({ imageBase64: finalImage })
     });
 
     if (!response.ok) {
@@ -654,6 +711,7 @@ const handleSaveProductImage = async () => {
     setProducts(refreshed);
 
     setShowImageModal(false);
+    setShowProductCropper(false);
     setProductImage(null);
     setCurrentProductForImage(null);
 
@@ -830,6 +888,7 @@ const openImageModal = (product) => {
                     src={`https://localhost:7062${p.imageUrl}`}
                     alt={p.name}
                     className="w-full h-full object-cover"
+                    style={{ aspectRatio: '1 / 1' }}
                   />
                 ) : (
                   <svg
@@ -1586,111 +1645,139 @@ const openImageModal = (product) => {
           )}
 
 
-          {/* Product Image Upload Modal */}
-{showImageModal && currentProductForImage && (
-  <div className="fixed inset-0 bg-black/70 z-[70] flex items-center justify-center p-4">
-    <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden">
-      <div className="p-6 border-b border-grey-stroke">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xl font-bold text-charcoal-600">
-            {productImage ? 'Edit Product Image' : 'Add Product Image'}
-          </h3>
-          <button
-            onClick={() => {
-              setShowImageModal(false);
-              setProductImage(null);
-              setCurrentProductForImage(null);
-            }}
-            className="p-2 hover:bg-grey-100 rounded-full transition-colors"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-      </div>
+         {/* Product Image Upload Modal */}
+            {showImageModal && currentProductForImage && (
+              <div className="fixed inset-0 bg-black/70 z-[70] flex items-center justify-center p-4">
+                <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden">
+                  <div className="p-6 border-b border-grey-stroke">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xl font-bold text-charcoal-600">
+                        {productImage ? 'Edit Product Image' : 'Add Product Image'}
+                      </h3>
+                      <button
+                        onClick={() => {
+                          setShowImageModal(false);
+                          setShowProductCropper(false);
+                          setProductImage(null);
+                          setCurrentProductForImage(null);
+                        }}
+                        className="p-2 hover:bg-grey-100 rounded-full transition-colors"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
 
-      <div className="p-6">
-        {/* Product Name */}
-        <div className="mb-4 p-3 bg-sage-50 rounded-lg">
-          <p className="text-sm text-charcoal-500 mb-1">Product</p>
-          <p className="text-base font-bold text-charcoal-700">{currentProductForImage.name}</p>
-        </div>
+                  <div className="p-6">
+                    {/* Product Name */}
+                    <div className="mb-4 p-3 bg-sage-50 rounded-lg">
+                      <p className="text-sm text-charcoal-500 mb-1">Product</p>
+                      <p className="text-base font-bold text-charcoal-700">{currentProductForImage.name}</p>
+                    </div>
 
-        {/* Image Preview */}
-        <div className="mb-6">
-          <div className="w-full aspect-square rounded-xl border-2 border-dashed border-grey-stroke flex items-center justify-center overflow-hidden bg-grey-100">
-            {productImage ? (
-              <img 
-                src={productImage.startsWith('data:') ? productImage : productImage}
-                alt="Preview" 
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="text-center p-8">
-                <svg className="w-12 h-12 mx-auto mb-3 text-charcoal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <p className="text-sm text-charcoal-400">
-                  No image selected
-                </p>
+                    {/* Image Preview/Cropper */}
+                    <div className="mb-6">
+                      <div className="w-full aspect-square rounded-xl border-2 border-dashed border-grey-stroke flex items-center justify-center overflow-hidden bg-grey-100 relative">
+                        {productImage && showProductCropper ? (
+                          <>
+                            <Cropper
+                              image={productImage}
+                              crop={productCrop}
+                              zoom={productZoom}
+                              aspect={1}
+                              cropShape="rect"
+                              showGrid={true}
+                              onCropChange={setProductCrop}
+                              onZoomChange={setProductZoom}
+                              onCropComplete={onProductCropComplete}
+                            />
+                            {/* Zoom Controls */}
+                            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white rounded-full px-6 py-3 shadow-lg z-10 flex items-center gap-3">
+                              <span className="text-sm font-semibold text-charcoal-600">Zoom:</span>
+                              <input
+                                type="range"
+                                min="1"
+                                max="3"
+                                step="0.1"
+                                value={productZoom}
+                                onChange={(e) => setProductZoom(parseFloat(e.target.value))}
+                                className="w-32"
+                              />
+                            </div>
+                          </>
+                        ) : productImage && !showProductCropper ? (
+                          <img 
+                            src={productImage.startsWith('data:') ? productImage : productImage}
+                            alt="Preview" 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="text-center p-8">
+                            <svg className="w-12 h-12 mx-auto mb-3 text-charcoal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <p className="text-sm text-charcoal-400">
+                              No image selected
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Upload Button */}
+                    <input
+                      ref={productFileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg"
+                      onChange={handleProductImageUpload}
+                      className="hidden"
+                    />
+                    <button
+                      onClick={() => productFileInputRef.current?.click()}
+                      className="w-full mb-3 px-4 py-3 bg-sage-100 hover:bg-sage-200 text-sage-700 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                      {productImage ? 'Change Image' : 'Upload Image'}
+                    </button>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-3">
+                      {productImage && (
+                        <button
+                          onClick={handleRemoveProductImage}
+                          disabled={uploadingImage}
+                          className="flex-1 px-4 py-3 bg-error-bg hover:bg-error-bg/80 text-error-text rounded-lg font-semibold transition-colors disabled:opacity-50"
+                        >
+                          Remove Image
+                        </button>
+                      )}
+                      <button
+                        onClick={handleSaveProductImage}
+                        disabled={!productImage || uploadingImage || (showProductCropper && !productCroppedAreaPixels)}
+                        className="flex-1 px-4 py-3 bg-sage-500 hover:bg-sage-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        {uploadingImage ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          'Save Image'
+                        )}
+                      </button>
+                    </div>
+
+                    <p className="text-xs text-charcoal-400 mt-3 text-center">
+                      Supported formats: PNG, JPG • Max size: 5MB
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
-          </div>
-        </div>
-
-        {/* Upload Button */}
-        <input
-          ref={productFileInputRef}
-          type="file"
-          accept="image/png,image/jpeg,image/jpg"
-          onChange={handleProductImageUpload}
-          className="hidden"
-        />
-        <button
-          onClick={() => productFileInputRef.current?.click()}
-          className="w-full mb-3 px-4 py-3 bg-sage-100 hover:bg-sage-200 text-sage-700 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-          </svg>
-          {productImage ? 'Change Image' : 'Upload Image'}
-        </button>
-
-        {/* Action Buttons */}
-        <div className="flex gap-3">
-          {productImage && (
-            <button
-              onClick={handleRemoveProductImage}
-              disabled={uploadingImage}
-              className="flex-1 px-4 py-3 bg-error-bg hover:bg-error-bg/80 text-error-text rounded-lg font-semibold transition-colors disabled:opacity-50"
-            >
-              Remove Image
-            </button>
-          )}
-          <button
-            onClick={handleSaveProductImage}
-            disabled={!productImage || uploadingImage}
-            className="flex-1 px-4 py-3 bg-sage-500 hover:bg-sage-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {uploadingImage ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Saving...
-              </>
-            ) : (
-              'Save Image'
-            )}
-          </button>
-        </div>
-
-        <p className="text-xs text-charcoal-400 mt-3 text-center">
-          Supported formats: PNG, JPG • Max size: 5MB
-        </p>
-      </div>
-    </div>
-  </div>
-)}
 
 
     </div>

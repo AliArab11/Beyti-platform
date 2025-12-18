@@ -15,6 +15,11 @@ namespace Beyti_Backend.Controllers.Api
         public string? ImageBase64 { get; set; }
     }
 
+    public class UpdateStoreDescriptionDto
+    {
+        public string? Description { get; set; }
+    }
+
 
     [Route("api/[controller]")]
     [ApiController]
@@ -67,6 +72,8 @@ namespace Beyti_Backend.Controllers.Api
                     categoryId = seller.CategoryId,
                     categoryName = seller.Category?.Name,
                     isOpen = seller.IsOpen,
+                    storeImageUrl = seller.StoreImageUrl,
+                    storeDescription = seller.StoreDescription,
                     subCategoryIds = seller.SellerSubCategories.Select(ssc => ssc.SubCategoryId).ToList(),
                     subCategoryNames = seller.SellerSubCategories
                     .Select(ssc => ssc.SubCategory.Name)
@@ -142,6 +149,7 @@ namespace Beyti_Backend.Controllers.Api
                     SubCategoryIds = seller.SellerSubCategories.Select(ssc => ssc.SubCategoryId).ToList(),
                     isOpen = seller.IsOpen,
                     StoreImageUrl = seller.StoreImageUrl,  // ← ADD THIS LINE
+                    StoreDescription = seller.StoreDescription,
                     Address = primaryAddress != null ? new
                     {
                         Street = primaryAddress.Street,
@@ -258,6 +266,7 @@ namespace Beyti_Backend.Controllers.Api
                                 id = p.Id,
                                 name = p.Name,
                                 description = p.Description,
+                                imageUrl = p.ImageUrl,
                                 basePrice = p.BasePrice,
                                 discountPercentage = p.DiscountPercentage,
                                 isActive = p.IsActive,
@@ -305,6 +314,7 @@ namespace Beyti_Backend.Controllers.Api
                             id = p.Id,
                             name = p.Name,
                             description = p.Description,
+                            imageUrl = p.ImageUrl,
                             basePrice = p.BasePrice,
                             discountPercentage = p.DiscountPercentage,
                             isActive = p.IsActive,
@@ -341,6 +351,8 @@ namespace Beyti_Backend.Controllers.Api
                     createdAt = seller.CreatedAt,
                     isOpen = seller.IsOpen,
                     averageRating = averageRating,
+                    storeImageUrl = seller.StoreImageUrl,
+                    storeDescription = seller.StoreDescription,
                     subCategoryIds = seller.SellerSubCategories.Select(ssc => ssc.SubCategoryId).ToList(),
                     subCategoryNames = seller.SellerSubCategories.Select(ssc => ssc.SubCategory.Name).ToList(),
                     storeSections = seller.StoreSections
@@ -405,6 +417,7 @@ namespace Beyti_Backend.Controllers.Api
                                 id = p.Id,
                                 name = p.Name,
                                 description = p.Description,
+                                imageUrl = p.ImageUrl,
                                 basePrice = p.BasePrice,
                                 discountPercentage = p.DiscountPercentage,
                                 isActive = p.IsActive,
@@ -819,6 +832,37 @@ namespace Beyti_Backend.Controllers.Api
                 return StatusCode(500, new
                 {
                     message = "Error deleting seller",
+                    error = ex.Message
+                });
+            }
+        }
+
+        // PUT: api/Sellers/{id}/store-description
+        [HttpPut("{id}/store-description")]
+        public async Task<IActionResult> UpdateStoreDescription(int id, [FromBody] UpdateStoreDescriptionDto dto)
+        {
+            try
+            {
+                var seller = await _context.Sellers.FindAsync(id);
+                if (seller == null)
+                    return NotFound(new { message = "Seller not found" });
+
+                seller.StoreDescription = dto.Description;
+                seller.UpdatedAt = DateTime.UtcNow;
+
+                await _context.SaveChangesAsync();
+
+                return Ok(new
+                {
+                    message = "Store description updated successfully",
+                    storeDescription = seller.StoreDescription
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Error updating store description",
                     error = ex.Message
                 });
             }

@@ -10,6 +10,7 @@ import { User, Envelope, Phone, MapPin, Calendar, IdentificationCard, CheckCircl
 
 import ConfirmModal from './ConfirmModal'; 
 import { formatTime } from '../Beyti-Website/Seller/Components/storeStatus';
+import Cropper from 'react-easy-crop';
 
 export default function ProfilePage({
   userProfile,
@@ -29,13 +30,57 @@ export default function ProfilePage({
     city: '',
     region: '',
     postalCode: '',
-    country: 'Bahrain'
+    country: 'Bahrain',
+    storeDescription: ''
   });
 
   const [showImageModal, setShowImageModal] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
   const fileInputRef = useRef(null);
+
+  const [showCropper, setShowCropper] = useState(false);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+
+  const onCropComplete = (croppedArea, croppedAreaPixels) => {
+  setCroppedAreaPixels(croppedAreaPixels);
+};
+
+const createCroppedImage = async () => {
+  try {
+    const image = new Image();
+    image.src = imagePreview;
+    
+    await new Promise((resolve) => {
+      image.onload = resolve;
+    });
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    canvas.width = croppedAreaPixels.width;
+    canvas.height = croppedAreaPixels.height;
+
+    ctx.drawImage(
+      image,
+      croppedAreaPixels.x,
+      croppedAreaPixels.y,
+      croppedAreaPixels.width,
+      croppedAreaPixels.height,
+      0,
+      0,
+      croppedAreaPixels.width,
+      croppedAreaPixels.height
+    );
+
+    return canvas.toDataURL('image/jpeg');
+  } catch (error) {
+    console.error('Error cropping image:', error);
+    return null;
+  }
+};
 
 
   const [availableSubCategories, setAvailableSubCategories] = useState([]);
@@ -63,13 +108,11 @@ useEffect(() => {
       city: userProfile.city || '',
       region: userProfile.region || '',
       postalCode: userProfile.postalCode || '',
-      country: userProfile.country || 'Bahrain'
+      country: userProfile.country || 'Bahrain',
+      storeDescription: userProfile.storeDescription || ''
     });
 
-    // Set image preview if exists
-    if (userRole === 'Seller' && userProfile.storeImageUrl) {
-      setImagePreview(userProfile.storeImageUrl);
-    }
+
 
     console.log('🔄 Updated states - isManuallyClosed:', userProfile.isManuallyClosed, 'isForceOpen:', userProfile.isForceOpen);
 
@@ -87,6 +130,15 @@ useEffect(() => {
     }
   }
 }, [userProfile, userRole]);
+
+// Initialize image preview from userProfile
+useEffect(() => {
+  if (userProfile?.storeImageUrl) {
+    setImagePreview(`https://localhost:7062${userProfile.storeImageUrl}`);
+  } else {
+    setImagePreview(null);
+  }
+}, [userProfile]);
 
 // Add this new function right after the useEffect:
 const loadSubCategories = async (categoryId) => {
@@ -166,10 +218,30 @@ const loadSubCategories = async (categoryId) => {
         }
       }
 
-      // Call the parent's update handler
-      if (onProfileUpdate) {
-        await onProfileUpdate(updates);
+      // Update store description for sellers
+      if (userRole === 'Seller' && entityId) {
+        try {
+          const descResponse = await fetch(`https://localhost:7062/api/Sellers/${entityId}/store-description`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ description: formData.storeDescription })
+          });
+
+          if (!descResponse.ok) {
+            const errorData = await descResponse.json();
+            throw new Error(errorData.message || 'Failed to update description');
+          }
+        } catch (error) {
+          console.error('Error updating description:', error);
+          throw error;
+        }
       }
+
+      // Call the parent's update handler
+      if (updates.forceRefresh) {
+        fetchUserProfile(); // must refetch from backend
+      }
+
 
       setSaveMessage({ type: 'success', text: 'Profile updated successfully!' });
       setIsEditing(false);
@@ -199,14 +271,15 @@ const loadSubCategories = async (categoryId) => {
         city: userProfile.city || '',
         region: userProfile.region || '',
         postalCode: userProfile.postalCode || '',
-        country: userProfile.country || 'Bahrain'
+        country: userProfile.country || 'Bahrain',
+        storeDescription: userProfile.storeDescription || ''
       });
     }
     setIsEditing(false);
     setSaveMessage(null);
   };
 
-  const handleImageUpload = (event) => {
+const handleImageUpload = (event) => {
   const file = event.target.files?.[0];
   if (!file) return;
 
@@ -226,6 +299,7 @@ const loadSubCategories = async (categoryId) => {
   const reader = new FileReader();
   reader.onloadend = () => {
     setImagePreview(reader.result);
+    setShowCropper(true);
   };
   reader.readAsDataURL(file);
 };
@@ -239,22 +313,43 @@ const handleSaveImage = async () => {
   setUploadingImage(true);
 
   try {
+    let finalImage = imagePreview;
+    
+    // If cropper was used, get the cropped image
+    if (showCropper && croppedAreaPixels) {
+      finalImage = await createCroppedImage();
+      if (!finalImage) {
+        alert('Failed to crop image');
+        setUploadingImage(false);
+        return;
+      }
+    }
+
     const response = await fetch(`https://localhost:7062/api/Sellers/${entityId}/store-image`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ imageBase64: imagePreview })
+      body: JSON.stringify({ imageBase64: finalImage })
     });
 
     if (!response.ok) {
       throw new Error('Failed to upload image');
     }
 
+    const result = await response.json();
+    
+    // Update local preview with the returned URL
+    setImagePreview(result.storeImageUrl);
+    
     setSaveMessage({ type: 'success', text: 'Store logo updated successfully!' });
     setShowImageModal(false);
+    setShowCropper(false);
 
-    // Trigger parent refresh
+    // Trigger parent refresh with the new image URL
     if (onProfileUpdate) {
-      await onProfileUpdate({ forceRefresh: true });
+      await onProfileUpdate({ 
+        forceRefresh: true,
+        storeImageUrl: result.storeImageUrl 
+      });
     }
   } catch (error) {
     console.error('Error uploading image:', error);
@@ -394,9 +489,9 @@ const handleToggleStoreStatus = async () => {
               <div className="relative">
                 <div className="w-32 h-32 rounded-full bg-grey-200 dark:bg-[#2A2A2A] border-4 border-grey-200 dark:border-[#2A2A2A] shadow-soft-lift dark:shadow-none flex items-center justify-center transition-colors overflow-hidden">
                   {userRole === 'Seller' && imagePreview ? (
-                    <img 
-                      src={imagePreview.startsWith('data:') ? imagePreview : `https://localhost:7062${imagePreview}`} 
-                      alt="Store Logo" 
+                    <img
+                      src={imagePreview}
+                      alt="Store Logo"
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -404,6 +499,7 @@ const handleToggleStoreStatus = async () => {
                       <User size={64} weight="fill" className="text-sage-100" />
                     </div>
                   )}
+
                 </div>
                 {userRole === 'Seller' && !readOnly && (
                   <button
@@ -547,11 +643,71 @@ const handleToggleStoreStatus = async () => {
           </div>
         </div>
 
-        {/* Contact & Address Card */}
+        {/* Contact & Details Card */}
         <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg border border-grey-stroke dark:border-charcoal-500 shadow-soft-lift dark:shadow-none p-6 transition-colors">
           <h2 className="text-display-h3 text-charcoal-600 dark:text-white font-semibold mb-6">Contact & Details</h2>
 
           <div className="space-y-4">
+            {/* Store Description - Only for Sellers */}
+            {userRole === 'Seller' && (
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-md bg-sage-100 dark:bg-sage-900 flex items-center justify-center flex-shrink-0 mt-1">
+                  <svg className="w-5 h-5 text-sage-700 dark:text-sage-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-label-medium text-charcoal-400 dark:text-gray-400 mb-1">Store Description</p>
+                  {isEditing ? (
+                    <textarea
+                      name="storeDescription"
+                      value={formData.storeDescription}
+                      onChange={handleInputChange}
+                      rows={3}
+                      maxLength={500}
+                      className="w-full px-3 py-2 border border-charcoal-400 dark:border-charcoal-500 dark:bg-charcoal-600 rounded-md text-body-regular text-charcoal-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-sage-500 resize-none"
+                      placeholder="Describe your store in a few words..."
+                    />
+                  ) : (
+                    <p className="text-body-regular text-charcoal-600 dark:text-white font-medium whitespace-pre-wrap">
+                      {formData.storeDescription || 'No description provided'}
+                    </p>
+                  )}
+                  {isEditing && (
+                    <p className="text-xs text-charcoal-400 dark:text-gray-400 mt-1">
+                      {formData.storeDescription?.length || 0}/500 characters
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Phone - Only show for non-Admin users */}
+            {showContactFields && (
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-md bg-sage-100 dark:bg-sage-900 flex items-center justify-center flex-shrink-0 mt-1">
+                  <Phone size={20} className="text-sage-700 dark:text-sage-300" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-label-medium text-charcoal-400 dark:text-gray-400 mb-1">Phone Number</p>
+                  {isEditing ? (
+                    <input
+                      type="tel"
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-charcoal-400 dark:border-charcoal-500 dark:bg-charcoal-600 rounded-md text-body-regular text-charcoal-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-sage-500"
+                      placeholder="Enter your phone number"
+                    />
+                  ) : (
+                    <p className="text-body-regular text-charcoal-600 dark:text-white font-medium">
+                      {formData.phone || 'Not provided'}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Address - Only show for non-Admin users */}
             {showContactFields && (
               <div className="flex items-start gap-4">
@@ -906,7 +1062,11 @@ const handleToggleStoreStatus = async () => {
                     {imagePreview ? 'Edit Store Logo' : 'Add Store Logo'}
                   </h3>
                   <button
-                    onClick={() => setShowImageModal(false)}
+                    onClick={() => {
+                      setShowImageModal(false);
+                      setShowCropper(false);
+                      setImagePreview(null);
+                    }}
                     className="p-2 hover:bg-grey-100 dark:hover:bg-charcoal-600 rounded-full transition-colors"
                   >
                     <X size={20} weight="bold" className="text-charcoal-600 dark:text-white" />
@@ -915,10 +1075,37 @@ const handleToggleStoreStatus = async () => {
               </div>
 
               <div className="p-6">
-                {/* Image Preview */}
+                {/* Image Preview/Cropper */}
                 <div className="mb-6">
-                  <div className="w-full aspect-square rounded-xl border-2 border-dashed border-grey-stroke dark:border-charcoal-500 flex items-center justify-center overflow-hidden bg-grey-100 dark:bg-charcoal-600">
-                    {imagePreview ? (
+                  <div className="w-full aspect-square rounded-xl border-2 border-dashed border-grey-stroke dark:border-charcoal-500 flex items-center justify-center overflow-hidden bg-grey-100 dark:bg-charcoal-600 relative">
+                    {imagePreview && showCropper ? (
+                      <>
+                        <Cropper
+                          image={imagePreview}
+                          crop={crop}
+                          zoom={zoom}
+                          aspect={1}
+                          cropShape="round"
+                          showGrid={false}
+                          onCropChange={setCrop}
+                          onZoomChange={setZoom}
+                          onCropComplete={onCropComplete}
+                        />
+                        {/* Zoom Controls */}
+                        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white dark:bg-charcoal-700 rounded-full px-6 py-3 shadow-lg z-10 flex items-center gap-3">
+                          <span className="text-sm font-semibold text-charcoal-600 dark:text-white">Zoom:</span>
+                          <input
+                            type="range"
+                            min="1"
+                            max="3"
+                            step="0.1"
+                            value={zoom}
+                            onChange={(e) => setZoom(parseFloat(e.target.value))}
+                            className="w-32"
+                          />
+                        </div>
+                      </>
+                    ) : imagePreview && !showCropper ? (
                       <img 
                         src={imagePreview} 
                         alt="Preview" 
@@ -964,7 +1151,7 @@ const handleToggleStoreStatus = async () => {
                   )}
                   <button
                     onClick={handleSaveImage}
-                    disabled={!imagePreview || uploadingImage}
+                    disabled={!imagePreview || uploadingImage || (showCropper && !croppedAreaPixels)}
                     className="flex-1 px-4 py-3 bg-sage-500 hover:bg-sage-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {uploadingImage ? (

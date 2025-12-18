@@ -218,7 +218,19 @@ namespace Beyti_Backend.Controllers.Api
             _context.Products.Add(product);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, product);
+            // Reload product to get all navigation properties
+            var createdProduct = await _context.Products
+                .Include(p => p.SubCategory)
+                .FirstOrDefaultAsync(p => p.Id == product.Id);
+
+            return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, new
+            {
+                id = createdProduct.Id,
+                name = createdProduct.Name,
+                basePrice = createdProduct.BasePrice,
+                imageUrl = createdProduct.ImageUrl,
+                isActive = createdProduct.IsActive
+            });
         }
 
 

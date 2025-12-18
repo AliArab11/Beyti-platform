@@ -1517,6 +1517,8 @@ const productsArr = Array.from(productMap.values()).sort(
                               status: 'Active',
                               categoryId: currentSeller?.categoryId,
                               subCategoryIds: currentSeller?.subCategoryIds || [],
+                              storeImageUrl: currentSeller?.storeImageUrl || null,
+                              storeDescription: currentSeller?.storeDescription || '',
                               openTime: currentSeller?.openTime || '',  
                               closeTime: currentSeller?.closeTime || '',  
                               isManuallyClosed: currentSeller?.isManuallyClosed || false,

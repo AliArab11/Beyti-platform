@@ -290,7 +290,8 @@ const handleAddToCart = () => {
       totalPrice: finalPrice * quantity,
       selectedVariant: selectedVariant,
       storeName: storeName,
-      sellerId: storeId
+      sellerId: storeId,
+      imageUrl: product.imageUrl || null
   };
     
     console.log('🛒 ProductPage: Creating cart item with quantity:', quantity);
@@ -524,27 +525,30 @@ const handleTrackOrder = () => {
       })()}
 
       {/* Main Content */}
-<main className="max-w-[1400px] mx-auto px-8 py-12">
-  <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-16">
-    {/* Left: Product Image */}
-    <div className="bg-white rounded-3xl p-12 shadow-[0_4px_20px_rgba(0,0,0,0.08)]">
-      <div className="relative aspect-square bg-gradient-to-br from-sage-100 to-sage-200 rounded-2xl flex items-center justify-center">
-        <button
-          onClick={() => setIsFavorite(!isFavorite)}
-          className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm p-3 rounded-full shadow-lg hover:scale-110 transition-transform z-10"
-        >
-          <Heart 
-            size={24} 
-            weight={isFavorite ? "fill" : "regular"} 
-            className={isFavorite ? "text-red-500" : "text-charcoal-600"}
-          />
-        </button>
-        
-        <div className="w-80 h-80 bg-white/30 rounded-full flex items-center justify-center">
-          <Package size={120} className="text-white/60" weight="thin" />
-        </div>
-      </div>
-    </div>
+      <main className="max-w-[1400px] mx-auto px-8 py-12">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-16">
+          {/* Left: Product Image */}
+          <div className="bg-white rounded-3xl p-2 shadow-[0_4px_20px_rgba(0,0,0,0.08)]">
+            <div className="relative aspect-square rounded-2xl overflow-hidden bg-gradient-to-br from-sage-100 to-sage-200">
+
+
+              {product.imageUrl ? (
+                <img 
+                  src={`https://localhost:7062${product.imageUrl}`}
+                  alt={product.name}
+                  className="absolute inset-0 w-full h-full object-contain"
+                />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-80 h-80 bg-white/30 rounded-full flex items-center justify-center">
+                    <Package size={120} className="text-white/60" weight="thin" />
+                  </div>
+                </div>
+              )}
+
+            </div>
+          </div>
+
 
     {/* Right: Product Info */}
     <div className="flex flex-col">
