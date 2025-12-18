@@ -759,20 +759,15 @@ export default function CustomerHistory() {
                                   {booking.serviceType || 'N/A'}
                                 </td>
                                 <td className="p-4 text-body-small text-charcoal-600 dark:text-cream-50 text-right">
-                                  {booking.finalAmount != null ? (
+                                  {booking.finalPrice != null ? (
                                     <div>
-                                      <div className="font-semibold">{formatCurrency(booking.finalAmount)}</div>
-                                      <div className="text-charcoal-400 dark:text-charcoal-300">Final</div>
+                                      <div className="font-semibold">{formatCurrency(booking.finalPrice)}</div>
+                                      <div className="text-charcoal-400 dark:text-charcoal-300">Paid</div>
                                     </div>
                                   ) : booking.quotedPrice != null ? (
                                     <div>
                                       <div className="font-semibold">{formatCurrency(booking.quotedPrice)}</div>
                                       <div className="text-charcoal-400 dark:text-charcoal-300">Quoted</div>
-                                    </div>
-                                  ) : booking.depositAmount != null ? (
-                                    <div>
-                                      <div className="font-semibold">{formatCurrency(booking.depositAmount)}</div>
-                                      <div className="text-charcoal-400 dark:text-charcoal-300">Deposit</div>
                                     </div>
                                   ) : (
                                     'Pending'

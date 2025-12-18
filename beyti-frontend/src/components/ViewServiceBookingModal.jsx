@@ -178,14 +178,6 @@ export default function ViewServiceBookingModal({ isOpen, onClose, booking, onOp
               <h3 className="text-card-h3 text-charcoal-600 dark:text-cream-50">Pricing</h3>
             </div>
             <div className="space-y-2">
-              {booking.depositAmount != null && (
-                <div className="flex justify-between">
-                  <span className="text-body-regular text-charcoal-400 dark:text-charcoal-300">Deposit:</span>
-                  <span className="text-body-regular text-charcoal-600 dark:text-cream-50 font-medium">
-                    {formatCurrency(booking.depositAmount)}
-                  </span>
-                </div>
-              )}
               {booking.quotedPrice != null && (
                 <div className="flex justify-between">
                   <span className="text-body-regular text-charcoal-400 dark:text-charcoal-300">Quoted Price:</span>
@@ -194,26 +186,26 @@ export default function ViewServiceBookingModal({ isOpen, onClose, booking, onOp
                   </span>
                 </div>
               )}
-              {booking.finalAmount != null && (
+              {booking.finalPrice != null && (
                 <div className="flex justify-between pt-2 border-t border-grey-stroke dark:border-charcoal-400">
-                  <span className="text-body-large text-charcoal-600 dark:text-cream-50 font-semibold">Final Amount:</span>
+                  <span className="text-body-large text-charcoal-600 dark:text-cream-50 font-semibold">Price Paid:</span>
                   <span className="text-body-large text-sage-600 dark:text-sage-400 font-semibold">
-                    {formatCurrency(booking.finalAmount)}
+                    {formatCurrency(booking.finalPrice)}
                   </span>
                 </div>
               )}
-              {booking.finalAmount == null && booking.quotedPrice == null && booking.depositAmount == null && (
+              {booking.finalPrice == null && booking.quotedPrice == null && (
                 <p className="text-body-regular text-charcoal-400 dark:text-charcoal-300">Pricing pending</p>
               )}
             </div>
           </div>
 
-          {/* Payment Method */}
-          {booking.paymentMethod && (
+          {/* Payment Type */}
+          {booking.paymentType && (
             <div className="bg-grey-200 dark:bg-charcoal-500 rounded-lg p-4">
-              <h3 className="text-card-h3 text-charcoal-600 dark:text-cream-50 mb-3">Payment Method</h3>
+              <h3 className="text-card-h3 text-charcoal-600 dark:text-cream-50 mb-3">Payment Type</h3>
               <p className="text-body-regular text-charcoal-600 dark:text-cream-50 font-medium">
-                {booking.paymentMethod}
+                {booking.paymentType}
               </p>
             </div>
           )}

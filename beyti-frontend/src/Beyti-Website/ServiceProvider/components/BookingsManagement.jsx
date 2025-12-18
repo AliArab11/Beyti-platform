@@ -12,6 +12,9 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [showQuoteModal, setShowQuoteModal] = useState(false);
   const [quotePrice, setQuotePrice] = useState('');
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [finalPrice, setFinalPrice] = useState('');
+  const [paymentType, setPaymentType] = useState('');
   const [viewMode, setViewMode] = useState('upcoming'); // 'upcoming' or 'all'
   const [currentWeekStart, setCurrentWeekStart] = useState(getWeekStart(new Date()));
   const [timeSlots, setTimeSlots] = useState([]);
@@ -164,10 +167,10 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
     }
   };
 
-  const handleStatusChange = async (bookingId, newStatus) => {
+  const handleStatusChange = async (bookingId, newStatus, additionalData = {}) => {
     try {
       const booking = bookings.find(b => b.id === bookingId);
-      await updateBookingStatus(bookingId, { status: newStatus });
+      await updateBookingStatus(bookingId, { status: newStatus, ...additionalData });
 
       // Log activity
       const actionMap = {
@@ -189,6 +192,41 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
     } catch (err) {
       console.error('Error updating status:', err);
       alert('Error updating booking status');
+    }
+  };
+
+  const handleCompleteService = async () => {
+    if (!finalPrice || parseFloat(finalPrice) <= 0) {
+      alert('Please enter a valid final price');
+      return;
+    }
+    if (!paymentType) {
+      alert('Please select a payment type');
+      return;
+    }
+
+    try {
+      await handleStatusChange(selectedBooking.id, 'Completed', {
+        finalPrice: parseFloat(finalPrice),
+        paymentType: paymentType
+      });
+
+      // Log activity with price details
+      logProviderActivity(
+        serviceProviderId,
+        'booking',
+        'Completed Service',
+        `Customer: ${selectedBooking.customerName || 'N/A'} - Final Price: ${parseFloat(finalPrice).toFixed(2)} BHD (${paymentType})`
+      );
+
+      alert('Service completed successfully!');
+      setShowCompleteModal(false);
+      setSelectedBooking(null);
+      setFinalPrice('');
+      setPaymentType('');
+    } catch (err) {
+      console.error('Error completing service:', err);
+      alert('Error completing service');
     }
   };
 
@@ -845,17 +883,23 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
 
                       {/* Pricing */}
                       <td className="px-6 py-4">
-                        {booking.quotedPrice ? (
+                        {booking.quotedPrice || booking.finalPrice ? (
                           <div>
-                            <p className="text-body-regular text-charcoal-600 dark:text-gray-200 font-medium">
-                              {booking.quotedPrice} BHD
-                            </p>
-                            <p className="text-label-medium text-charcoal-400 dark:text-gray-400">
-                              Deposit: {booking.depositAmount} BHD
-                            </p>
-                            <p className="text-label-medium text-charcoal-400 dark:text-gray-400">
-                              Final: {booking.finalAmount} BHD
-                            </p>
+                            {booking.quotedPrice && (
+                              <p className="text-label-medium text-charcoal-400 dark:text-gray-400">
+                                Quoted: {booking.quotedPrice} BHD
+                              </p>
+                            )}
+                            {booking.finalPrice && (
+                              <p className="text-body-regular text-charcoal-600 dark:text-gray-200 font-medium">
+                                Final: {booking.finalPrice} BHD
+                              </p>
+                            )}
+                            {booking.paymentType && (
+                              <p className="text-label-small text-sage-600 dark:text-sage-400">
+                                ({booking.paymentType})
+                              </p>
+                            )}
                           </div>
                         ) : (
                           <span className="text-charcoal-400 dark:text-charcoal-300">-</span>
@@ -954,7 +998,10 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
                           {booking.status === 'InProgress' && (
                             <CRUDButton
                               variant="success"
-                              onClick={() => handleStatusChange(booking.id, 'Completed')}
+                              onClick={() => {
+                                setSelectedBooking(booking);
+                                setShowCompleteModal(true);
+                              }}
                               className="w-full text-center"
                             >
                               Complete
@@ -1103,29 +1150,31 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
               )}
 
               {/* Pricing */}
-              {selectedBooking.quotedPrice && (
+              {(selectedBooking.quotedPrice || selectedBooking.finalPrice) && (
                 <div>
                   <label className="text-label-medium text-charcoal-400 dark:text-gray-400">Pricing</label>
                   <div className="mt-1 p-4 bg-sage-50 dark:bg-sage-900/20 rounded-lg border border-sage-200 dark:border-sage-800">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-body-regular text-charcoal-600 dark:text-white">Quoted Price:</span>
-                      <span className="text-body-regular text-charcoal-600 dark:text-white font-bold">
-                        {selectedBooking.quotedPrice} BHD
-                      </span>
-                    </div>
-                    {selectedBooking.depositAmount && (
+                    {selectedBooking.quotedPrice && (
                       <div className="flex justify-between items-center mb-2">
-                        <span className="text-label-medium text-charcoal-400 dark:text-gray-400">Deposit:</span>
-                        <span className="text-label-medium text-charcoal-600 dark:text-white">
-                          {selectedBooking.depositAmount} BHD
+                        <span className="text-body-regular text-charcoal-600 dark:text-white">Quoted Price:</span>
+                        <span className="text-body-regular text-charcoal-600 dark:text-white font-bold">
+                          {selectedBooking.quotedPrice} BHD
                         </span>
                       </div>
                     )}
-                    {selectedBooking.finalAmount && (
+                    {selectedBooking.finalPrice && (
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-label-medium text-charcoal-400 dark:text-gray-400">Final Price:</span>
+                        <span className="text-label-medium text-charcoal-600 dark:text-white font-bold">
+                          {selectedBooking.finalPrice} BHD
+                        </span>
+                      </div>
+                    )}
+                    {selectedBooking.paymentType && (
                       <div className="flex justify-between items-center">
-                        <span className="text-label-medium text-charcoal-400 dark:text-gray-400">Final Payment:</span>
+                        <span className="text-label-medium text-charcoal-400 dark:text-gray-400">Payment Type:</span>
                         <span className="text-label-medium text-charcoal-600 dark:text-white">
-                          {selectedBooking.finalAmount} BHD
+                          {selectedBooking.paymentType}
                         </span>
                       </div>
                     )}
@@ -1219,8 +1268,7 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
                   <CRUDButton
                     variant="success"
                     onClick={() => {
-                      handleStatusChange(selectedBooking.id, 'Completed');
-                      setSelectedBooking(null);
+                      setShowCompleteModal(true);
                     }}
                     className="flex-1"
                   >
@@ -1313,6 +1361,106 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
                     setShowQuoteModal(false);
                     setSelectedBooking(null);
                     setQuotePrice('');
+                  }}
+                  className="flex-1"
+                >
+                  Cancel
+                </CRUDButton>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Complete Service Modal */}
+      {showCompleteModal && selectedBooking && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-xl max-w-md w-full transition-colors">
+            <div className="p-6 border-b border-grey-stroke dark:border-charcoal-500">
+              <h3 className="text-card-h2 text-charcoal-600 dark:text-white">Complete Service</h3>
+              <p className="text-body-regular text-charcoal-400 dark:text-gray-400 mt-1">
+                Enter final price and payment method
+              </p>
+            </div>
+
+            <div className="p-6">
+              <div className="mb-4 p-4 bg-cream-50 dark:bg-charcoal-600 rounded-lg">
+                <p className="text-body-regular text-charcoal-400 dark:text-gray-400 mb-2">
+                  <span className="font-semibold text-charcoal-600 dark:text-white">Customer:</span> {selectedBooking.customerName}
+                </p>
+                <p className="text-body-regular text-charcoal-400 dark:text-gray-400 mb-2">
+                  <span className="font-semibold text-charcoal-600 dark:text-white">Service:</span> {selectedBooking.serviceName}
+                </p>
+                {selectedBooking.quotedPrice && (
+                  <p className="text-body-regular text-charcoal-400 dark:text-gray-400">
+                    <span className="font-semibold text-charcoal-600 dark:text-white">Quoted Price:</span>{' '}
+                    {selectedBooking.quotedPrice} BHD
+                  </p>
+                )}
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">
+                  Final Price (BHD) *
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={finalPrice}
+                  onChange={(e) => setFinalPrice(e.target.value)}
+                  className="w-full border border-grey-stroke dark:border-charcoal-500 dark:bg-charcoal-600 rounded-lg px-4 py-3 text-body-regular text-charcoal-600 dark:text-white focus:ring-2 focus:ring-sage-500 focus:border-sage-500"
+                  placeholder="Enter actual price charged (e.g., 25.00)"
+                  autoFocus
+                />
+                <p className="text-label-small text-charcoal-400 dark:text-gray-400 mt-1">
+                  This is the final amount you received from the customer
+                </p>
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">
+                  Payment Type *
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => setPaymentType('Cash')}
+                    className={`p-4 rounded-lg border-2 transition-all ${
+                      paymentType === 'Cash'
+                        ? 'bg-sage-500 border-sage-500 text-white'
+                        : 'bg-white dark:bg-charcoal-600 border-grey-stroke dark:border-charcoal-500 text-charcoal-600 dark:text-white hover:border-sage-500'
+                    }`}
+                  >
+                    <p className="font-bold text-sm">Cash</p>
+                  </button>
+                  <button
+                    onClick={() => setPaymentType('BenefitPay')}
+                    className={`p-4 rounded-lg border-2 transition-all ${
+                      paymentType === 'BenefitPay'
+                        ? 'bg-sage-500 border-sage-500 text-white'
+                        : 'bg-white dark:bg-charcoal-600 border-grey-stroke dark:border-charcoal-500 text-charcoal-600 dark:text-white hover:border-sage-500'
+                    }`}
+                  >
+                    <p className="font-bold text-sm">BenefitPay</p>
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <CRUDButton
+                  variant="success"
+                  onClick={handleCompleteService}
+                  disabled={!finalPrice || parseFloat(finalPrice) <= 0 || !paymentType}
+                  className="flex-1"
+                >
+                  Complete Service
+                </CRUDButton>
+                <CRUDButton
+                  variant="error"
+                  onClick={() => {
+                    setShowCompleteModal(false);
+                    setFinalPrice('');
+                    setPaymentType('');
                   }}
                   className="flex-1"
                 >

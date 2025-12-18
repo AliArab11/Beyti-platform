@@ -352,8 +352,6 @@ public partial class BeytiContext : DbContext
         {
             entity.Property(e => e.CancellationFee).HasDefaultValue(0m);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())");
-            entity.Property(e => e.DepositAmount).HasComputedColumnSql("([QuotedPrice]*(0.5))", true);
-            entity.Property(e => e.FinalAmount).HasComputedColumnSql("([QuotedPrice]*(0.5))", true);
             entity.Property(e => e.ServiceType).HasDefaultValue("Home");
             entity.Property(e => e.Status).HasDefaultValue("PendingQuote");
             entity.Property(e => e.UpdatedAt).HasDefaultValueSql("(sysutcdatetime())");

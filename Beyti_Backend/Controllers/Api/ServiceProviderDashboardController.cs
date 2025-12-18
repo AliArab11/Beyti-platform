@@ -910,8 +910,8 @@ namespace Beyti_Backend.Controllers.Api
                         sb.Status,
                         sb.ServiceType,
                         sb.QuotedPrice,
-                        sb.DepositAmount,
-                        sb.FinalAmount,
+                        sb.FinalPrice,
+                        sb.PaymentType,
                         sb.Notes,
                         CustomerName = sb.Customer.UserProfile.DisplayName,
                         CustomerPhone = sb.Customer.Phone,
@@ -962,9 +962,16 @@ namespace Beyti_Backend.Controllers.Api
                 if (body.TryGetProperty("quotedPrice", out var priceProp))
                 {
                     booking.QuotedPrice = priceProp.GetDecimal();
-                    // Calculate deposit and final amount (50% split)
-                    booking.DepositAmount = booking.QuotedPrice * 0.5m;
-                    booking.FinalAmount = booking.QuotedPrice * 0.5m;
+                }
+
+                if (body.TryGetProperty("finalPrice", out var finalPriceProp))
+                {
+                    booking.FinalPrice = finalPriceProp.GetDecimal();
+                }
+
+                if (body.TryGetProperty("paymentType", out var paymentTypeProp))
+                {
+                    booking.PaymentType = paymentTypeProp.GetString();
                 }
 
                 booking.UpdatedAt = DateTime.Now;
@@ -1072,8 +1079,7 @@ namespace Beyti_Backend.Controllers.Api
                     .Select(sb => new
                     {
                         sb.QuotedPrice,
-                        sb.FinalAmount,
-                        sb.DepositAmount
+                        sb.FinalPrice
                     })
                     .ToListAsync();
 
@@ -1081,8 +1087,8 @@ namespace Beyti_Backend.Controllers.Api
                 decimal totalEarnings = 0;
                 foreach (var booking in completedBookingsList)
                 {
-                    // Use FinalAmount if available, otherwise QuotedPrice, otherwise 0
-                    totalEarnings += booking.FinalAmount ?? booking.QuotedPrice ?? 0;
+                    // Use FinalPrice if available, otherwise QuotedPrice, otherwise 0
+                    totalEarnings += booking.FinalPrice ?? booking.QuotedPrice ?? 0;
                 }
 
                 // Query the Services table for active services count

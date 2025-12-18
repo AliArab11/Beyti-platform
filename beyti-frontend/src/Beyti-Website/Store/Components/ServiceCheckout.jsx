@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { X, MapPin, Calendar, Clock, CreditCard, Wallet, CalendarCheck } from '@phosphor-icons/react';
+import { X, MapPin, Calendar, Clock, CalendarCheck } from '@phosphor-icons/react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
 const ServiceCheckout = ({ bookingData, onClose }) => {
-  const [step, setStep] = useState(1); // 1: Date & Time, 2: Address, 3: Notes, 4: Payment
+  const [step, setStep] = useState(1); // 1: Date & Time, 2: Address, 3: Notes
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState(null);
   const [availableTimeSlots, setAvailableTimeSlots] = useState([]);
@@ -14,7 +14,6 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
   const [mapLocation, setMapLocation] = useState(null);
-  const [paymentMethod, setPaymentMethod] = useState('');
   const [addresses, setAddresses] = useState([]);
   const [loadingAddresses, setLoadingAddresses] = useState(false);
   const [notes, setNotes] = useState('');
@@ -344,12 +343,8 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
       return;
     }
     // Step 3 is notes - optional, so no validation needed
-    if (step === 4 && !paymentMethod) {
-      alert('Please select payment method');
-      return;
-    }
 
-    if (step < 4) {
+    if (step < 3) {
       setStep(step + 1);
     } else {
       handlePlaceBooking();
@@ -393,7 +388,7 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
         status: 'Pending',
         serviceType: 'Scheduled',
         quotedPrice: bookingData.minPrice,
-        notes: notes ? `${notes}\n\nPayment Method: ${paymentMethod}` : `Payment Method: ${paymentMethod}`
+        notes: notes
       };
 
       console.log('Booking payload:', bookingPayload);
@@ -447,7 +442,7 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
         {/* Progress Bar */}
         <div className="bg-white px-5 py-3 border-b border-grey-stroke">
           <div className="flex items-center justify-between">
-            {['Date & Time', 'Address', 'Notes', 'Payment'].map((label, idx) => (
+            {['Date & Time', 'Address', 'Notes'].map((label, idx) => (
               <div key={idx} className="flex items-center">
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs transition-all ${
                   step > idx + 1 ? 'bg-sage-500 text-white' : step === idx + 1 ? 'bg-sage-500 text-white' : 'bg-grey-stroke text-charcoal-400'
@@ -457,7 +452,7 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
                 <span className={`ml-1.5 text-xs font-semibold ${step === idx + 1 ? 'text-sage-600' : 'text-charcoal-400'}`} style={{ fontFamily: 'Inter, sans-serif' }}>
                   {label}
                 </span>
-                {idx < 3 && <div className={`w-8 h-0.5 mx-2 ${step > idx + 1 ? 'bg-sage-500' : 'bg-grey-stroke'}`} />}
+                {idx < 2 && <div className={`w-8 h-0.5 mx-2 ${step > idx + 1 ? 'bg-sage-500' : 'bg-grey-stroke'}`} />}
               </div>
             ))}
           </div>
@@ -677,64 +672,6 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
             </div>
           )}
 
-          {/* Step 4: Payment Method */}
-          {step === 4 && (
-            <div>
-              <h3 className="text-xl font-bold text-charcoal-600 mb-4" style={{ fontFamily: 'Merriweather, serif' }}>
-                Payment Method
-              </h3>
-              <div className="grid grid-cols-3 gap-3 mb-4">
-                {['Cash', 'Card', 'Online'].map(method => (
-                  <button
-                    key={method}
-                    onClick={() => setPaymentMethod(method)}
-                    className={`p-5 rounded-xl border-2 transition-all ${
-                      paymentMethod === method
-                        ? 'bg-sage-500 border-sage-500 text-white'
-                        : 'bg-white border-grey-stroke hover:border-sage-500'
-                    }`}
-                  >
-                    {method === 'Cash' ? (
-                      <Wallet size={28} weight="fill" className="mx-auto mb-2" />
-                    ) : (
-                      <CreditCard size={28} weight="fill" className="mx-auto mb-2" />
-                    )}
-                    <p className="font-bold text-sm">{method}</p>
-                  </button>
-                ))}
-              </div>
-
-              {/* Booking Summary */}
-              <div className="bg-gradient-to-br from-sage-100 to-sage-200 p-5 rounded-xl border-2 border-sage-300">
-                <h4 className="font-bold text-charcoal-600 mb-3">Booking Summary</h4>
-                <div className="space-y-2 text-charcoal-600 text-sm">
-                  <div className="flex justify-between">
-                    <span>Service:</span>
-                    <span className="font-bold">{bookingData?.serviceName}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Provider:</span>
-                    <span className="font-bold">{bookingData?.serviceProviderName}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Date:</span>
-                    <span className="font-bold">{selectedDate && formatDate(selectedDate)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Time:</span>
-                    <span className="font-bold">{selectedTimeSlot && formatTimeSlot(selectedTimeSlot)}</span>
-                  </div>
-                  <div className="border-t-2 border-sage-300 pt-2 mt-2 flex justify-between text-lg font-black text-sage-700">
-                    <span>Estimated Price:</span>
-                    <span>{estimatedPrice.toFixed(3)} BD</span>
-                  </div>
-                  <p className="text-xs text-charcoal-500 italic mt-2">
-                    * Final price may vary based on service requirements
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Footer */}
@@ -748,7 +685,7 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
             </button>
           )}
           <button onClick={handleContinue} className="flex-1 bg-sage-500 text-white font-bold py-2.5 rounded-xl hover:bg-sage-600 text-sm">
-            {step === 4 ? 'Confirm Booking' : 'Continue'}
+            {step === 3 ? 'Confirm Booking' : 'Continue'}
           </button>
         </div>
       </div>

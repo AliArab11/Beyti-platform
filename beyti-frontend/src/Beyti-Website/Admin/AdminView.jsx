@@ -11,7 +11,10 @@ import {
   CheckCircle,
   UserPlus,
   ShieldCheck,
-  Clock
+  Clock,
+  Bell,
+  User,
+  GridFour
 } from '@phosphor-icons/react';
 import {
   getDashboardStatistics,
@@ -907,33 +910,48 @@ const AdminView = () => {
               </div>
 
               {/* Quick Actions */}
-              <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none p-6 transition-colors space-y-4">
-                <h3 className="text-card-h2 text-charcoal-600 dark:text-white">Quick Actions</h3>
-                <p className="text-body-regular text-charcoal-400 dark:text-gray-400">
-                  Common tasks you might want to do next.
-                </p>
+              <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none p-6 transition-colors">
+                <h2 className="text-card-h2 text-charcoal-600 dark:text-white mb-4">Quick Actions</h2>
 
+                {/* Quick Action Buttons */}
                 <div className="space-y-3">
                   <button
-                    type="button"
-                    className="w-full py-2.5 rounded-full bg-sage-500 hover:bg-sage-600 text-cream-50 font-semibold text-sm shadow-soft-lift transition-colors"
                     onClick={handleOpenAnnouncementModal}
+                    className="w-full flex items-center gap-4 p-4 bg-sage-100 dark:bg-sage-900 hover:bg-sage-200 dark:hover:bg-sage-800 rounded-lg transition-all duration-200 hover:scale-[1.02] hover:shadow-md"
                   >
-                    Send Announcement
+                    <div className="w-10 h-10 bg-sage-500 rounded-full flex items-center justify-center flex-shrink-0">
+                      <Bell size={20} className="text-white" weight="bold" />
+                    </div>
+                    <div className="text-left flex-1">
+                      <p className="text-body-medium text-charcoal-600 dark:text-white font-semibold">Send Announcement</p>
+                      <p className="text-label-medium text-charcoal-400 dark:text-gray-400">Broadcast message to all users</p>
+                    </div>
                   </button>
+
                   <button
-                    type="button"
-                    className="w-full py-2.5 rounded-full bg-sage-100 hover:bg-sage-200 text-sage-700 font-semibold text-sm transition-colors"
                     onClick={() => handleNavigate('/admin/users')}
+                    className="w-full flex items-center gap-4 p-4 bg-cream-100 dark:bg-charcoal-500 hover:bg-cream-200 dark:hover:bg-charcoal-400 rounded-lg transition-all duration-200 hover:scale-[1.02] hover:shadow-md"
                   >
-                    View Users
+                    <div className="w-10 h-10 bg-sage-500 rounded-full flex items-center justify-center flex-shrink-0">
+                      <User size={20} className="text-white" weight="bold" />
+                    </div>
+                    <div className="text-left flex-1">
+                      <p className="text-body-medium text-charcoal-600 dark:text-white font-semibold">View Users</p>
+                      <p className="text-label-medium text-charcoal-400 dark:text-gray-400">Manage platform user accounts</p>
+                    </div>
                   </button>
+
                   <button
-                    type="button"
-                    className="w-full py-2.5 rounded-full bg-grey-300 hover:bg-grey-400 text-charcoal-600 dark:text-charcoal-700 font-semibold text-sm transition-colors"
                     onClick={() => handleNavigate('/admin/category-moderation')}
+                    className="w-full flex items-center gap-4 p-4 bg-cream-100 dark:bg-charcoal-500 hover:bg-cream-200 dark:hover:bg-charcoal-400 rounded-lg transition-all duration-200 hover:scale-[1.02] hover:shadow-md"
                   >
-                    View Categories
+                    <div className="w-10 h-10 bg-sage-500 rounded-full flex items-center justify-center flex-shrink-0">
+                      <GridFour size={20} className="text-white" weight="bold" />
+                    </div>
+                    <div className="text-left flex-1">
+                      <p className="text-body-medium text-charcoal-600 dark:text-white font-semibold">View Categories</p>
+                      <p className="text-label-medium text-charcoal-400 dark:text-gray-400">Organize and manage categories</p>
+                    </div>
                   </button>
                 </div>
               </div>
