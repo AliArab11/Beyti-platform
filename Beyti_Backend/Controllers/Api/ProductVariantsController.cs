@@ -252,8 +252,8 @@ namespace Beyti_Backend.Controllers.Api
                 SKU = dto.SKU,
                 Price = dto.Price,
                 StockQty = dto.StockQty,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now,
+                UpdatedAt = DateTime.Now
             };
 
             _context.ProductVariants.Add(productVariant);
@@ -346,7 +346,7 @@ namespace Beyti_Backend.Controllers.Api
             productVariant.SKU = dto.SKU;
             productVariant.Price = dto.Price;
             productVariant.StockQty = dto.StockQty;
-            productVariant.UpdatedAt = DateTime.UtcNow;
+            productVariant.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 

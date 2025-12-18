@@ -5,21 +5,29 @@ import { Table, TableHeader, TableBody, TableRow } from '../../../components/Tab
 import StatusChip from '../../../components/StatusChip';
 import CRUDButton from '../../../components/CRUDButton';
 import { getRecentProviderActivities } from '../../../utils/providerActivityLogger';
+import QuickAddServiceModal from './QuickAddServiceModal';
+import QuickAddScheduleModal from './QuickAddScheduleModal';
 import {
   Clock,
   Package,
   CalendarCheck,
   Calendar,
   User,
-  Bell
+  Bell,
+  Plus,
+  ClockClockwise
 } from '@phosphor-icons/react';
 
-export default function ProviderOverview({ serviceProviderId, onNavigateToBookings, activityRefreshKey }) {
+export default function ProviderOverview({ serviceProviderId, onNavigateToBookings, activityRefreshKey, onNavigate }) {
   const [stats, setStats] = useState(null);
   const [todayBookings, setTodayBookings] = useState([]);
   const [recentReviews, setRecentReviews] = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Modal States
+  const [showServiceModal, setShowServiceModal] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
 
   useEffect(() => {
     if (serviceProviderId) {
@@ -111,10 +119,10 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
       let averageRating = 0;
       try {
         const reviews = await getServiceReviews(serviceProviderId);
-        // Sort reviews by creation date and show the last 3
+        // Sort reviews by creation date and show the last 2
         const sortedReviews = reviews
           .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-          .slice(0, 3);
+          .slice(0, 2);
         setRecentReviews(sortedReviews);
 
         // Calculate average rating from all reviews
@@ -365,7 +373,7 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
         </Table>
       </div>
 
-      {/* Recent Activity and Recent Reviews - Side by Side */}
+      {/* Recent Activity and Quick Actions - Side by Side */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Recent Activity */}
         <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none p-6 border border-transparent dark:border-charcoal-500 transition-colors h-[500px] flex flex-col">
@@ -420,46 +428,78 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
           )}
         </div>
 
-        {/* Recent Reviews */}
+        {/* Quick Actions */}
         <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none p-6 border border-transparent dark:border-charcoal-500 transition-colors h-[500px] flex flex-col">
-          <div className="flex items-center justify-between mb-4 flex-shrink-0">
-            <h2 className="text-card-h2 text-charcoal-600 dark:text-white">Recent Reviews</h2>
-            {stats.currentRating > 0 && (
-              <div className="flex items-center gap-2">
-                {renderStarRating(stats.currentRating)}
+          <h2 className="text-card-h2 text-charcoal-600 dark:text-white mb-4">Quick Actions</h2>
+
+          {/* Quick Action Buttons */}
+          <div className="space-y-3 mb-6">
+            <button
+              onClick={() => setShowServiceModal(true)}
+              className="w-full flex items-center gap-4 p-4 bg-sage-100 dark:bg-sage-900 hover:bg-sage-200 dark:hover:bg-sage-800 rounded-lg transition-all duration-200 hover:scale-[1.02] hover:shadow-md"
+            >
+              <div className="w-10 h-10 bg-sage-500 rounded-full flex items-center justify-center flex-shrink-0">
+                <Plus size={20} className="text-white" weight="bold" />
               </div>
-            )}
+              <div className="text-left flex-1">
+                <p className="text-body-medium text-charcoal-600 dark:text-white font-semibold">Add Service</p>
+                <p className="text-label-medium text-charcoal-400 dark:text-gray-400">Create a new service offering</p>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setShowScheduleModal(true)}
+              className="w-full flex items-center gap-4 p-4 bg-cream-100 dark:bg-charcoal-500 hover:bg-cream-200 dark:hover:bg-charcoal-400 rounded-lg transition-all duration-200 hover:scale-[1.02] hover:shadow-md"
+            >
+              <div className="w-10 h-10 bg-sage-500 rounded-full flex items-center justify-center flex-shrink-0">
+                <ClockClockwise size={20} className="text-white" weight="bold" />
+              </div>
+              <div className="text-left flex-1">
+                <p className="text-body-medium text-charcoal-600 dark:text-white font-semibold">Add Timeline</p>
+                <p className="text-label-medium text-charcoal-400 dark:text-gray-400">Update your availability schedule</p>
+              </div>
+            </button>
           </div>
 
-          {loading ? (
-            <div className="flex items-center justify-center flex-1">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sage-500"></div>
+          {/* Last 2 Reviews */}
+          <div className="flex-1 flex flex-col">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-body-medium text-charcoal-600 dark:text-white font-semibold">Recent Reviews</h3>
+              {stats.currentRating > 0 && (
+                <div className="flex items-center gap-1">
+                  <span className="text-yellow-500 text-sm">★</span>
+                  <span className="text-label-medium text-charcoal-600 dark:text-white font-medium">
+                    {stats.currentRating.toFixed(1)}
+                  </span>
+                </div>
+              )}
             </div>
-          ) : recentReviews.length === 0 ? (
-            <div className="text-center flex-1 flex flex-col justify-center">
-              <span className="text-5xl text-charcoal-300 dark:text-gray-600 mb-3 block">★</span>
-              <p className="text-body-regular text-charcoal-400 dark:text-gray-400">No reviews yet</p>
-              <p className="text-label-medium text-charcoal-300 dark:text-gray-500 mt-1">
-                Complete services to receive customer reviews
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4 overflow-y-auto flex-1">
-              {recentReviews.map((review, index) => (
-                <div
-                  key={review.id || index}
-                  className="pb-4 border-b border-grey-stroke dark:border-charcoal-500 last:border-0 last:pb-0"
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <p className="text-body-medium text-charcoal-600 dark:text-white font-semibold">
+
+            {loading ? (
+              <div className="flex items-center justify-center flex-1">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-sage-500"></div>
+              </div>
+            ) : recentReviews.length === 0 ? (
+              <div className="text-center flex-1 flex flex-col justify-center">
+                <span className="text-3xl text-charcoal-300 dark:text-gray-600 mb-2 block">★</span>
+                <p className="text-label-medium text-charcoal-400 dark:text-gray-400">No reviews yet</p>
+              </div>
+            ) : (
+              <div className="space-y-3 overflow-y-auto flex-1">
+                {recentReviews.map((review, index) => (
+                  <div
+                    key={review.id || index}
+                    className="pb-3 border-b border-grey-stroke dark:border-charcoal-500 last:border-0 last:pb-0"
+                  >
+                    <div className="flex items-start justify-between mb-1">
+                      <p className="text-body-regular text-charcoal-600 dark:text-white font-medium">
                         {review.customer?.fullName || 'Customer'}
                       </p>
-                      <div className="flex items-center gap-0.5 mt-1">
+                      <div className="flex items-center gap-0.5">
                         {[1, 2, 3, 4, 5].map((star) => (
                           <span
                             key={star}
-                            className={`text-sm ${
+                            className={`text-xs ${
                               star <= (review.overallRating || 0)
                                 ? 'text-yellow-500'
                                 : 'text-charcoal-300 dark:text-gray-600'
@@ -470,21 +510,42 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
                         ))}
                       </div>
                     </div>
-                    <span className="text-label-medium text-charcoal-300 dark:text-gray-500">
+                    {review.comment && (
+                      <p className="text-label-medium text-charcoal-400 dark:text-gray-400 line-clamp-2">
+                        {review.comment}
+                      </p>
+                    )}
+                    <p className="text-label-small text-charcoal-300 dark:text-gray-500 mt-1">
                       {new Date(review.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                  {review.comment && (
-                    <p className="text-body-regular text-charcoal-400 dark:text-gray-400 mt-2">
-                      {review.comment}
                     </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Quick Add Modals */}
+      <QuickAddServiceModal
+        serviceProviderId={serviceProviderId}
+        isOpen={showServiceModal}
+        onClose={() => setShowServiceModal(false)}
+        onSuccess={() => {
+          // Optionally refresh data or navigate
+          loadRecentActivity();
+        }}
+      />
+
+      <QuickAddScheduleModal
+        serviceProviderId={serviceProviderId}
+        isOpen={showScheduleModal}
+        onClose={() => setShowScheduleModal(false)}
+        onSuccess={() => {
+          // Optionally refresh data or navigate
+          loadRecentActivity();
+        }}
+      />
     </div>
   );
 }

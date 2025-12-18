@@ -134,7 +134,7 @@ namespace Beyti_Backend.Controllers.Api
             }
 
             // Update timestamp
-            serviceBooking.UpdatedAt = DateTime.UtcNow;
+            serviceBooking.UpdatedAt = DateTime.Now;
 
             _context.Entry(serviceBooking).State = EntityState.Modified;
 
@@ -166,8 +166,13 @@ namespace Beyti_Backend.Controllers.Api
         public async Task<ActionResult<ServiceBooking>> PostServiceBooking(ServiceBooking serviceBooking)
         {
             // Set timestamps FIRST
-            serviceBooking.CreatedAt = DateTime.UtcNow;
-            serviceBooking.UpdatedAt = DateTime.UtcNow;
+            serviceBooking.CreatedAt = DateTime.Now;
+            serviceBooking.UpdatedAt = DateTime.Now;
+
+            // Debug logging for timezone verification
+            Console.WriteLine($"[ServiceBooking] Received BookingDateTime: {serviceBooking.BookingDateTime}");
+            Console.WriteLine($"[ServiceBooking] DateTime.Now: {DateTime.Now}");
+            Console.WriteLine($"[ServiceBooking] BookingDateTime Kind: {serviceBooking.BookingDateTime.Kind}");
 
             // Remove navigation properties from ModelState BEFORE any validation
             ModelState.Remove("serviceBooking.Customer");

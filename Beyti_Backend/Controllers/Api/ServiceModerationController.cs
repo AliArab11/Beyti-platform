@@ -30,7 +30,7 @@ namespace Beyti_Backend.Controllers.Api
                 var inactiveServices = totalServices - activeServices;
 
                 var recentServices = await _context.Services
-                    .Where(s => s.CreatedAt >= DateTime.UtcNow.AddDays(-7))
+                    .Where(s => s.CreatedAt >= DateTime.Now.AddDays(-7))
                     .CountAsync();
 
                 return Ok(new

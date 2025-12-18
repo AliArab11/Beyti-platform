@@ -172,8 +172,8 @@ namespace Beyti_Backend.Controllers.Api
                     DisplayName = dto.FullName,
                     RoleType = "Customer",
                     Status = "Active",
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.Now,
+                    UpdatedAt = DateTime.Now
                 };
 
                 _context.UserProfiles.Add(profile);
@@ -183,8 +183,8 @@ namespace Beyti_Backend.Controllers.Api
                 {
                     UserProfileId = profile.Id,
                     Phone = dto.Phone,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.Now,
+                    UpdatedAt = DateTime.Now
                 };
 
                 _context.Customers.Add(customer);
@@ -230,15 +230,15 @@ namespace Beyti_Backend.Controllers.Api
 
                 // Update UserProfile to Customer role
                 profile.RoleType = "Customer";
-                profile.UpdatedAt = DateTime.UtcNow;
+                profile.UpdatedAt = DateTime.Now;
 
                 // Create Customer record
                 var customer = new Customer
                 {
                     UserProfileId = profile.Id,
                     Phone = dto.Phone,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.Now,
+                    UpdatedAt = DateTime.Now
                 };
 
                 _context.Customers.Add(customer);
@@ -270,8 +270,8 @@ namespace Beyti_Backend.Controllers.Api
 
             customer.UserProfile.DisplayName = dto.FullName;
             customer.Phone = dto.Phone;
-            customer.UserProfile.UpdatedAt = DateTime.UtcNow;
-            customer.UpdatedAt = DateTime.UtcNow;
+            customer.UserProfile.UpdatedAt = DateTime.Now;
+            customer.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -316,14 +316,14 @@ namespace Beyti_Backend.Controllers.Api
                 if (!string.IsNullOrEmpty(dto.DisplayName))
                 {
                     customer.UserProfile.DisplayName = dto.DisplayName;
-                    customer.UserProfile.UpdatedAt = DateTime.UtcNow;
+                    customer.UserProfile.UpdatedAt = DateTime.Now;
                 }
 
                 // Update Customer Phone
                 if (!string.IsNullOrEmpty(dto.Phone))
                 {
                     customer.Phone = dto.Phone;
-                    customer.UpdatedAt = DateTime.UtcNow;
+                    customer.UpdatedAt = DateTime.Now;
                 }
 
                 await _context.SaveChangesAsync();
@@ -376,7 +376,7 @@ namespace Beyti_Backend.Controllers.Api
                     address.Region = dto.Region ?? address.Region;
                     address.PostalCode = dto.PostalCode ?? address.PostalCode;
                     address.Country = dto.Country ?? address.Country;
-                    address.UpdatedAt = DateTime.UtcNow;
+                    address.UpdatedAt = DateTime.Now;
                 }
                 else
                 {
@@ -390,8 +390,8 @@ namespace Beyti_Backend.Controllers.Api
                         Country = dto.Country,
                         IsDefault = true,
                         IsActive = true,
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
+                        CreatedAt = DateTime.Now,
+                        UpdatedAt = DateTime.Now
                     };
 
                     _context.Addresses.Add(newAddress);
@@ -407,7 +407,7 @@ namespace Beyti_Backend.Controllers.Api
                     _context.CustomerAddresses.Add(newCustomerAddress);
                 }
 
-                customer.UpdatedAt = DateTime.UtcNow;
+                customer.UpdatedAt = DateTime.Now;
                 await _context.SaveChangesAsync();
 
                 return Ok(new

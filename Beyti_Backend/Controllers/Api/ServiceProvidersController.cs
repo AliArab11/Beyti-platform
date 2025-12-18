@@ -145,7 +145,7 @@ namespace Beyti_Backend.Controllers.Api
                     provider.Status = status;
             }
 
-            provider.UpdatedAt = DateTime.UtcNow;
+            provider.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
             return Ok(provider);
@@ -194,7 +194,7 @@ namespace Beyti_Backend.Controllers.Api
             if (body.TryGetProperty("userId", out var userIdProp))
                 userId = userIdProp.GetString();
 
-            var now = DateTime.UtcNow;
+            var now = DateTime.Now;
             UserProfile profile;
 
             // Check if this is onboarding (userId provided) or admin creation

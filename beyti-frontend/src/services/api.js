@@ -1628,15 +1628,6 @@ export const updateUserProfile = async (userId, userRole, updates) => {
       method: 'PUT',
       body: JSON.stringify(profileUpdates),
     });
-  } else if (userRole === 'Admin' || userRole === 'Super Admin') {
-    // Admin profile updates use the AdminDashboard endpoint
-    const adminUpdates = {
-      displayName: updates.displayName,
-    };
-    await fetchAPI(`/AdminDashboard/Users/${userId}`, {
-      method: 'PUT',
-      body: JSON.stringify(adminUpdates),
-    });
   }
 
   // If address updates are provided and user has associated entity ID

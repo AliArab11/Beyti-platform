@@ -220,7 +220,7 @@ namespace Beyti_Backend.Controllers.Api
 
                 ticket.DriverId = dto.DriverId;
                 ticket.Status = "Accepted";
-                ticket.UpdatedAt = DateTime.UtcNow;
+                ticket.UpdatedAt = DateTime.Now;
 
                 await _context.SaveChangesAsync();
                 return NoContent();
@@ -245,7 +245,7 @@ namespace Beyti_Backend.Controllers.Api
                     return NotFound();
 
                 ticket.Status = dto.Status;
-                ticket.UpdatedAt = DateTime.UtcNow;
+                ticket.UpdatedAt = DateTime.Now;
 
                 // Sync Order Status with Delivery Ticket Status
                 switch (dto.Status)
@@ -267,7 +267,7 @@ namespace Beyti_Backend.Controllers.Api
                         break;
                 }
 
-                ticket.Order.UpdatedAt = DateTime.UtcNow;
+                ticket.Order.UpdatedAt = DateTime.Now;
 
                 await _context.SaveChangesAsync();
                 return NoContent();

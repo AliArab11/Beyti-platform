@@ -133,7 +133,7 @@ namespace Beyti_Backend.Controllers.Api
                         if (!string.IsNullOrWhiteSpace(businessNameValue))
                         {
                             provider.BusinessName = businessNameValue;
-                            provider.UpdatedAt = DateTime.UtcNow;
+                            provider.UpdatedAt = DateTime.Now;
                         }
                         else
                         {
@@ -146,7 +146,7 @@ namespace Beyti_Backend.Controllers.Api
                 // UserProfile table doesn't have Email or DateOfBirth fields
                 // Address is managed in separate Address table via ServiceProviderAddress
 
-                userProfile.UpdatedAt = DateTime.UtcNow;
+                userProfile.UpdatedAt = DateTime.Now;
                 await _context.SaveChangesAsync();
 
                 return Ok(new { message = "Profile updated successfully" });
@@ -233,8 +233,8 @@ namespace Beyti_Backend.Controllers.Api
                         Country = country,
                         IsDefault = true,
                         IsActive = true,
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
+                        CreatedAt = DateTime.Now,
+                        UpdatedAt = DateTime.Now
                     };
                     _context.Addresses.Add(address);
                     await _context.SaveChangesAsync();
@@ -266,7 +266,7 @@ namespace Beyti_Backend.Controllers.Api
                 if (body.TryGetProperty("Label", out var label) && label.ValueKind != JsonValueKind.Null)
                     address.Label = label.GetString();
 
-                address.UpdatedAt = DateTime.UtcNow;
+                address.UpdatedAt = DateTime.Now;
                 await _context.SaveChangesAsync();
 
                 return Ok(new { message = "Address updated successfully" });
@@ -772,7 +772,7 @@ namespace Beyti_Backend.Controllers.Api
                     StartTime = startTime,
                     EndTime = endTime,
                     IsActive = true,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.Now
                 };
 
                 _context.TimeSlots.Add(timeSlot);
@@ -967,7 +967,7 @@ namespace Beyti_Backend.Controllers.Api
                     booking.FinalAmount = booking.QuotedPrice * 0.5m;
                 }
 
-                booking.UpdatedAt = DateTime.UtcNow;
+                booking.UpdatedAt = DateTime.Now;
                 await _context.SaveChangesAsync();
 
                 // Update TimeSlot IsActive based on booking status

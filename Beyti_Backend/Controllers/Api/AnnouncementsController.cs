@@ -89,7 +89,7 @@ namespace Beyti_Backend.Controllers.Api
                 Message = dto.Message,
                 Audience = string.Join(",", dto.Audiences), // Store as comma-separated
                 IsActive = true,
-                CreatedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.Now,
                 ExpiresAt = dto.ExpiresAt
             };
 

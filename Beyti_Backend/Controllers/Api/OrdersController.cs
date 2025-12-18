@@ -161,7 +161,7 @@ namespace Beyti_Backend.Controllers.Api
         // Helper method to auto-cancel expired orders
         private async Task AutoCancelExpiredOrders()
         {
-            var now = DateTime.UtcNow;
+            var now = DateTime.Now;
             var expiryThreshold = now.AddMinutes(-1); // 10 minutes ago
 
             var expiredOrders = await _context.Orders
@@ -288,7 +288,7 @@ namespace Beyti_Backend.Controllers.Api
                 if (dto.TotalAmount.HasValue)
                     order.TotalAmount = dto.TotalAmount.Value;
 
-                order.UpdatedAt = DateTime.UtcNow;
+                order.UpdatedAt = DateTime.Now;
                 await _context.SaveChangesAsync();
 
                 return NoContent();
@@ -336,8 +336,8 @@ namespace Beyti_Backend.Controllers.Api
                 SubtotalAmount = dto.SubtotalAmount,
                 DeliveryFee = dto.DeliveryFee,
                 TotalAmount = dto.TotalAmount,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now,
+                UpdatedAt = DateTime.Now
             };
 
             _context.Orders.Add(order);
@@ -471,7 +471,7 @@ namespace Beyti_Backend.Controllers.Api
                     }
 
                     variant.StockQty -= item.Quantity;
-                    variant.UpdatedAt = DateTime.UtcNow;
+                    variant.UpdatedAt = DateTime.Now;
                 }
 
                 await _context.SaveChangesAsync();
@@ -501,7 +501,7 @@ namespace Beyti_Backend.Controllers.Api
                 if (variant != null)
                 {
                     variant.StockQty += item.Qty;
-                    variant.UpdatedAt = DateTime.UtcNow;
+                    variant.UpdatedAt = DateTime.Now;
                 }
             }
 
@@ -534,7 +534,7 @@ namespace Beyti_Backend.Controllers.Api
                 var oldStatus = order.Status;
 
                 order.Status = dto.Status;
-                order.UpdatedAt = DateTime.UtcNow;
+                order.UpdatedAt = DateTime.Now;
 
                 // Only restore stock if we're NEWLY cancelling (not already cancelled)
                 if (dto.Status == "Cancelled" && oldStatus != "Cancelled")
@@ -544,7 +544,7 @@ namespace Beyti_Backend.Controllers.Api
                         if (item.ProductVariant != null)
                         {
                             item.ProductVariant.StockQty += item.Qty;
-                            item.ProductVariant.UpdatedAt = DateTime.UtcNow;
+                            item.ProductVariant.UpdatedAt = DateTime.Now;
                         }
                     }
                 }
@@ -558,8 +558,8 @@ namespace Beyti_Backend.Controllers.Api
                         PickupAddressId = order.PickupAddressId,
                         DeliveryAddressId = order.DeliveryAddressId,
                         Status = "Pending",
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
+                        CreatedAt = DateTime.Now,
+                        UpdatedAt = DateTime.Now
                     };
                     _context.DeliveryTickets.Add(deliveryTicket);
                 }
@@ -624,7 +624,7 @@ namespace Beyti_Backend.Controllers.Api
                     if (order.DeliveryTicket != null)
                     {
                         order.DeliveryTicket.Status = "Available";
-                        order.DeliveryTicket.UpdatedAt = DateTime.UtcNow;
+                        order.DeliveryTicket.UpdatedAt = DateTime.Now;
                     }
                 }
                 else
@@ -633,7 +633,7 @@ namespace Beyti_Backend.Controllers.Api
                     order.Status = dto.Status;
                 }
 
-                order.UpdatedAt = DateTime.UtcNow;
+                order.UpdatedAt = DateTime.Now;
                 await _context.SaveChangesAsync();
 
                 // Send notification to customer about the status change

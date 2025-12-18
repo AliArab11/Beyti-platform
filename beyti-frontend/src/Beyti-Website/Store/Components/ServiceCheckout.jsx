@@ -367,9 +367,20 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
       }
 
       // Combine selected date with time slot's start time
+      // IMPORTANT: Create datetime in local timezone (Bahrain) without conversion to UTC
       const [hours, minutes] = selectedTimeSlot.startTime.split(':');
       const bookingDateTime = new Date(selectedDate);
       bookingDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+
+      // Format as ISO string but remove the 'Z' to treat it as local time
+      // This ensures the backend receives the exact time the user selected
+      const year = bookingDateTime.getFullYear();
+      const month = String(bookingDateTime.getMonth() + 1).padStart(2, '0');
+      const day = String(bookingDateTime.getDate()).padStart(2, '0');
+      const hour = String(bookingDateTime.getHours()).padStart(2, '0');
+      const minute = String(bookingDateTime.getMinutes()).padStart(2, '0');
+      const second = String(bookingDateTime.getSeconds()).padStart(2, '0');
+      const localDateTimeString = `${year}-${month}-${day}T${hour}:${minute}:${second}`;
 
       const bookingPayload = {
         customerId: customerId,
@@ -378,7 +389,7 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
         serviceId: bookingData.serviceId,
         serviceAddressId: selectedAddress.id,
         timeSlotId: selectedTimeSlot.id,
-        bookingDateTime: bookingDateTime.toISOString(),
+        bookingDateTime: localDateTimeString,
         status: 'Pending',
         serviceType: 'Scheduled',
         quotedPrice: bookingData.minPrice,

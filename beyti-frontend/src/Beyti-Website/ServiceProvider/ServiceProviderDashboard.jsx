@@ -7,7 +7,6 @@ import BookingsManagement from './components/BookingsManagement';
 import ReviewsManagement from './components/ReviewsManagement';
 import NotificationsPage from './components/NotificationsPage';
 import ProfilePage from '../../components/ProfilePage';
-import WeeklySchedule from './components/WeeklySchedule';
 import ServiceProviderSidebar from './components/ServiceProviderSidebar';
 import PageHeader from '../../components/PageHeader';
 import { getUserProfile, updateUserProfile, updateProviderStatus, getProviderProfile } from '../../services/api';
@@ -169,12 +168,8 @@ export default function ServiceProviderDashboard() {
 
   // Handler for navigating from dashboard stats to bookings with filter
   const handleNavigateToBookings = (status) => {
-    if (status === 'schedule') {
-      setActiveTab('weeklySchedule');
-    } else {
-      setBookingFilter(status);
-      setActiveTab('bookings');
-    }
+    setBookingFilter(status);
+    setActiveTab('bookings');
   };
 
   // Reset filter when manually switching to bookings tab
@@ -196,8 +191,6 @@ export default function ServiceProviderDashboard() {
         return 'Booking Requests';
       case 'schedule':
         return 'Availability';
-      case 'weeklySchedule':
-        return 'Weekly Schedule';
       case 'reviews':
         return 'Reviews';
       case 'notifications':
@@ -288,19 +281,19 @@ export default function ServiceProviderDashboard() {
                   serviceProviderId={serviceProviderId}
                   onNavigateToBookings={handleNavigateToBookings}
                   activityRefreshKey={activityRefreshKey}
+                  onNavigate={handleNavigate}
                 />
               </>
             )}
             {activeTab === 'services' && (
-              <ServicesManagement serviceProviderId={serviceProviderId} searchTerm={serviceSearchQuery} />
+              <ServicesManagement
+                serviceProviderId={serviceProviderId}
+                searchTerm={serviceSearchQuery}
+              />
             )}
             {activeTab === 'schedule' && (
-              <ScheduleManagement serviceProviderId={serviceProviderId} />
-            )}
-            {activeTab === 'weeklySchedule' && (
-              <WeeklySchedule
+              <ScheduleManagement
                 serviceProviderId={serviceProviderId}
-                onNavigateToBookings={handleNavigateToBookings}
               />
             )}
             {activeTab === 'bookings' && (

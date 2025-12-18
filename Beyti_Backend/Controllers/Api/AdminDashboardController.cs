@@ -129,7 +129,7 @@ namespace Beyti_Backend.Controllers.Api
 
                 // Mark current user as "Role Changed"
                 user.Status = "Role Changed";
-                user.UpdatedAt = DateTime.UtcNow;
+                user.UpdatedAt = DateTime.Now;
                 await _context.SaveChangesAsync();
 
                 // Create new UserProfile with the new role
@@ -139,8 +139,8 @@ namespace Beyti_Backend.Controllers.Api
                     DisplayName = newDisplayName ?? user.DisplayName,
                     RoleType = newRoleType,
                     Status = "Active",
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.Now,
+                    UpdatedAt = DateTime.Now
                 };
 
                 _context.UserProfiles.Add(newUser);
@@ -156,15 +156,15 @@ namespace Beyti_Backend.Controllers.Api
                             StoreName = "Default Store",
                             Phone = "N/A",
                             CategoryId = categoryId!.Value,
-                            CreatedAt = DateTime.UtcNow,
-                            UpdatedAt = DateTime.UtcNow
+                            CreatedAt = DateTime.Now,
+                            UpdatedAt = DateTime.Now
                         });
                         break;
                     case "Customer":
-                        _context.Customers.Add(new Customer { UserProfileId = newUser.Id, Phone = "N/A", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
+                        _context.Customers.Add(new Customer { UserProfileId = newUser.Id, Phone = "N/A", CreatedAt = DateTime.Now, UpdatedAt = DateTime.Now });
                         break;
                     case "Driver":
-                        _context.Drivers.Add(new Driver { UserProfileId = newUser.Id, Phone = "N/A", Status = "Active", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
+                        _context.Drivers.Add(new Driver { UserProfileId = newUser.Id, Phone = "N/A", Status = "Active", CreatedAt = DateTime.Now, UpdatedAt = DateTime.Now });
                         break;
                     case "ServiceProvider":
                         _context.ServiceProviders.Add(new BeytiDB.Data.ServiceProvider
@@ -174,12 +174,12 @@ namespace Beyti_Backend.Controllers.Api
                             Phone = "N/A",
                             ServiceCategoryId = serviceCategoryId!.Value,
                             Status = "Available",
-                            CreatedAt = DateTime.UtcNow,
-                            UpdatedAt = DateTime.UtcNow
+                            CreatedAt = DateTime.Now,
+                            UpdatedAt = DateTime.Now
                         });
                         break;
                     case "Admin":
-                        _context.AdminProfiles.Add(new AdminProfile { UserProfileId = newUser.Id, Title = newUser.DisplayName, Permissions = "All", CreatedAt = DateTime.UtcNow });
+                        _context.AdminProfiles.Add(new AdminProfile { UserProfileId = newUser.Id, Title = newUser.DisplayName, Permissions = "All", CreatedAt = DateTime.Now });
                         break;
                     default:
                         return BadRequest("Invalid RoleType");
@@ -235,7 +235,7 @@ namespace Beyti_Backend.Controllers.Api
                     {
                         int oldCategoryId = seller.CategoryId;
                         seller.CategoryId = categoryId.Value;
-                        seller.UpdatedAt = DateTime.UtcNow;
+                        seller.UpdatedAt = DateTime.Now;
                         changes.Add($"Category changed from ID {oldCategoryId} to ID {categoryId.Value}");
                     }
                 }
@@ -248,12 +248,12 @@ namespace Beyti_Backend.Controllers.Api
                     {
                         int oldServiceCategoryId = serviceProvider.ServiceCategoryId;
                         serviceProvider.ServiceCategoryId = serviceCategoryId.Value;
-                        serviceProvider.UpdatedAt = DateTime.UtcNow;
+                        serviceProvider.UpdatedAt = DateTime.Now;
                         changes.Add($"Service Category changed from ID {oldServiceCategoryId} to ID {serviceCategoryId.Value}");
                     }
                 }
 
-                user.UpdatedAt = DateTime.UtcNow;
+                user.UpdatedAt = DateTime.Now;
 
                 await _context.SaveChangesAsync();
 
@@ -366,8 +366,8 @@ namespace Beyti_Backend.Controllers.Api
                     DisplayName = displayName,
                     RoleType = roleType,
                     Status = status ?? "Active",
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.Now,
+                    UpdatedAt = DateTime.Now
                 };
 
                 _context.UserProfiles.Add(userProfile);
@@ -383,15 +383,15 @@ namespace Beyti_Backend.Controllers.Api
                             StoreName = "Default Store",
                             Phone = "N/A",
                             CategoryId = categoryId!.Value,
-                            CreatedAt = DateTime.UtcNow,
-                            UpdatedAt = DateTime.UtcNow
+                            CreatedAt = DateTime.Now,
+                            UpdatedAt = DateTime.Now
                         });
                         break;
                     case "Customer":
-                        _context.Customers.Add(new Customer { UserProfileId = userProfile.Id, Phone = "N/A", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
+                        _context.Customers.Add(new Customer { UserProfileId = userProfile.Id, Phone = "N/A", CreatedAt = DateTime.Now, UpdatedAt = DateTime.Now });
                         break;
                     case "Driver":
-                        _context.Drivers.Add(new Driver { UserProfileId = userProfile.Id, Phone = "N/A", Status = "Active", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
+                        _context.Drivers.Add(new Driver { UserProfileId = userProfile.Id, Phone = "N/A", Status = "Active", CreatedAt = DateTime.Now, UpdatedAt = DateTime.Now });
                         break;
                     case "ServiceProvider":
                         _context.ServiceProviders.Add(new BeytiDB.Data.ServiceProvider
@@ -401,12 +401,12 @@ namespace Beyti_Backend.Controllers.Api
                             Phone = "N/A",
                             ServiceCategoryId = serviceCategoryId!.Value,
                             Status = "Available",
-                            CreatedAt = DateTime.UtcNow,
-                            UpdatedAt = DateTime.UtcNow
+                            CreatedAt = DateTime.Now,
+                            UpdatedAt = DateTime.Now
                         });
                         break;
                     case "Admin":
-                        _context.AdminProfiles.Add(new AdminProfile { UserProfileId = userProfile.Id, Title = userProfile.DisplayName, Permissions = "All", CreatedAt = DateTime.UtcNow });
+                        _context.AdminProfiles.Add(new AdminProfile { UserProfileId = userProfile.Id, Title = userProfile.DisplayName, Permissions = "All", CreatedAt = DateTime.Now });
                         break;
                     default:
                         return BadRequest("Invalid RoleType");
@@ -451,7 +451,7 @@ namespace Beyti_Backend.Controllers.Api
 
             string oldStatus = user.Status;
             user.Status = user.Status == "Active" ? "Inactive" : "Active";
-            user.UpdatedAt = DateTime.UtcNow;
+            user.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -534,16 +534,16 @@ namespace Beyti_Backend.Controllers.Api
 
                 // Update application status
                 request.Status = "Approved";
-                request.UpdatedAt = DateTime.UtcNow;
+                request.UpdatedAt = DateTime.Now;
 
                 // Update service provider
                 request.ServiceProvider.Status = "Available"; // Set to Available (not Active)
-                request.ServiceProvider.VerifiedAt = DateTime.UtcNow;
-                request.ServiceProvider.UpdatedAt = DateTime.UtcNow;
+                request.ServiceProvider.VerifiedAt = DateTime.Now;
+                request.ServiceProvider.UpdatedAt = DateTime.Now;
 
                 // Update user profile status (for account activation)
                 request.ServiceProvider.UserProfile.Status = "Active";
-                request.ServiceProvider.UserProfile.UpdatedAt = DateTime.UtcNow;
+                request.ServiceProvider.UserProfile.UpdatedAt = DateTime.Now;
 
                 await _context.SaveChangesAsync();
 
@@ -597,15 +597,15 @@ namespace Beyti_Backend.Controllers.Api
 
                 // Update application status
                 request.Status = "Rejected";
-                request.UpdatedAt = DateTime.UtcNow;
+                request.UpdatedAt = DateTime.Now;
 
                 // Optionally set service provider as unavailable
                 request.ServiceProvider.Status = "Unavailable";
-                request.ServiceProvider.UpdatedAt = DateTime.UtcNow;
+                request.ServiceProvider.UpdatedAt = DateTime.Now;
 
                 // Optionally deactivate user profile
                 request.ServiceProvider.UserProfile.Status = "Inactive";
-                request.ServiceProvider.UserProfile.UpdatedAt = DateTime.UtcNow;
+                request.ServiceProvider.UserProfile.UpdatedAt = DateTime.Now;
 
                 await _context.SaveChangesAsync();
 
@@ -696,7 +696,7 @@ namespace Beyti_Backend.Controllers.Api
                     .CountAsync(sp => sp.Status == "Available");
 
                 // Recent Activities (last 7 days)
-                var weekAgo = DateTime.UtcNow.AddDays(-7);
+                var weekAgo = DateTime.Now.AddDays(-7);
                 var recentUsers = await _context.UserProfiles
                     .CountAsync(u => u.CreatedAt >= weekAgo);
 
@@ -719,7 +719,7 @@ namespace Beyti_Backend.Controllers.Api
                 var driverMemberships = activeMemberships.FirstOrDefault(m => m.Role == "Driver")?.Count ?? 0;
 
                 // Monthly revenue (last 30 days)
-                var monthAgo = DateTime.UtcNow.AddDays(-30);
+                var monthAgo = DateTime.Now.AddDays(-30);
                 var monthlyRevenue = await _context.Orders
                     .Where(o => completedStatuses.Contains(o.Status) && o.CreatedAt >= monthAgo)
                     .SumAsync(o => (decimal?)o.TotalAmount) ?? 0;
@@ -1082,7 +1082,7 @@ namespace Beyti_Backend.Controllers.Api
 
                 // Suspend the UserProfile (account level)
                 user.Status = "Suspended"; // Changed from "Inactive" to "Suspended"
-                user.UpdatedAt = DateTime.UtcNow;
+                user.UpdatedAt = DateTime.Now;
 
                 // Handle role-specific suspensions
                 if (user.RoleType == "Seller")
@@ -1093,13 +1093,13 @@ namespace Beyti_Backend.Controllers.Api
 
                     if (seller != null)
                     {
-                        seller.UpdatedAt = DateTime.UtcNow;
+                        seller.UpdatedAt = DateTime.Now;
 
                         // Deactivate all their products
                         foreach (var product in seller.Products)
                         {
                             product.IsActive = false;
-                            product.UpdatedAt = DateTime.UtcNow;
+                            product.UpdatedAt = DateTime.Now;
                         }
                     }
                 }
@@ -1113,7 +1113,7 @@ namespace Beyti_Backend.Controllers.Api
                     {
                         // Mark service provider as unavailable
                         serviceProvider.Status = "Unavailable";
-                        serviceProvider.UpdatedAt = DateTime.UtcNow;
+                        serviceProvider.UpdatedAt = DateTime.Now;
 
                         // Deactivate all their services
                         foreach (var service in serviceProvider.Services)
@@ -1130,7 +1130,7 @@ namespace Beyti_Backend.Controllers.Api
                     if (driver != null)
                     {
                         driver.Status = "Suspended"; // Changed from "Inactive"
-                        driver.UpdatedAt = DateTime.UtcNow;
+                        driver.UpdatedAt = DateTime.Now;
                     }
                 }
 
@@ -1183,7 +1183,7 @@ namespace Beyti_Backend.Controllers.Api
 
                 // Reactivate the UserProfile
                 user.Status = "Active";
-                user.UpdatedAt = DateTime.UtcNow;
+                user.UpdatedAt = DateTime.Now;
 
                 // Handle role-specific reactivations
                 if (user.RoleType == "Seller")
@@ -1194,13 +1194,13 @@ namespace Beyti_Backend.Controllers.Api
 
                     if (seller != null)
                     {
-                        seller.UpdatedAt = DateTime.UtcNow;
+                        seller.UpdatedAt = DateTime.Now;
 
                         // Reactivate all their products
                         foreach (var product in seller.Products)
                         {
                             product.IsActive = true;
-                            product.UpdatedAt = DateTime.UtcNow;
+                            product.UpdatedAt = DateTime.Now;
                         }
                     }
                 }
@@ -1214,7 +1214,7 @@ namespace Beyti_Backend.Controllers.Api
                     {
                         // Set back to Available
                         serviceProvider.Status = "Available";
-                        serviceProvider.UpdatedAt = DateTime.UtcNow;
+                        serviceProvider.UpdatedAt = DateTime.Now;
 
                         // Reactivate all their services
                         foreach (var service in serviceProvider.Services)
@@ -1231,7 +1231,7 @@ namespace Beyti_Backend.Controllers.Api
                     if (driver != null)
                     {
                         driver.Status = "Active";
-                        driver.UpdatedAt = DateTime.UtcNow;
+                        driver.UpdatedAt = DateTime.Now;
                     }
                 }
 

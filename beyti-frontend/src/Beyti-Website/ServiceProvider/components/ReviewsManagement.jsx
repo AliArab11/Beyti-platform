@@ -458,13 +458,18 @@ export default function ReviewsManagement({ serviceProviderId, searchQuery = '' 
                         </td>
                         <td className="px-6 py-4 text-body-regular text-charcoal-600 dark:text-gray-200">
                           <div className="flex gap-2">
-                            <Button
-                              variant="primary"
-                              size="small"
-                              onClick={() => handleRespondClick(review)}
-                            >
-                              Reply
-                            </Button>
+                           <Button
+                                  size="small"
+                                  onClick={() => handleRespondClick(review)}
+                                  className={
+                                    review.providerResponse
+                                      ? "bg-success-btn text-white hover:bg-success-btn/90 cursor-default"
+                                      : ""
+                                  }
+                                  disabled={!!review.providerResponse}
+                                >
+                                  {review.providerResponse ? "Replied" : "Reply"}
+                                </Button>
                             <Button
                               variant="secondary"
                               size="small"

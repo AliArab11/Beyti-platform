@@ -11,7 +11,6 @@ import {
   Briefcase,
   CalendarCheck,
   CalendarBlank,
-  Calendar,
   User,
   CaretDown,
   Star,
@@ -50,14 +49,6 @@ const ServiceProviderSidebar = ({ currentPage, onNavigate, userName = "Service P
           onClick={() => onNavigate('bookings')}
         >
           Booking Requests
-        </NavigationButton>
-
-        <NavigationButton
-          selected={currentPage === 'weeklySchedule'}
-          icon={<Calendar size={20} weight={currentPage === 'weeklySchedule' ? 'fill' : 'regular'} />}
-          onClick={() => onNavigate('weeklySchedule')}
-        >
-          Schedule
         </NavigationButton>
 
         <NavigationButton

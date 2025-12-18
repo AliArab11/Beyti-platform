@@ -55,7 +55,7 @@ namespace Beyti_Backend.Services
                 RelatedEntityType = relatedEntityType,
                 RelatedEntityId = relatedEntityId,
                 IsRead = false,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             };
 
             _context.Notifications.Add(notification);
@@ -111,7 +111,7 @@ namespace Beyti_Backend.Services
                 RelatedEntityId = announcementId,
                 IsRead = false,
                 IsDeleted = false,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             }).ToList();
 
             // 3. Bulk insert notifications

@@ -37,7 +37,7 @@ public partial class ServiceProvider
     public DateTime? VerifiedAt { get; set; }
 
     [Precision(3)]
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
 
     [Precision(3)]
     public DateTime UpdatedAt { get; set; }

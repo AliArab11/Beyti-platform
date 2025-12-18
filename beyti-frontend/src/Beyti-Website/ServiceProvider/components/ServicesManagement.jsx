@@ -410,18 +410,34 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
         )}
       </div>
 
-      {/* Form */}
+      {/* Form Modal */}
       {showForm && (
-        <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none p-6 transition-colors">
-          <h3 className="text-card-h2 text-charcoal-600 dark:text-white mb-2">
-            {editingService ? 'Edit Service' : 'Add New Service'}
-          </h3>
-          {providerCategory && (
-            <p className="text-body-regular text-charcoal-400 dark:text-gray-400 mb-6">
-              Your enrolled category: <span className="font-semibold text-sage-600 dark:text-sage-400">{providerCategory.name}</span>
-            </p>
-          )}
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-cream-50 dark:bg-[#2A2A2A] rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col border border-grey-stroke">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-grey-stroke flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-semibold text-charcoal-700 dark:text-white">
+                  {editingService ? 'Edit Service' : 'Add New Service'}
+                </h3>
+                {providerCategory && (
+                  <p className="text-sm text-charcoal-400 dark:text-gray-400 mt-1">
+                    Your enrolled category: <span className="font-semibold text-sage-600 dark:text-sage-400">{providerCategory.name}</span>
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={handleCancelForm}
+                className="text-charcoal-400 hover:text-charcoal-600 dark:text-gray-400 dark:hover:text-gray-200 text-2xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <form onSubmit={handleSubmit} className="space-y-4" id="service-form">
             <div>
               <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">Service Name *</label>
               <input
@@ -465,7 +481,7 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
               <textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="w-full border border-grey-stroke rounded-lg px-4 py-2 text-body-regular focus:ring-2 focus:ring-sage-500 focus:border-sage-500"
+                className="w-full border border-grey-stroke rounded-lg px-4 py-2 text-body-regular focus:ring-2 focus:ring-sage-500 focus:border-sage-500 bg-white dark:bg-[#1F1F1F] dark:text-white resize-none"
                 rows="3"
               />
             </div>
@@ -581,15 +597,29 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
               )}
             </div>
 
-            <div className="flex gap-3 pt-4">
-              <CRUDButton type="submit" variant="success">
-                {editingService ? 'Update Service' : 'Add Service'}
-              </CRUDButton>
-              <CRUDButton type="button" variant="error" onClick={handleCancelForm}>
-                Cancel
-              </CRUDButton>
+              </form>
             </div>
-          </form>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-grey-stroke bg-grey-100 dark:bg-[#1F1F1F]">
+              <div className="flex flex-col md:flex-row gap-3">
+                <button
+                  type="submit"
+                  form="service-form"
+                  className="flex-1 bg-sage-500 hover:bg-sage-600 text-cream-50 py-2.5 rounded-lg font-semibold transition-colors"
+                >
+                  {editingService ? 'Update Service' : 'Add Service'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelForm}
+                  className="flex-1 bg-grey-300 hover:bg-grey-400 text-charcoal-700 dark:text-charcoal-600 py-2.5 rounded-lg font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
