@@ -523,7 +523,7 @@ namespace Beyti_Backend.Controllers.Api
 
                 // Simple toggle
                 seller.IsOpen = !seller.IsOpen;
-                seller.UpdatedAt = DateTime.UtcNow;
+                seller.UpdatedAt = DateTime.Now;
 
                 await _context.SaveChangesAsync();
 

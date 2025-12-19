@@ -372,7 +372,7 @@ namespace Beyti_Backend.Controllers.Api
 
             // Toggle active status instead of deleting
             productVariant.IsActive = false;
-            productVariant.UpdatedAt = DateTime.UtcNow;
+            productVariant.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 

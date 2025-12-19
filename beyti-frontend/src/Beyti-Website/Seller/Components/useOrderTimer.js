@@ -12,16 +12,25 @@ export const useOrderTimer = (order, onExpire) => {
     const status = order.status?.toLowerCase();
     if (!['placed', 'pending'].includes(status)) return null;
 
-    // Parse the date string correctly
+    // Parse the date string as LOCAL time, not UTC
     const dateStr = order.createdAt;
     let orderTime;
 
-    if (dateStr.endsWith('Z')) {
-      orderTime = new Date(dateStr);
-    } else if (dateStr.includes('T') && !dateStr.includes('+') && !dateStr.endsWith('Z')) {
-      orderTime = new Date(dateStr + 'Z');
+    // Remove any 'Z' suffix to prevent UTC parsing
+    const cleanDateStr = dateStr.replace('Z', '');
+    
+    // Parse as local time by removing timezone indicators
+    if (cleanDateStr.includes('T')) {
+      // Split date and time parts
+      const [datePart, timePart] = cleanDateStr.split('T');
+      const [year, month, day] = datePart.split('-').map(Number);
+      const [hours, minutes, seconds] = timePart.split(':').map(s => parseFloat(s));
+      
+      // Create date in local timezone
+      orderTime = new Date(year, month - 1, day, hours, minutes, seconds);
     } else {
-      orderTime = new Date(dateStr);
+      // Fallback for other formats
+      orderTime = new Date(cleanDateStr);
     }
     
     const expiryTime = new Date(orderTime.getTime() + 1 * 60 * 1000);

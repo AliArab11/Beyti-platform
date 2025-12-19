@@ -529,8 +529,7 @@ const showSnackbar = (message, type = 'success') => {
 const handlePlaceOrder = async () => {
 
   // CHECK STORE STATUS
-  const currentStore = stores.find(s => s.id === parseInt(storeId));
-  if (currentStore && !isStoreOpen(currentStore)) {
+  if (selectedStore && !isStoreOpen(selectedStore)) {
     showSnackbar('Store is currently closed and cannot accept orders', 'error');
     return;
   }
