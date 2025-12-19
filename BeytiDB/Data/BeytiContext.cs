@@ -77,6 +77,8 @@ public partial class BeytiContext : DbContext
 
     public virtual DbSet<ServiceReview> ServiceReviews { get; set; }
 
+    public virtual DbSet<StoreSection> StoreSections { get; set; }
+
     public virtual DbSet<SubCategory> SubCategories { get; set; }
 
     public virtual DbSet<TimeSlot> TimeSlots { get; set; }

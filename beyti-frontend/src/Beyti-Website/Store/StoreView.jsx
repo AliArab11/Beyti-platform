@@ -8,6 +8,7 @@ import ActiveOrderBanner from './Components/ActiveOrderBanner';
 import Snackbar from './../../components/Snackbar';
 import PageHeader from '../../components/PageHeader';
 import CustomerHeader from '../../components/CustomerHeader';
+import { isStoreOpen, formatTime } from '../Seller/Components/storeStatus';
 
 import OrderDetails from './Components/OrderDetails';
 import { createOrder, createOrderItem, getProductVariants, getOrder, getOrders } from '../../services/api';
@@ -90,6 +91,17 @@ const StoreInfo = ({ store }) => (
                         fill="white" opacity="0.15"/>
                 </svg>
               </div>
+              {/* Store Status Badge */}
+                <div className="absolute top-4 right-8 z-20">
+                  <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold shadow-lg ${
+                    isStoreOpen(store)
+                      ? 'bg-success-btn text-white'
+                      : 'bg-error-btn text-white'
+                  }`}>
+                    <div className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
+                    {isStoreOpen(store) ? 'OPEN' : 'CLOSED'}
+                  </div>
+                </div>
             </div>
           );
         })()}
@@ -183,7 +195,7 @@ const StoreInfo = ({ store }) => (
               <div className="flex-1">
                 {/* Store Name with Rating inline */}
                 <div className="flex items-center gap-4 mb-1.5">
-                  <h1 className="text-[32px] font-bold text-charcoal-600 leading-tight drop-shadow-[0_3px_8px_rgba(0,0,0,0.2)]" 
+                   <h1 className="text-[32px] font-bold text-charcoal-600 leading-tight drop-shadow-[0_3px_8px_rgba(0,0,0,0.2)]" 
                       style={{ fontFamily: "Merriweather, serif" }}>
                     {store?.storeName || "Cookies by Maryam"}
                   </h1>
@@ -220,9 +232,22 @@ const StoreInfo = ({ store }) => (
                 
                 {/* Categories */}
                 <p className="text-[15px] text-charcoal-500" 
-                   style={{ fontFamily: "Inter, sans-serif" }}>
-                  Cakes • Cookies • Desserts
+                  style={{ fontFamily: "Inter, sans-serif" }}>
+                  {store?.subCategoryNames?.length > 0 
+                    ? store.subCategoryNames.join(' • ') 
+                    : 'No categories'}
                 </p>
+                {/* Store Hours */}
+                  {store?.openTime && store?.closeTime && (
+                    <p className="text-[14px] text-charcoal-400 mt-2 flex items-center gap-2" 
+                      style={{ fontFamily: "Inter, sans-serif" }}>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span className="font-semibold">Store Hours:</span>
+                      {formatTime(store.openTime)} - {formatTime(store.closeTime)}
+                    </p>
+                  )}
               </div>
             </div>
 
@@ -264,21 +289,27 @@ const StoreInfo = ({ store }) => (
     </div>
 );
 
-// Category Sidebar
-const CategorySidebar = ({ selected, onSelect }) => {
-  const categories = [
-    { id: "popular", label: "Most Popular", icon: <Star size={24} weight="regular" /> },
-    { id: "cookies", label: "Cookies", icon: <Cake size={24} weight="regular" /> },
-    { id: "offers", label: "Offers", icon: <Heart size={24} weight="regular" /> },
-    { id: "newest", label: "Newest Cookies", icon: <Cake size={24} weight="regular" /> },
-    { id: "chocolate", label: "Chocolate Cookies", icon: <Cake size={24} weight="regular" /> },
-    { id: "cakes", label: "Cookies Cakes", icon: <Bread size={24} weight="regular" /> },
+const CategorySidebar = ({ selected, onSelect, sections = [] }) => {
+  const defaultCategories = [
+    { id: "all", label: "All Products", icon: <Package size={24} weight="regular" /> },
   ];
+
+  const sectionCategories = sections
+    .filter(s => s.isActive)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map(section => ({
+      id: `section-${section.id}`,
+      label: section.name,
+      icon: <Bread size={24} weight="regular" />,
+      sectionId: section.id
+    }));
+
+  const allCategories = [...defaultCategories, ...sectionCategories];
 
   return (
     <aside className="w-[280px] flex-shrink-0 sticky top-[88px] h-[calc(100vh-88px)] overflow-y-auto">
       <div className="space-y-3 py-6">
-        {categories.map(cat => (
+        {allCategories.map(cat => (
           <button
             key={cat.id}
             onClick={() => onSelect(cat.id)}
@@ -438,7 +469,7 @@ const StoreView = () => {
   const [store, setStore] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedCategory, setSelectedCategory] = useState("popular");
+  const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("popular");
 
@@ -713,6 +744,11 @@ const handleProductClick = (product) => {
 };
 
   const handleAddToCart = (item) => {
+    // CHECK IF STORE IS CLOSED 
+    if (!isStoreOpen(store)) {
+        showSnackbar('Store is currently closed and cannot accept orders', 'error');
+        return;
+    }
   console.log('🎯 handleAddToCart called with:', item);
   console.log('📊 Current cart state:', cart);
   
@@ -913,16 +949,16 @@ useEffect(() => {
 
 
   // Get category title
-  const getCategoryTitle = (categoryId) => {
-    const titles = {
-      popular: "Most Popular",
-      cookies: "Cookies",
-      offers: "Offers",
-      newest: "Newest Cookies",
-      chocolate: "Chocolate Cookies",
-      cakes: "Cookies Cakes"
-    };
-    return titles[categoryId] || "Products";
+    const getCategoryTitle = (categoryId) => {
+    if (categoryId === "all") return "All Products";
+    
+    if (categoryId.startsWith("section-")) {
+      const sectionId = parseInt(categoryId.replace("section-", ""));
+      const section = store?.storeSections?.find(s => s.id === sectionId);
+      return section ? section.name : "Products";
+    }
+    
+    return "Products";
   };
 
 const filteredProducts = (store?.products || [])
@@ -935,6 +971,16 @@ const filteredProducts = (store?.products || [])
     // Search filter
     if (searchQuery && !product.name?.toLowerCase().includes(searchQuery.toLowerCase())) {
       return false;
+    }
+    
+    // Section filter
+    if (selectedCategory !== "all") {
+      if (selectedCategory.startsWith("section-")) {
+        const sectionId = parseInt(selectedCategory.replace("section-", ""));
+        if (product.storeSectionId !== sectionId) {
+          return false;
+        }
+      }
     }
     
     return true;
@@ -1043,7 +1089,11 @@ const filteredProducts = (store?.products || [])
       
       <div className="max-w-[1440px] mx-auto px-12 py-8">
         <div className="flex gap-8">
-          <CategorySidebar selected={selectedCategory} onSelect={setSelectedCategory} />
+          <CategorySidebar 
+            selected={selectedCategory} 
+            onSelect={setSelectedCategory}
+            sections={store?.storeSections || []}
+          />
           
           <div className="flex-1">
             {/* Category Title with Search, Filter and Sort - ALL IN ONE ROW */}

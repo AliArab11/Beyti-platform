@@ -32,6 +32,17 @@ public partial class Seller
     [Precision(3)]
     public DateTime UpdatedAt { get; set; }
 
+    public bool IsOpen { get; set; }
+
+    public TimeSpan? OpenTime { get; set; }
+    public TimeSpan? CloseTime { get; set; }
+    public bool? IsManuallyClosed { get; set; }
+
+    public bool? IsForceOpen { get; set; }
+
+    // ADD THIS NEW LINE:
+    public DateTime? ForceOpenStartTime { get; set; }  // Track when force open was activated
+
     // 🔹 MAIN STORE CATEGORY (Food / Clothes / Self Care)
     public int CategoryId { get; set; }
 
@@ -42,9 +53,13 @@ public partial class Seller
     public virtual ICollection<SellerSubCategory> SellerSubCategories { get; set; }
         = new List<SellerSubCategory>();
 
-
     [InverseProperty("Seller")]
     public virtual ICollection<Order> Orders { get; set; } = new List<Order>();
+
+    [InverseProperty("Seller")]
+    public virtual ICollection<StoreSection> StoreSections { get; set; }
+    = new List<StoreSection>();
+
 
     [InverseProperty("Seller")]
     public virtual ICollection<Product> Products { get; set; } = new List<Product>();

@@ -7,6 +7,7 @@ import Snackbar from './../../../components/Snackbar';
 import CustomerHeader from './../../../components/CustomerHeader';
 import PageHeader from './../../../components/PageHeader'
 import ConfirmModal from './../../../components/ConfirmModal';
+import { isStoreOpen } from '../../Seller/Components/storeStatus';
 
 
 import { 
@@ -526,6 +527,14 @@ const showSnackbar = (message, type = 'success') => {
   };
 
 const handlePlaceOrder = async () => {
+
+  // CHECK STORE STATUS
+  const currentStore = stores.find(s => s.id === parseInt(storeId));
+  if (currentStore && !isStoreOpen(currentStore)) {
+    showSnackbar('Store is currently closed and cannot accept orders', 'error');
+    return;
+  }
+
   try {
     setPlacingOrder(true);
     setOrderError(null);
@@ -931,10 +940,15 @@ const handlePlaceOrder = async () => {
                             
                             <div className="flex-1 min-w-0">
                                 <h4 className="text-[18px] font-semibold text-charcoal-600 mb-1" style={{ fontFamily: 'Inter, sans-serif' }}>
-                                {item.name}
+                                  {item.name}
+                                  {item.variantName && (
+                                    <span className="text-sm font-normal text-charcoal-400 ml-2">
+                                      ({item.variantName})
+                                    </span>
+                                  )}
                                 </h4>
                                 <p className="text-[16px] text-charcoal-600 font-medium" style={{ fontFamily: 'Inter, sans-serif' }}>
-                                {item.basePrice.toFixed(2)} BD
+                                {item.basePrice.toFixed(3)} BD
                                 </p>
                             </div>
                             </div>
@@ -1066,7 +1080,14 @@ const handlePlaceOrder = async () => {
                             <ShoppingCart size={20} className="text-sage-600" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-charcoal-600 truncate">{item.name}</p>
+                            <p className="text-sm font-semibold text-charcoal-600 truncate">
+                              {item.name}
+                              {item.variantName && (
+                                <span className="text-xs font-normal text-charcoal-400 ml-1">
+                                  ({item.variantName})
+                                </span>
+                              )}
+                            </p>
                             <p className="text-xs text-charcoal-400">Qty: {item.quantity}</p>
                           </div>
                           <p className="text-sm font-bold text-charcoal-600">{item.totalPrice.toFixed(3)} BD</p>
@@ -1232,7 +1253,14 @@ const handlePlaceOrder = async () => {
                             <ShoppingCart size={20} className="text-sage-600" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-charcoal-600 truncate">{item.name}</p>
+                            <p className="text-sm font-semibold text-charcoal-600 truncate">
+                              {item.name}
+                              {item.variantName && (
+                                <span className="text-xs font-normal text-charcoal-400 ml-1">
+                                  ({item.variantName})
+                                </span>
+                              )}
+                            </p>
                             <p className="text-xs text-charcoal-400">Qty: {item.quantity}</p>
                           </div>
                           <p className="text-sm font-bold text-charcoal-600">{item.totalPrice.toFixed(3)} BD</p>
@@ -1303,7 +1331,14 @@ const handlePlaceOrder = async () => {
                             <ShoppingCart size={20} className="text-sage-600" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-charcoal-600 truncate">{item.name}</p>
+                           <p className="text-sm font-semibold text-charcoal-600 truncate">
+                              {item.name}
+                              {item.variantName && (
+                                <span className="text-xs font-normal text-charcoal-400 ml-1">
+                                  ({item.variantName})
+                                </span>
+                              )}
+                            </p>
                             <p className="text-xs text-charcoal-400">Qty: {item.quantity}</p>
                           </div>
                           <p className="text-sm font-bold text-charcoal-600">{item.totalPrice.toFixed(3)} BD</p>

@@ -3,6 +3,7 @@ import AnalyticsCard from "../../../components/AnalyticsCard";
 import StatusChip from "../../../components/StatusChip";
 import Button from "../../../components/Button";
 import ConfirmModal from "../../../components/ConfirmModal";
+import SectionsManager from './SectionsManager';
 
 import {
   getProducts,
@@ -14,6 +15,13 @@ import {
   updateProductVariant,
   deleteProductVariant,
   getProductVariants,
+  getSellerById,
+  getColorValues,
+  getSizeValues,
+  getStoreSections,  
+  createStoreSection,  
+  updateStoreSection,  
+  deleteStoreSection,  
 } from "../../../services/api";
 
 const formatCurrency = (value) => {
@@ -25,6 +33,12 @@ const Products = ({ sellerId }) => {
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState([]);
   const [subCategories, setSubCategories] = useState([]);
+  const [sellerCategory, setSellerCategory] = useState(null);
+  const [colorOptions, setColorOptions] = useState([]);
+  const [sizeOptions, setSizeOptions] = useState([]); 
+
+  const [storeSections, setStoreSections] = useState([]);
+  const [showSectionsModal, setShowSectionsModal] = useState(false);
 
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -35,30 +49,34 @@ const Products = ({ sellerId }) => {
 
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
 
-  const [form, setForm] = useState({
-    name: "",
-    description: "",
-    basePrice: "",
-    discountPercentage: "",
-    subCategoryId: "",
-    stockQty: "",
-    sku: "",
-    colorValue: "",
-    sizeValue: "",
-  });
+const [form, setForm] = useState({
+  name: "",
+  description: "",
+  basePrice: "",
+  discountPercentage: "",
+  subCategoryId: "",
+  storeSectionId: "",
+  stockQty: "",
+  sku: "",
+  variantName: "",
+  colorValue: "",
+  sizeValue: "",
+});
 
     const [showVariantModal, setShowVariantModal] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [variants, setVariants] = useState([]);
     const [editingVariant, setEditingVariant] = useState(null);
 
-    const [variantForm, setVariantForm] = useState({
-    colorValue: "",
-    sizeValue: "",
-    sku: "",
-    price: "",
-    stockQty: "",
-    });
+
+const [variantForm, setVariantForm] = useState({
+  variantName: "",
+  colorValue: "",
+  sizeValue: "",
+  sku: "",
+  price: "",
+  stockQty: "",
+});
 
   // ========================
   // LOAD DATA
@@ -69,11 +87,12 @@ const Products = ({ sellerId }) => {
   const sid = Number(sellerId);
   const sellerProducts = prodData.filter((p) => p.sellerId === sid);
 
-  // attach variants
+  // attach variants (only active ones)
   for (const p of sellerProducts) {
     try {
       const v = await getProductVariants(p.id);
-      p.variants = v;
+      // Filter only active variants
+      p.variants = v.filter(variant => variant.isActive !== false);
     } catch {
       p.variants = [];
     }
@@ -114,17 +133,80 @@ const checkDuplicateSKU = async (sku, currentVariantId = null) => {
   return { isDuplicate: false };
 };
 
- useEffect(() => {
+// Auto-fill variant name when color/size change (for category 2 only)
+useEffect(() => {
+  if (sellerCategory === 2) {
+    let autoFilledName = '';
+    
+    if (variantForm.colorValue && variantForm.sizeValue) {
+      autoFilledName = `${variantForm.colorValue} / ${variantForm.sizeValue}`;
+    } else if (variantForm.colorValue) {
+      autoFilledName = variantForm.colorValue;
+    } else if (variantForm.sizeValue) {
+      autoFilledName = variantForm.sizeValue;
+    }
+    
+    if (autoFilledName) {
+      setVariantForm(prev => ({
+        ...prev,
+        variantName: autoFilledName
+      }));
+    }
+  }
+}, [variantForm.colorValue, variantForm.sizeValue, sellerCategory]);
+
+// Auto-fill initial variant name when color/size change in main form
+useEffect(() => {
+  if (sellerCategory === 2 && !editing) {
+    let autoFilledName = '';
+    
+    if (form.colorValue && form.sizeValue) {
+      autoFilledName = `${form.colorValue} / ${form.sizeValue}`;
+    } else if (form.colorValue) {
+      autoFilledName = form.colorValue;
+    } else if (form.sizeValue) {
+      autoFilledName = form.sizeValue;
+    }
+    
+    if (autoFilledName) {
+      setForm(prev => ({
+        ...prev,
+        variantName: autoFilledName
+      }));
+    }
+  }
+}, [form.colorValue, form.sizeValue, sellerCategory, editing]);
+
+useEffect(() => {
   const load = async () => {
     setLoading(true);
     try {
-      const [sellerProducts, subCats] = await Promise.all([
-        loadSellerProducts(sellerId),
-        getSubCategoryDropdown()
-      ]);
+      // Fetch seller info to get category
+      const sellerData = await getSellerById(sellerId);
+      setSellerCategory(sellerData.categoryId);
 
-      setProducts(sellerProducts);
-      setSubCategories(subCats);
+      const promises = [
+        loadSellerProducts(),
+        getSubCategoryDropdown(),
+        getStoreSections(sellerId)
+      ];
+
+      // Only load colors and sizes if seller is in Clothing category (ID = 2)
+      if (sellerData.categoryId === 2) {
+        promises.push(getColorValues());
+        promises.push(getSizeValues());
+      }
+
+      const results = await Promise.all(promises);
+      
+      setProducts(results[0]);
+      setSubCategories(results[1]);
+      setStoreSections(results[2] || []);
+      
+      if (sellerData.categoryId === 2) {
+        setColorOptions(results[2] || []);
+        setSizeOptions(results[3] || []);
+      }
     } catch (err) {
       console.error("Failed to load products", err);
       alert("Failed to load products. Check console for details.");
@@ -135,7 +217,6 @@ const checkDuplicateSKU = async (sku, currentVariantId = null) => {
 
   load();
 }, [sellerId]);
-
 
 
 
@@ -179,32 +260,37 @@ const checkDuplicateSKU = async (sku, currentVariantId = null) => {
   // ========================
   // OPEN / CLOSE MODAL
   // ========================
-  const openNew = () => {
-    setEditing(null);
-    setForm({
-      name: "",
-      description: "",
-      basePrice: "",
-      discountPercentage: "",
-      subCategoryId: "",
-      stockQty: "",
-      sku: "",
-      colorValue: "",
-      sizeValue: "",
-    });
-    setShowModal(true);
-  };
 
-  const openEdit = (p) => {
+const openNew = () => {
+  setEditing(null);
+  setForm({
+    name: "",
+    description: "",
+    basePrice: "",
+    discountPercentage: "",
+    subCategoryId: "",
+    storeSectionId: "",
+    stockQty: "",
+    sku: "",
+    variantName: "",
+    colorValue: "",
+    sizeValue: "",
+  });
+  setShowModal(true);
+};
+
+const openEdit = (p) => {
   setEditing(p);
   setForm({
     name: p.name,
     description: p.description || "",
     basePrice: p.basePrice,
     discountPercentage: p.discountPercentage || "",
-    subCategoryId: p.subCategoryId,
+    subCategoryId: p.subCategoryId || "",
+    storeSectionId: p.storeSectionId || "",  // ← ADD THIS
     stockQty: "",
     sku: "",
+    variantName: "",
     colorValue: "",
     sizeValue: "",
   });
@@ -221,13 +307,14 @@ const saveProduct = async (e) => {
 
   // Step 1: Prepare the basic product data
   const payload = {
-  Name: form.name.trim(),
-  Description: form.description.trim(),
-  BasePrice: parseFloat(form.basePrice),
-  DiscountPercentage: form.discountPercentage ? parseFloat(form.discountPercentage) : null,
-  SellerId: sellerId,
-  SubCategoryId: parseInt(form.subCategoryId),
-};
+    Name: form.name.trim(),
+    Description: form.description.trim(),
+    BasePrice: parseFloat(form.basePrice),
+    DiscountPercentage: form.discountPercentage ? parseFloat(form.discountPercentage) : null,
+    SellerId: sellerId,
+    SubCategoryId: form.subCategoryId ? parseInt(form.subCategoryId) : null,  // ← MADE OPTIONAL
+    StoreSectionId: form.storeSectionId ? parseInt(form.storeSectionId) : null,  // ← ADD THIS
+  };
 
   try {
     // Step 2: Check if we're EDITING or CREATING
@@ -260,9 +347,16 @@ const saveProduct = async (e) => {
       // All validations passed! Now create the product
       const created = await createProduct(payload);
 
+      // Auto-generate variant name if category is 2 (Clothing) and both color/size provided
+      let finalVariantName = form.variantName.trim();
+      if (sellerCategory === 2 && form.colorValue && form.sizeValue && !finalVariantName) {
+        finalVariantName = `${form.colorValue.trim()} / ${form.sizeValue.trim()}`;
+      }
+
       // Then immediately create the required initial variant
       await createProductVariant({
         ProductId: created.id,
+        VariantName: finalVariantName,
         ColorValue: form.colorValue.trim() || null,
         SizeValue: form.sizeValue.trim() || null,
         SKU: form.sku.trim(),
@@ -278,16 +372,17 @@ const saveProduct = async (e) => {
     // Step 4: Close modal and reset form
     closeModal();
     setForm({
-      name: "",
-      description: "",
-      basePrice: "",
-      discountPercentage: "",
-      subCategoryId: "",
-      stockQty: "",
-      sku: "",
-      colorValue: "",
-      sizeValue: "",
-    });
+    name: "",
+    description: "",
+    basePrice: "",
+    discountPercentage: "",
+    subCategoryId: "",
+    stockQty: "",
+    sku: "",
+    variantName: "",
+    colorValue: "",
+    sizeValue: "",
+  });
     
   } catch (err) {
     console.error("Save product error:", err);
@@ -340,8 +435,9 @@ const saveProduct = async (e) => {
 const openVariantModal = async (product) => {
   setSelectedProduct(product);
   setEditingVariant(null);
-  setVariantError(null); // Clear any previous errors
+  setVariantError(null);
   setVariantForm({
+    variantName: "",
     colorValue: "",
     sizeValue: "",
     sku: "",
@@ -371,8 +467,9 @@ const closeVariantModal = () => {
 
 const openEditVariant = (variant) => {
   setEditingVariant(variant);
-  setVariantError(null); // Clear error when switching variants
+  setVariantError(null);
   setVariantForm({
+    variantName: variant.variantName || "",
     colorValue: variant.colorValue || "",
     sizeValue: variant.sizeValue || "",
     sku: variant.sku || "",
@@ -384,6 +481,12 @@ const openEditVariant = (variant) => {
 const saveVariant = async (e) => {
   e.preventDefault();
   setVariantError(null);
+
+  // VALIDATION 0: Variant Name is required
+  if (!variantForm.variantName || variantForm.variantName.trim() === '') {
+    setVariantError('Variant Name is required');
+    return;
+  }
 
   // VALIDATION 1: SKU is required
   if (!variantForm.sku || variantForm.sku.trim() === '') {
@@ -414,14 +517,15 @@ const saveVariant = async (e) => {
     return;
   }
 
-  const payload = {
-    ProductId: selectedProduct.id,
-    ColorValue: variantForm.colorValue || null,
-    SizeValue: variantForm.sizeValue || null,
-    SKU: variantForm.sku || null,
-    Price: variantForm.price ? parseFloat(variantForm.price) : null,
-    StockQty: parseInt(variantForm.stockQty),
-  };
+const payload = {
+  ProductId: selectedProduct.id,
+  VariantName: variantForm.variantName.trim(),
+  ColorValue: variantForm.colorValue || null,
+  SizeValue: variantForm.sizeValue || null,
+  SKU: variantForm.sku || null,
+  Price: variantForm.price ? parseFloat(variantForm.price) : null,
+  StockQty: parseInt(variantForm.stockQty),
+};
 
   try {
     if (editingVariant) {
@@ -443,12 +547,13 @@ setSelectedProduct(updatedProduct); // update metadata too
     setVariantError(null);
     setEditingVariant(null);
     setVariantForm({
-      colorValue: "",
-      sizeValue: "",
-      sku: "",
-      price: "",
-      stockQty: "",
-    });
+    variantName: "",
+    colorValue: "",
+    sizeValue: "",
+    sku: "",
+    price: "",
+    stockQty: "",
+  });
   } catch (err) {
     alert(err.message || "Failed to save variant");
   }
@@ -458,8 +563,8 @@ const removeVariant = async (variantId) => {
   await new Promise((resolve) => {
     setConfirmModal({
       isOpen: true,
-      title: 'Delete Variant',
-      message: 'Are you sure you want to delete this variant? This action cannot be undone.',
+      title: 'Deactivate Variant',
+      message: 'Are you sure you want to deactivate this variant? It will be hidden from your product listings.',
       onConfirm: () => {
         setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null });
         resolve(true);
@@ -497,10 +602,12 @@ const removeVariant = async (variantId) => {
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       {/* ADD PRODUCT BUTTON */}
-      <div className="flex justify-end">
-
+      <div className="flex justify-end gap-3">
+        <Button variant="secondary" size="large" onClick={() => setShowSectionsModal(true)}>
+          Manage Sections
+        </Button>
         <Button variant="primary" size="large" onClick={openNew}>
-        Add Product
+          Add Product
         </Button>
       </div>
 
@@ -775,23 +882,28 @@ const removeVariant = async (variantId) => {
 
                 <div>
                   <label className="block text-label-medium text-charcoal-600 mb-2 font-semibold">
-                    Category *
+                    Store Section (Optional)
                   </label>
                   <select
-                    required
-                    value={form.subCategoryId}
+                    value={form.storeSectionId}
                     onChange={(e) =>
-                      setForm({ ...form, subCategoryId: e.target.value })
+                      setForm({ ...form, storeSectionId: e.target.value })
                     }
                     className="w-full border-2 border-grey-stroke rounded-lg p-3 bg-white text-body-regular text-charcoal-600 focus:outline-none focus:border-sage-500 focus:ring-2 focus:ring-sage-100 transition-all"
                   >
-                    <option value="">Select category</option>
-                    {subCategories.map((sc) => (
-                      <option key={sc.id} value={sc.id}>
-                        {sc.name}
-                      </option>
-                    ))}
+                    <option value="">No section</option>
+                    {storeSections
+                      .filter(s => s.isActive)
+                      .sort((a, b) => a.sortOrder - b.sortOrder)
+                      .map((section) => (
+                        <option key={section.id} value={section.id}>
+                          {section.name}
+                        </option>
+                      ))}
                   </select>
+                  <p className="text-xs text-charcoal-400 mt-1">
+                    Organize products into custom sections
+                  </p>
                 </div>
               </div>
 
@@ -859,38 +971,82 @@ const removeVariant = async (variantId) => {
                       </div>
                     </div>
 
-                    <h4 className="text-card-h3 text-charcoal-600 mt-5 mb-3">
-                      Variant Attributes (Optional)
-                    </h4>
+                    {sellerCategory === 2 && (
+                      <>
+                        <h4 className="text-card-h3 text-charcoal-600 mb-3">
+                          Variant Attributes
+                        </h4>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                      <div>
-                        <label className="block text-label-medium text-charcoal-600 mb-2 font-semibold">
-                          Color
-                        </label>
-                        <input
-                          type="text"
-                          value={form.colorValue}
-                          onChange={(e) =>
-                            setForm({ ...form, colorValue: e.target.value })
-                          }
-                          className="w-full border-2 border-grey-stroke rounded-lg p-3 bg-white text-body-regular text-charcoal-600 focus:outline-none focus:border-sage-500 focus:ring-2 focus:ring-sage-100 transition-all"
-                        />
-                      </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+                          <div>
+                            <label className="block text-label-medium text-charcoal-600 mb-2 font-semibold">
+                              Color
+                            </label>
+                            <select
+                              value={form.colorValue}
+                              onChange={(e) =>
+                                setForm({ ...form, colorValue: e.target.value })
+                              }
+                              className="w-full border-2 border-grey-stroke rounded-lg p-3 bg-white text-body-regular text-charcoal-600 focus:outline-none focus:border-sage-500 focus:ring-2 focus:ring-sage-100 transition-all"
+                            >
+                              <option value="">Select color</option>
+                              {colorOptions.map((color) => (
+                                <option key={color.id} value={color.name}>
+                                  {color.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
 
-                      <div>
-                        <label className="block text-label-medium text-charcoal-600 mb-2 font-semibold">
-                          Size
-                        </label>
-                        <input
-                          type="text"
-                          value={form.sizeValue}
-                          onChange={(e) =>
-                            setForm({ ...form, sizeValue: e.target.value })
-                          }
-                          className="w-full border-2 border-grey-stroke rounded-lg p-3 bg-white text-body-regular text-charcoal-600 focus:outline-none focus:border-sage-500 focus:ring-2 focus:ring-sage-100 transition-all"
-                        />
-                      </div>
+                          <div>
+                            <label className="block text-label-medium text-charcoal-600 mb-2 font-semibold">
+                              Size
+                            </label>
+                            <select
+                              value={form.sizeValue}
+                              onChange={(e) =>
+                                setForm({ ...form, sizeValue: e.target.value })
+                              }
+                              className="w-full border-2 border-grey-stroke rounded-lg p-3 bg-white text-body-regular text-charcoal-600 focus:outline-none focus:border-sage-500 focus:ring-2 focus:ring-sage-100 transition-all"
+                            >
+                              <option value="">Select size</option>
+                              {sizeOptions.map((size) => (
+                                <option key={size.id} value={size.name}>
+                                  {size.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    <div className="mb-5">
+                      <label className="block text-label-medium text-charcoal-600 mb-2 font-semibold">
+                        Variant Name <span className="text-error-text">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={form.variantName}
+                        onChange={(e) =>
+                          setForm({ ...form, variantName: e.target.value })
+                        }
+                        readOnly={sellerCategory === 2 && (form.colorValue || form.sizeValue)}
+                        placeholder={sellerCategory === 2 ? "Select color/size to auto-fill" : "e.g., Standard, Premium, etc."}
+                        className={`w-full border-2 border-grey-stroke rounded-lg p-3 text-body-regular text-charcoal-600 focus:outline-none focus:border-sage-500 focus:ring-2 focus:ring-sage-100 transition-all ${
+                          sellerCategory === 2 && (form.colorValue || form.sizeValue)
+                            ? 'bg-grey-200 cursor-not-allowed'
+                            : 'bg-white'
+                        }`}
+                      />
+                      <p className="text-xs text-charcoal-400 mt-1">
+                        {sellerCategory === 2 
+                          ? (form.colorValue || form.sizeValue)
+                            ? "Auto-filled based on color/size selection (clear color & size to edit manually)"
+                            : "Select color and/or size to auto-fill, or enter manually"
+                          : "Give this variant a descriptive name"}
+                      </p>
                     </div>
                   </div>
                 </>
@@ -961,36 +1117,77 @@ const removeVariant = async (variantId) => {
                   <p className="text-sm text-error-text">{variantError}</p>
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-label-medium text-charcoal-600 mb-2 font-semibold">
-                    Color
-                  </label>
-                  <input
-                    type="text"
-                    value={variantForm.colorValue}
-                    onChange={(e) =>
-                      setVariantForm({ ...variantForm, colorValue: e.target.value })
-                    }
-                    placeholder="e.g., Red, Blue"
-                    className="w-full border-2 border-grey-stroke rounded-lg p-3 bg-white text-body-regular text-charcoal-600 focus:outline-none focus:border-sage-500 focus:ring-2 focus:ring-sage-100 transition-all"
-                  />
-                </div>
+              
+              {sellerCategory === 2 && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-label-medium text-charcoal-600 mb-2 font-semibold">
+                      Color
+                    </label>
+                    <select
+                      value={variantForm.colorValue}
+                      onChange={(e) =>
+                        setVariantForm({ ...variantForm, colorValue: e.target.value })
+                      }
+                      className="w-full border-2 border-grey-stroke rounded-lg p-3 bg-white text-body-regular text-charcoal-600 focus:outline-none focus:border-sage-500 focus:ring-2 focus:ring-sage-100 transition-all"
+                    >
+                      <option value="">Select color</option>
+                      {colorOptions.map((color) => (
+                        <option key={color.id} value={color.name}>
+                          {color.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                <div>
-                  <label className="block text-label-medium text-charcoal-600 mb-2 font-semibold">
-                    Size
-                  </label>
-                  <input
-                    type="text"
-                    value={variantForm.sizeValue}
-                    onChange={(e) =>
-                      setVariantForm({ ...variantForm, sizeValue: e.target.value })
-                    }
-                    placeholder="e.g., S, M, L"
-                    className="w-full border-2 border-grey-stroke rounded-lg p-3 bg-white text-body-regular text-charcoal-600 focus:outline-none focus:border-sage-500 focus:ring-2 focus:ring-sage-100 transition-all"
-                  />
+                  <div>
+                    <label className="block text-label-medium text-charcoal-600 mb-2 font-semibold">
+                      Size
+                    </label>
+                    <select
+                      value={variantForm.sizeValue}
+                      onChange={(e) =>
+                        setVariantForm({ ...variantForm, sizeValue: e.target.value })
+                      }
+                      className="w-full border-2 border-grey-stroke rounded-lg p-3 bg-white text-body-regular text-charcoal-600 focus:outline-none focus:border-sage-500 focus:ring-2 focus:ring-sage-100 transition-all"
+                    >
+                      <option value="">Select size</option>
+                      {sizeOptions.map((size) => (
+                        <option key={size.id} value={size.name}>
+                          {size.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
+              )}
+
+              <div>
+                <label className="block text-label-medium text-charcoal-600 mb-2 font-semibold">
+                  Variant Name <span className="text-error-text">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={variantForm.variantName}
+                  onChange={(e) =>
+                    setVariantForm({ ...variantForm, variantName: e.target.value })
+                  }
+                  readOnly={sellerCategory === 2 && (variantForm.colorValue || variantForm.sizeValue)}
+                  placeholder={sellerCategory === 2 ? "Select color/size to auto-fill" : "e.g., Standard, Premium, etc."}
+                  className={`w-full border-2 border-grey-stroke rounded-lg p-3 text-body-regular text-charcoal-600 focus:outline-none focus:border-sage-500 focus:ring-2 focus:ring-sage-100 transition-all ${
+                    sellerCategory === 2 && (variantForm.colorValue || variantForm.sizeValue)
+                      ? 'bg-grey-200 cursor-not-allowed'
+                      : 'bg-white'
+                  }`}
+                />
+                <p className="text-xs text-charcoal-400 mt-1">
+                  {sellerCategory === 2 
+                    ? (variantForm.colorValue || variantForm.sizeValue)
+                      ? "Auto-filled based on color/size selection (clear color & size to edit manually)"
+                      : "Select color and/or size to auto-fill, or enter manually"
+                    : "Give this variant a descriptive name"}
+                </p>
               </div>
 
               <div>
@@ -1054,8 +1251,9 @@ const removeVariant = async (variantId) => {
                     variant="secondary"
                     onClick={() => {
                       setEditingVariant(null);
-                      setVariantError(null); // Clear error
+                      setVariantError(null);
                       setVariantForm({
+                        variantName: "",
                         colorValue: "",
                         sizeValue: "",
                         sku: "",
@@ -1105,11 +1303,14 @@ const removeVariant = async (variantId) => {
             ) : (
               <div className="space-y-3 max-h-[500px] overflow-y-auto">
                 {variants.map((variant) => (
-                  <div
-                    key={variant.id}
-                    className="bg-white rounded-lg p-4 border-2 border-grey-stroke hover:border-sage-300 transition-all"
-                  >
-                    <div className="flex items-start justify-between mb-3">
+                    <div
+                      key={variant.id}
+                      className="bg-white rounded-lg p-4 border-2 border-grey-stroke hover:border-sage-300 transition-all">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <h4 className="text-body-large font-bold text-charcoal-600 mb-2">
+                        {variant.variantName}
+                      </h4>
                       <div className="flex gap-2">
                         {variant.colorValue && (
                           <StatusChip variant="brand">
@@ -1122,6 +1323,7 @@ const removeVariant = async (variantId) => {
                           </StatusChip>
                         )}
                       </div>
+                    </div>
                       <div className="flex gap-2">
                         <button
                           onClick={() => openEditVariant(variant)}
@@ -1198,6 +1400,47 @@ const removeVariant = async (variantId) => {
   confirmText={confirmModal.confirmText || "Confirm"}
   variant={confirmModal.variant || "danger"}
 />
+
+          {/* SECTIONS MANAGEMENT MODAL */}
+          {showSectionsModal && (
+            <div className="fixed inset-0 bg-charcoal-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 modal-backdrop-enter">
+              <div className="bg-cream-50 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto modal-content-enter">
+                <div className="bg-sage-500 p-8 rounded-t-2xl">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h2 className="text-display-h2 text-white font-bold">
+                        Manage Store Sections
+                      </h2>
+                      <p className="text-body-medium text-white/80 mt-2">
+                        Organize your products into custom sections
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowSectionsModal(false)}
+                      className="text-white hover:text-cream-50 transition-colors"
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-6">
+                  <SectionsManager
+                    sellerId={sellerId}
+                    sections={storeSections}
+                    onSectionsChange={async () => {
+                      const updated = await getStoreSections(sellerId);
+                      setStoreSections(updated);
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+
     </div>
   );
 };

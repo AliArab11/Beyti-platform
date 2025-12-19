@@ -5,6 +5,7 @@ import { Cake, Heart, Star, MagnifyingGlass, ArrowLeft, Bread, ShoppingCartSimpl
 import ActiveOrderBanner from './ActiveOrderBanner';
 import Snackbar from './../../../components/Snackbar';
 import CustomerHeader from './../../../components/CustomerHeader';
+import { isStoreOpen } from '../../Seller/Components/storeStatus';
 
 
 
@@ -18,6 +19,7 @@ const customerId = location.state?.customerId;
 const customerName = location.state?.customerName;
 const storeName = location.state?.storeName;
 const customerAddresses = location.state?.customerAddresses || [];
+const selectedStore = location.state?.selectedStore;
 
 // Get cart from localStorage
 const [localCart, setLocalCart] = useState(() => {
@@ -256,6 +258,11 @@ const formatDate = (dateString) => {
 
 
 const handleAddToCart = () => {
+  // CHECK STORE STATUS 
+    if (selectedStore && !isStoreOpen(selectedStore)) {
+        showSnackbar('Store is currently closed and cannot accept orders', 'error');
+        return;
+    }
     // ✅ CHECK LOGIN STATUS FIRST - BEFORE ANYTHING ELSE
     if (!customerId) {
         showSnackbar('Please login to add items to cart', 'warning');
@@ -273,17 +280,18 @@ const handleAddToCart = () => {
       : originalPrice;
 
     const item = {
-        id: product.id,
-        name: product.name,
-        basePrice: finalPrice,
-        originalPrice: originalPrice,
-        discountPercentage: product.discountPercentage,
-        quantity: quantity,
-        totalPrice: finalPrice * quantity,
-        selectedVariant: selectedVariant,
-        storeName: storeName,
-        sellerId: storeId
-    };
+      id: product.id,
+      name: product.name,
+      variantName: selectedVariant?.variantName || null, // ← ADD THIS LINE
+      basePrice: finalPrice,
+      originalPrice: originalPrice,
+      discountPercentage: product.discountPercentage,
+      quantity: quantity,
+      totalPrice: finalPrice * quantity,
+      selectedVariant: selectedVariant,
+      storeName: storeName,
+      sellerId: storeId
+  };
     
     console.log('🛒 ProductPage: Creating cart item with quantity:', quantity);
     console.log('📦 Full item:', item);
@@ -647,18 +655,6 @@ const handleTrackOrder = () => {
             </>
           );
         })()}
-        {product.subCategory && (
-          <div className="flex gap-2 mt-4">
-            <span className="bg-sage-100 text-sage-700 text-sm font-semibold px-4 py-2 rounded-full">
-              {product.subCategory.name}
-            </span>
-            {product.subCategory.category && (
-              <span className="bg-cream-100 text-charcoal-600 text-sm font-semibold px-4 py-2 rounded-full">
-                {product.subCategory.category.name}
-              </span>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Variants */}
@@ -668,53 +664,26 @@ const handleTrackOrder = () => {
             Select Variant
           </h3>
           <div className="grid grid-cols-3 gap-3">
-            {variants.map(variant => (
-              <button
-                key={variant.id}
-                onClick={() => setSelectedVariant(variant)}
-                className={`p-4 rounded-xl font-semibold transition-all border-2 ${
-                  selectedVariant?.id === variant.id
-                    ? 'bg-sage-500 text-white border-sage-500 shadow-md'
-                    : 'bg-white text-charcoal-600 border-grey-stroke hover:border-sage-500'
-                }`}
-              >
-                <div className="text-sm">
-                  {variant.colorValue && <div className="font-bold mb-1">{variant.colorValue}</div>}
-                  {variant.sizeValue && <div className="font-bold mb-1">{variant.sizeValue}</div>}
-                  {variant.price && (
-                    <>
-                      {product.discountPercentage ? (
-                        <div className={`text-xs mt-2 ${
-                          selectedVariant?.id === variant.id ? 'text-white' : 'text-charcoal-500'
-                        }`}>
-                          <div className="font-bold">
-                            {calculateDiscountedPrice(variant.price, product.discountPercentage).toFixed(3)} BD
-                          </div>
-                          <div className={`line-through text-xs ${
-                            selectedVariant?.id === variant.id ? 'text-white/70' : 'text-charcoal-400'
-                          }`}>
-                            {variant.price.toFixed(3)} BD
-                          </div>
-                        </div>
-                      ) : (
-                        <div className={`text-xs font-semibold mt-2 ${
-                          selectedVariant?.id === variant.id ? 'text-white' : 'text-charcoal-500'
-                        }`}>
-                          {variant.price.toFixed(3)} BD
-                        </div>
-                      )}
-                    </>
-                  )}
-                  {variant.stockQty !== undefined && (
-                    <div className={`text-xs mt-1 ${
-                      selectedVariant?.id === variant.id ? 'text-white/80' : 'text-charcoal-400'
-                    }`}>
-                      {variant.stockQty > 0 ? `${variant.stockQty} in stock` : 'Out of stock'}
-                    </div>
-                  )}
+           {variants.map(variant => (
+            <button
+              key={variant.id}
+              onClick={() => setSelectedVariant(variant)}
+              className={`p-4 rounded-xl font-semibold transition-all border-2 ${
+                selectedVariant?.id === variant.id
+                  ? 'bg-sage-500 text-white border-sage-500 shadow-md'
+                  : 'bg-white text-charcoal-600 border-grey-stroke hover:border-sage-500'
+              }`}
+            >
+              <div className="text-sm">
+                <div className="font-bold mb-2">{variant.variantName}</div>
+                <div className={`text-xs mt-1 ${
+                  selectedVariant?.id === variant.id ? 'text-white/80' : 'text-charcoal-400'
+                }`}>
+                  {variant.stockQty > 0 ? `${variant.stockQty} in stock` : 'Out of stock'}
                 </div>
-              </button>
-            ))}
+              </div>
+            </button>
+          ))}
           </div>
         </div>
       )}

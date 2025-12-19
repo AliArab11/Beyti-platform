@@ -17,6 +17,9 @@ public partial class ProductVariant
 
     public int ProductId { get; set; }
 
+    [StringLength(120)]
+    public string VariantName { get; set; } = null!;
+
     public int? ColorValueId { get; set; }
 
     public int? SizeValueId { get; set; }
@@ -34,6 +37,8 @@ public partial class ProductVariant
 
     [Precision(3)]
     public DateTime UpdatedAt { get; set; }
+
+    public bool IsActive { get; set; }
 
     [ForeignKey("ColorValueId")]
     [InverseProperty("ProductVariantColorValues")]

@@ -478,6 +478,26 @@ export const getSellerByUserProfileId = async (userProfileId) => {
 };
 
 /**
+ * Get seller profile with full details including subcategories
+ * @param {number} sellerId - Seller ID
+ * @returns {Promise<object>} - Seller profile with subcategories
+ */
+export const getSellerProfile = async (sellerId, userProfileId) => {
+  if (userProfileId) {
+    return await fetchAPI(`/Sellers/Profile/${userProfileId}`);
+  }
+  // Fallback to regular sellers endpoint
+  const sellers = await fetchAPI('/Sellers');
+  return sellers.find(s => s.id === sellerId);
+};
+
+export const getSellerById = async (sellerId) => {
+  const response = await fetch(`https://localhost:7062/api/Sellers/${sellerId}`);
+  if (!response.ok) throw new Error("Failed to fetch seller");
+  return response.json();
+};
+
+/**
  * Create a new seller
  * @param {object} data - Seller data (PascalCase: UserProfileId, StoreName, Phone)
  * @returns {Promise<object>} - Created seller object
@@ -511,6 +531,42 @@ export const deleteSeller = async (id) => {
   return await fetchAPI(`/Sellers/${id}`, {
     method: 'DELETE',
   });
+};
+
+
+// Store Sections APIS
+
+export const getStoreSections = async (sellerId) => {
+  const res = await fetch(`${BASE_URL}/StoreSections/seller/${sellerId}`);
+  if (!res.ok) throw new Error("Failed to fetch store sections");
+  return res.json();
+};
+
+export const createStoreSection = async (sellerId, data) => {
+  const res = await fetch(`${BASE_URL}/StoreSections?sellerId=${sellerId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to create section");
+  return res.json();
+};
+
+export const updateStoreSection = async (id, data) => {
+  const res = await fetch(`${BASE_URL}/StoreSections/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to update section");
+  return res.json();
+};
+
+export const deleteStoreSection = async (id) => {
+  const res = await fetch(`${BASE_URL}/StoreSections/${id}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error("Failed to delete section");
 };
 
 // --- Product APIs ---

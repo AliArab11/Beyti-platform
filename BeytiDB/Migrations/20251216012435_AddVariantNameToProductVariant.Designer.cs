@@ -4,6 +4,7 @@ using BeytiDB.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BeytiDB.Migrations
 {
     [DbContext(typeof(BeytiContext))]
-    partial class BeytiContextModelSnapshot : ModelSnapshot
+    [Migration("20251216012435_AddVariantNameToProductVariant")]
+    partial class AddVariantNameToProductVariant
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -771,10 +774,7 @@ namespace BeytiDB.Migrations
                     b.Property<int>("SellerId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("StoreSectionId")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("SubCategoryId")
+                    b.Property<int>("SubCategoryId")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("UpdatedAt")
@@ -786,8 +786,6 @@ namespace BeytiDB.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("GenderId");
-
-                    b.HasIndex("StoreSectionId");
 
                     b.HasIndex(new[] { "SellerId" }, "IX_Product_Seller");
 
@@ -814,9 +812,6 @@ namespace BeytiDB.Migrations
                         .HasPrecision(3)
                         .HasColumnType("datetime2(3)")
                         .HasDefaultValueSql("(sysutcdatetime())");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
 
                     b.Property<decimal?>("Price")
                         .HasColumnType("decimal(10, 2)");
@@ -1018,29 +1013,11 @@ namespace BeytiDB.Migrations
                     b.Property<int>("CategoryId")
                         .HasColumnType("int");
 
-                    b.Property<TimeSpan?>("CloseTime")
-                        .HasColumnType("time");
-
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(3)
                         .HasColumnType("datetime2(3)")
                         .HasDefaultValueSql("(sysutcdatetime())");
-
-                    b.Property<DateTime?>("ForceOpenStartTime")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool?>("IsForceOpen")
-                        .HasColumnType("bit");
-
-                    b.Property<bool?>("IsManuallyClosed")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsOpen")
-                        .HasColumnType("bit");
-
-                    b.Property<TimeSpan?>("OpenTime")
-                        .HasColumnType("time");
 
                     b.Property<string>("Phone")
                         .HasMaxLength(30)
@@ -1501,35 +1478,6 @@ namespace BeytiDB.Migrations
                     b.HasIndex(new[] { "ServiceProviderId" }, "IX_ServiceReview_Provider");
 
                     b.ToTable("ServiceReview");
-                });
-
-            modelBuilder.Entity("BeytiDB.Data.StoreSection", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<int>("SellerId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SellerId");
-
-                    b.ToTable("StoreSection");
                 });
 
             modelBuilder.Entity("BeytiDB.Data.SubCategory", b =>
@@ -2287,20 +2235,15 @@ namespace BeytiDB.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_Product_Seller");
 
-                    b.HasOne("BeytiDB.Data.StoreSection", "StoreSection")
-                        .WithMany("Products")
-                        .HasForeignKey("StoreSectionId");
-
                     b.HasOne("BeytiDB.Data.SubCategory", "SubCategory")
                         .WithMany("Products")
                         .HasForeignKey("SubCategoryId")
+                        .IsRequired()
                         .HasConstraintName("FK_Product_SubCategory");
 
                     b.Navigation("Gender");
 
                     b.Navigation("Seller");
-
-                    b.Navigation("StoreSection");
 
                     b.Navigation("SubCategory");
                 });
@@ -2600,17 +2543,6 @@ namespace BeytiDB.Migrations
                     b.Navigation("ServiceProvider");
                 });
 
-            modelBuilder.Entity("BeytiDB.Data.StoreSection", b =>
-                {
-                    b.HasOne("BeytiDB.Data.Seller", "Seller")
-                        .WithMany("StoreSections")
-                        .HasForeignKey("SellerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Seller");
-                });
-
             modelBuilder.Entity("BeytiDB.Data.SubCategory", b =>
                 {
                     b.HasOne("BeytiDB.Data.Category", "Category")
@@ -2755,8 +2687,6 @@ namespace BeytiDB.Migrations
                     b.Navigation("SellerAddresses");
 
                     b.Navigation("SellerSubCategories");
-
-                    b.Navigation("StoreSections");
                 });
 
             modelBuilder.Entity("BeytiDB.Data.Service", b =>
@@ -2798,11 +2728,6 @@ namespace BeytiDB.Migrations
                     b.Navigation("Services");
 
                     b.Navigation("TimeSlots");
-                });
-
-            modelBuilder.Entity("BeytiDB.Data.StoreSection", b =>
-                {
-                    b.Navigation("Products");
                 });
 
             modelBuilder.Entity("BeytiDB.Data.SubCategory", b =>

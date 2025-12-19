@@ -6,7 +6,7 @@ import OrderDetails from './Components/OrderDetails';
 import ActiveOrderBanner from './Components/ActiveOrderBanner';
 import Snackbar from './../../components/Snackbar';
 import CustomerHeader from '../../components/CustomerHeader';
-
+import { isStoreOpen } from '../Seller/Components/storeStatus';
 
 
 // Get customers function
@@ -33,9 +33,22 @@ const getCategories = async () => {
     const response = await fetch('https://localhost:7062/api/Categories');
     if (!response.ok) throw new Error('Failed to fetch categories');
     const data = await response.json();
-    return Array.isArray(data) ? data.filter(cat => cat.isActive) : [];
+    return Array.isArray(data) ? data : [];
   } catch (error) {
     console.error('Error fetching categories:', error);
+    return [];
+  }
+};
+
+// Get ALL subcategories (not filtered by category)
+const getAllSubCategories = async () => {
+  try {
+    const response = await fetch('https://localhost:7062/api/SubCategories');
+    if (!response.ok) throw new Error('Failed to fetch subcategories');
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error('Error fetching subcategories:', error);
     return [];
   }
 };
@@ -147,33 +160,67 @@ const CategoryTabs = ({ categories, selected, onSelect }) => (
 );
 
 // Subcategory Sidebar Component
-const SubcategorySidebar = ({ categories, selected, onSelect }) => (
-  <aside className="w-[280px] flex-shrink-0 mt-20">
-    <div className="space-y-3">
-      {categories.map(cat => (
+const SubcategorySidebar = ({ subcategories, selected, onSelect }) => {
+  // Icon mapping for common subcategory names
+  const getIconForSubcategory = (name) => {
+    const lowerName = name.toLowerCase();
+    if (lowerName.includes('sweet') || lowerName.includes('dessert')) return <Cake size={24} weight="regular" />;
+    if (lowerName.includes('traditional')) return <BowlFood size={24} weight="regular" />;
+    if (lowerName.includes('healthy')) return <Heart size={24} weight="regular" />;
+    if (lowerName.includes('bake') || lowerName.includes('bread')) return <Bread size={24} weight="regular" />;
+    if (lowerName.includes('beverage') || lowerName.includes('drink')) return <Coffee size={24} weight="regular" />;
+    return <Storefront size={24} weight="regular" />; // Default icon
+  };
+
+  return (
+    <aside className="w-[280px] flex-shrink-0 mt-20">
+      <div className="space-y-3">
+        {/* "All Stores" option */}
         <button
-          key={cat.id}
-          onClick={() => onSelect(cat.id)}
+          onClick={() => onSelect(null)}
           className={`w-full flex items-center gap-4 px-6 py-4 rounded-full text-left transition-all font-medium text-[17px] ${
-            selected === cat.id
+            selected === null
               ? 'bg-sage-500 text-white shadow-[0_2px_8px_rgba(85,107,92,0.3)]'
               : 'bg-cream-50 text-sage-500 hover:bg-cream-100'
           }`}
           style={{ fontFamily: 'Inter, sans-serif' }}
         >
           <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
-            selected === cat.id ? 'bg-sage-700' : 'bg-[#E8F0EA]'
+            selected === null ? 'bg-sage-700' : 'bg-[#E8F0EA]'
           }`}>
-            <div className={selected === cat.id ? 'text-white' : 'text-sage-500'}>
-              {cat.icon}
+            <div className={selected === null ? 'text-white' : 'text-sage-500'}>
+              <Storefront size={24} weight="regular" />
             </div>
           </div>
-          <span>{cat.label}</span>
+          <span>All Stores</span>
         </button>
-      ))}
-    </div>
-  </aside>
-);
+
+        {/* Actual subcategories */}
+        {subcategories.map(subcat => (
+          <button
+            key={subcat.id}
+            onClick={() => onSelect(subcat.id)}
+            className={`w-full flex items-center gap-4 px-6 py-4 rounded-full text-left transition-all font-medium text-[17px] ${
+              selected === subcat.id
+                ? 'bg-sage-500 text-white shadow-[0_2px_8px_rgba(85,107,92,0.3)]'
+                : 'bg-cream-50 text-sage-500 hover:bg-cream-100'
+            }`}
+            style={{ fontFamily: 'Inter, sans-serif' }}
+          >
+            <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
+              selected === subcat.id ? 'bg-sage-700' : 'bg-[#E8F0EA]'
+            }`}>
+              <div className={selected === subcat.id ? 'text-white' : 'text-sage-500'}>
+                {getIconForSubcategory(subcat.name)}
+              </div>
+            </div>
+            <span>{subcat.name}</span>
+          </button>
+        ))}
+      </div>
+    </aside>
+  );
+};
 
 // Search Bar Component
 const SearchBar = ({ value, onChange }) => (
@@ -204,10 +251,16 @@ const SearchBar = ({ value, onChange }) => (
 );
 
 // Featured Carousel Component
-const FeaturedCarousel = ({ stores, onStoreClick }) => {
+const FeaturedCarousel = ({ stores, onStoreClick, subcategories = [], selectedCategory }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   
-  const featured = stores.slice(0, 6);
+  // Filter stores by selected category only (ignore subcategory filter)
+  const categoryFilteredStores = stores.filter(store => {
+    if (!selectedCategory) return true;
+    return store.categoryId === selectedCategory;
+  });
+  
+  const featured = categoryFilteredStores.slice(0, 6);
 
   useEffect(() => {
     if (featured.length === 0) return;
@@ -261,6 +314,17 @@ const FeaturedCarousel = ({ stores, onStoreClick }) => {
                   </div>
                   <div className="absolute top-3 right-4 w-12 h-12 rounded-full opacity-15"
                       style={{ background: `radial-gradient(circle, ${colors.accent} 0%, transparent 70%)` }}></div>
+                      {/* Store Status Badge*/}
+                        <div className="absolute top-3 left-3">
+                          <div className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 ${
+                            isStoreOpen(store)
+                              ? 'bg-success-btn text-white'
+                              : 'bg-error-btn text-white'
+                          }`}>
+                            <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                            {isStoreOpen(store) ? 'OPEN' : 'CLOSED'}
+                          </div>
+                        </div>
                   
                   <div className="absolute -bottom-8 left-4">
                     <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${colors.gradient} border-4 border-white flex items-center justify-center`}
@@ -313,9 +377,24 @@ const FeaturedCarousel = ({ stores, onStoreClick }) => {
                       );
                     })()}
                   </div>
-                  <div className="flex gap-2 flex-wrap">
-                    <span className="px-3 py-1 bg-cream-100 rounded-full text-xs font-medium text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>Bakery</span>
-                    <span className="px-3 py-1 bg-cream-100 rounded-full text-xs font-medium text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>Sweets</span>
+                 <div className="flex gap-2 flex-wrap">
+                    {(() => {
+                      // Get subcategory names for this store
+                      const storeSubcategoryIds = store.subCategoryIds || [];
+                      const storeSubcategories = subcategories.filter(sub => storeSubcategoryIds.includes(sub.id));
+                      
+                      return storeSubcategories.length > 0 ? (
+                        storeSubcategories.map(subcat => (
+                          <span key={subcat.id} className="px-3 py-1 bg-cream-100 rounded-full text-xs font-medium text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>
+                            {subcat.name}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="px-3 py-1 bg-grey-200 rounded-full text-xs font-medium text-charcoal-400 italic" style={{ fontFamily: 'Inter, sans-serif' }}>
+                          No categories
+                        </span>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
@@ -350,7 +429,7 @@ const FeaturedCarousel = ({ stores, onStoreClick }) => {
 };
 
 // Store Card Component
-const StoreCard = ({ store }) => {
+const StoreCard = ({ store, subcategories = [] }) => {
   const colors = getStoreColors(store.storeName);
   const words = store.storeName.split(' ').filter(w => w.length > 0);
   const initials = words.length >= 2 
@@ -372,6 +451,18 @@ const StoreCard = ({ store }) => {
         </div>
         <div className="absolute top-3 right-4 w-12 h-12 rounded-full opacity-15"
              style={{ background: `radial-gradient(circle, ${colors.accent} 0%, transparent 70%)` }}></div>
+
+             {/* Store Status Badge */}
+              <div className="absolute top-3 left-3">
+                <div className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 ${
+                  isStoreOpen(store)
+                    ? 'bg-success-btn text-white'
+                    : 'bg-error-btn text-white'
+                }`}>
+                  <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                  {isStoreOpen(store) ? 'OPEN' : 'CLOSED'}
+                </div>
+              </div>
         
         <div className="absolute -bottom-8 left-4">
           <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${colors.gradient} border-4 border-white flex items-center justify-center`}
@@ -425,8 +516,26 @@ const StoreCard = ({ store }) => {
           })()}
         </div>
         <div className="flex gap-2 flex-wrap">
-          <span className="px-3 py-1 bg-cream-100 rounded-full text-xs font-medium text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>Bakery</span>
-          <span className="px-3 py-1 bg-cream-100 rounded-full text-xs font-medium text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>Sweets</span>
+          {(() => {
+            // Get subcategory names for this store
+            const storeSubcategoryIds = store.subCategoryIds || [];
+            // We need to get subcategories from the parent scope
+            // Since StoreCard is used in MainStoreView, we'll need to pass subcategories as a prop
+            return storeSubcategoryIds.length > 0 ? (
+              storeSubcategoryIds.map(subId => {
+                const subcat = subcategories.find(s => s.id === subId);
+                return subcat ? (
+                  <span key={subcat.id} className="px-3 py-1 bg-cream-100 rounded-full text-xs font-medium text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>
+                    {subcat.name}
+                  </span>
+                ) : null;
+              })
+            ) : (
+              <span className="px-3 py-1 bg-grey-200 rounded-full text-xs font-medium text-charcoal-400 italic" style={{ fontFamily: 'Inter, sans-serif' }}>
+                No categories
+              </span>
+            );
+          })()}
         </div>
       </div>
     </div>
@@ -500,10 +609,26 @@ const MainStoreView = () => {
   const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState(null); // Will be set after fetching
-  const [selectedSubcategory, setSelectedSubcategory] = useState("sweets");
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [subcategories, setSubcategories] = useState([]);
+  const [selectedSubcategory, setSelectedSubcategory] = useState(null); // null means "All Stores"
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStoreId, setSelectedStoreId] = useState(null);
+
+  const [filteredSubcategories, setFilteredSubcategories] = useState([]); // Filtered by category
+
+  // Filter subcategories by selected category for the sidebar
+useEffect(() => {
+  if (!selectedCategory) {
+    setFilteredSubcategories([]);
+    setSelectedSubcategory(null);
+    return;
+  }
+  
+  const filtered = subcategories.filter(sub => sub.categoryId === selectedCategory);
+  setFilteredSubcategories(filtered);
+  setSelectedSubcategory(null); // Reset to "All Stores" when category changes
+}, [selectedCategory, subcategories]);
 
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [activeFilters, setActiveFilters] = useState({
@@ -698,25 +823,27 @@ const [bannerDismissed, setBannerDismissed] = useState(() => {
   return localStorage.getItem(`beyti_bannerDismissed_${customerId}`) === 'true';
 });
 
-  
-  const subcategories = [
-    { id: "sweets", label: "Sweets", icon: <Cake size={24} weight="regular" /> },
-    { id: "traditional", label: "Traditional", icon: <BowlFood size={24} weight="regular" /> },
-    { id: "healthy", label: "Healthy", icon: <Heart size={24} weight="regular" /> },
-    { id: "bakery", label: "Bakery", icon: <Bread size={24} weight="regular" /> },
-    { id: "beverages", label: "Beverages", icon: <Coffee size={24} weight="regular" /> }
-  ];
 
 useEffect(() => {
   const initialize = async () => {
     const cats = await getCategories();
     setCategories(cats);
     if (cats.length > 0) {
-      setSelectedCategory(cats[0].id); // Select first category by default
+      setSelectedCategory(cats[0].id);
     }
   };
   initialize();
   fetchStores();
+}, []);
+
+// Fetch ALL subcategories on mount (for store cards to display)
+useEffect(() => {
+  const fetchAllSubcategories = async () => {
+    const allSubs = await getAllSubCategories();
+    setSubcategories(allSubs);
+  };
+  
+  fetchAllSubcategories();
 }, []);
 
 // Load customers on mount
@@ -908,12 +1035,20 @@ const handleStoreNavigation = (targetStoreId) => {
 };
 
 
-
 const filteredStores = stores
   .filter(store => {
     // Category filter - MOST IMPORTANT
     if (selectedCategory && store.categoryId !== selectedCategory) {
       return false;
+    }
+    
+    // Subcategory filter - NEW
+    if (selectedSubcategory !== null) {
+      // Check if store has this subcategory
+      const storeSubcategoryIds = store.subCategoryIds || [];
+      if (!storeSubcategoryIds.includes(selectedSubcategory)) {
+        return false;
+      }
     }
     
     // Search filter
@@ -1021,7 +1156,7 @@ const filteredStores = stores
         
         <div className="flex gap-4 mt-2">
           <SubcategorySidebar 
-            categories={subcategories} 
+            subcategories={filteredSubcategories}
             selected={selectedSubcategory} 
             onSelect={setSelectedSubcategory} 
           />
@@ -1216,8 +1351,10 @@ const filteredStores = stores
               </div>
             </div>
             <FeaturedCarousel 
-            stores={stores} 
-            onStoreClick={handleStoreNavigation}
+              stores={stores} 
+              onStoreClick={handleStoreNavigation}
+              subcategories={subcategories}
+              selectedCategory={selectedCategory}
             />
 
             {loading ? (
@@ -1241,10 +1378,10 @@ const filteredStores = stores
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {filteredStores.map(store => (
-                    <div key={store.id} onClick={() => handleStoreNavigation(store.id)}>
-                        <StoreCard store={store} />
-                    </div>
-                    ))}
+                  <div key={store.id} onClick={() => handleStoreNavigation(store.id)}>
+                    <StoreCard store={store} subcategories={subcategories} />
+                  </div>
+                ))}
               </div>
             )}
           </div>
