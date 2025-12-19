@@ -34,6 +34,12 @@ public partial class Seller
 
     public bool IsOpen { get; set; }
 
+    [StringLength(500)]
+    public string? StoreDescription { get; set; }
+
+    [StringLength(500)]
+    public string? StoreImageUrl { get; set; }   // main store picture
+
     public TimeSpan? OpenTime { get; set; }
     public TimeSpan? CloseTime { get; set; }
     public bool? IsManuallyClosed { get; set; }

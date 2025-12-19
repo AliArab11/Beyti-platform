@@ -34,6 +34,8 @@ namespace Beyti_Backend.Controllers.Api
             public decimal SubtotalAmount { get; set; }
             public decimal DeliveryFee { get; set; }
             public decimal? TotalAmount { get; set; }
+            public string? OrderNote { get; set; }
+            public string? DeliveryNote { get; set; }
         }
         public class UpdateOrderDto
         {
@@ -110,6 +112,7 @@ namespace Beyti_Backend.Controllers.Api
                 o.TotalAmount,
                 o.CreatedAt,
                 o.UpdatedAt,
+                o.OrderNote,
                 customerName = o.Customer.UserProfile.DisplayName,
                 sellerName = o.Seller.UserProfile.DisplayName,
                 sellerPhone = o.Seller.Phone,
@@ -159,7 +162,7 @@ namespace Beyti_Backend.Controllers.Api
         private async Task AutoCancelExpiredOrders()
         {
             var now = DateTime.UtcNow;
-            var expiryThreshold = now.AddMinutes(-1); // 10 minutes ago
+            var expiryThreshold = now.AddMinutes(-10); // 10 minutes ago
 
             var expiredOrders = await _context.Orders
                 .Include(o => o.OrderItems)
@@ -230,7 +233,7 @@ namespace Beyti_Backend.Controllers.Api
                 o.TotalAmount,
                 o.CreatedAt,
                 o.UpdatedAt,
-
+                o.OrderNote,
                 customerName = o.Customer?.UserProfile?.DisplayName,
                 sellerName = o.Seller?.UserProfile?.DisplayName,
                 sellerPhone = o.Seller?.Phone,
@@ -333,12 +336,30 @@ namespace Beyti_Backend.Controllers.Api
                 SubtotalAmount = dto.SubtotalAmount,
                 DeliveryFee = dto.DeliveryFee,
                 TotalAmount = dto.TotalAmount,
+                OrderNote = dto.OrderNote, 
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
 
             _context.Orders.Add(order);
             await _context.SaveChangesAsync();
+
+            // Create delivery ticket immediately if delivery order
+            if (order.FulfillmentType == "Delivery")
+            {
+                var deliveryTicket = new DeliveryTicket
+                {
+                    OrderId = order.Id,
+                    PickupAddressId = order.PickupAddressId,
+                    DeliveryAddressId = order.DeliveryAddressId,
+                    Status = "Pending",
+                    DeliveryNote = dto.DeliveryNote,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+                _context.DeliveryTickets.Add(deliveryTicket);
+                await _context.SaveChangesAsync();
+            }
 
             return CreatedAtAction("GetOrder", new { id = order.Id }, order);
         }
@@ -517,19 +538,22 @@ namespace Beyti_Backend.Controllers.Api
                     }
                 }
 
-                // If order is accepted and it's a delivery, create a delivery ticket
+                // If order is accepted and it's a delivery, ticket already exists - just keep it pending
                 if (dto.Status == "Accepted" && order.FulfillmentType == "Delivery")
                 {
-                    var deliveryTicket = new DeliveryTicket
+                    // Ticket already exists from order creation, stays in Pending status
+                    if (order.DeliveryTicket != null)
                     {
-                        OrderId = order.Id,
-                        PickupAddressId = order.PickupAddressId,
-                        DeliveryAddressId = order.DeliveryAddressId,
-                        Status = "Pending",
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
-                    };
-                    _context.DeliveryTickets.Add(deliveryTicket);
+                        order.DeliveryTicket.Status = "Pending";
+                        order.DeliveryTicket.UpdatedAt = DateTime.UtcNow;
+                    }
+                }
+
+                // If order is cancelled, cancel the delivery ticket too
+                if (dto.Status == "Cancelled" && order.DeliveryTicket != null)
+                {
+                    order.DeliveryTicket.Status = "Cancelled";
+                    order.DeliveryTicket.UpdatedAt = DateTime.UtcNow;
                 }
 
                 await _context.SaveChangesAsync();
@@ -554,35 +578,93 @@ namespace Beyti_Backend.Controllers.Api
                 if (order == null)
                     return NotFound();
 
+                var currentStatus = order.Status?.ToLower();
+                var newStatus = dto.Status?.ToLower();
+
+                // Status progression order
+                var statusOrder = new Dictionary<string, int>
+        {
+            { "placed", 1 },
+            { "pending", 1 },
+            { "accepted", 2 },
+            { "preparing", 3 },
+            { "ready for pickup", 4 },
+            { "picked up", 5 },
+            { "completed", 6 },
+            { "delivered", 6 },
+            { "cancelled", 7 }
+        };
+
+                // CRITICAL FIX: Block refresh attempts - if status hasn't changed, ignore
+                if (currentStatus == newStatus && newStatus != "cancelled")
+                {
+                    Console.WriteLine($"⚠️ Order {id} - Ignoring duplicate status update: {newStatus}");
+                    return NoContent();
+                }
+
+                // CRITICAL FIX: Prevent going backwards (except to cancelled)
+                if (statusOrder.ContainsKey(currentStatus) && statusOrder.ContainsKey(newStatus))
+                {
+                    if (newStatus != "cancelled" && statusOrder[newStatus] < statusOrder[currentStatus])
+                    {
+                        Console.WriteLine($"❌ Order {id} - Cannot revert from {currentStatus} to {newStatus}");
+                        return BadRequest(new { message = $"Cannot revert status from {currentStatus} to {newStatus}" });
+                    }
+                }
+
                 // SPECIAL HANDLING FOR DELIVERY ORDERS
                 if (order.FulfillmentType == "Delivery" && dto.Status == "Ready for Pickup")
                 {
-                    // Customer should NOT see "Ready for Pickup"
-                    // So DO NOT update order.Status to "Ready for Pickup"
-
-                    // Keep customer status at "Preparing"
-                    order.Status = "Preparing";
-
-                    // Update delivery ticket so drivers see it
+                    // CRITICAL: Check if delivery ticket exists and is still in offering phase
                     if (order.DeliveryTicket != null)
                     {
-                        order.DeliveryTicket.Status = "Available";
-                        order.DeliveryTicket.UpdatedAt = DateTime.UtcNow;
+                        var ticketStatus = order.DeliveryTicket.Status?.ToLower();
+
+                        // Only trigger offering if ticket is pending (not yet offered to any driver)
+                        if (ticketStatus == "pending" || ticketStatus == null)
+                        {
+                            // Update order status to "Ready for Pickup" (seller can't click again)
+                            order.Status = "Ready for Pickup";
+
+                            // Update delivery ticket to start offering to drivers
+                            order.DeliveryTicket.Status = "Pending";
+                            order.DeliveryTicket.UpdatedAt = DateTime.UtcNow;
+                            await _context.SaveChangesAsync();
+
+                            // Trigger the offering process
+                            await OfferToNextClosestDriver(order.DeliveryTicket.Id);
+
+                            Console.WriteLine($"✅ Order {id} marked Ready for Pickup - offering to drivers started");
+                        }
+                        else
+                        {
+                            // Ticket already being offered/accepted - don't allow status change
+                            Console.WriteLine($"⚠️ Order {id} - Delivery ticket already in progress ({ticketStatus}), ignoring refresh");
+                            return NoContent();
+                        }
+                    }
+                    else
+                    {
+                        // No delivery ticket yet - set status but don't trigger drivers
+                        order.Status = "Ready for Pickup";
+                        Console.WriteLine($"⚠️ Order {id} - No delivery ticket found, status updated but drivers not triggered");
                     }
                 }
                 else
                 {
-                    // Normal flow for pickup orders
+                    // Normal status progression for non-delivery or other statuses
                     order.Status = dto.Status;
                 }
 
                 order.UpdatedAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
 
+                Console.WriteLine($"✅ Order {id} - Status updated: {currentStatus} → {newStatus}");
                 return NoContent();
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"❌ Order {id} - Error: {ex.Message}");
                 return StatusCode(500, new { message = "Error updating status", error = ex.Message });
             }
         }
@@ -602,9 +684,200 @@ namespace Beyti_Backend.Controllers.Api
             return NoContent();
         }
 
+        // In-memory cache for route data (keyed by orderId)
+        private static readonly Dictionary<int, RouteData> _routeCache = new();
+
+        private class RouteData
+        {
+            public List<double[]> RoutePoints { get; set; } = new();
+            public double TotalDuration { get; set; } // seconds
+            public DateTime PickupTime { get; set; }
+        }
+
+        // GET: api/Orders/{orderId}/tracking
+        [HttpGet("{orderId}/tracking")]
+        public async Task<ActionResult<object>> GetOrderTracking(int orderId)
+        {
+            var order = await _context.Orders
+                .Include(o => o.DeliveryTicket)
+                .Include(o => o.PickupAddress)
+                .Include(o => o.DeliveryAddress)
+                .FirstOrDefaultAsync(o => o.Id == orderId);
+
+            if (order == null)
+                return NotFound();
+
+            // Only show map when driver has picked up the order
+            if (order.Status != "Picked Up")
+            {
+                return Ok(new
+                {
+                    showMap = false,
+                    status = order.Status
+                });
+            }
+
+            var ticket = order.DeliveryTicket;
+            if (ticket == null || order.PickupAddress == null || order.DeliveryAddress == null)
+            {
+                return Ok(new { showMap = false, status = order.Status });
+            }
+
+            var pickupLat = (double)(order.PickupAddress.Latitude ?? 0);
+            var pickupLng = (double)(order.PickupAddress.Longitude ?? 0);
+            var deliveryLat = (double)(order.DeliveryAddress.Latitude ?? 0);
+            var deliveryLng = (double)(order.DeliveryAddress.Longitude ?? 0);
+
+            // Check if we have route cached, if not fetch from OSRM
+            if (!_routeCache.ContainsKey(orderId))
+            {
+                try
+                {
+                    var route = await FetchOSRMRoute(pickupLng, pickupLat, deliveryLng, deliveryLat);
+                    _routeCache[orderId] = new RouteData
+                    {
+                        RoutePoints = route.RoutePoints,
+                        TotalDuration = route.Duration,
+                        PickupTime = ticket.UpdatedAt
+                    };
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ OSRM Error: {ex.Message}");
+                    // Fallback to straight line if OSRM fails
+                    _routeCache[orderId] = new RouteData
+                    {
+                        RoutePoints = new List<double[]>
+                {
+                    new[] { pickupLng, pickupLat },
+                    new[] { deliveryLng, deliveryLat }
+                },
+                        TotalDuration = 900, // 15 min default
+                        PickupTime = ticket.UpdatedAt
+                    };
+                }
+            }
+
+            var routeData = _routeCache[orderId];
+            var timeSincePickup = (DateTime.UtcNow - routeData.PickupTime).TotalSeconds;
+            var progress = Math.Min(timeSincePickup / routeData.TotalDuration, 1.0);
+
+            // Find driver position along route
+            var totalPoints = routeData.RoutePoints.Count;
+            var targetIndex = (int)(progress * (totalPoints - 1));
+            targetIndex = Math.Min(targetIndex, totalPoints - 1);
+
+            var driverPoint = routeData.RoutePoints[targetIndex];
+
+            // Calculate remaining time
+            var remainingSeconds = Math.Max(0, routeData.TotalDuration - timeSincePickup);
+
+            return Ok(new
+            {
+                showMap = true,
+                status = order.Status,
+                driverLocation = new
+                {
+                    latitude = driverPoint[1],
+                    longitude = driverPoint[0]
+                },
+                pickupLocation = new
+                {
+                    latitude = pickupLat,
+                    longitude = pickupLng
+                },
+                deliveryLocation = new
+                {
+                    latitude = deliveryLat,
+                    longitude = deliveryLng
+                },
+                estimatedArrival = remainingSeconds / 60.0, // convert to minutes
+                routePolyline = routeData.RoutePoints.Select(p => new[] { p[1], p[0] }).ToList() // [lat, lng] for frontend
+            });
+        }
+
+        private async Task<(List<double[]> RoutePoints, double Duration)> FetchOSRMRoute(
+            double startLng, double startLat, double endLng, double endLat)
+        {
+            using var client = new HttpClient();
+            var url = $"https://router.project-osrm.org/route/v1/driving/{startLng},{startLat};{endLng},{endLat}?overview=full&geometries=geojson";
+
+            var response = await client.GetStringAsync(url);
+            var json = System.Text.Json.JsonDocument.Parse(response);
+
+            var coordinates = json.RootElement
+                .GetProperty("routes")[0]
+                .GetProperty("geometry")
+                .GetProperty("coordinates")
+                .EnumerateArray()
+                .Select(coord => new[]
+                {
+            coord[0].GetDouble(), // lng
+            coord[1].GetDouble()  // lat
+                })
+                .ToList();
+
+            var duration = json.RootElement
+                .GetProperty("routes")[0]
+                .GetProperty("duration")
+                .GetDouble();
+
+            return (coordinates, duration);
+        }
+
         private bool OrderExists(int id)
         {
             return _context.Orders.Any(e => e.Id == id);
+        }
+
+        private async Task<bool> OfferToNextClosestDriver(int ticketId)
+        {
+            try
+            {
+                var ticket = await _context.DeliveryTickets
+                    .Include(dt => dt.PickupAddress)
+                    .Include(dt => dt.Order)
+                        .ThenInclude(o => o.Seller)
+                            .ThenInclude(s => s.SellerAddresses)
+                                .ThenInclude(sa => sa.Address)
+                    .FirstOrDefaultAsync(dt => dt.Id == ticketId);
+
+                if (ticket == null) return false;
+
+                decimal? pickupLat = ticket.PickupAddress?.Latitude
+                    ?? ticket.Order?.Seller?.SellerAddresses?.FirstOrDefault()?.Address?.Latitude;
+                decimal? pickupLng = ticket.PickupAddress?.Longitude
+                    ?? ticket.Order?.Seller?.SellerAddresses?.FirstOrDefault()?.Address?.Longitude;
+
+                if (pickupLat == null || pickupLng == null) return false;
+
+                var availableDrivers = await _context.Drivers
+                    .Where(d => d.Status == "Active" && d.CurrentLat != null && d.CurrentLng != null)
+                    .Where(d => !_context.DeliveryTickets
+                        .Any(dt => dt.DriverId == d.Id && (dt.Status == "Accepted" || dt.Status == "Picked Up")))
+                    .ToListAsync();
+
+                if (!availableDrivers.Any()) return false;
+
+                var closest = availableDrivers
+                    .OrderBy(d => Math.Sqrt(
+                        Math.Pow((double)(d.CurrentLat.Value - pickupLat.Value), 2) +
+                        Math.Pow((double)(d.CurrentLng.Value - pickupLng.Value), 2)))
+                    .FirstOrDefault();
+
+                if (closest == null) return false;
+
+                ticket.CurrentOfferedDriverId = closest.Id;
+                ticket.OfferExpiresAt = DateTime.UtcNow.AddSeconds(45);
+                ticket.Status = "Offered";
+
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 }

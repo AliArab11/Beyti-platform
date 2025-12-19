@@ -43,6 +43,9 @@ public partial class Order
     [Column(TypeName = "decimal(11, 2)")]
     public decimal? TotalAmount { get; set; }
 
+    [StringLength(500)]
+    public string? OrderNote { get; set; }
+
     [Precision(3)]
     public DateTime CreatedAt { get; set; }
 

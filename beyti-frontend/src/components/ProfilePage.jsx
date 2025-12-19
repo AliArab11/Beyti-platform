@@ -5,11 +5,12 @@
  * Works for all user types: Admin, ServiceProvider, Seller, Driver, Customer
  */
 
-import { useState, useEffect } from 'react';
-import { User, Envelope, Phone, MapPin, Calendar, IdentificationCard, CheckCircle, XCircle, Buildings, Tag, X  } from '@phosphor-icons/react';
+import { useState, useEffect, useRef } from 'react';
+import { User, Envelope, Phone, MapPin, Calendar, IdentificationCard, CheckCircle, XCircle, Buildings, Tag, X, Camera, Upload  } from '@phosphor-icons/react';
 
 import ConfirmModal from './ConfirmModal'; 
 import { formatTime } from '../Beyti-Website/Seller/Components/storeStatus';
+import Cropper from 'react-easy-crop';
 
 export default function ProfilePage({
   userProfile,
@@ -29,8 +30,57 @@ export default function ProfilePage({
     city: '',
     region: '',
     postalCode: '',
-    country: 'Bahrain'
+    country: 'Bahrain',
+    storeDescription: ''
   });
+
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imagePreview, setImagePreview] = useState(null);
+  const fileInputRef = useRef(null);
+
+  const [showCropper, setShowCropper] = useState(false);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+
+  const onCropComplete = (croppedArea, croppedAreaPixels) => {
+  setCroppedAreaPixels(croppedAreaPixels);
+};
+
+const createCroppedImage = async () => {
+  try {
+    const image = new Image();
+    image.src = imagePreview;
+    
+    await new Promise((resolve) => {
+      image.onload = resolve;
+    });
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    canvas.width = croppedAreaPixels.width;
+    canvas.height = croppedAreaPixels.height;
+
+    ctx.drawImage(
+      image,
+      croppedAreaPixels.x,
+      croppedAreaPixels.y,
+      croppedAreaPixels.width,
+      croppedAreaPixels.height,
+      0,
+      0,
+      croppedAreaPixels.width,
+      croppedAreaPixels.height
+    );
+
+    return canvas.toDataURL('image/jpeg');
+  } catch (error) {
+    console.error('Error cropping image:', error);
+    return null;
+  }
+};
 
 
   const [availableSubCategories, setAvailableSubCategories] = useState([]);
@@ -58,8 +108,11 @@ useEffect(() => {
       city: userProfile.city || '',
       region: userProfile.region || '',
       postalCode: userProfile.postalCode || '',
-      country: userProfile.country || 'Bahrain'
+      country: userProfile.country || 'Bahrain',
+      storeDescription: userProfile.storeDescription || ''
     });
+
+
 
     console.log('🔄 Updated states - isManuallyClosed:', userProfile.isManuallyClosed, 'isForceOpen:', userProfile.isForceOpen);
 
@@ -77,6 +130,15 @@ useEffect(() => {
     }
   }
 }, [userProfile, userRole]);
+
+// Initialize image preview from userProfile
+useEffect(() => {
+  if (userProfile?.storeImageUrl) {
+    setImagePreview(`https://localhost:7062${userProfile.storeImageUrl}`);
+  } else {
+    setImagePreview(null);
+  }
+}, [userProfile]);
 
 // Add this new function right after the useEffect:
 const loadSubCategories = async (categoryId) => {
@@ -156,10 +218,30 @@ const loadSubCategories = async (categoryId) => {
         }
       }
 
-      // Call the parent's update handler
-      if (onProfileUpdate) {
-        await onProfileUpdate(updates);
+      // Update store description for sellers
+      if (userRole === 'Seller' && entityId) {
+        try {
+          const descResponse = await fetch(`https://localhost:7062/api/Sellers/${entityId}/store-description`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ description: formData.storeDescription })
+          });
+
+          if (!descResponse.ok) {
+            const errorData = await descResponse.json();
+            throw new Error(errorData.message || 'Failed to update description');
+          }
+        } catch (error) {
+          console.error('Error updating description:', error);
+          throw error;
+        }
       }
+
+      // Call the parent's update handler
+      if (updates.forceRefresh) {
+        fetchUserProfile(); // must refetch from backend
+      }
+
 
       setSaveMessage({ type: 'success', text: 'Profile updated successfully!' });
       setIsEditing(false);
@@ -189,12 +271,125 @@ const loadSubCategories = async (categoryId) => {
         city: userProfile.city || '',
         region: userProfile.region || '',
         postalCode: userProfile.postalCode || '',
-        country: userProfile.country || 'Bahrain'
+        country: userProfile.country || 'Bahrain',
+        storeDescription: userProfile.storeDescription || ''
       });
     }
     setIsEditing(false);
     setSaveMessage(null);
   };
+
+const handleImageUpload = (event) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  // Validate file type
+  if (!file.type.startsWith('image/')) {
+    alert('Please select an image file (PNG or JPG)');
+    return;
+  }
+
+  // Validate file size (max 5MB)
+  if (file.size > 5 * 1024 * 1024) {
+    alert('Image size must be less than 5MB');
+    return;
+  }
+
+  // Create preview
+  const reader = new FileReader();
+  reader.onloadend = () => {
+    setImagePreview(reader.result);
+    setShowCropper(true);
+  };
+  reader.readAsDataURL(file);
+};
+
+const handleSaveImage = async () => {
+  if (!imagePreview || !entityId) {
+    alert('No image to save');
+    return;
+  }
+
+  setUploadingImage(true);
+
+  try {
+    let finalImage = imagePreview;
+    
+    // If cropper was used, get the cropped image
+    if (showCropper && croppedAreaPixels) {
+      finalImage = await createCroppedImage();
+      if (!finalImage) {
+        alert('Failed to crop image');
+        setUploadingImage(false);
+        return;
+      }
+    }
+
+    const response = await fetch(`https://localhost:7062/api/Sellers/${entityId}/store-image`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageBase64: finalImage })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to upload image');
+    }
+
+    const result = await response.json();
+    
+    // Update local preview with the returned URL
+    setImagePreview(result.storeImageUrl);
+    
+    setSaveMessage({ type: 'success', text: 'Store logo updated successfully!' });
+    setShowImageModal(false);
+    setShowCropper(false);
+
+    // Trigger parent refresh with the new image URL
+    if (onProfileUpdate) {
+      await onProfileUpdate({ 
+        forceRefresh: true,
+        storeImageUrl: result.storeImageUrl 
+      });
+    }
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    setSaveMessage({ type: 'error', text: 'Failed to upload image. Please try again.' });
+  } finally {
+    setUploadingImage(false);
+  }
+};
+
+const handleRemoveImage = async () => {
+  if (!entityId) return;
+
+  setUploadingImage(true);
+
+  try {
+    const response = await fetch(`https://localhost:7062/api/Sellers/${entityId}/store-image`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageBase64: null })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to remove image');
+    }
+
+    setImagePreview(null);
+    setSaveMessage({ type: 'success', text: 'Store logo removed successfully!' });
+    setShowImageModal(false);
+
+    // Trigger parent refresh
+    if (onProfileUpdate) {
+      await onProfileUpdate({ forceRefresh: true });
+    }
+  } catch (error) {
+    console.error('Error removing image:', error);
+    setSaveMessage({ type: 'error', text: 'Failed to remove image. Please try again.' });
+  } finally {
+    setUploadingImage(false);
+  }
+};
 
   const toggleSubCategory = (subCategoryId) => {
   setSelectedSubCategories(prev => {
@@ -291,10 +486,30 @@ const handleToggleStoreStatus = async () => {
         <div className="px-8 pb-8">
           <div className="flex items-end justify-between -mt-16 mb-6">
             <div className="flex items-end gap-6">
-              <div className="w-32 h-32 rounded-full bg-grey-200 dark:bg-[#2A2A2A] border-4 border-grey-200 dark:border-[#2A2A2A] shadow-soft-lift dark:shadow-none flex items-center justify-center transition-colors">
-                <div className="w-full h-full rounded-full bg-sage-500 flex items-center justify-center">
-                  <User size={64} weight="fill" className="text-sage-100" />
+              <div className="relative">
+                <div className="w-32 h-32 rounded-full bg-grey-200 dark:bg-[#2A2A2A] border-4 border-grey-200 dark:border-[#2A2A2A] shadow-soft-lift dark:shadow-none flex items-center justify-center transition-colors overflow-hidden">
+                  {userRole === 'Seller' && imagePreview ? (
+                    <img
+                      src={imagePreview}
+                      alt="Store Logo"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full rounded-full bg-sage-500 flex items-center justify-center">
+                      <User size={64} weight="fill" className="text-sage-100" />
+                    </div>
+                  )}
+
                 </div>
+                {userRole === 'Seller' && !readOnly && (
+                  <button
+                    onClick={() => setShowImageModal(true)}
+                    className="absolute bottom-0 right-0 w-10 h-10 bg-sage-500 hover:bg-sage-600 text-white rounded-full flex items-center justify-center shadow-lg transition-colors"
+                    title={imagePreview ? "Edit Logo" : "Add Logo"}
+                  >
+                    <Camera size={20} weight="bold" />
+                  </button>
+                )}
               </div>
               <div className="pb-2">
                 <h1 className="text-display-h2 text-charcoal-600 dark:text-white font-semibold">
@@ -428,11 +643,71 @@ const handleToggleStoreStatus = async () => {
           </div>
         </div>
 
-        {/* Contact & Address Card */}
+        {/* Contact & Details Card */}
         <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg border border-grey-stroke dark:border-charcoal-500 shadow-soft-lift dark:shadow-none p-6 transition-colors">
           <h2 className="text-display-h3 text-charcoal-600 dark:text-white font-semibold mb-6">Contact & Details</h2>
 
           <div className="space-y-4">
+            {/* Store Description - Only for Sellers */}
+            {userRole === 'Seller' && (
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-md bg-sage-100 dark:bg-sage-900 flex items-center justify-center flex-shrink-0 mt-1">
+                  <svg className="w-5 h-5 text-sage-700 dark:text-sage-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-label-medium text-charcoal-400 dark:text-gray-400 mb-1">Store Description</p>
+                  {isEditing ? (
+                    <textarea
+                      name="storeDescription"
+                      value={formData.storeDescription}
+                      onChange={handleInputChange}
+                      rows={3}
+                      maxLength={500}
+                      className="w-full px-3 py-2 border border-charcoal-400 dark:border-charcoal-500 dark:bg-charcoal-600 rounded-md text-body-regular text-charcoal-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-sage-500 resize-none"
+                      placeholder="Describe your store in a few words..."
+                    />
+                  ) : (
+                    <p className="text-body-regular text-charcoal-600 dark:text-white font-medium whitespace-pre-wrap">
+                      {formData.storeDescription || 'No description provided'}
+                    </p>
+                  )}
+                  {isEditing && (
+                    <p className="text-xs text-charcoal-400 dark:text-gray-400 mt-1">
+                      {formData.storeDescription?.length || 0}/500 characters
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Phone - Only show for non-Admin users */}
+            {showContactFields && (
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-md bg-sage-100 dark:bg-sage-900 flex items-center justify-center flex-shrink-0 mt-1">
+                  <Phone size={20} className="text-sage-700 dark:text-sage-300" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-label-medium text-charcoal-400 dark:text-gray-400 mb-1">Phone Number</p>
+                  {isEditing ? (
+                    <input
+                      type="tel"
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-charcoal-400 dark:border-charcoal-500 dark:bg-charcoal-600 rounded-md text-body-regular text-charcoal-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-sage-500"
+                      placeholder="Enter your phone number"
+                    />
+                  ) : (
+                    <p className="text-body-regular text-charcoal-600 dark:text-white font-medium">
+                      {formData.phone || 'Not provided'}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Address - Only show for non-Admin users */}
             {showContactFields && (
               <div className="flex items-start gap-4">
@@ -776,6 +1051,127 @@ const handleToggleStoreStatus = async () => {
           </div>
         </div>
       )}
+
+      {/* Store Image Upload Modal - Only for Sellers */}
+        {userRole === 'Seller' && showImageModal && (
+          <div className="fixed inset-0 bg-black/70 z-[70] flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-[#2A2A2A] rounded-2xl w-full max-w-md overflow-hidden">
+              <div className="p-6 border-b border-grey-stroke dark:border-charcoal-500">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-bold text-charcoal-600 dark:text-white">
+                    {imagePreview ? 'Edit Store Logo' : 'Add Store Logo'}
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setShowImageModal(false);
+                      setShowCropper(false);
+                      setImagePreview(null);
+                    }}
+                    className="p-2 hover:bg-grey-100 dark:hover:bg-charcoal-600 rounded-full transition-colors"
+                  >
+                    <X size={20} weight="bold" className="text-charcoal-600 dark:text-white" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6">
+                {/* Image Preview/Cropper */}
+                <div className="mb-6">
+                  <div className="w-full aspect-square rounded-xl border-2 border-dashed border-grey-stroke dark:border-charcoal-500 flex items-center justify-center overflow-hidden bg-grey-100 dark:bg-charcoal-600 relative">
+                    {imagePreview && showCropper ? (
+                      <>
+                        <Cropper
+                          image={imagePreview}
+                          crop={crop}
+                          zoom={zoom}
+                          aspect={1}
+                          cropShape="round"
+                          showGrid={false}
+                          onCropChange={setCrop}
+                          onZoomChange={setZoom}
+                          onCropComplete={onCropComplete}
+                        />
+                        {/* Zoom Controls */}
+                        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white dark:bg-charcoal-700 rounded-full px-6 py-3 shadow-lg z-10 flex items-center gap-3">
+                          <span className="text-sm font-semibold text-charcoal-600 dark:text-white">Zoom:</span>
+                          <input
+                            type="range"
+                            min="1"
+                            max="3"
+                            step="0.1"
+                            value={zoom}
+                            onChange={(e) => setZoom(parseFloat(e.target.value))}
+                            className="w-32"
+                          />
+                        </div>
+                      </>
+                    ) : imagePreview && !showCropper ? (
+                      <img 
+                        src={imagePreview} 
+                        alt="Preview" 
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="text-center p-8">
+                        <Upload size={48} className="mx-auto mb-3 text-charcoal-400 dark:text-charcoal-300" />
+                        <p className="text-sm text-charcoal-400 dark:text-charcoal-300">
+                          No image selected
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Upload Button */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full mb-3 px-4 py-3 bg-sage-100 dark:bg-sage-900 hover:bg-sage-200 dark:hover:bg-sage-800 text-sage-700 dark:text-sage-300 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+                >
+                  <Upload size={20} weight="bold" />
+                  {imagePreview ? 'Change Image' : 'Upload Image'}
+                </button>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3">
+                  {imagePreview && (
+                    <button
+                      onClick={handleRemoveImage}
+                      disabled={uploadingImage}
+                      className="flex-1 px-4 py-3 bg-error-bg hover:bg-error-bg/80 text-error-text rounded-lg font-semibold transition-colors disabled:opacity-50"
+                    >
+                      Remove Image
+                    </button>
+                  )}
+                  <button
+                    onClick={handleSaveImage}
+                    disabled={!imagePreview || uploadingImage || (showCropper && !croppedAreaPixels)}
+                    className="flex-1 px-4 py-3 bg-sage-500 hover:bg-sage-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {uploadingImage ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Logo'
+                    )}
+                  </button>
+                </div>
+
+                <p className="text-xs text-charcoal-400 dark:text-charcoal-300 mt-3 text-center">
+                  Supported formats: PNG, JPG • Max size: 5MB
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 }

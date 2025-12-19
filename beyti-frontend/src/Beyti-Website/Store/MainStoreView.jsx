@@ -86,57 +86,6 @@ const getSellers = async () => {
   }
 };
 
-// Color generation utility function
-const getStoreColors = (storeName) => {
-  const gradients = [
-    'from-[#6366F1] via-[#8B5CF6] to-[#EC4899]',
-    'from-[#F59E0B] via-[#EF4444] to-[#DC2626]',
-    'from-[#10B981] via-[#059669] to-[#047857]',
-    'from-[#3B82F6] via-[#2563EB] to-[#1D4ED8]',
-    'from-[#EC4899] via-[#DB2777] to-[#BE185D]',
-    'from-[#8B5CF6] via-[#7C3AED] to-[#6D28D9]',
-    'from-[#14B8A6] via-[#0D9488] to-[#0F766E]',
-    'from-[#F97316] via-[#EA580C] to-[#C2410C]',
-  ];
-  
-  const bannerGradients = [
-    'from-[#6366F1]/20 via-[#8B5CF6]/15 to-[#EC4899]/20',
-    'from-[#F59E0B]/20 via-[#EF4444]/15 to-[#DC2626]/20',
-    'from-[#10B981]/20 via-[#059669]/15 to-[#047857]/20',
-    'from-[#3B82F6]/20 via-[#2563EB]/15 to-[#1D4ED8]/20',
-    'from-[#EC4899]/20 via-[#DB2777]/15 to-[#BE185D]/20',
-    'from-[#8B5CF6]/20 via-[#7C3AED]/15 to-[#6D28D9]/20',
-    'from-[#14B8A6]/20 via-[#0D9488]/15 to-[#0F766E]/20',
-    'from-[#F97316]/20 via-[#EA580C]/15 to-[#C2410C]/20',
-  ];
-  
-  const shadowColors = [
-    'rgba(139,92,246,0.5)',
-    'rgba(239,68,68,0.5)',
-    'rgba(16,185,129,0.5)',
-    'rgba(59,130,246,0.5)',
-    'rgba(236,72,153,0.5)',
-    'rgba(139,92,246,0.5)',
-    'rgba(20,184,166,0.5)',
-    'rgba(249,115,22,0.5)',
-  ];
-  
-  const accentColors = [
-    '#8B5CF6', '#EF4444', '#10B981', '#3B82F6',
-    '#EC4899', '#8B5CF6', '#14B8A6', '#F97316'
-  ];
-  
-  const hash = storeName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const index = hash % gradients.length;
-  
-  return {
-    gradient: gradients[index],
-    bannerGradient: bannerGradients[index],
-    shadow: shadowColors[index],
-    accent: accentColors[index]
-  };
-};
-
 
 
 // Main Category Tabs Component
@@ -289,7 +238,6 @@ const FeaturedCarousel = ({ stores, onStoreClick, subcategories = [], selectedCa
       <div className="overflow-hidden px-12 py-3">
         <div className="flex gap-6 transition-transform duration-500" style={{ transform: `translateX(-${currentIndex * (100 / 3)}%)` }}>
           {featured.map((store, idx) => {
-            const colors = getStoreColors(store.storeName);
             const words = store.storeName.split(' ').filter(w => w.length > 0);
             const initials = words.length >= 2 
               ? words[0][0].toUpperCase() + words[words.length - 1][0].toUpperCase()
@@ -301,19 +249,7 @@ const FeaturedCarousel = ({ stores, onStoreClick, subcategories = [], selectedCa
                 onClick={() => onStoreClick(store.id)}
                 className="flex-shrink-0 w-[calc(33.333%-16px)] bg-white rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all cursor-pointer"
               >
-                <div className={`relative h-32 bg-gradient-to-br ${colors.bannerGradient}`} style={{ backgroundColor: '#F5F5F7' }}>
-                  <div className="absolute inset-0 opacity-20">
-                    <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-                      <defs>
-                        <pattern id={`pattern-carousel-${idx}`} patternUnits="userSpaceOnUse" width="25" height="25" patternTransform="rotate(45)">
-                          <line x1="0" y1="0" x2="0" y2="25" stroke={colors.accent} strokeWidth="1" opacity="0.3"/>
-                        </pattern>
-                      </defs>
-                      <rect width="100%" height="100%" fill={`url(#pattern-carousel-${idx})`}/>
-                    </svg>
-                  </div>
-                  <div className="absolute top-3 right-4 w-12 h-12 rounded-full opacity-15"
-                      style={{ background: `radial-gradient(circle, ${colors.accent} 0%, transparent 70%)` }}></div>
+                <div className="relative h-32 bg-gradient-to-br from-cream-100 to-cream-200">
                       {/* Store Status Badge*/}
                         <div className="absolute top-3 left-3">
                           <div className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 ${
@@ -327,17 +263,20 @@ const FeaturedCarousel = ({ stores, onStoreClick, subcategories = [], selectedCa
                         </div>
                   
                   <div className="absolute -bottom-8 left-4">
-                    <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${colors.gradient} border-4 border-white flex items-center justify-center`}
-                        style={{ boxShadow: `0 4px 12px ${colors.shadow}` }}>
-                      <div className="absolute inset-0 flex items-center justify-center opacity-15">
-                        <svg viewBox="0 0 100 100" className="w-14 h-14 text-white">
-                          <polygon points="50,10 85,30 85,70 50,90 15,70 15,30" fill="currentColor"/>
-                        </svg>
-                      </div>
-                      <span className="relative z-10 text-[18px] font-black text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.4)]" 
-                            style={{ fontFamily: "Inter, sans-serif" }}>
-                        {initials}
-                      </span>
+                    <div className="w-16 h-16 rounded-full border-4 border-white flex items-center justify-center overflow-hidden bg-white shadow-[0_4px_12px_rgba(0,0,0,0.15)]">
+                      {store.storeImageUrl ? (
+                        <img 
+                          src={`https://localhost:7062${store.storeImageUrl}`}
+                          alt={store.storeName}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-grey-200 to-grey-300">
+                          <span className="text-lg font-black text-charcoal-600" style={{ fontFamily: "Inter, sans-serif" }}>
+                            {initials}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -430,7 +369,6 @@ const FeaturedCarousel = ({ stores, onStoreClick, subcategories = [], selectedCa
 
 // Store Card Component
 const StoreCard = ({ store, subcategories = [] }) => {
-  const colors = getStoreColors(store.storeName);
   const words = store.storeName.split(' ').filter(w => w.length > 0);
   const initials = words.length >= 2 
     ? words[0][0].toUpperCase() + words[words.length - 1][0].toUpperCase()
@@ -438,19 +376,7 @@ const StoreCard = ({ store, subcategories = [] }) => {
 
   return (
     <div className="bg-white rounded-2xl overflow-hidden cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all">
-      <div className={`relative h-32 bg-gradient-to-br ${colors.bannerGradient}`} style={{ backgroundColor: '#F5F5F7' }}>
-        <div className="absolute inset-0 opacity-20">
-          <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <pattern id={`pattern-${store.id}`} patternUnits="userSpaceOnUse" width="25" height="25" patternTransform="rotate(45)">
-                <line x1="0" y1="0" x2="0" y2="25" stroke={colors.accent} strokeWidth="1" opacity="0.3"/>
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill={`url(#pattern-${store.id})`}/>
-          </svg>
-        </div>
-        <div className="absolute top-3 right-4 w-12 h-12 rounded-full opacity-15"
-             style={{ background: `radial-gradient(circle, ${colors.accent} 0%, transparent 70%)` }}></div>
+      <div className="relative h-32 bg-gradient-to-br from-cream-100 to-cream-200">
 
              {/* Store Status Badge */}
               <div className="absolute top-3 left-3">
@@ -465,17 +391,20 @@ const StoreCard = ({ store, subcategories = [] }) => {
               </div>
         
         <div className="absolute -bottom-8 left-4">
-          <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${colors.gradient} border-4 border-white flex items-center justify-center`}
-               style={{ boxShadow: `0 4px 12px ${colors.shadow}` }}>
-            <div className="absolute inset-0 flex items-center justify-center opacity-15">
-              <svg viewBox="0 0 100 100" className="w-14 h-14 text-white">
-                <polygon points="50,10 85,30 85,70 50,90 15,70 15,30" fill="currentColor"/>
-              </svg>
-            </div>
-            <span className="relative z-10 text-[18px] font-black text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.4)]" 
-                  style={{ fontFamily: "Inter, sans-serif" }}>
-              {initials}
-            </span>
+          <div className="w-16 h-16 rounded-full border-4 border-white flex items-center justify-center overflow-hidden bg-white shadow-[0_4px_12px_rgba(0,0,0,0.15)]">
+            {store.storeImageUrl ? (
+              <img 
+                src={`https://localhost:7062${store.storeImageUrl}`}
+                alt={store.storeName}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-grey-200 to-grey-300">
+                <span className="text-lg font-black text-charcoal-600" style={{ fontFamily: "Inter, sans-serif" }}>
+                  {initials}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1079,31 +1008,38 @@ const filteredStores = stores
     return true;
   })
   .sort((a, b) => {
-    // Sort stores: rated stores first (by rating desc), then NEW stores
-    const ratingA = a.averageRating;
-    const ratingB = b.averageRating;
-    
-    const hasRatingA = ratingA !== null && ratingA !== undefined;
-    const hasRatingB = ratingB !== null && ratingB !== undefined;
-    
-    // Both have ratings - sort by rating (highest first)
-    if (hasRatingA && hasRatingB) {
-      return ratingB - ratingA;
-    }
-    
-    // Only A has rating - A comes first
-    if (hasRatingA && !hasRatingB) {
-      return -1;
-    }
-    
-    // Only B has rating - B comes first
-    if (!hasRatingA && hasRatingB) {
-      return 1;
-    }
-    
-    // Neither has rating - maintain original order
-    return 0;
-  });
+  // FIRST PRIORITY: Open stores before closed stores
+  const aIsOpen = isStoreOpen(a);
+  const bIsOpen = isStoreOpen(b);
+  
+  if (aIsOpen && !bIsOpen) return -1; // a is open, b is closed -> a comes first
+  if (!aIsOpen && bIsOpen) return 1;  // a is closed, b is open -> b comes first
+  
+  // SECOND PRIORITY: Sort by rating within same open/closed group
+  const ratingA = a.averageRating;
+  const ratingB = b.averageRating;
+  
+  const hasRatingA = ratingA !== null && ratingA !== undefined;
+  const hasRatingB = ratingB !== null && ratingB !== undefined;
+  
+  // Both have ratings - sort by rating (highest first)
+  if (hasRatingA && hasRatingB) {
+    return ratingB - ratingA;
+  }
+  
+  // Only A has rating - A comes first
+  if (hasRatingA && !hasRatingB) {
+    return -1;
+  }
+  
+  // Only B has rating - B comes first
+  if (!hasRatingA && hasRatingB) {
+    return 1;
+  }
+  
+  // Neither has rating - maintain original order
+  return 0;
+});
 
 
   
