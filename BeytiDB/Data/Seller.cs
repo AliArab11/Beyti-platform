@@ -66,6 +66,10 @@ public partial class Seller
     public virtual ICollection<StoreSection> StoreSections { get; set; }
     = new List<StoreSection>();
 
+    [InverseProperty(nameof(CustomerFavoriteSeller.Seller))]
+    public virtual ICollection<CustomerFavoriteSeller> FavoritedByCustomers { get; set; }
+    = new List<CustomerFavoriteSeller>();
+
 
     [InverseProperty("Seller")]
     public virtual ICollection<Product> Products { get; set; } = new List<Product>();

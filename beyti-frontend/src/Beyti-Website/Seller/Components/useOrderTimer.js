@@ -24,7 +24,7 @@ export const useOrderTimer = (order, onExpire) => {
       orderTime = new Date(dateStr);
     }
     
-    const expiryTime = new Date(orderTime.getTime() + 1 * 60 * 1000);
+    const expiryTime = new Date(orderTime.getTime() + 10 * 60 * 1000);
     const now = new Date();
     const diff = expiryTime - now;
 

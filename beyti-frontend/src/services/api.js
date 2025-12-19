@@ -1400,6 +1400,15 @@ export const getSellerAddress = async (id) => {
   return await fetchAPI(`/SellerAddresses/${id}`);
 };
 
+/**
+ * Get seller's address by seller ID
+ * @param {number} sellerId - Seller ID
+ * @returns {Promise<object>} - Seller address with address details
+ */
+export const getSellerAddressBySellerId = async (sellerId) => {
+  return await fetchAPI(`/SellerAddresses/Seller/${sellerId}`);
+};
+
 export const createSellerAddress = async (data) => {
   return await fetchAPI('/SellerAddresses', {
     method: 'POST',

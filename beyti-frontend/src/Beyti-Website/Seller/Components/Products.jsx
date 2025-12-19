@@ -3,6 +3,7 @@ import AnalyticsCard from "../../../components/AnalyticsCard";
 import StatusChip from "../../../components/StatusChip";
 import Button from "../../../components/Button";
 import ConfirmModal from "../../../components/ConfirmModal";
+import Snackbar from '../../../components/Snackbar';
 import SectionsManager from './SectionsManager';
 import Cropper from 'react-easy-crop';
 
@@ -117,6 +118,22 @@ const createCroppedProductImage = async () => {
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [variants, setVariants] = useState([]);
     const [editingVariant, setEditingVariant] = useState(null);
+
+    // Snackbar state
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    type: 'success' // 'success' | 'error' | 'warning'
+  });
+
+  // Helper function to show snackbar
+  const showSnackbar = (message, type = 'success') => {
+    setSnackbar({ open: true, message, type });
+  };
+
+  const closeSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
 
 
 const [variantForm, setVariantForm] = useState({
@@ -259,7 +276,7 @@ useEffect(() => {
       }
     } catch (err) {
       console.error("Failed to load products", err);
-      alert("Failed to load products. Check console for details.");
+     showSnackbar("Failed to load products. Please refresh the page.", 'error');
     } finally {
       setLoading(false);
     }
@@ -370,18 +387,19 @@ const saveProduct = async (e) => {
     // Step 2: Check if we're EDITING or CREATING
     if (editing) {
       await updateProduct(editing.id, payload);
+      showSnackbar('Product updated successfully!', 'success');
       
     } else {
       // VALIDATION 1: Check if SKU is provided
       if (!form.sku || form.sku.trim() === '') {
-        alert('SKU is required for the initial variant');
-        return; // Stop here, don't create product
+        showSnackbar('SKU is required for the initial variant', 'error');
+        return;
       }
       
       // VALIDATION 2: Check if Stock Quantity is provided
       if (!form.stockQty || form.stockQty === '') {
-        alert('Stock Quantity is required for the initial variant');
-        return; // Stop here, don't create product
+        showSnackbar('Stock Quantity is required for the initial variant', 'error');
+        return;// Stop here, don't create product
       }
 
       // VALIDATION 3: Check for duplicate SKU (only if SKU exists after previous validations)
@@ -389,13 +407,14 @@ const saveProduct = async (e) => {
         const skuCheck = await checkDuplicateSKU(form.sku.trim());
         
         if (skuCheck.isDuplicate) {
-          alert('This SKU is already in use. Please choose a different SKU code.');
+          showSnackbar('This SKU is already in use. Please choose a different SKU code.', 'error');
           return;
         }
       }
 
       // All validations passed! Now create the product
       const created = await createProduct(payload);
+      showSnackbar('Product created successfully!', 'success');
 
       // Auto-generate variant name if category is 2 (Clothing) and both color/size provided
       let finalVariantName = form.variantName.trim();
@@ -447,7 +466,7 @@ const saveProduct = async (e) => {
     
   } catch (err) {
     console.error("Save product error:", err);
-    alert(err.message || "Failed to save product");
+    showSnackbar(err.message || "Failed to save product", 'error');
   }
 };
 
@@ -592,9 +611,11 @@ const payload = {
     if (editingVariant) {
       // Update existing variant
       await updateProductVariant(editingVariant.id, payload);
+      showSnackbar('Variant updated successfully!', 'success'); 
     } else {
       // Create new variant
       await createProductVariant(payload);
+      showSnackbar('Variant created successfully!', 'success');
     }
 
     const refreshed = await loadSellerProducts();
@@ -616,7 +637,7 @@ setSelectedProduct(updatedProduct); // update metadata too
     stockQty: "",
   });
   } catch (err) {
-    alert(err.message || "Failed to save variant");
+    showSnackbar(err.message || "Failed to save variant", 'error');
   }
 };
 
@@ -635,6 +656,7 @@ const removeVariant = async (variantId) => {
   
   try {
     await deleteProductVariant(variantId);
+    showSnackbar('Variant deactivated successfully!', 'success');
     
     const refreshed = await loadSellerProducts();
     setProducts(refreshed);
@@ -644,7 +666,7 @@ const removeVariant = async (variantId) => {
     setSelectedProduct(updatedProduct);
 
   } catch (err) {
-    alert(err.message || "Failed to delete variant");
+    showSnackbar(err.message || "Failed to delete variant", 'error');
   }
 };
 
@@ -654,13 +676,13 @@ const handleProductImageUpload = (event) => {
 
   // Validate file type
   if (!file.type.startsWith('image/')) {
-    alert('Please select an image file (PNG or JPG)');
+    showSnackbar('Please select an image file (PNG or JPG)', 'error');
     return;
   }
 
   // Validate file size (max 5MB)
   if (file.size > 5 * 1024 * 1024) {
-    alert('Image size must be less than 5MB');
+    showSnackbar('Image size must be less than 5MB', 'error');
     return;
   }
 
@@ -675,7 +697,7 @@ const handleProductImageUpload = (event) => {
 
 const handleSaveProductImage = async () => {
   if (!productImage || !currentProductForImage) {
-    alert('No image to save');
+    showSnackbar('No image to save', 'error');
     return;
   }
 
@@ -688,7 +710,7 @@ const handleSaveProductImage = async () => {
     if (showProductCropper && productCroppedAreaPixels) {
       finalImage = await createCroppedProductImage();
       if (!finalImage) {
-        alert('Failed to crop image');
+        showSnackbar('Failed to crop image', 'error');
         setUploadingImage(false);
         return;
       }
@@ -715,10 +737,10 @@ const handleSaveProductImage = async () => {
     setProductImage(null);
     setCurrentProductForImage(null);
 
-    alert('Product image updated successfully!');
+    showSnackbar('Product image updated successfully!', 'success');
   } catch (error) {
     console.error('Error uploading image:', error);
-    alert('Failed to upload image. Please try again.');
+    showSnackbar('Failed to upload image. Please try again.', 'error');
   } finally {
     setUploadingImage(false);
   }
@@ -748,10 +770,10 @@ const handleRemoveProductImage = async () => {
     setShowImageModal(false);
     setCurrentProductForImage(null);
 
-    alert('Product image removed successfully!');
+    showSnackbar('Product image removed successfully!', 'success');
   } catch (error) {
     console.error('Error removing image:', error);
-    alert('Failed to remove image. Please try again.');
+    showSnackbar('Failed to remove image. Please try again.', 'error');
   } finally {
     setUploadingImage(false);
   }
@@ -1778,6 +1800,14 @@ const openImageModal = (product) => {
                 </div>
               </div>
             )}
+
+            {/* SNACKBAR */}
+      <Snackbar
+        open={snackbar.open}
+        message={snackbar.message}
+        type={snackbar.type}
+        onClose={closeSnackbar}
+      />
 
 
     </div>

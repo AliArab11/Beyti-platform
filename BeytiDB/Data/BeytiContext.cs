@@ -29,6 +29,8 @@ public partial class BeytiContext : DbContext
 
     public virtual DbSet<CustomerAddress> CustomerAddresses { get; set; }
 
+    public virtual DbSet<CustomerFavoriteSeller> CustomerFavoriteSellers { get; set; } = null!;
+
     public virtual DbSet<DeliveryTicket> DeliveryTickets { get; set; }
 
     public virtual DbSet<Driver> Drivers { get; set; }
@@ -163,6 +165,21 @@ public partial class BeytiContext : DbContext
             entity.HasOne(d => d.Address).WithMany(p => p.CustomerAddresses).HasConstraintName("FK_CustomerAddress_Address");
 
             entity.HasOne(d => d.Customer).WithMany(p => p.CustomerAddresses).HasConstraintName("FK_CustomerAddress_Customer");
+        });
+
+        modelBuilder.Entity<CustomerFavoriteSeller>(entity =>
+        {
+            entity.HasKey(x => new { x.CustomerId, x.SellerId });
+
+            entity.HasOne(x => x.Customer)
+                  .WithMany(c => c.FavoriteSellers)
+                  .HasForeignKey(x => x.CustomerId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.Seller)
+                  .WithMany(s => s.FavoritedByCustomers)
+                  .HasForeignKey(x => x.SellerId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<DeliveryTicket>(entity =>
