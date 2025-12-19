@@ -25,11 +25,17 @@ public partial class DeliveryTicket
     [StringLength(20)]
     public string Status { get; set; } = null!;
 
+    [StringLength(500)]
+    public string? DeliveryNote { get; set; }
+
     [Precision(3)]
     public DateTime CreatedAt { get; set; }
 
     [Precision(3)]
     public DateTime UpdatedAt { get; set; }
+
+    public int? CurrentOfferedDriverId { get; set; }
+    public DateTime? OfferExpiresAt { get; set; }
 
     [ForeignKey("DeliveryAddressId")]
     [InverseProperty("DeliveryTicketDeliveryAddresses")]

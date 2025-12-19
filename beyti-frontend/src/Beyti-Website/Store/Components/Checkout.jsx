@@ -40,6 +40,8 @@ const Checkout = () => {
   const [addingAddress, setAddingAddress] = useState(false);
   const [addressError, setAddressError] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('');
+  const [orderComments, setOrderComments] = useState('');
+  const [deliveryComments, setDeliveryComments] = useState('');
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
   const [mapLocation, setMapLocation] = useState(null);
@@ -320,6 +322,13 @@ const showSnackbar = (message, type = 'success') => {
       return;
     }
 
+    // ✅ NEW: Require coordinates for delivery addresses
+    if (!savedLocation || !savedLocation.lat || !savedLocation.lng) {
+      setAddressError('Please pick a location on the map to enable delivery tracking');
+      showSnackbar('📍 Map location required for delivery addresses', 'warning');
+      return;
+    }
+
     if (!customerId) {
       setAddressError('Customer ID is missing');
       return;
@@ -375,6 +384,13 @@ const showSnackbar = (message, type = 'success') => {
   const handleUpdateAddress = async (addressId) => {
     if (!newAddress.street || !newAddress.city || !newAddress.country) {
       setAddressError('Please fill required fields: Street, City, and Country');
+      return;
+    }
+
+    // ✅ NEW: Require coordinates when updating addresses
+    if (!savedLocation || !savedLocation.lat || !savedLocation.lng) {
+      setAddressError('Please pick a location on the map to enable delivery tracking');
+      showSnackbar('📍 Map location required for delivery addresses', 'warning');
       return;
     }
 
@@ -693,6 +709,8 @@ const handlePlaceOrder = async () => {
       SubtotalAmount: subtotalAmount,
       DeliveryFee: deliveryFee,
       TotalAmount: totalAmount,
+      OrderNote: orderComments || null,
+      DeliveryNote: fulfillmentType === 'Delivery' ? (deliveryComments || null) : null,
       CreatedAt: Date.now(),
       UpdatedAt: Date.now()
     };
@@ -933,8 +951,16 @@ const handlePlaceOrder = async () => {
                                 className="bg-white rounded-xl border border-grey-stroke shadow-sm hover:shadow-md transition-shadow p-5 flex items-center justify-between"
                             >
                             <div className="flex items-center gap-4 flex-1">
-                            <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-sage-100 to-sage-200 flex items-center justify-center flex-shrink-0">
+                            <div className="w-20 h-20 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden bg-gradient-to-br from-sage-100 to-sage-200">
+                              {item.imageUrl ? (
+                                <img 
+                                  src={`https://localhost:7062${item.imageUrl}`}
+                                  alt={item.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
                                 <ShoppingCart size={28} className="text-sage-600" />
+                              )}
                             </div>
                             
                             <div className="flex-1 min-w-0">
@@ -986,6 +1012,25 @@ const handlePlaceOrder = async () => {
                         ))}
                     </>
                     )}
+                    {/* Order Comments Field */}
+                      {localCart.length > 0 && (
+                        <div className="mt-6 bg-white rounded-xl border border-grey-stroke shadow-sm p-5">
+                          <label className="block text-base font-semibold text-charcoal-600 mb-2">
+                            Order Comments <span className="text-sm font-normal text-charcoal-400">(Optional)</span>
+                          </label>
+                          <textarea
+                            value={orderComments}
+                            onChange={(e) => setOrderComments(e.target.value)}
+                            placeholder="Add any special instructions for your order..."
+                            className="w-full border-2 border-grey-stroke rounded-lg p-3 text-sm focus:border-sage-500 focus:outline-none resize-none"
+                            rows={3}
+                            maxLength={500}
+                          />
+                          <p className="text-xs text-charcoal-400 mt-1 text-right">
+                            {orderComments.length}/500 characters
+                          </p>
+                        </div>
+                      )}
                 </section>
 
                 {/* RIGHT: ORDER SUMMARY PANEL */}
@@ -1308,6 +1353,26 @@ const handlePlaceOrder = async () => {
                       ))}
                     </div>
 
+                    {/* Delivery Comments - Only show for delivery orders */}
+                      {fulfillmentType === 'Delivery' && (
+                        <div className="mt-5 bg-cream-50 rounded-xl border border-grey-stroke p-4">
+                          <label className="block text-base font-semibold text-charcoal-600 mb-2">
+                            Delivery Instructions <span className="text-sm font-normal text-charcoal-400">(Optional)</span>
+                          </label>
+                          <textarea
+                            value={deliveryComments}
+                            onChange={(e) => setDeliveryComments(e.target.value)}
+                            placeholder="E.g., Leave at door, call upon arrival, building/apartment number..."
+                            className="w-full border-2 border-grey-stroke rounded-lg p-3 text-sm focus:border-sage-500 focus:outline-none resize-none"
+                            rows={3}
+                            maxLength={500}
+                          />
+                          <p className="text-xs text-charcoal-400 mt-1 text-right">
+                            {deliveryComments.length}/500 characters
+                          </p>
+                        </div>
+                      )}
+
                     {orderError && (
                       <div className="mt-4 bg-error-bg border-l-4 border-error-btn p-3 rounded">
                         <p className="text-body-regular text-error-text font-semibold">
@@ -1445,12 +1510,21 @@ const handlePlaceOrder = async () => {
               <button
                 type="button"
                 onClick={() => setShowMapModal(true)}
-                className="w-full bg-sage-500 hover:bg-sage-600 text-white px-4 py-3 rounded-xl font-bold flex items-center justify-center gap-2"
+                className={`w-full px-4 py-3 rounded-xl font-bold flex items-center justify-center gap-2 ${
+                  savedLocation 
+                    ? 'bg-success-btn hover:bg-success-text text-white' 
+                    : 'bg-sage-500 hover:bg-sage-600 text-white ring-2 ring-amber-400 animate-pulse'
+                }`}
               >
                 <MapPin size={20} weight="fill" />
-                📍 Pick Location from Map
-                {savedLocation && <span className="ml-2 text-xs">✓ Location Set</span>}
+                {savedLocation ? '✓ Location Set' : '📍 Pick Location from Map (Required)'}
               </button>
+
+              {!savedLocation && (
+                <p className="text-xs text-amber-600 font-semibold text-center">
+                  ⚠️ Location coordinates are required for delivery tracking
+                </p>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-charcoal-600 mb-1">

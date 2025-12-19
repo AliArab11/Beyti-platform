@@ -4,6 +4,7 @@ using BeytiDB.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BeytiDB.Migrations
 {
     [DbContext(typeof(BeytiContext))]
-    partial class BeytiContextModelSnapshot : ModelSnapshot
+    [Migration("20251217165105_AddDriverColumns")]
+    partial class AddDriverColumns
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -330,21 +333,11 @@ namespace BeytiDB.Migrations
                         .HasColumnType("datetime2(3)")
                         .HasDefaultValueSql("(sysutcdatetime())");
 
-                    b.Property<int?>("CurrentOfferedDriverId")
-                        .HasColumnType("int");
-
                     b.Property<int?>("DeliveryAddressId")
                         .HasColumnType("int");
 
-                    b.Property<string>("DeliveryNote")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
                     b.Property<int?>("DriverId")
                         .HasColumnType("int");
-
-                    b.Property<DateTime?>("OfferExpiresAt")
-                        .HasColumnType("datetime2");
 
                     b.Property<int>("OrderId")
                         .HasColumnType("int");
@@ -398,6 +391,12 @@ namespace BeytiDB.Migrations
 
                     b.Property<decimal?>("CurrentLng")
                         .HasColumnType("decimal(9,6)");
+
+                    b.Property<int?>("CurrentOfferedDriverId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("OfferExpiresAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Phone")
                         .IsRequired()
@@ -608,10 +607,6 @@ namespace BeytiDB.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
-                    b.Property<string>("OrderNote")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
                     b.Property<string>("PaymentMethod")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -777,10 +772,6 @@ namespace BeytiDB.Migrations
 
                     b.Property<byte?>("GenderId")
                         .HasColumnType("tinyint");
-
-                    b.Property<string>("ImageUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
@@ -1069,14 +1060,6 @@ namespace BeytiDB.Migrations
                     b.Property<string>("Phone")
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
-
-                    b.Property<string>("StoreDescription")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("StoreImageUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
 
                     b.Property<string>("StoreName")
                         .IsRequired()

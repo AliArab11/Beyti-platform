@@ -36,6 +36,7 @@ namespace Beyti_Backend.Controllers.Api
                 .Select(d => new
                 {
                     d.Id,
+                    d.UserProfileId,
                     fullName = d.UserProfile.DisplayName,
                     d.Phone,
                     d.Status,
@@ -57,17 +58,32 @@ namespace Beyti_Backend.Controllers.Api
                 if (driver == null)
                     return NotFound("Driver not found");
 
+                // ✅ ASSIGN RANDOM BAHRAIN LOCATION IF NOT SET
+                if (driver.CurrentLat == null || driver.CurrentLng == null)
+                {
+                    var random = new Random();
+
+                    // Bahrain land bounds (tight - avoids sea)
+                    driver.CurrentLat = (decimal)(26.05 + random.NextDouble() * 0.20); // 26.05 to 26.25
+                    driver.CurrentLng = (decimal)(50.45 + random.NextDouble() * 0.15); // 50.45 to 50.60
+                    driver.UpdatedAt = DateTime.UtcNow;
+
+                    await _context.SaveChangesAsync();
+                }
+
                 return Ok(new
                 {
                     DriverId = driver.Id,
-                    Id = driver.Id, // For compatibility
+                    Id = driver.Id,
                     UserProfileId = driver.UserProfileId,
                     FullName = driver.UserProfile.DisplayName,
                     Phone = driver.Phone,
                     Status = driver.Status,
                     CreatedAt = driver.CreatedAt,
                     DisplayName = driver.UserProfile.DisplayName,
-                    RoleType = driver.UserProfile.RoleType
+                    RoleType = driver.UserProfile.RoleType,
+                    CurrentLat = driver.CurrentLat,
+                    CurrentLng = driver.CurrentLng
                 });
             }
             catch (Exception ex)

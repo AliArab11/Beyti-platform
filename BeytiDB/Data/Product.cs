@@ -35,6 +35,9 @@ public partial class Product
     [Column(TypeName = "decimal(5, 2)")]
     public decimal? DiscountPercentage { get; set; }
 
+    [StringLength(500)]
+    public string? ImageUrl { get; set; }
+
     public bool IsActive { get; set; }
 
     [Precision(3)]

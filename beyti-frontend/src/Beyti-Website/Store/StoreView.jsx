@@ -14,17 +14,20 @@ import OrderDetails from './Components/OrderDetails';
 import { createOrder, createOrderItem, getProductVariants, getOrder, getOrders } from '../../services/api';
 
 
-// Mock API call - replace with your actual API
+
 const getStoreDetails = async (storeId) => {
   try {
-    const response = await fetch(`https://localhost:7062/api/Sellers/${storeId}/products`);
-    if (!response.ok) throw new Error('Failed to fetch');
+    const response = await fetch(
+      `https://localhost:7062/api/Sellers/${storeId}/products`
+    );
+    if (!response.ok) throw new Error("Failed to fetch");
     return await response.json();
   } catch (error) {
-    console.error('Error fetching store:', error);
+    console.error("Error fetching store:", error);
     return null;
   }
 };
+
 
 
 // Store Info Section
@@ -34,149 +37,45 @@ const StoreInfo = ({ store }) => (
       
       {/* Main Card Container */}
       <div className="bg-white rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.08)] relative">
-        
+
         {/* Banner Section (Top) */}
-        {(() => {
-          const storeName = store?.storeName || "Cookies by Maryam";
-          const hash = storeName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-          
-          const bannerGradients = [
-            'from-[#6366F1]/20 via-[#8B5CF6]/15 to-[#EC4899]/20',
-            'from-[#F59E0B]/20 via-[#EF4444]/15 to-[#DC2626]/20',
-            'from-[#10B981]/20 via-[#059669]/15 to-[#047857]/20',
-            'from-[#3B82F6]/20 via-[#2563EB]/15 to-[#1D4ED8]/20',
-            'from-[#EC4899]/20 via-[#DB2777]/15 to-[#BE185D]/20',
-            'from-[#8B5CF6]/20 via-[#7C3AED]/15 to-[#6D28D9]/20',
-            'from-[#14B8A6]/20 via-[#0D9488]/15 to-[#0F766E]/20',
-            'from-[#F97316]/20 via-[#EA580C]/15 to-[#C2410C]/20',
-          ];
-          
-          const accentColors = [
-            '#8B5CF6', '#EF4444', '#10B981', '#3B82F6', 
-            '#EC4899', '#8B5CF6', '#14B8A6', '#F97316'
-          ];
-          
-          const index = hash % bannerGradients.length;
-          const gradient = bannerGradients[index];
-          const accentColor = accentColors[index];
-          
-          return (
-            <div className={`relative h-[180px] bg-gradient-to-br ${gradient} rounded-t-3xl overflow-hidden`}
-                 style={{ backgroundColor: '#F5F5F7' }}>
-              <div className="absolute inset-0 opacity-30">
-                <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-                  <defs>
-                    <pattern id="diagonalLines" patternUnits="userSpaceOnUse" width="40" height="40" patternTransform="rotate(45)">
-                      <line x1="0" y1="0" x2="0" y2="40" stroke={accentColor} strokeWidth="1" opacity="0.3"/>
-                    </pattern>
-                  </defs>
-                  <rect width="100%" height="100%" fill="url(#diagonalLines)"/>
-                </svg>
+          <div className="relative h-[180px] bg-gradient-to-br from-cream-100 to-cream-200 rounded-t-3xl overflow-hidden">
+            {/* Store Status Badge */}
+            <div className="absolute top-4 right-8 z-20">
+              <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold shadow-lg ${
+                isStoreOpen(store)
+                  ? 'bg-success-btn text-white'
+                  : 'bg-error-btn text-white'
+              }`}>
+                <div className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
+                {isStoreOpen(store) ? 'OPEN' : 'CLOSED'}
               </div>
-              
-              <div className="absolute inset-0">
-                <div className="absolute top-8 right-16 w-32 h-32 rounded-full opacity-20"
-                     style={{ background: `radial-gradient(circle, ${accentColor} 0%, transparent 70%)` }}></div>
-                <div className="absolute bottom-6 right-1/3 w-24 h-24 rounded-full opacity-15"
-                     style={{ background: `radial-gradient(circle, ${accentColor} 0%, transparent 70%)` }}></div>
-                <div className="absolute top-12 left-1/4 w-20 h-20 rounded-full opacity-25"
-                     style={{ background: `radial-gradient(circle, ${accentColor} 0%, transparent 70%)` }}></div>
-              </div>
-              
-              <div className="absolute bottom-0 left-0 right-0">
-                <svg viewBox="0 0 1200 60" className="w-full" preserveAspectRatio="none">
-                  <path d="M0,30 Q300,10 600,30 T1200,30 L1200,60 L0,60 Z" 
-                        fill="white" opacity="0.1"/>
-                  <path d="M0,40 Q300,20 600,40 T1200,40 L1200,60 L0,60 Z" 
-                        fill="white" opacity="0.15"/>
-                </svg>
-              </div>
-              {/* Store Status Badge */}
-                <div className="absolute top-4 right-8 z-20">
-                  <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold shadow-lg ${
-                    isStoreOpen(store)
-                      ? 'bg-success-btn text-white'
-                      : 'bg-error-btn text-white'
-                  }`}>
-                    <div className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
-                    {isStoreOpen(store) ? 'OPEN' : 'CLOSED'}
-                  </div>
-                </div>
             </div>
-          );
-        })()}
-          
-          {/* Circular Logo */}
+          </div>
+        
+        {/* Circular Logo */}
           <div className="absolute -bottom-[112px] left-12 z-30">
-            {(() => {
-              const gradients = [
-                'from-[#6366F1] via-[#8B5CF6] to-[#EC4899]',
-                'from-[#F59E0B] via-[#EF4444] to-[#DC2626]',
-                'from-[#10B981] via-[#059669] to-[#047857]',
-                'from-[#3B82F6] via-[#2563EB] to-[#1D4ED8]',
-                'from-[#EC4899] via-[#DB2777] to-[#BE185D]',
-                'from-[#8B5CF6] via-[#7C3AED] to-[#6D28D9]',
-                'from-[#14B8A6] via-[#0D9488] to-[#0F766E]',
-                'from-[#F97316] via-[#EA580C] to-[#C2410C]',
-              ];
-              
-              const shadowColors = [
-                'rgba(139,92,246,0.5)',
-                'rgba(239,68,68,0.5)',
-                'rgba(16,185,129,0.5)',
-                'rgba(59,130,246,0.5)',
-                'rgba(236,72,153,0.5)',
-                'rgba(139,92,246,0.5)',
-                'rgba(20,184,166,0.5)',
-                'rgba(249,115,22,0.5)',
-              ];
-              
-              const storeName = store?.storeName || "Cookies by Maryam";
-              const hash = storeName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-              const index = hash % gradients.length;
-              const gradient = gradients[index];
-              const shadowColor = shadowColors[index];
-              
-              return (
-                <div className={`w-[140px] h-[140px] rounded-full bg-gradient-to-br ${gradient} border-[6px] border-white flex items-center justify-center overflow-hidden relative`}
-                     style={{ boxShadow: `0 8px 30px ${shadowColor}` }}>
-                  <div className="absolute inset-0 opacity-20">
-                    <div className="absolute top-0 left-0 w-full h-full" 
-                         style={{
-                           backgroundImage: `radial-gradient(circle at 20% 30%, rgba(255,255,255,0.3) 0%, transparent 50%),
-                                            radial-gradient(circle at 80% 70%, rgba(255,255,255,0.2) 0%, transparent 50%)`
-                         }}>
-                    </div>
-                  </div>
-                  
-                  <div className="relative z-10 w-full h-full flex flex-col items-center justify-center p-3">
-                    <div className="absolute inset-0 flex items-center justify-center opacity-15">
-                      <svg viewBox="0 0 100 100" className="w-28 h-28 text-white">
-                        <polygon points="50,5 90,27.5 90,72.5 50,95 10,72.5 10,27.5" fill="currentColor" stroke="currentColor" strokeWidth="3"/>
-                      </svg>
-                    </div>
-                    
-                    <div className="relative">
-                      {(() => {
-                        const words = storeName.split(' ').filter(w => w.length > 0);
-                        const initials = words.length >= 2 
-                          ? words[0][0].toUpperCase() + words[words.length - 1][0].toUpperCase()
-                          : words[0].slice(0, 2).toUpperCase();
-                        
-                        return (
-                          <span className="text-[52px] font-black text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.4)] tracking-tighter" 
-                                style={{ fontFamily: "Inter, sans-serif" }}>
-                            {initials}
-                          </span>
-                        );
-                      })()}
-                    </div>
-                    
-                    <div className="w-14 h-1 bg-white/90 rounded-full mt-1 shadow-[0_2px_6px_rgba(0,0,0,0.3)]"></div>
-                  </div>
+            <div className="w-[140px] h-[140px] rounded-full border-[6px] border-white flex items-center justify-center overflow-hidden bg-white shadow-[0_8px_30px_rgba(0,0,0,0.15)]">
+              {store?.storeImageUrl ? (
+                <img 
+                  src={`https://localhost:7062${store.storeImageUrl}`}
+                  alt={store.storeName}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-grey-200 to-grey-300">
+                  <span className="text-5xl font-black text-charcoal-600" style={{ fontFamily: "Inter, sans-serif" }}>
+                    {(() => {
+                      const storeName = store?.storeName || "Store";
+                      const words = storeName.split(' ').filter(w => w.length > 0);
+                      return words.length >= 2 
+                        ? words[0][0].toUpperCase() + words[words.length - 1][0].toUpperCase()
+                        : words[0].slice(0, 2).toUpperCase();
+                    })()}
+                  </span>
                 </div>
-              );
-            })()}
+              )}
+            </div>
           </div>
         </div>
 
@@ -261,15 +160,12 @@ const StoreInfo = ({ store }) => (
                    style={{ fontFamily: "Inter, sans-serif", lineHeight: '1.6' }}>
                 
                 <p className="text-charcoal-500">
-                  {store?.description || "Handcrafted cookies made with love. Perfect for any occasion."}
+                  {store?.storeDescription || "----------"}
                 </p>
 
                 <p>
                   <span className="font-semibold text-[#556B5C]">Phone:</span>{" "}
                   <span className="text-charcoal-600">{store?.phone || "+1 555-1234"}</span>
-                  {"  "}
-                  <span className="font-semibold text-[#556B5C]">Email:</span>{" "}
-                  <span className="text-charcoal-600">{store?.email || "maryam@beyti.com"}</span>
                 </p>
 
                 <p>
@@ -289,10 +185,35 @@ const StoreInfo = ({ store }) => (
     </div>
 );
 
-const CategorySidebar = ({ selected, onSelect, sections = [] }) => {
+const CategorySidebar = ({ selected, onSelect, sections = [], systemSections }) => {
   const defaultCategories = [
     { id: "all", label: "All Products", icon: <Package size={24} weight="regular" /> },
   ];
+
+  // Add system sections
+  const systemCategories = [];
+  
+  if (systemSections?.mostPopular?.products?.length > 0) {
+    systemCategories.push({
+      id: "system-popular",
+      label: "Most Popular",
+      icon: <Star size={24} weight="fill" />,
+      sortOrder: -1,
+      isSystemSection: true
+    });
+  }
+  
+  if (systemSections?.discounts?.products?.length > 0) {
+    systemCategories.push({
+      id: "system-discounts",
+      label: "Discounts",
+      icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/>
+      </svg>,
+      sortOrder: -2,
+      isSystemSection: true
+    });
+  }
 
   const sectionCategories = sections
     .filter(s => s.isActive)
@@ -304,7 +225,7 @@ const CategorySidebar = ({ selected, onSelect, sections = [] }) => {
       sectionId: section.id
     }));
 
-  const allCategories = [...defaultCategories, ...sectionCategories];
+  const allCategories = [...defaultCategories, ...systemCategories, ...sectionCategories];
 
   return (
     <aside className="w-[280px] flex-shrink-0 sticky top-[88px] h-[calc(100vh-88px)] overflow-y-auto">
@@ -342,72 +263,44 @@ const calculateDiscountedPrice = (originalPrice, discountPercentage) => {
 
 // Product Card
 const ProductCard = ({ product, onClick }) => {
-     console.log('🔍 Product data:', product.name, {
-       basePrice: product?.basePrice,
-       discountPercentage: product?.discountPercentage,
-       hasDiscount: !!product?.discountPercentage
-     });
   const rating = product?.averageRating || 0;
   const reviewCount = product?.reviewCount || 0;
   const hasEnoughReviews = reviewCount >= 5;
 
-  
-
   return (
     <div 
       onClick={onClick}
-      className="bg-white rounded-2xl overflow-hidden cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all group"
+      className="bg-white rounded-xl overflow-hidden cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_8px_24px_rgba(85,107,92,0.15)] hover:scale-[1.02] transition-all duration-300 group"
     >
-      {/* Product Image */}
-      <div className="relative h-48 bg-gradient-to-br from-[#D8E8DC] to-[#C9DFD0] overflow-hidden">
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-32 h-32 bg-white/30 rounded-full flex items-center justify-center">
-            <svg className="w-16 h-16 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-            </svg>
+      {/* Product Image - Square */}
+      <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-[#D8E8DC] to-[#C9DFD0]">
+        {product?.imageUrl ? (
+          <img 
+            src={`https://localhost:7062${product.imageUrl}`}
+            alt={product.name}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            style={{ aspectRatio: '1 / 1' }}
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-32 h-32 bg-white/30 rounded-full flex items-center justify-center">
+              <svg className="w-16 h-16 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+              </svg>
+            </div>
           </div>
-        </div>
-        
-        {/* Price Badge */}
-        <div className="absolute top-4 right-4">
-          {(() => {
-            const originalPrice = product?.basePrice || 15.000;
-            const discount = product?.discountPercentage || product?.discount;
-            const discountedPrice = discount ? calculateDiscountedPrice(originalPrice, discount) : null;
-            
-            return discountedPrice ? (
-              <div className="bg-white px-3 py-2 rounded-2xl shadow-lg">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-charcoal-400 line-through" style={{ fontFamily: 'Inter, sans-serif' }}>
-                    {originalPrice.toFixed(3)} BD
-                  </span>
-                  <span className="text-lg font-bold text-sage-700" style={{ fontFamily: 'Inter, sans-serif' }}>
-                    {discountedPrice.toFixed(3)} BD
-                  </span>
-                  <div className="bg-sage-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                    {discount}% OFF
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-white px-4 py-2 rounded-full shadow-lg">
-                <span className="text-lg font-bold text-sage-700">
-                  {originalPrice.toFixed(3)} BD
-                </span>
-              </div>
-            );
-          })()}
-        </div>
+        )}
       </div>
 
-      {/* Product Info */}
-      <div className="p-5">
-        <h3 className="font-bold text-charcoal-600 text-lg mb-2 line-clamp-2 group-hover:text-sage-600 transition-colors" style={{ fontFamily: 'Merriweather, serif' }}>
+      {/* Product Info - Compact & Organized */}
+      <div className="p-4 space-y-1">
+        {/* Product Name - Bigger */}
+        <h3 className="font-bold text-charcoal-600 text-xl leading-tight line-clamp-2 group-hover:text-sage-600 transition-colors min-h-[3rem]" style={{ fontFamily: 'Merriweather, serif' }}>
           {product?.name || "Dream Cookie"}
         </h3>
         
         {/* Rating or NEW badge */}
-        <div className="flex items-center gap-1 mb-3">
+        <div className="flex items-center gap-1.5 mt-1 mb-1">
           {!hasEnoughReviews ? (
             <span className="px-3 py-1 bg-sage-500 text-white text-xs font-bold rounded-full" style={{ fontFamily: 'Inter, sans-serif' }}>
               NEW
@@ -425,22 +318,41 @@ const ProductCard = ({ product, onClick }) => {
                   </div>
                 );
               })}
-              <span className="text-sm font-semibold text-charcoal-600 ml-1" style={{ fontFamily: 'Inter, sans-serif' }}>
+              <span className="text-sm font-bold text-charcoal-600 ml-0.5" style={{ fontFamily: 'Inter, sans-serif' }}>
                 {rating.toFixed(1)}
               </span>
             </>
           )}
         </div>
 
-        {product?.description && (
-          <p className="text-sm text-charcoal-400 mb-4 line-clamp-2">
-            {product.description}
-          </p>
-        )}
-        
-        <button className="w-full bg-sage-500 hover:bg-sage-600 text-white font-semibold py-3 rounded-xl transition-all shadow-[0_2px_8px_rgba(85,107,92,0.2)]">
-          View Details
-        </button>
+        {/* Price at Bottom - Compact */}
+        <div className="pt-2 border-t border-grey-stroke/40">
+          {(() => {
+            const originalPrice = product?.basePrice || 15.000;
+            const discount = product?.discountPercentage || product?.discount;
+            const discountedPrice = discount ? calculateDiscountedPrice(originalPrice, discount) : null;
+            
+            return discountedPrice ? (
+              <div className="flex items-center justify-between">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-xl font-extrabold text-sage-700" style={{ fontFamily: 'Inter, sans-serif' }}>
+                    {discountedPrice.toFixed(3)} BD
+                  </span>
+                  <span className="text-xs font-medium text-charcoal-400 line-through" style={{ fontFamily: 'Inter, sans-serif' }}>
+                    {originalPrice.toFixed(3)} BD
+                  </span>
+                </div>
+                <div className="bg-error-btn text-white text-xs font-bold px-2.5 py-1 rounded-full">
+                  {discount}% OFF
+                </div>
+              </div>
+            ) : (
+              <span className="text-xl font-extrabold text-sage-700 block" style={{ fontFamily: 'Inter, sans-serif' }}>
+                {originalPrice.toFixed(3)} BD
+              </span>
+            );
+          })()}
+        </div>
       </div>
     </div>
   );
@@ -465,6 +377,8 @@ const StoreView = () => {
 
   const [showDifferentStoreModal, setShowDifferentStoreModal] = useState(false);
   const [pendingCartItem, setPendingCartItem] = useState(null);
+
+  const [systemSections, setSystemSections] = useState({ discounts: null, mostPopular: null });
 
   const [store, setStore] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -763,7 +677,8 @@ const handleProductClick = (product) => {
     basePrice: finalPrice,
     originalPrice: originalPrice,
     discountPercentage: discount,
-    sellerId: item.sellerId || store?.id
+    sellerId: item.sellerId || store?.id,
+    imageUrl: item.imageUrl || null
   };
     
     console.log('✅ Item with seller:', itemWithSeller);
@@ -873,6 +788,12 @@ useEffect(() => {
       setError(null);
       const data = await getStoreDetails(storeId);
       setStore(data);
+      // ✅ store system sections separately
+        if (data?.systemSections) {
+          setSystemSections(data.systemSections);
+        } else {
+          setSystemSections({ discounts: null, mostPopular: null });
+        }
     } catch (err) {
       setError(err.message || "Failed to load store");
     } finally {
@@ -948,77 +869,90 @@ useEffect(() => {
   }, [customerId]);
 
 
-  // Get category title
-    const getCategoryTitle = (categoryId) => {
-    if (categoryId === "all") return "All Products";
-    
-    if (categoryId.startsWith("section-")) {
-      const sectionId = parseInt(categoryId.replace("section-", ""));
-      const section = store?.storeSections?.find(s => s.id === sectionId);
-      return section ? section.name : "Products";
-    }
-    
-    return "Products";
-  };
+const getCategoryTitle = (categoryId) => {
+  if (categoryId === "all") return "All Products";
+  
+  if (categoryId === "system-popular") return "Most Popular";
+  if (categoryId === "system-discounts") return "Discounts";
+  
+  if (categoryId.startsWith("section-")) {
+    const sectionId = parseInt(categoryId.replace("section-", ""));
+    const section = store?.storeSections?.find(s => s.id === sectionId);
+    return section ? section.name : "Products";
+  }
+  
+  return "Products";
+};
 
-const filteredProducts = (store?.products || [])
-  .filter(product => {
-    // Filter out inactive products
-    if (product.isActive === false) {
-      return false;
-    }
-    
-    // Search filter
-    if (searchQuery && !product.name?.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false;
-    }
-    
-    // Section filter
-    if (selectedCategory !== "all") {
-      if (selectedCategory.startsWith("section-")) {
-        const sectionId = parseInt(selectedCategory.replace("section-", ""));
-        if (product.storeSectionId !== sectionId) {
-          return false;
+const filteredProducts = (() => {
+  // Handle system sections
+  if (selectedCategory === "system-popular") {
+    return systemSections.mostPopular?.products || [];
+  }
+  
+  if (selectedCategory === "system-discounts") {
+    return systemSections.discounts?.products || [];
+  }
+  
+  // Handle regular sections
+  return (store?.products || [])
+    .filter(product => {
+      // Filter out inactive products
+      if (product.isActive === false) {
+        return false;
+      }
+      
+      // Search filter
+      if (searchQuery && !product.name?.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false;
+      }
+      
+      // Section filter
+      if (selectedCategory !== "all") {
+        if (selectedCategory.startsWith("section-")) {
+          const sectionId = parseInt(selectedCategory.replace("section-", ""));
+          if (product.storeSectionId !== sectionId) {
+            return false;
+          }
         }
       }
-    }
-    
-    return true;
-  })
-
-  .sort((a, b) => {
-    // Helper function to check if product is new (less than 5 reviews)
-    const isNewProduct = (product) => {
-      const reviewCount = product.reviews?.filter(r => !r.isCommentHiddenBySeller)?.length || 0;
-      return reviewCount < 5;
-    };
-    
-    const aIsNew = isNewProduct(a);
-    const bIsNew = isNewProduct(b);
-    const aRating = a.averageRating || 0;
-    const bRating = b.averageRating || 0;
-    
-    // Apply sorting
-    if (sortBy === 'price-low') return (a.basePrice || 0) - (b.basePrice || 0);
-    if (sortBy === 'price-high') return (b.basePrice || 0) - (a.basePrice || 0);
-    if (sortBy === 'newest') return new Date(b.createdAt) - new Date(a.createdAt);
-    
-    if (sortBy === 'rating-high') {
-      // New products go last when sorting high to low
-      if (aIsNew && !bIsNew) return 1;
-      if (!aIsNew && bIsNew) return -1;
-      return bRating - aRating;
-    }
-    
-    if (sortBy === 'rating-low') {
-      // New products go first when sorting low to high
-      if (aIsNew && !bIsNew) return -1;
-      if (!aIsNew && bIsNew) return 1;
-      return aRating - bRating;
-    }
-    
-    return 0; // Default: popular (no sorting)
-  });
+      
+      return true;
+    })
+    .sort((a, b) => {
+      // Helper function to check if product is new (less than 5 reviews)
+      const isNewProduct = (product) => {
+        const reviewCount = product.reviews?.filter(r => !r.isCommentHiddenBySeller)?.length || 0;
+        return reviewCount < 5;
+      };
+      
+      const aIsNew = isNewProduct(a);
+      const bIsNew = isNewProduct(b);
+      const aRating = a.averageRating || 0;
+      const bRating = b.averageRating || 0;
+      
+      // Apply sorting
+      if (sortBy === 'price-low') return (a.basePrice || 0) - (b.basePrice || 0);
+      if (sortBy === 'price-high') return (b.basePrice || 0) - (a.basePrice || 0);
+      if (sortBy === 'newest') return new Date(b.createdAt) - new Date(a.createdAt);
+      
+      if (sortBy === 'rating-high') {
+        // New products go last when sorting high to low
+        if (aIsNew && !bIsNew) return 1;
+        if (!aIsNew && bIsNew) return -1;
+        return bRating - aRating;
+      }
+      
+      if (sortBy === 'rating-low') {
+        // New products go first when sorting low to high
+        if (aIsNew && !bIsNew) return -1;
+        if (!aIsNew && bIsNew) return 1;
+        return aRating - bRating;
+      }
+      
+      return 0; // Default: popular (no sorting)
+    });
+})();
 
   if (loading) {
     return (
@@ -1093,6 +1027,7 @@ const filteredProducts = (store?.products || [])
             selected={selectedCategory} 
             onSelect={setSelectedCategory}
             sections={store?.storeSections || []}
+            systemSections={systemSections}
           />
           
           <div className="flex-1">
