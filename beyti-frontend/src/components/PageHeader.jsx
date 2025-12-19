@@ -19,7 +19,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MagnifyingGlass, Bell, CaretDown, User } from '@phosphor-icons/react';
+import { MagnifyingGlass, Bell, CaretDown, User, ClockCountdown } from '@phosphor-icons/react';
 import SettingsModal from './SettingsModal';
 import { logout } from '../utils/auth';
 import NotificationDropdown from './NotificationDropdown';
@@ -128,6 +128,24 @@ const handleProfileClick = () => {
 
       {/* Right: Controls */}
       <div className="flex items-center gap-4">
+        {/* History Icon - Only show for Customer role */}
+        {userRole === 'Customer' && (
+          <button
+            onClick={() => navigate('/customer/history')}
+            className="
+              flex items-center justify-center
+              w-[42px] h-[42px]
+              bg-sage-500 hover:bg-sage-600
+              rounded-md
+              transition-colors
+              group
+            "
+            title="View History"
+          >
+            <ClockCountdown size={20} weight="regular" className="text-sage-100" />
+          </button>
+        )}
+
         {/* Notification Bell */}
         <NotificationDropdown userId={userId} />
 
