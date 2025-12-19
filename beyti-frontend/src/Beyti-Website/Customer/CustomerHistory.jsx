@@ -14,7 +14,8 @@ import StatusChip from '../../components/StatusChip';
 import ViewOrderModal from '../../components/ViewOrderModal';
 import ViewServiceBookingModal from '../../components/ViewServiceBookingModal';
 import ServiceReviewModal from '../../components/ServiceReviewModal';
-import { getUserProfile, updateUserProfile, getCustomerOrders, getServiceBookings, createServiceReview, getCustomerServiceReviews } from '../../services/api';
+import BookingTimer from '../../components/BookingTimer';
+import { getUserProfile, updateUserProfile, getCustomerOrders, getServiceBookings, createServiceReview, getCustomerServiceReviews, cancelServiceBooking } from '../../services/api';
 import { isAuthenticated, getUserId, handleSuspensionError } from '../../utils/authUtils';
 
 export default function CustomerHistory() {
@@ -32,6 +33,10 @@ export default function CustomerHistory() {
   const [viewOrderModal, setViewOrderModal] = useState({ isOpen: false, order: null });
   const [viewBookingModal, setViewBookingModal] = useState({ isOpen: false, booking: null });
   const [reviewModal, setReviewModal] = useState({ isOpen: false, booking: null });
+  const [cancellingBookingId, setCancellingBookingId] = useState(null);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelBookingData, setCancelBookingData] = useState(null);
+  const [cancellationReason, setCancellationReason] = useState('');
 
   // Check authentication on mount
   // useEffect(() => {
@@ -208,6 +213,7 @@ export default function CustomerHistory() {
       case 'InProgress':
         return 'brand';
       case 'Canceled':
+      case 'Cancelled':
       case 'Rejected':
         return 'error';
       default:
@@ -225,9 +231,9 @@ export default function CustomerHistory() {
       ['Pending', 'PendingQuote', 'DepositPending', 'Confirmed', 'InProgress'].includes(b.status)
     ).length;
 
-    // Services in progress - not yet completed or rejected (final states)
+    // Services in progress - not yet completed, rejected, or cancelled (final states)
     const inProgressBookings = serviceBookings.filter(b =>
-      !['Completed', 'Rejected', 'Canceled'].includes(b.status)
+      !['Completed', 'Rejected', 'Canceled', 'Cancelled'].includes(b.status)
     );
 
     return {
@@ -291,6 +297,50 @@ export default function CustomerHistory() {
     } catch (error) {
       console.error('Error submitting review:', error);
       throw error;
+    }
+  };
+
+  const handleCancelBookingClick = (booking) => {
+    setCancelBookingData(booking);
+    setShowCancelDialog(true);
+  };
+
+  const handleConfirmCancelBooking = async () => {
+    if (!cancellationReason.trim()) {
+      alert('Please provide a reason for cancellation');
+      return;
+    }
+
+    if (!cancelBookingData) return;
+
+    try {
+      setCancellingBookingId(cancelBookingData.id);
+      await cancelServiceBooking(cancelBookingData.id, cancelBookingData, displayName, cancellationReason);
+      alert('Booking cancelled successfully.');
+      setShowCancelDialog(false);
+      setCancellationReason('');
+      setCancelBookingData(null);
+      await fetchHistory(); // Refresh to show updated status
+    } catch (error) {
+      console.error('Error cancelling booking:', error);
+      alert('Failed to cancel booking. Please try again.');
+    } finally {
+      setCancellingBookingId(null);
+    }
+  };
+
+  const handleTimerExpire = async (bookingId) => {
+    // Auto-cancel when timer expires
+    try {
+      console.log('Booking #' + bookingId + ' expired, auto-cancelling...');
+      // Find the booking object
+      const booking = serviceBookings.find(b => b.id === bookingId);
+      if (booking) {
+        await cancelServiceBooking(bookingId, booking, 'System', 'No response from provider within time limit');
+        await fetchHistory(); // Refresh to show updated status
+      }
+    } catch (error) {
+      console.error('Error auto-cancelling booking:', error);
     }
   };
 
@@ -480,6 +530,24 @@ export default function CustomerHistory() {
                               </StatusChip>
                             </div>
                           </div>
+
+                          {/* Timer and Cancel for Pending Bookings */}
+                          {booking.status === 'Pending' && booking.createdAt && (
+                            <div className="mt-4 flex flex-col items-center gap-3">
+                              <BookingTimer
+                                createdAt={booking.createdAt}
+                                durationMinutes={1}
+                                onExpire={() => handleTimerExpire(booking.id)}
+                              />
+                              <button
+                                onClick={() => handleCancelBookingClick(booking)}
+                                disabled={cancellingBookingId === booking.id}
+                                className="px-6 py-2 bg-error-bg hover:bg-error-hover text-error-text border-2 border-error-border rounded-lg text-body-small font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {cancellingBookingId === booking.id ? 'Cancelling...' : 'Cancel Booking'}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -736,6 +804,7 @@ export default function CustomerHistory() {
                               <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Type</th>
                               <th className="text-right p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Price</th>
                               <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Status</th>
+                              <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Timer</th>
                               <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Actions</th>
                             </tr>
                           </thead>
@@ -779,12 +848,36 @@ export default function CustomerHistory() {
                                   </StatusChip>
                                 </td>
                                 <td className="p-4 text-center">
-                                  <button
-                                    onClick={() => handleViewBooking(booking)}
-                                    className="px-4 py-2 bg-sage-500 hover:bg-sage-600 dark:bg-sage-700 dark:hover:bg-sage-600 text-cream-50 rounded-md text-body-small transition-colors"
-                                  >
-                                    View
-                                  </button>
+                                  {booking.status === 'Pending' && booking.createdAt && (
+                                    <BookingTimer
+                                      createdAt={booking.createdAt}
+                                      durationMinutes={1}
+                                      onExpire={() => handleTimerExpire(booking.id)}
+                                      compact={true}
+                                    />
+                                  )}
+                                  {booking.status !== 'Pending' && (
+                                    <span className="text-charcoal-400 dark:text-charcoal-300 text-label-small">—</span>
+                                  )}
+                                </td>
+                                <td className="p-4 text-center">
+                                  <div className="flex items-center justify-center gap-2">
+                                    <button
+                                      onClick={() => handleViewBooking(booking)}
+                                      className="px-4 py-2 bg-sage-500 hover:bg-sage-600 dark:bg-sage-700 dark:hover:bg-sage-600 text-cream-50 rounded-md text-body-small transition-colors"
+                                    >
+                                      View
+                                    </button>
+                                    {booking.status === 'Pending' && (
+                                      <button
+                                        onClick={() => handleCancelBookingClick(booking)}
+                                        disabled={cancellingBookingId === booking.id}
+                                        className="px-4 py-2 bg-error-bg hover:bg-error-hover text-error-text border border-error-border rounded-md text-body-small transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                      >
+                                        {cancellingBookingId === booking.id ? 'Cancelling...' : 'Cancel'}
+                                      </button>
+                                    )}
+                                  </div>
                                 </td>
                               </tr>
                             ))}
@@ -891,6 +984,8 @@ export default function CustomerHistory() {
         booking={viewBookingModal.booking}
         onOpenReview={handleOpenReview}
         hasReview={viewBookingModal.booking ? bookingHasReview(viewBookingModal.booking.id) : false}
+        onCancelBooking={handleCancelBookingClick}
+        onTimerExpire={handleTimerExpire}
       />
 
       <ServiceReviewModal
@@ -899,6 +994,59 @@ export default function CustomerHistory() {
         booking={reviewModal.booking}
         onSubmit={handleSubmitReview}
       />
+
+      {/* Cancel Booking Confirmation Dialog */}
+      {showCancelDialog && cancelBookingData && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-cream-50 dark:bg-charcoal-600 rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="p-6 border-b border-grey-stroke dark:border-charcoal-400">
+              <h3 className="text-card-h2 text-charcoal-600 dark:text-white font-bold">
+                Cancel Booking?
+              </h3>
+              <p className="text-body-small text-charcoal-400 dark:text-charcoal-300 mt-2">
+                Booking ID: #{cancelBookingData.id} - {cancelBookingData.serviceName}
+              </p>
+            </div>
+
+            <div className="p-6">
+              <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">
+                Reason for cancellation *
+              </label>
+              <textarea
+                value={cancellationReason}
+                onChange={(e) => setCancellationReason(e.target.value)}
+                placeholder="E.g., Changed my mind, Found another provider, etc."
+                className="w-full h-24 border-2 border-grey-stroke dark:border-charcoal-400 dark:bg-charcoal-500 dark:text-white rounded-xl p-3 text-body-small resize-none focus:border-sage-500 focus:outline-none"
+                maxLength={200}
+                autoFocus
+              />
+              <p className="text-label-small text-charcoal-400 dark:text-charcoal-300 mt-2">
+                {cancellationReason.length}/200 characters
+              </p>
+            </div>
+
+            <div className="p-6 pt-0 flex gap-3">
+              <button
+                onClick={() => {
+                  setShowCancelDialog(false);
+                  setCancellationReason('');
+                  setCancelBookingData(null);
+                }}
+                className="flex-1 px-4 py-2 bg-grey-200 dark:bg-charcoal-400 text-charcoal-600 dark:text-white font-bold rounded-xl hover:bg-grey-300 dark:hover:bg-charcoal-300 transition-all"
+              >
+                Keep Booking
+              </button>
+              <button
+                onClick={handleConfirmCancelBooking}
+                disabled={!cancellationReason.trim() || cancellingBookingId}
+                className="flex-1 px-4 py-2 bg-error-bg text-error-text border-2 border-error-border font-bold rounded-xl hover:bg-error-hover transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {cancellingBookingId ? 'Cancelling...' : 'Confirm Cancel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

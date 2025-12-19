@@ -974,6 +974,17 @@ namespace Beyti_Backend.Controllers.Api
                     booking.PaymentType = paymentTypeProp.GetString();
                 }
 
+                // Handle cancellation fields
+                if (body.TryGetProperty("canceledBy", out var canceledByProp))
+                {
+                    booking.CanceledBy = canceledByProp.GetString();
+                }
+
+                if (body.TryGetProperty("cancellationReason", out var cancellationReasonProp))
+                {
+                    booking.CancellationReason = cancellationReasonProp.GetString();
+                }
+
                 booking.UpdatedAt = DateTime.Now;
                 await _context.SaveChangesAsync();
 
@@ -1014,6 +1025,7 @@ namespace Beyti_Backend.Controllers.Api
                 "Completed" => $"Your service \"{serviceName}\" has been completed. Please leave a review!",
                 "Rejected" => $"Unfortunately, your booking for \"{serviceName}\" has been rejected. Please contact us for more information.",
                 "Canceled" => $"Your booking for \"{serviceName}\" has been canceled.",
+                "Cancelled" => $"Your booking for \"{serviceName}\" has been cancelled.",
                 "DepositPending" => $"Your quote for \"{serviceName}\" is ready! Please pay the deposit to confirm your booking.",
                 _ => $"Your booking status has been updated to {status}."
             };

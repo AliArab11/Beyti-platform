@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { getProviderBookings, updateBookingStatus, getProviderTimeSlots } from '../../../services/api';
 import CRUDButton from '../../../components/CRUDButton';
 import StatusChip from '../../../components/StatusChip';
+import BookingTimer from '../../../components/BookingTimer';
 import { logProviderActivity } from '../../../utils/providerActivityLogger';
 import { Calendar } from '@phosphor-icons/react';
 
@@ -426,6 +427,29 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
                         </div>
                       </div>
 
+                      {/* Timer for Pending Bookings */}
+                      {booking.status === 'Pending' && booking.createdAt && (
+                        <div className="mb-3">
+                          <BookingTimer
+                            createdAt={booking.createdAt}
+                            durationMinutes={1}
+                            onExpire={async () => {
+                              console.log('Booking expired, auto-cancelling booking #' + booking.id);
+                              try {
+                                await updateBookingStatus(booking.id, {
+                                  status: 'Cancelled',
+                                  canceledBy: 'System',
+                                  cancellationReason: 'No response from provider within time limit'
+                                });
+                                await fetchBookings(); // Refresh to show updated status
+                              } catch (error) {
+                                console.error('Error auto-cancelling booking:', error);
+                              }
+                            }}
+                          />
+                        </div>
+                      )}
+
                       {/* Action Buttons */}
                       <div className="flex gap-2">
                         {booking.status === 'Pending' && (
@@ -450,42 +474,14 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
                             >
                               Reject
                             </CRUDButton>
-                          </>
-                        )}
-                        {booking.status === 'PendingQuote' && (
-                          <>
                             <CRUDButton
-                              variant="success"
-                              onClick={() => {
-                                setSelectedBooking(booking);
-                                setShowQuoteModal(true);
-                              }}
+                              variant="secondary"
+                              onClick={() => setSelectedBooking(booking)}
                             >
-                              Send Quote
-                            </CRUDButton>
-                            <CRUDButton
-                              variant="error"
-                              onClick={() => {
-                                if (confirm('Reject this booking?')) {
-                                  handleStatusChange(booking.id, 'Rejected');
-                                }
-                              }}
-                            >
-                              Reject
+                              View Details
                             </CRUDButton>
                           </>
                         )}
-                        {booking.status === 'DepositPending' && (
-                          <div className="text-warning-text text-label-medium px-4 py-2 bg-warning-bg rounded-lg border border-warning-border">
-                            Awaiting Payment
-                          </div>
-                        )}
-                        <CRUDButton
-                          variant="secondary"
-                          onClick={() => setSelectedBooking(booking)}
-                        >
-                          View Details
-                        </CRUDButton>
                       </div>
                     </div>
                   </div>
@@ -556,7 +552,7 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
                     <option value="Confirmed">Confirmed</option>
                     <option value="InProgress">In Progress</option>
                     <option value="Completed">Completed</option>
-                    <option value="Canceled">Canceled</option>
+                    <option value="Cancelled">Cancelled</option>
                     <option value="Rejected">Rejected</option>
                   </select>
                 </div>
@@ -921,7 +917,30 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
                       {/* Actions */}
                       <td className="px-6 py-4">
                         <div className="flex flex-col gap-2 min-w-[140px]">
-                          {/* Pending Status */}
+                          {/* Show Timer for Pending bookings */}
+                          {booking.status === 'Pending' && booking.createdAt && (
+                            <div className="mb-2">
+                              <BookingTimer
+                                createdAt={booking.createdAt}
+                                durationMinutes={1}
+                                onExpire={async () => {
+                                  console.log('Booking expired, auto-cancelling booking #' + booking.id);
+                                  try {
+                                    await updateBookingStatus(booking.id, {
+                                      status: 'Cancelled',
+                                      canceledBy: 'System',
+                                      cancellationReason: 'No response from provider within time limit'
+                                    });
+                                    await fetchBookings(); // Refresh to show updated status
+                                  } catch (error) {
+                                    console.error('Error auto-cancelling booking:', error);
+                                  }
+                                }}
+                              />
+                            </div>
+                          )}
+
+                          {/* Pending Status - Accept/Reject */}
                           {booking.status === 'Pending' && (
                             <>
                               <CRUDButton
@@ -949,84 +968,45 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
                             </>
                           )}
 
-                          {/* PendingQuote Status */}
-                          {booking.status === 'PendingQuote' && (
-                            <>
-                              <CRUDButton
-                                variant="success"
-                                onClick={() => {
-                                  setSelectedBooking(booking);
-                                  setShowQuoteModal(true);
-                                }}
-                                className="w-full text-center"
-                              >
-                                Send Quote
-                              </CRUDButton>
-                              <CRUDButton
-                                variant="error"
-                                onClick={() => {
-                                  if (confirm('Are you sure you want to reject this booking?')) {
-                                    handleStatusChange(booking.id, 'Rejected');
-                                  }
-                                }}
-                                className="w-full text-center"
-                              >
-                                Reject
-                              </CRUDButton>
-                            </>
-                          )}
-
-                          {/* DepositPending Status */}
-                          {booking.status === 'DepositPending' && (
-                            <span className="text-warning-text text-label-medium text-center">
-                              Awaiting Payment
-                            </span>
-                          )}
-
-                          {/* Confirmed Status */}
+                          {/* Confirmed Status - Start Service */}
                           {booking.status === 'Confirmed' && (
                             <CRUDButton
-                              variant="warning"
-                              onClick={() => handleStatusChange(booking.id, 'InProgress')}
+                              variant="success"
+                              onClick={() => {
+                                if (confirm('Start the service now?')) {
+                                  handleStatusChange(booking.id, 'InProgress');
+                                }
+                              }}
                               className="w-full text-center"
                             >
                               Start Service
                             </CRUDButton>
                           )}
 
-                          {/* InProgress Status */}
+                          {/* InProgress Status - End Service & Enter Price */}
                           {booking.status === 'InProgress' && (
                             <CRUDButton
                               variant="success"
                               onClick={() => {
                                 setSelectedBooking(booking);
                                 setShowCompleteModal(true);
+                                setFinalPrice(booking.quotedPrice || '');
                               }}
                               className="w-full text-center"
                             >
-                              Complete
+                              End Service
                             </CRUDButton>
                           )}
 
-                          {/* Completed Status */}
-                          {booking.status === 'Completed' && (
-                            <span className="text-success-text text-label-medium text-center">
-                              ✓ Completed
-                            </span>
-                          )}
-
-                          {/* Rejected Status */}
-                          {booking.status === 'Rejected' && (
-                            <span className="text-error-text text-label-medium text-center">
-                              ✗ Rejected
-                            </span>
-                          )}
-
-                          {/* Canceled Status */}
-                          {booking.status === 'Canceled' && (
-                            <span className="text-charcoal-400 text-label-medium text-center">
-                              Canceled
-                            </span>
+                          {/* All other statuses - View button only */}
+                          {!['Pending', 'Confirmed', 'InProgress'].includes(booking.status) && (
+                            <CRUDButton
+                              variant="secondary"
+                              onClick={() => setSelectedBooking(booking)}
+                              className="w-full text-center"
+                            >
+                              View
+                            </CRUDButton>
                           )}
                         </div>
                       </td>
@@ -1196,6 +1176,7 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
 
               {/* Action Buttons */}
               <div className="flex gap-3 pt-4 border-t border-grey-stroke dark:border-charcoal-500">
+                {/* Pending - Confirm or Reject */}
                 {selectedBooking.status === 'Pending' && (
                   <>
                     <CRUDButton
@@ -1225,38 +1206,15 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
                   </>
                 )}
 
-                {selectedBooking.status === 'PendingQuote' && (
-                  <>
-                    <CRUDButton
-                      variant="success"
-                      onClick={() => {
-                        setShowQuoteModal(true);
-                      }}
-                      className="flex-1"
-                    >
-                      Send Quote
-                    </CRUDButton>
-                    <CRUDButton
-                      variant="error"
-                      onClick={() => {
-                        if (confirm('Are you sure you want to reject this booking?')) {
-                          handleStatusChange(selectedBooking.id, 'Rejected');
-                          setSelectedBooking(null);
-                        }
-                      }}
-                      className="flex-1"
-                    >
-                      Reject
-                    </CRUDButton>
-                  </>
-                )}
-
+                {/* Confirmed - Start Service */}
                 {selectedBooking.status === 'Confirmed' && (
                   <CRUDButton
-                    variant="warning"
+                    variant="success"
                     onClick={() => {
-                      handleStatusChange(selectedBooking.id, 'InProgress');
-                      setSelectedBooking(null);
+                      if (confirm('Start the service now?')) {
+                        handleStatusChange(selectedBooking.id, 'InProgress');
+                        setSelectedBooking(null);
+                      }
                     }}
                     className="flex-1"
                   >
@@ -1264,15 +1222,17 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
                   </CRUDButton>
                 )}
 
+                {/* InProgress - End Service */}
                 {selectedBooking.status === 'InProgress' && (
                   <CRUDButton
                     variant="success"
                     onClick={() => {
                       setShowCompleteModal(true);
+                      setFinalPrice(selectedBooking.quotedPrice || '');
                     }}
                     className="flex-1"
                   >
-                    Complete Service
+                    End Service & Enter Price
                   </CRUDButton>
                 )}
 

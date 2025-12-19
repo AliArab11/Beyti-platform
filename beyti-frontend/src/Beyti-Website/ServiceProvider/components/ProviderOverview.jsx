@@ -33,6 +33,14 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
     if (serviceProviderId) {
       fetchDashboardData();
       loadRecentActivity();
+
+      // Set up automatic refresh every 10 seconds to update pending requests count
+      // This ensures the count updates when timers expire and bookings are auto-cancelled
+      const refreshInterval = setInterval(() => {
+        fetchDashboardData(false); // Don't show loading spinner on automatic refreshes
+      }, 10000); // Refresh every 10 seconds
+
+      return () => clearInterval(refreshInterval);
     }
   }, [serviceProviderId]);
 
@@ -50,9 +58,11 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
     setRecentActivity(activities.slice(0, 4));
   };
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = async (showLoadingSpinner = true) => {
     try {
-      setLoading(true);
+      if (showLoadingSpinner) {
+        setLoading(true);
+      }
 
       // Fetch statistics and bookings
       const [statisticsData, allBookings] = await Promise.all([

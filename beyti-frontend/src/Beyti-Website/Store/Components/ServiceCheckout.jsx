@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { X, MapPin, Calendar, Clock, CalendarCheck } from '@phosphor-icons/react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import BookingConfirmationModal from '../../../components/BookingConfirmationModal';
+import { cancelServiceBooking } from '../../../services/api';
 
 const ServiceCheckout = ({ bookingData, onClose }) => {
   const [step, setStep] = useState(1); // 1: Date & Time, 2: Address, 3: Notes
@@ -17,6 +19,9 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
   const [addresses, setAddresses] = useState([]);
   const [loadingAddresses, setLoadingAddresses] = useState(false);
   const [notes, setNotes] = useState('');
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [createdBooking, setCreatedBooking] = useState(null);
+  const [showAreYouSureDialog, setShowAreYouSureDialog] = useState(false);
 
   // New address form
   const [newAddress, setNewAddress] = useState({
@@ -347,7 +352,8 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
     if (step < 3) {
       setStep(step + 1);
     } else {
-      handlePlaceBooking();
+      // Show "Are you sure?" dialog before placing booking
+      setShowAreYouSureDialog(true);
     }
   };
 
@@ -400,8 +406,20 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
       });
 
       if (response.ok) {
-        alert('Booking placed successfully! The service provider will confirm your appointment.');
-        onClose();
+        const booking = await response.json();
+        // Enrich booking with service and provider details for display
+        const enrichedBooking = {
+          ...booking,
+          serviceName: bookingData.serviceName,
+          category: bookingData.category,
+          serviceType: bookingData.serviceType || 'Scheduled',
+          businessName: bookingData.serviceProviderName || bookingData.businessName,
+          providerName: bookingData.serviceProviderName || bookingData.providerName,
+          quotedPrice: bookingData.minPrice,
+          address: selectedAddress
+        };
+        setCreatedBooking(enrichedBooking);
+        setShowConfirmationModal(true);
       } else {
         const errorText = await response.text();
         console.error('Booking error response:', errorText);
@@ -421,9 +439,91 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
     return `${slot.startTime} - ${slot.endTime}`;
   };
 
+  const handleCancelBooking = async (bookingId, currentBooking, canceledBy, cancellationReason) => {
+    try {
+      await cancelServiceBooking(bookingId, currentBooking, canceledBy, cancellationReason);
+      alert('Booking cancelled successfully.');
+      setShowConfirmationModal(false);
+      onClose();
+    } catch (error) {
+      console.error('Error cancelling booking:', error);
+      throw error;
+    }
+  };
+
   const estimatedPrice = bookingData?.minPrice || 0;
 
   return (
+    <>
+      {/* Booking Confirmation Modal */}
+      {createdBooking && (
+        <BookingConfirmationModal
+          isOpen={showConfirmationModal}
+          onClose={() => {
+            setShowConfirmationModal(false);
+            onClose();
+          }}
+          booking={createdBooking}
+          onCancel={handleCancelBooking}
+        />
+      )}
+
+      {/* Are You Sure Dialog */}
+      {showAreYouSureDialog && (
+        <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <h3 className="text-xl font-bold text-charcoal-600 mb-3" style={{ fontFamily: 'Merriweather, serif' }}>
+              Confirm Your Booking
+            </h3>
+            <p className="text-sm text-charcoal-500 mb-6" style={{ fontFamily: 'Inter, sans-serif' }}>
+              Are you sure you want to proceed with this booking?
+            </p>
+
+            {/* Booking Summary */}
+            <div className="bg-cream-50 rounded-xl p-4 mb-6 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-charcoal-500">Service:</span>
+                <span className="font-semibold text-charcoal-600">{bookingData?.serviceName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-charcoal-500">Date:</span>
+                <span className="font-semibold text-charcoal-600">{selectedDate && formatDate(selectedDate)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-charcoal-500">Time:</span>
+                <span className="font-semibold text-charcoal-600">{selectedTimeSlot && formatTimeSlot(selectedTimeSlot)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-charcoal-500">Price:</span>
+                <span className="font-semibold text-sage-600">BD {estimatedPrice.toFixed(2)}</span>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowAreYouSureDialog(false)}
+                className="flex-1 px-4 py-2.5 bg-grey-200 text-charcoal-600 font-bold rounded-xl hover:bg-grey-300 transition-all text-sm"
+                style={{ fontFamily: 'Inter, sans-serif' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowAreYouSureDialog(false);
+                  handlePlaceBooking();
+                }}
+                className="flex-1 px-4 py-2.5 bg-sage-500 text-white font-bold rounded-xl hover:bg-sage-600 transition-all text-sm"
+                style={{ fontFamily: 'Inter, sans-serif' }}
+              >
+                Yes, Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Only show checkout modal if confirmation modal is not open */}
+      {!showConfirmationModal && (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-cream-50 rounded-3xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-hidden flex flex-col">
         {/* Header */}
@@ -780,7 +880,9 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
           </div>
         </div>
       )}
-    </div>
+      </div>
+      )}
+    </>
   );
 };
 

@@ -1,9 +1,22 @@
 import { X, Scissors, MapPin, CreditCard, Calendar, Clock } from '@phosphor-icons/react';
 import Button from './Button';
 import StatusChip from './StatusChip';
+import BookingTimer from './BookingTimer';
 
-export default function ViewServiceBookingModal({ isOpen, onClose, booking, onOpenReview, hasReview }) {
+export default function ViewServiceBookingModal({ isOpen, onClose, booking, onOpenReview, hasReview, onCancelBooking, onTimerExpire }) {
   if (!isOpen || !booking) return null;
+
+  const handleCancelClick = () => {
+    if (onCancelBooking) {
+      onCancelBooking(booking);
+    }
+  };
+
+  const handleTimerExpireLocal = () => {
+    if (onTimerExpire) {
+      onTimerExpire(booking.id);
+    }
+  };
 
   const formatDate = (dateString) => {
     if (!dateString) return '—';
@@ -44,6 +57,7 @@ export default function ViewServiceBookingModal({ isOpen, onClose, booking, onOp
       case 'InProgress':
         return 'brand';
       case 'Canceled':
+      case 'Cancelled':
       case 'Rejected':
         return 'error';
       default:
@@ -75,6 +89,27 @@ export default function ViewServiceBookingModal({ isOpen, onClose, booking, onOp
 
         {/* Content */}
         <div className="p-6 space-y-6">
+          {/* Timer for Pending Bookings */}
+          {booking.status === 'Pending' && booking.createdAt && (
+            <div className="bg-warning-bg border-2 border-warning-border rounded-lg p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-body-medium text-charcoal-600 dark:text-white font-semibold mb-1">
+                    Provider Response Timer
+                  </p>
+                  <p className="text-label-small text-charcoal-400 dark:text-charcoal-300">
+                    Booking will auto-cancel if provider doesn't respond
+                  </p>
+                </div>
+                <BookingTimer
+                  createdAt={booking.createdAt}
+                  durationMinutes={1}
+                  onExpire={handleTimerExpireLocal}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Status and Booking Date */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-grey-200 dark:bg-charcoal-500 rounded-lg p-4">
@@ -210,6 +245,31 @@ export default function ViewServiceBookingModal({ isOpen, onClose, booking, onOp
             </div>
           )}
 
+          {/* Cancellation Information */}
+          {(booking.status === 'Canceled' || booking.status === 'Cancelled') && (booking.canceledBy || booking.cancellationReason) && (
+            <div className="bg-error-bg dark:bg-error-bg/20 border-2 border-error-border dark:border-error-border rounded-lg p-4">
+              <h3 className="text-card-h3 text-error-text dark:text-error-text mb-4">Cancellation Details</h3>
+              <div className="space-y-3">
+                {booking.canceledBy && (
+                  <div className="flex justify-between">
+                    <span className="text-body-regular text-charcoal-600 dark:text-charcoal-300">Cancelled By:</span>
+                    <span className="text-body-regular text-charcoal-600 dark:text-cream-50 font-medium">
+                      {booking.canceledBy}
+                    </span>
+                  </div>
+                )}
+                {booking.cancellationReason && (
+                  <div className="pt-2 border-t border-error-border dark:border-error-border/50">
+                    <span className="text-body-regular text-charcoal-600 dark:text-charcoal-300 block mb-2">Reason:</span>
+                    <p className="text-body-regular text-charcoal-600 dark:text-cream-50">
+                      {booking.cancellationReason}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Notes */}
           {booking.notes && (
             <div className="bg-grey-200 dark:bg-charcoal-500 rounded-lg p-4">
@@ -223,6 +283,14 @@ export default function ViewServiceBookingModal({ isOpen, onClose, booking, onOp
 
         {/* Footer */}
         <div className="sticky bottom-0 bg-cream-50 dark:bg-charcoal-600 border-t border-grey-stroke dark:border-charcoal-400 p-6 flex justify-end gap-3">
+          {booking.status === 'Pending' && onCancelBooking && (
+            <Button
+              variant="danger"
+              onClick={handleCancelClick}
+            >
+              Cancel Booking
+            </Button>
+          )}
           {booking.status === 'Completed' && !hasReview && onOpenReview && (
             <Button
               variant="secondary"

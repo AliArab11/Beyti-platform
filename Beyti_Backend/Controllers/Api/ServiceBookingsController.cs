@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using BeytiDB.Data;
 using Beyti_Backend.Services;
-
+ 
 namespace Beyti_Backend.Controllers.Api
 {
     [Route("api/[controller]")]
@@ -86,6 +86,8 @@ namespace Beyti_Backend.Controllers.Api
                     b.CustomerId,
                     b.ServiceProviderId,
                     b.ServiceCatalogId,
+                    b.ServiceId,
+                    b.ServiceAddressId,
                     b.TimeSlotId,
                     b.BookingDateTime,
                     serviceDate = b.BookingDateTime.Date,
@@ -96,6 +98,9 @@ namespace Beyti_Backend.Controllers.Api
                     b.FinalPrice,
                     b.PaymentType,
                     b.Notes,
+                    b.CanceledBy,
+                    b.CancellationReason,
+                    b.CancellationFee,
                     b.CreatedAt,
                     b.UpdatedAt,
                     providerName = b.ServiceProvider.UserProfile.DisplayName,

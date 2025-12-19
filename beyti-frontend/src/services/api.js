@@ -2232,6 +2232,44 @@ export const updateServiceBooking = async (id, data) => {
   });
 };
 
+/**
+ * Cancel a service booking
+ * @param {number} id - Service booking ID
+ * @param {object} currentBooking - Current booking object with all fields
+ * @param {string} canceledBy - Name of the person/system canceling
+ * @param {string} cancellationReason - Reason for cancellation
+ * @returns {Promise<Object>} - Updated service booking object
+ */
+export const cancelServiceBooking = async (id, currentBooking, canceledBy, cancellationReason) => {
+  // Extract only the fields needed for the update
+  // DO NOT send navigation properties (address, customer, serviceProvider, etc.)
+  const cleanedBooking = {
+    id: currentBooking.id,
+    customerId: currentBooking.customerId,
+    serviceProviderId: currentBooking.serviceProviderId,
+    serviceCatalogId: currentBooking.serviceCatalogId,
+    serviceId: currentBooking.serviceId || null,
+    serviceAddressId: currentBooking.serviceAddressId,
+    timeSlotId: currentBooking.timeSlotId,
+    bookingDateTime: currentBooking.bookingDateTime,
+    serviceType: currentBooking.serviceType,
+    quotedPrice: currentBooking.quotedPrice || null,
+    finalPrice: currentBooking.finalPrice || null,
+    paymentType: currentBooking.paymentType,
+    notes: currentBooking.notes,
+    createdAt: currentBooking.createdAt,
+    // Update status and cancellation fields
+    status: 'Cancelled',
+    canceledBy: canceledBy,
+    cancellationReason: cancellationReason
+  };
+
+  return await fetchAPI(`/ServiceBookings/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(cleanedBooking),
+  });
+};
+
 // ================== AUDIT LOGS API ==================
 
 /**
