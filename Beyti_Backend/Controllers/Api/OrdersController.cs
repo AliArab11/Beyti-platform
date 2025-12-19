@@ -370,6 +370,8 @@ namespace Beyti_Backend.Controllers.Api
                     relatedEntityType: "Order",
                     relatedEntityId: order.Id
                 );
+            }
+
             // Create delivery ticket immediately if delivery order
             if (order.FulfillmentType == "Delivery")
             {
@@ -712,10 +714,10 @@ namespace Beyti_Backend.Controllers.Api
                 await _context.SaveChangesAsync();
 
                 // Send notification to customer about the status change
-                if (!string.IsNullOrEmpty(customerVisibleStatus) && order.Customer?.UserProfile != null)
+                if (!string.IsNullOrEmpty(dto.Status) && order.Customer?.UserProfile != null)
                 {
                     var sellerName = order.Seller?.UserProfile?.DisplayName ?? "seller";
-                    var notificationMessage = GetOrderStatusNotificationMessage(customerVisibleStatus, sellerName, order.Id);
+                    var notificationMessage = GetOrderStatusNotificationMessage(dto.Status, sellerName, order.Id);
 
                     await _notificationService.SendNotificationAsync(
                         recipientUserId: order.Customer.UserProfile.Id,
@@ -911,6 +913,8 @@ namespace Beyti_Backend.Controllers.Api
                 "Cancelled" => $"Unfortunately, your order #{orderId} from {sellerName} has been cancelled. Please contact the seller for more information.",
                 _ => $"Your order #{orderId} status has been updated to: {status}"
             };
+        }
+
         private async Task<bool> OfferToNextClosestDriver(int ticketId)
         {
             try
