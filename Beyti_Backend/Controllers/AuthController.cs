@@ -66,8 +66,8 @@ namespace Beyti_Backend.Controllers
                     DisplayName = $"{model.FirstName} {model.LastName}".Trim(),
                     RoleType = "Pending", // ✅ FIX: Pending until user selects role
                     Status = "Active",
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.Now,
+                    UpdatedAt = DateTime.Now
                 };
 
                 _businessContext.UserProfiles.Add(userProfile);

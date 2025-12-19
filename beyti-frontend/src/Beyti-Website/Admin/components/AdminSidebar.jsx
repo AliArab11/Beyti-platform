@@ -17,7 +17,8 @@ import {
   Tag,
   Briefcase,
   Bell,
-  ClockClockwise
+  ClockClockwise,
+  Megaphone
 } from '@phosphor-icons/react';
 import NavigationButton from '../../../components/NavigationButton';
 
@@ -84,6 +85,14 @@ const AdminSidebar = ({ currentPage, onNavigate }) => {
           onClick={() => onNavigate('/admin/category-moderation')}
         >
           Categories
+        </NavigationButton>
+
+        <NavigationButton
+          selected={currentPage === 'announcements'}
+          icon={<Megaphone size={20} weight={currentPage === 'announcements' ? 'fill' : 'regular'} />}
+          onClick={() => onNavigate('/admin/announcements')}
+        >
+          Announcements
         </NavigationButton>
 
         <NavigationButton

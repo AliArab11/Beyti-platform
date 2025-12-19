@@ -531,7 +531,7 @@ namespace Beyti_Backend.Controllers.Api
 
                     profile.RoleType = "Seller";
                     profile.DisplayName = dto.StoreName;
-                    profile.UpdatedAt = DateTime.UtcNow;
+                    profile.UpdatedAt = DateTime.Now;
 
                     // Delete orphaned Customer record if exists
                     var existingCustomer = await _context.Customers
@@ -551,8 +551,8 @@ namespace Beyti_Backend.Controllers.Api
                         DisplayName = dto.StoreName,
                         RoleType = "Seller",
                         Status = "Active",
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
+                        CreatedAt = DateTime.Now,
+                        UpdatedAt = DateTime.Now
                     };
 
                     _context.UserProfiles.Add(profile);
@@ -563,8 +563,8 @@ namespace Beyti_Backend.Controllers.Api
                 {
                     UserProfileId = profile.Id,
                     Phone = dto.Phone,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.Now,
+                    UpdatedAt = DateTime.Now
                 };
 
                 _context.Sellers.Add(seller);
@@ -605,8 +605,8 @@ namespace Beyti_Backend.Controllers.Api
 
                 seller.UserProfile.DisplayName = dto.StoreName;
                 seller.Phone = dto.Phone;
-                seller.UpdatedAt = DateTime.UtcNow;
-                seller.UserProfile.UpdatedAt = DateTime.UtcNow;
+                seller.UpdatedAt = DateTime.Now;
+                seller.UserProfile.UpdatedAt = DateTime.Now;
 
                 await _context.SaveChangesAsync();
 
@@ -666,7 +666,7 @@ namespace Beyti_Backend.Controllers.Api
                     });
                 }
 
-                seller.UpdatedAt = DateTime.UtcNow;
+                seller.UpdatedAt = DateTime.Now;
                 await _context.SaveChangesAsync();
 
                 return Ok(new { message = "Subcategories updated successfully", subCategoryIds });
@@ -695,7 +695,7 @@ namespace Beyti_Backend.Controllers.Api
 
                 // Simple toggle
                 seller.IsOpen = !seller.IsOpen;
-                seller.UpdatedAt = DateTime.UtcNow;
+                seller.UpdatedAt = DateTime.Now;
 
                 await _context.SaveChangesAsync();
 

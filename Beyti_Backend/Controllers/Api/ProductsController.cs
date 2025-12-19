@@ -177,7 +177,7 @@ namespace Beyti_Backend.Controllers.Api
             product.StoreSectionId = dto.StoreSectionId;  // ← NEW
             product.GenderId = dto.GenderId;
             product.DiscountPercentage = dto.DiscountPercentage;
-            product.UpdatedAt = DateTime.UtcNow;
+            product.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
             return NoContent();
@@ -209,9 +209,8 @@ namespace Beyti_Backend.Controllers.Api
                 DiscountPercentage = dto.DiscountPercentage,
                 SellerId = dto.SellerId,
                 SubCategoryId = dto.SubCategoryId,
-                StoreSectionId = dto.StoreSectionId,  // ← NEW
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.Now,
+                UpdatedAt = DateTime.Now,
                 IsActive = true
             };
 
@@ -246,7 +245,7 @@ namespace Beyti_Backend.Controllers.Api
 
             // Toggle active status instead of deleting
             product.IsActive = !product.IsActive;
-            product.UpdatedAt = DateTime.UtcNow;
+            product.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 

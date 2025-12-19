@@ -8,6 +8,7 @@ namespace Beyti_Backend.Services
     public interface INotificationService
     {
         Task SendNotificationAsync(int recipientUserId, int? senderUserId, string type, string title, string body, string? relatedEntityType = null, int? relatedEntityId = null);
+        Task SendAnnouncementNotificationsAsync(int announcementId, int adminUserId, string title, string message, List<string> audiences);
     }
 
     public class NotificationService : INotificationService
@@ -54,7 +55,7 @@ namespace Beyti_Backend.Services
                 RelatedEntityType = relatedEntityType,
                 RelatedEntityId = relatedEntityId,
                 IsRead = false,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             };
 
             _context.Notifications.Add(notification);
@@ -74,6 +75,67 @@ namespace Beyti_Backend.Services
                 notification.IsRead,
                 notification.CreatedAt
             });
+        }
+
+        public async Task SendAnnouncementNotificationsAsync(
+            int announcementId,
+            int adminUserId,
+            string title,
+            string message,
+            List<string> audiences)
+        {
+            // 1. Fetch all users matching the audiences
+            var recipients = new List<int>();
+
+            foreach (var audience in audiences)
+            {
+                var users = await _context.UserProfiles
+                    .Where(u => u.RoleType == audience && u.Status == "Active")
+                    .Select(u => u.Id)
+                    .ToListAsync();
+                recipients.AddRange(users);
+            }
+
+            // Remove duplicates in case a user belongs to multiple selected audiences
+            recipients = recipients.Distinct().ToList();
+
+            // 2. Create notification for each recipient
+            var notifications = recipients.Select(recipientId => new Notification
+            {
+                RecipientUserId = recipientId,
+                SenderUserId = adminUserId,
+                Type = "Announcement",
+                Title = title,
+                Body = message,
+                RelatedEntityType = "Announcement",
+                RelatedEntityId = announcementId,
+                IsRead = false,
+                IsDeleted = false,
+                CreatedAt = DateTime.Now
+            }).ToList();
+
+            // 3. Bulk insert notifications
+            await _context.Notifications.AddRangeAsync(notifications);
+            await _context.SaveChangesAsync();
+
+            // 4. Send real-time notifications via SignalR
+            foreach (var notification in notifications)
+            {
+                await _hubContext.Clients.Group($"user_{notification.RecipientUserId}")
+                    .SendAsync("ReceiveNotification", new
+                    {
+                        id = notification.Id,
+                        recipientUserId = notification.RecipientUserId,
+                        senderUserId = notification.SenderUserId,
+                        type = notification.Type,
+                        title = notification.Title,
+                        body = notification.Body,
+                        relatedEntityType = notification.RelatedEntityType,
+                        relatedEntityId = notification.RelatedEntityId,
+                        isRead = notification.IsRead,
+                        createdAt = notification.CreatedAt
+                    });
+            }
         }
     }
 }

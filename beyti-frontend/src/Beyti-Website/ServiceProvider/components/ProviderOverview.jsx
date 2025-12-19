@@ -5,24 +5,43 @@ import { Table, TableHeader, TableBody, TableRow } from '../../../components/Tab
 import StatusChip from '../../../components/StatusChip';
 import CRUDButton from '../../../components/CRUDButton';
 import { getRecentProviderActivities } from '../../../utils/providerActivityLogger';
+import QuickAddServiceModal from './QuickAddServiceModal';
+import QuickAddScheduleModal from './QuickAddScheduleModal';
 import {
   Clock,
   Package,
   CalendarCheck,
   Calendar,
-  User
+  User,
+  Bell,
+  Plus,
+  ClockClockwise
 } from '@phosphor-icons/react';
 
-export default function ProviderOverview({ serviceProviderId, onNavigateToBookings, activityRefreshKey }) {
+export default function ProviderOverview({ serviceProviderId, onNavigateToBookings, activityRefreshKey, onNavigate }) {
   const [stats, setStats] = useState(null);
   const [todayBookings, setTodayBookings] = useState([]);
   const [recentReviews, setRecentReviews] = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Modal States
+  const [showServiceModal, setShowServiceModal] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+
   useEffect(() => {
-    fetchDashboardData();
-    loadRecentActivity();
+    if (serviceProviderId) {
+      fetchDashboardData();
+      loadRecentActivity();
+
+      // Set up automatic refresh every 10 seconds to update pending requests count
+      // This ensures the count updates when timers expire and bookings are auto-cancelled
+      const refreshInterval = setInterval(() => {
+        fetchDashboardData(false); // Don't show loading spinner on automatic refreshes
+      }, 10000); // Refresh every 10 seconds
+
+      return () => clearInterval(refreshInterval);
+    }
   }, [serviceProviderId]);
 
   // Reload activity when activityRefreshKey changes
@@ -39,9 +58,11 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
     setRecentActivity(activities.slice(0, 4));
   };
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = async (showLoadingSpinner = true) => {
     try {
-      setLoading(true);
+      if (showLoadingSpinner) {
+        setLoading(true);
+      }
 
       // Fetch statistics and bookings
       const [statisticsData, allBookings] = await Promise.all([
@@ -51,28 +72,67 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
 
       console.log('Statistics from backend:', statisticsData);
 
-      // Get today's date (start and end of day)
+      // Get today's date (start and end of day in local timezone)
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
 
-      // Filter today's bookings
-      const todaysBookings = allBookings.filter(booking => {
-        const bookingDate = new Date(booking.BookingDateTime || booking.CreatedAt);
-        return bookingDate >= today && bookingDate < tomorrow;
+      console.log('Filtering bookings for today:', {
+        todayStart: today.toISOString(),
+        tomorrowStart: tomorrow.toISOString(),
+        totalBookings: allBookings.length
       });
 
-      setTodayBookings(todaysBookings);
+      // Log all bookings to see their structure
+      console.log('All bookings data:', allBookings);
+
+      // Filter today's bookings based on BookingDateTime (scheduled time)
+      const todaysBookings = allBookings.filter(booking => {
+        // Use BookingDateTime as the primary field for scheduling
+        const bookingDateTimeStr = booking.bookingDateTime || booking.BookingDateTime;
+
+        if (!bookingDateTimeStr) {
+          console.warn('Booking missing BookingDateTime:', booking.id || booking.Id);
+          return false;
+        }
+
+        const bookingDate = new Date(bookingDateTimeStr);
+        const isToday = bookingDate >= today && bookingDate < tomorrow;
+
+        if (isToday) {
+          console.log('Found today\'s booking:', {
+            id: booking.id,
+            service: booking.serviceName,
+            customer: booking.customerName,
+            time: bookingDate.toLocaleString(),
+            status: booking.status,
+            fullBooking: booking
+          });
+        }
+
+        return isToday;
+      });
+
+      console.log(`Found ${todaysBookings.length} bookings for today`);
+
+      // Sort today's bookings by time (earliest first)
+      const sortedTodaysBookings = todaysBookings.sort((a, b) => {
+        const dateA = new Date(a.bookingDateTime || a.BookingDateTime);
+        const dateB = new Date(b.bookingDateTime || b.BookingDateTime);
+        return dateA - dateB;
+      });
+
+      setTodayBookings(sortedTodaysBookings);
 
       // Try to fetch reviews filtered by service provider
       let averageRating = 0;
       try {
         const reviews = await getServiceReviews(serviceProviderId);
-        // Sort reviews by creation date and show the last 3
+        // Sort reviews by creation date and show the last 2
         const sortedReviews = reviews
           .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-          .slice(0, 3);
+          .slice(0, 2);
         setRecentReviews(sortedReviews);
 
         // Calculate average rating from all reviews
@@ -132,7 +192,7 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
 
   const formatTime = (dateString) => {
     const date = new Date(dateString);
-    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
   };
 
   const renderStarRating = (rating) => {
@@ -184,6 +244,35 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
 
   return (
     <div className="space-y-8">
+      {/* Pending Requests Alert - Similar to Admin Flagged Users */}
+      {stats && stats.pendingRequests > 0 && (
+        <div
+          onClick={() => onNavigateToBookings && onNavigateToBookings('Pending')}
+          className="bg-warning-bg border-2 border-warning-stroke rounded-lg p-4 cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.01]"
+        >
+          <div className="flex items-center gap-4">
+            <div className="flex-shrink-0">
+              <div className="w-12 h-12 bg-warning-text rounded-full flex items-center justify-center animate-pulse">
+                <CalendarCheck size={24} className="text-white" weight="fill" />
+              </div>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-card-h3 text-charcoal-600 dark:text-white font-semibold">
+                {stats.pendingRequests} Pending Booking Request{stats.pendingRequests > 1 ? 's' : ''}
+              </h3>
+              <p className="text-body-regular text-charcoal-400 dark:text-gray-400 mt-1">
+                Click here to review and respond to pending booking requests
+              </p>
+            </div>
+            <div className="flex-shrink-0">
+              <span className="text-body-medium text-warning-text font-semibold">
+                Review Now →
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Row - Today's Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <AnalyticsCard
@@ -191,7 +280,7 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
           metrics={[
             {
               value: loading ? '...' : stats.todayBookings.toString(),
-              label: 'Scheduled for Today'
+              label: new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
             }
           ]}
         />
@@ -206,15 +295,20 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
           ]}
         />
 
-        <AnalyticsCard
-          title="Pending Requests"
-          metrics={[
-            {
-              value: loading ? '...' : stats.pendingRequests.toString(),
-              label: 'Awaiting Confirmation'
-            }
-          ]}
-        />
+        <div
+          onClick={() => stats.pendingRequests > 0 && onNavigateToBookings && onNavigateToBookings('Pending')}
+          className={stats.pendingRequests > 0 ? 'cursor-pointer transition-transform hover:scale-105' : ''}
+        >
+          <AnalyticsCard
+            title="Pending Requests"
+            metrics={[
+              {
+                value: loading ? '...' : stats.pendingRequests.toString(),
+                label: stats.pendingRequests > 0 ? 'Click to Review' : 'Awaiting Confirmation'
+              }
+            ]}
+          />
+        </div>
 
         <AnalyticsCard
           title="Total Earnings"
@@ -230,13 +324,13 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
       {/* Today's Bookings Table */}
       <div>
         <Table
-          title="Today's Bookings"
+          title={`Today's Schedule - ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}`}
           actionButton={
             <CRUDButton
               variant="success"
-              onClick={() => onNavigateToBookings && onNavigateToBookings(null)}
+              onClick={() => onNavigateToBookings && onNavigateToBookings('schedule')}
             >
-              View All Bookings
+              View Schedule
             </CRUDButton>
           }
         >
@@ -257,26 +351,26 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
               />
             ) : todayBookings.length === 0 ? (
               <TableRow
-                data={['No bookings scheduled for today', '', '', '', '', '']}
+                data={[`No bookings scheduled for ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}`, '', '', '', '', '']}
               />
             ) : (
               todayBookings.map((booking) => (
                 <TableRow
-                  key={booking.Id}
+                  key={booking.id}
                   data={[
-                    booking.ServiceName || 'N/A',
-                    booking.CustomerName || 'N/A',
-                    formatTime(booking.BookingDateTime || booking.CreatedAt),
-                    <StatusChip variant={getStatusVariant(booking.Status)}>
-                      {booking.Status}
+                    booking.serviceName || 'N/A',
+                    booking.customerName || 'N/A',
+                    formatTime(booking.bookingDateTime || booking.BookingDateTime),
+                    <StatusChip variant={getStatusVariant(booking.status)}>
+                      {booking.status}
                     </StatusChip>,
-                    booking.QuotedPrice ? `${booking.QuotedPrice.toFixed(3)} BD` : 'Pending'
+                    booking.quotedPrice ? `${booking.quotedPrice.toFixed(3)} BD` : 'Pending'
                   ]}
                   actions={
                     <>
                       <CRUDButton
                         variant="success"
-                        onClick={() => handleViewBookingDetails(booking.Id)}
+                        onClick={() => handleViewBookingDetails(booking.id)}
                       >
                         View
                       </CRUDButton>
@@ -289,7 +383,7 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
         </Table>
       </div>
 
-      {/* Recent Activity and Recent Reviews - Side by Side */}
+      {/* Recent Activity and Quick Actions - Side by Side */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Recent Activity */}
         <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none p-6 border border-transparent dark:border-charcoal-500 transition-colors h-[500px] flex flex-col">
@@ -344,46 +438,78 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
           )}
         </div>
 
-        {/* Recent Reviews */}
+        {/* Quick Actions */}
         <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none p-6 border border-transparent dark:border-charcoal-500 transition-colors h-[500px] flex flex-col">
-          <div className="flex items-center justify-between mb-4 flex-shrink-0">
-            <h2 className="text-card-h2 text-charcoal-600 dark:text-white">Recent Reviews</h2>
-            {stats.currentRating > 0 && (
-              <div className="flex items-center gap-2">
-                {renderStarRating(stats.currentRating)}
+          <h2 className="text-card-h2 text-charcoal-600 dark:text-white mb-4">Quick Actions</h2>
+
+          {/* Quick Action Buttons */}
+          <div className="space-y-3 mb-6">
+            <button
+              onClick={() => setShowServiceModal(true)}
+              className="w-full flex items-center gap-4 p-4 bg-sage-100 dark:bg-sage-900 hover:bg-sage-200 dark:hover:bg-sage-800 rounded-lg transition-all duration-200 hover:scale-[1.02] hover:shadow-md"
+            >
+              <div className="w-10 h-10 bg-sage-500 rounded-full flex items-center justify-center flex-shrink-0">
+                <Plus size={20} className="text-white" weight="bold" />
               </div>
-            )}
+              <div className="text-left flex-1">
+                <p className="text-body-medium text-charcoal-600 dark:text-white font-semibold">Add Service</p>
+                <p className="text-label-medium text-charcoal-400 dark:text-gray-400">Create a new service offering</p>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setShowScheduleModal(true)}
+              className="w-full flex items-center gap-4 p-4 bg-cream-100 dark:bg-charcoal-500 hover:bg-cream-200 dark:hover:bg-charcoal-400 rounded-lg transition-all duration-200 hover:scale-[1.02] hover:shadow-md"
+            >
+              <div className="w-10 h-10 bg-sage-500 rounded-full flex items-center justify-center flex-shrink-0">
+                <ClockClockwise size={20} className="text-white" weight="bold" />
+              </div>
+              <div className="text-left flex-1">
+                <p className="text-body-medium text-charcoal-600 dark:text-white font-semibold">Add Timeline</p>
+                <p className="text-label-medium text-charcoal-400 dark:text-gray-400">Update your availability schedule</p>
+              </div>
+            </button>
           </div>
 
-          {loading ? (
-            <div className="flex items-center justify-center flex-1">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sage-500"></div>
+          {/* Last 2 Reviews */}
+          <div className="flex-1 flex flex-col">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-body-medium text-charcoal-600 dark:text-white font-semibold">Recent Reviews</h3>
+              {stats.currentRating > 0 && (
+                <div className="flex items-center gap-1">
+                  <span className="text-yellow-500 text-sm">★</span>
+                  <span className="text-label-medium text-charcoal-600 dark:text-white font-medium">
+                    {stats.currentRating.toFixed(1)}
+                  </span>
+                </div>
+              )}
             </div>
-          ) : recentReviews.length === 0 ? (
-            <div className="text-center flex-1 flex flex-col justify-center">
-              <span className="text-5xl text-charcoal-300 dark:text-gray-600 mb-3 block">★</span>
-              <p className="text-body-regular text-charcoal-400 dark:text-gray-400">No reviews yet</p>
-              <p className="text-label-medium text-charcoal-300 dark:text-gray-500 mt-1">
-                Complete services to receive customer reviews
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4 overflow-y-auto flex-1">
-              {recentReviews.map((review, index) => (
-                <div
-                  key={review.id || index}
-                  className="pb-4 border-b border-grey-stroke dark:border-charcoal-500 last:border-0 last:pb-0"
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <p className="text-body-medium text-charcoal-600 dark:text-white font-semibold">
+
+            {loading ? (
+              <div className="flex items-center justify-center flex-1">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-sage-500"></div>
+              </div>
+            ) : recentReviews.length === 0 ? (
+              <div className="text-center flex-1 flex flex-col justify-center">
+                <span className="text-3xl text-charcoal-300 dark:text-gray-600 mb-2 block">★</span>
+                <p className="text-label-medium text-charcoal-400 dark:text-gray-400">No reviews yet</p>
+              </div>
+            ) : (
+              <div className="space-y-3 overflow-y-auto flex-1">
+                {recentReviews.map((review, index) => (
+                  <div
+                    key={review.id || index}
+                    className="pb-3 border-b border-grey-stroke dark:border-charcoal-500 last:border-0 last:pb-0"
+                  >
+                    <div className="flex items-start justify-between mb-1">
+                      <p className="text-body-regular text-charcoal-600 dark:text-white font-medium">
                         {review.customer?.fullName || 'Customer'}
                       </p>
-                      <div className="flex items-center gap-0.5 mt-1">
+                      <div className="flex items-center gap-0.5">
                         {[1, 2, 3, 4, 5].map((star) => (
                           <span
                             key={star}
-                            className={`text-sm ${
+                            className={`text-xs ${
                               star <= (review.overallRating || 0)
                                 ? 'text-yellow-500'
                                 : 'text-charcoal-300 dark:text-gray-600'
@@ -394,21 +520,42 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
                         ))}
                       </div>
                     </div>
-                    <span className="text-label-medium text-charcoal-300 dark:text-gray-500">
+                    {review.comment && (
+                      <p className="text-label-medium text-charcoal-400 dark:text-gray-400 line-clamp-2">
+                        {review.comment}
+                      </p>
+                    )}
+                    <p className="text-label-small text-charcoal-300 dark:text-gray-500 mt-1">
                       {new Date(review.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                  {review.comment && (
-                    <p className="text-body-regular text-charcoal-400 dark:text-gray-400 mt-2">
-                      {review.comment}
                     </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Quick Add Modals */}
+      <QuickAddServiceModal
+        serviceProviderId={serviceProviderId}
+        isOpen={showServiceModal}
+        onClose={() => setShowServiceModal(false)}
+        onSuccess={() => {
+          // Optionally refresh data or navigate
+          loadRecentActivity();
+        }}
+      />
+
+      <QuickAddScheduleModal
+        serviceProviderId={serviceProviderId}
+        isOpen={showScheduleModal}
+        onClose={() => setShowScheduleModal(false)}
+        onSuccess={() => {
+          // Optionally refresh data or navigate
+          loadRecentActivity();
+        }}
+      />
     </div>
   );
 }

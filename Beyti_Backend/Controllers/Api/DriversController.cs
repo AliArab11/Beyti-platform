@@ -139,7 +139,7 @@ namespace Beyti_Backend.Controllers.Api
 
                     // Update profile to Driver role
                     profile.RoleType = "Driver";
-                    profile.UpdatedAt = DateTime.UtcNow;
+                    profile.UpdatedAt = DateTime.Now;
                 }
                 else
                 {
@@ -149,8 +149,8 @@ namespace Beyti_Backend.Controllers.Api
                         DisplayName = dto.FullName ?? dto.Email ?? "Driver",
                         RoleType = "Driver",
                         Status = dto.Status,
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
+                        CreatedAt = DateTime.Now,
+                        UpdatedAt = DateTime.Now
                     };
 
                     _context.UserProfiles.Add(profile);
@@ -162,8 +162,8 @@ namespace Beyti_Backend.Controllers.Api
                     UserProfileId = profile.Id,
                     Phone = dto.PhoneNumber,
                     Status = dto.Status,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.Now,
+                    UpdatedAt = DateTime.Now
                 };
 
                 _context.Drivers.Add(driver);
@@ -203,8 +203,8 @@ namespace Beyti_Backend.Controllers.Api
             driver.UserProfile.DisplayName = dto.FullName;
             driver.Phone = dto.PhoneNumber;
             driver.Status = dto.Status;
-            driver.UserProfile.UpdatedAt = DateTime.UtcNow;
-            driver.UpdatedAt = DateTime.UtcNow;
+            driver.UserProfile.UpdatedAt = DateTime.Now;
+            driver.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 

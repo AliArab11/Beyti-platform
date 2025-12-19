@@ -40,11 +40,11 @@ public partial class ServiceBooking
     [Column(TypeName = "decimal(10, 2)")]
     public decimal? QuotedPrice { get; set; }
 
-    [Column(TypeName = "numeric(12, 3)")]
-    public decimal? DepositAmount { get; set; }
+    [Column(TypeName = "decimal(10, 2)")]
+    public decimal? FinalPrice { get; set; }
 
-    [Column(TypeName = "numeric(12, 3)")]
-    public decimal? FinalAmount { get; set; }
+    [StringLength(20)]
+    public string? PaymentType { get; set; }
 
     [StringLength(500)]
     public string? Notes { get; set; }

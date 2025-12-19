@@ -6,7 +6,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using BeytiDB.Data;
-
+using Beyti_Backend.Services;
+ 
 namespace Beyti_Backend.Controllers.Api
 {
     [Route("api/[controller]")]
@@ -14,10 +15,12 @@ namespace Beyti_Backend.Controllers.Api
     public class ServiceBookingsController : ControllerBase
     {
         private readonly BeytiContext _context;
+        private readonly INotificationService _notificationService;
 
-        public ServiceBookingsController(BeytiContext context)
+        public ServiceBookingsController(BeytiContext context, INotificationService notificationService)
         {
             _context = context;
+            _notificationService = notificationService;
         }
 
         // GET: api/ServiceBookings
@@ -83,6 +86,8 @@ namespace Beyti_Backend.Controllers.Api
                     b.CustomerId,
                     b.ServiceProviderId,
                     b.ServiceCatalogId,
+                    b.ServiceId,
+                    b.ServiceAddressId,
                     b.TimeSlotId,
                     b.BookingDateTime,
                     serviceDate = b.BookingDateTime.Date,
@@ -90,9 +95,12 @@ namespace Beyti_Backend.Controllers.Api
                     b.Status,
                     b.ServiceType,
                     b.QuotedPrice,
-                    b.DepositAmount,
-                    b.FinalAmount,
+                    b.FinalPrice,
+                    b.PaymentType,
                     b.Notes,
+                    b.CanceledBy,
+                    b.CancellationReason,
+                    b.CancellationFee,
                     b.CreatedAt,
                     b.UpdatedAt,
                     providerName = b.ServiceProvider.UserProfile.DisplayName,
@@ -131,7 +139,7 @@ namespace Beyti_Backend.Controllers.Api
             }
 
             // Update timestamp
-            serviceBooking.UpdatedAt = DateTime.UtcNow;
+            serviceBooking.UpdatedAt = DateTime.Now;
 
             _context.Entry(serviceBooking).State = EntityState.Modified;
 
@@ -163,8 +171,13 @@ namespace Beyti_Backend.Controllers.Api
         public async Task<ActionResult<ServiceBooking>> PostServiceBooking(ServiceBooking serviceBooking)
         {
             // Set timestamps FIRST
-            serviceBooking.CreatedAt = DateTime.UtcNow;
-            serviceBooking.UpdatedAt = DateTime.UtcNow;
+            serviceBooking.CreatedAt = DateTime.Now;
+            serviceBooking.UpdatedAt = DateTime.Now;
+
+            // Debug logging for timezone verification
+            Console.WriteLine($"[ServiceBooking] Received BookingDateTime: {serviceBooking.BookingDateTime}");
+            Console.WriteLine($"[ServiceBooking] DateTime.Now: {DateTime.Now}");
+            Console.WriteLine($"[ServiceBooking] BookingDateTime Kind: {serviceBooking.BookingDateTime.Kind}");
 
             // Remove navigation properties from ModelState BEFORE any validation
             ModelState.Remove("serviceBooking.Customer");
@@ -189,6 +202,37 @@ namespace Beyti_Backend.Controllers.Api
 
                 // Update TimeSlot IsActive based on booking status
                 await UpdateTimeSlotAvailability(serviceBooking.TimeSlotId, serviceBooking.Status);
+
+                // Send notification to service provider about new booking
+                var customer = await _context.Customers
+                    .Include(c => c.UserProfile)
+                    .FirstOrDefaultAsync(c => c.Id == serviceBooking.CustomerId);
+
+                var serviceProvider = await _context.ServiceProviders
+                    .Include(sp => sp.UserProfile)
+                    .FirstOrDefaultAsync(sp => sp.Id == serviceBooking.ServiceProviderId);
+
+                var serviceCatalog = await _context.ServiceCatalogs
+                    .FirstOrDefaultAsync(sc => sc.Id == serviceBooking.ServiceCatalogId);
+
+                if (serviceProvider?.UserProfile != null && customer?.UserProfile != null)
+                {
+                    var customerName = customer.UserProfile.DisplayName ?? "A customer";
+                    var serviceName = serviceCatalog?.Name ?? "a service";
+                    var bookingDate = serviceBooking.BookingDateTime.ToString("MMM dd, yyyy") ?? "a scheduled date";
+
+                    var notificationMessage = $"New booking request #{serviceBooking.Id} from {customerName} for {serviceName} on {bookingDate}. Please review and respond.";
+
+                    await _notificationService.SendNotificationAsync(
+                        recipientUserId: serviceProvider.UserProfile.Id,
+                        senderUserId: customer.UserProfile.Id,
+                        type: "NewBooking",
+                        title: "New Service Booking",
+                        body: notificationMessage,
+                        relatedEntityType: "ServiceBooking",
+                        relatedEntityId: serviceBooking.Id
+                    );
+                }
 
                 return CreatedAtAction("GetServiceBooking", new { id = serviceBooking.Id }, serviceBooking);
             }

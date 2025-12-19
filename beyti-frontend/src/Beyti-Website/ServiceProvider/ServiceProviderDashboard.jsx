@@ -9,7 +9,7 @@ import NotificationsPage from './components/NotificationsPage';
 import ProfilePage from '../../components/ProfilePage';
 import ServiceProviderSidebar from './components/ServiceProviderSidebar';
 import PageHeader from '../../components/PageHeader';
-import { getUserProfile, updateUserProfile, updateProviderStatus } from '../../services/api';
+import { getUserProfile, updateUserProfile, updateProviderStatus, getProviderProfile } from '../../services/api';
 import { logProviderActivity } from '../../utils/providerActivityLogger';
 import { isAuthenticated, getUserId, handleSuspensionError } from '../../utils/authUtils';
 
@@ -25,17 +25,18 @@ export default function ServiceProviderDashboard() {
   const [notificationSearchQuery, setNotificationSearchQuery] = useState('');
   const [serviceSearchQuery, setServiceSearchQuery] = useState('');
   const [activityRefreshKey, setActivityRefreshKey] = useState(0);
+  const [serviceProviderId, setServiceProviderId] = useState(null);
 
   // Check authentication on mount
-  useEffect(() => {
-    if (!isAuthenticated()) {
-      navigate('/login');
-    }
-  }, [navigate]);
+  // useEffect(() => {
+  //   if (!isAuthenticated()) {
+  //     navigate('/login');
+  //   }
+  // }, [navigate]);
 
   // Get user ID from localStorage (will be replaced with context in future)
-  const userProfileId = parseInt(getUserId()) || 1;
-  const serviceProviderId = 1; // TODO: Get from API based on userProfileId
+  // const userProfileId = parseInt(getUserId()) || 1;
+  const userProfileId = 1; // Hardcoded for testing
 
   // Fetch user profile details
   const fetchUserProfile = async () => {
@@ -49,29 +50,30 @@ export default function ServiceProviderDashboard() {
       // 2. CRITICAL CHANGE: Use getProviderProfile instead of getUserProfile
       // This hits the new endpoint: GET /api/ServiceProviderDashboard/Profile/{id}
       const profile = await getProviderProfile(userProfileId);
-      
+
       console.log('[fetchUserProfile] Received provider profile:', profile);
+      console.log('[fetchUserProfile] Profile keys:', Object.keys(profile));
 
       if (profile) {
-        // 3. Map the Backend (PascalCase) data to Frontend (camelCase)
+        // 3. Map the Backend data to Frontend (check if PascalCase or camelCase)
         const normalizedProfile = {
-          id: profile.Id, // CRITICAL: This is the actual ServiceProviderId (e.g., 6)
-          userProfileId: profile.UserProfileId,
-          displayName: profile.DisplayName,
-          roleType: profile.RoleType,
-          status: profile.Status, // This is ServiceProvider.Status from the API
-          accountStatus: profile.AccountStatus, // UserProfile.Status (Active/Suspended)
-          phone: profile.Phone,
-          businessName: profile.BusinessName,
+          id: profile.id || profile.Id,
+          userProfileId: profile.userProfileId || profile.UserProfileId,
+          displayName: profile.displayName || profile.DisplayName,
+          roleType: profile.roleType || profile.RoleType,
+          status: profile.status || profile.Status, // This is ServiceProvider.Status from the API
+          accountStatus: profile.accountStatus || profile.AccountStatus, // UserProfile.Status (Active/Suspended)
+          phone: profile.phone || profile.Phone,
+          businessName: profile.businessName || profile.BusinessName,
           // Address fields from the new controller
-          street: profile.Street,
-          city: profile.City,
-          region: profile.Region,
-          postalCode: profile.PostalCode,
-          country: profile.Country,
-          address: profile.Address, // Formatted string
-          createdAt: profile.CreatedAt,
-          updatedAt: profile.UpdatedAt,
+          street: profile.street || profile.Street,
+          city: profile.city || profile.City,
+          region: profile.region || profile.Region,
+          postalCode: profile.postalCode || profile.PostalCode,
+          country: profile.country || profile.Country,
+          address: profile.address || profile.Address, // Formatted string
+          createdAt: profile.createdAt || profile.CreatedAt,
+          updatedAt: profile.updatedAt || profile.UpdatedAt,
         };
 
         console.log('[fetchUserProfile] Normalized profile status:', normalizedProfile.status);
@@ -279,14 +281,20 @@ export default function ServiceProviderDashboard() {
                   serviceProviderId={serviceProviderId}
                   onNavigateToBookings={handleNavigateToBookings}
                   activityRefreshKey={activityRefreshKey}
+                  onNavigate={handleNavigate}
                 />
               </>
             )}
             {activeTab === 'services' && (
-              <ServicesManagement serviceProviderId={serviceProviderId} searchTerm={serviceSearchQuery} />
+              <ServicesManagement
+                serviceProviderId={serviceProviderId}
+                searchTerm={serviceSearchQuery}
+              />
             )}
             {activeTab === 'schedule' && (
-              <ScheduleManagement serviceProviderId={serviceProviderId} />
+              <ScheduleManagement
+                serviceProviderId={serviceProviderId}
+              />
             )}
             {activeTab === 'bookings' && (
               <BookingsManagement
