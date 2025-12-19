@@ -162,7 +162,7 @@ namespace Beyti_Backend.Controllers.Api
         private async Task AutoCancelExpiredOrders()
         {
             var now = DateTime.UtcNow;
-            var expiryThreshold = now.AddMinutes(-1); // 10 minutes ago
+            var expiryThreshold = now.AddMinutes(-10); // 10 minutes ago
 
             var expiredOrders = await _context.Orders
                 .Include(o => o.OrderItems)
