@@ -65,6 +65,7 @@ namespace Beyti_Backend.Controllers.Api
                 result.Add(new
                 {
                     seller.Id,
+                    userProfileId = seller.UserProfileId,
                     storeName = seller.UserProfile.DisplayName,
                     seller.Phone,
                     seller.CreatedAt,

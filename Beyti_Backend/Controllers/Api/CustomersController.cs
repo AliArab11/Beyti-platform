@@ -94,6 +94,7 @@ namespace Beyti_Backend.Controllers.Api
      .Select(c => new
      {
          c.Id,
+         c.UserProfileId,
          fullName = c.UserProfile.DisplayName,
          c.Phone,
          c.CreatedAt,
@@ -136,6 +137,7 @@ namespace Beyti_Backend.Controllers.Api
             return new
             {
                 customer.Id,
+                customer.UserProfileId,
                 fullName = customer.UserProfile.DisplayName,
                 customer.Phone,
                 customer.CreatedAt,

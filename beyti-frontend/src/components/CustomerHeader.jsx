@@ -17,6 +17,7 @@ const CustomerHeader = ({
   onSearchChange,
   customerName = null,
   customerId = null,
+  userProfileId = null, // UserProfile ID for notifications
   cart = [],
   stores = [],
   customerAddresses = [],
@@ -163,7 +164,7 @@ const CustomerHeader = ({
         {/* Right: Actions */}
           <div className="flex items-center gap-4 ml-auto pr-[clamp(16px,4vw,32px)]">
           {/* Notifications */}
-          <NotificationDropdown userId={customerId} />
+          <NotificationDropdown userId={userProfileId} />
 
           {/* Cart Button */}
           <button

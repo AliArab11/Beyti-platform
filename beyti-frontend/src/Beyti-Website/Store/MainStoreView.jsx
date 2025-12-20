@@ -13,12 +13,17 @@ import { isStoreOpen } from '../Seller/Components/storeStatus';
 const getCustomers = async () => {
   try {
     const response = await fetch('https://localhost:7062/api/Customers');
-    
+
     if (!response.ok) {
       throw new Error('Failed to load customers');
     }
 
     const data = await response.json();
+    console.log("🔔 MainStoreView: Fetched customers from API:", data);
+    if (data.length > 0) {
+      console.log("🔔 MainStoreView: First customer structure:", data[0]);
+      console.log("🔔 MainStoreView: First customer userProfileId:", data[0].userProfileId);
+    }
     return Array.isArray(data) ? data : [];
   } catch (error) {
     console.error('Error fetching customers:', error);
@@ -504,17 +509,32 @@ const CustomerSelectModal = ({ isOpen, customers, onSelect, onClose }) => {
             const id = e.target.value;
             if (id) {
               const numericId = parseInt(id, 10);
-              const selected = customers.find((c) => c.id === numericId);
-              onSelect(selected);
+              console.log("🔔 CustomerSelectModal: Selected ID from dropdown:", numericId);
+              console.log("🔔 CustomerSelectModal: Available customers:", customers);
+              const selected = customers.find((c) => {
+                const customerId = c.id || c.Id; // Handle both camelCase and PascalCase
+                console.log("🔔 CustomerSelectModal: Comparing", customerId, "with", numericId);
+                return customerId === numericId;
+              });
+              console.log("🔔 CustomerSelectModal: Found customer:", selected);
+              if (selected) {
+                onSelect(selected);
+              } else {
+                console.error("🔔 CustomerSelectModal: Customer not found!");
+              }
             }
           }}
         >
           <option value="">-- Select Customer --</option>
-          {customers.map((customer) => (
-            <option key={customer.id} value={customer.id}>
-              {customer.fullName || customer.name || `Customer #${customer.id}`}
-            </option>
-          ))}
+          {customers.map((customer) => {
+            const customerId = customer.id || customer.Id;
+            const customerName = customer.fullName || customer.name || `Customer #${customerId}`;
+            return (
+              <option key={customerId} value={customerId}>
+                {customerName}
+              </option>
+            );
+          })}
         </select>
 
         <button
@@ -571,6 +591,7 @@ useEffect(() => {
   const [customers, setCustomers] = useState([]);
   const [customerId, setCustomerId] = useState(null);
   const [customerName, setCustomerName] = useState(null);
+  const [userProfileId, setUserProfileId] = useState(null); // Add userProfileId for notifications
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [customerAddresses, setCustomerAddresses] = useState([]);
 
@@ -793,10 +814,14 @@ useEffect(() => {
 useEffect(() => {
   const savedCustomerId = sessionStorage.getItem('beyti_customerId');
   const savedCustomerName = sessionStorage.getItem('beyti_customerName');
-  
+  const savedUserProfileId = sessionStorage.getItem('beyti_userProfileId');
+
   if (savedCustomerId && savedCustomerName) {
     setCustomerId(parseInt(savedCustomerId, 10));
     setCustomerName(savedCustomerName);
+    if (savedUserProfileId) {
+      setUserProfileId(parseInt(savedUserProfileId, 10));
+    }
     console.log("Restored customer session:", savedCustomerName);
   }
   // Removed auto-opening modal - let user browse as guest
@@ -880,31 +905,43 @@ useEffect(() => {
 }, [showFilterDropdown]);
 
 const handleCustomerSelect = (customer) => {
-  const name = customer.fullName || customer.name || `Customer #${customer.id}`;
-  setCustomerId(customer.id);
+  // Handle both camelCase and PascalCase from API
+  const customerId = customer.id || customer.Id;
+  const userProfileId = customer.userProfileId || customer.UserProfileId;
+  const name = customer.fullName || customer.name || `Customer #${customerId}`;
+
+  console.log("🔔 MainStoreView: Selected customer:", customer);
+  console.log("🔔 MainStoreView: customer.userProfileId:", userProfileId);
+  console.log("🔔 MainStoreView: customer.id:", customerId);
+
+  setCustomerId(customerId);
   setCustomerName(name);
+  setUserProfileId(userProfileId); // Store userProfileId for notifications
   setCustomerModalOpen(false);
-  
+
   // Save to sessionStorage
-  sessionStorage.setItem('beyti_customerId', customer.id.toString());
+  sessionStorage.setItem('beyti_customerId', customerId.toString());
   sessionStorage.setItem('beyti_customerName', name);
-  
-  console.log("Selected customer with addresses:", customer);
+  sessionStorage.setItem('beyti_userProfileId', userProfileId?.toString() || '');
+
+  console.log("🔔 MainStoreView: Saved to sessionStorage - userProfileId:", userProfileId);
 };
 
 const handleCustomerLogout = () => {
   // Clear customer session
   sessionStorage.removeItem('beyti_customerId');
   sessionStorage.removeItem('beyti_customerName');
+  sessionStorage.removeItem('beyti_userProfileId');
   setCustomerId(null);
   setCustomerName(null);
+  setUserProfileId(null);
   setActiveOrder(null);
-  
+
   // Clear any active order from localStorage
   if (customerId) {
     localStorage.removeItem(`beyti_activeOrder_${customerId}`);
   }
-  
+
   console.log("Customer logged out");
 };
 
@@ -1056,6 +1093,7 @@ const filteredStores = stores
       <CustomerHeader
         customerName={customerName}
         customerId={customerId}
+        userProfileId={userProfileId}
         cart={cart}
         stores={stores}
         customerAddresses={customerAddresses}
