@@ -10,7 +10,6 @@ import AdminUsersPage from './Pages/Admin/AdminDash';
 import ServiceProviderRequests from './Pages/Admin/ServiceProviderRequests.jsx';
 import CustomerPage from "./Pages/Customer";
 import SellerPage from "./Pages/Seller";
-import StoresPage from "./Pages/Seller/Store";
 import MainStoreView from "./Beyti-Website/Store/MainStoreView.jsx";
 import HomePage from "./Beyti-Website/Store/HomePage.jsx";
 import ServiceProviderStoresView from "./Beyti-Website/Store/ServiceProviderStoresView.jsx";
@@ -104,7 +103,6 @@ export default function App() {
     // { path: '/addplan', label: 'Add Plan' },
     // { path: '/seller', label: 'Seller' },
     { path: '/seller-dashboard', label: 'Seller Dashboard' },
-    { path: '/store', label: 'Store' },
     { path: '/stores', label: 'Home Page' },
     { path: '/mainStore', label: 'Seller Stores' },
     { path: '/serviceProviders', label: 'Service Providers' },
@@ -233,7 +231,6 @@ export default function App() {
             <Route path="/checkout" element={<Checkout />} />
 
 
-            <Route path="/store" element={<StoresPage />} />
             <Route path="/stores" element={<HomePage />} />
             <Route path="/mainStore" element={<MainStoreView />} />
             <Route path="/serviceProviders" element={<ServiceProviderStoresView />} />
