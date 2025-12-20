@@ -19,8 +19,6 @@ import ProductPage from "./Beyti-Website/Store/Components/ProductPage.jsx";
 import Checkout from "./Beyti-Website/Store/Components/Checkout.jsx";
 import StoreDetailsPage from "./Pages/Seller/StoreDetails";
 import CustomerDashboardPage from './Beyti-Website/Customer/CustomerDashboard.jsx';
-import CustomerNotifications from "./Beyti-Website/Customer/CustomerNotifications.jsx";
-import CustomerHistory from "./Beyti-Website/Customer/CustomerHistory.jsx";
 
 import SellerDashboardLayout from "./Beyti-Website/Seller/SellerDashboard.jsx";
 import SellerProductsPage from "./Beyti-Website/Seller/Components/Products.jsx";
@@ -211,20 +209,21 @@ export default function App() {
             <Route path="/seller" element={<SellerPage />} />
 
             <Route path="/seller-dashboard" element={<SellerDashboardLayout />}>
-              <Route index element={<SellerAnalyticsPage />} /> 
+              <Route index element={<SellerAnalyticsPage />} />
               <Route path="dashboard" element={<SellerAnalyticsPage />} />
               <Route path="orders" element={<SellerOrdersPage />} />
               <Route path="products" element={<SellerProductsPage />} />
               <Route path="analytics" element={<SellerAnalyticsPage />} />
               <Route path="reviews" element={<SellerReviewsPage />} />
+              <Route path="notifications" element={<div />} />
               <Route path="profile" element={<div />} />
             </Route>
 
             <Route path="/customer-dashboard" element={<CustomerDashboardPage />}>
               <Route index element={<div />} />
-              <Route path="orders" element={<div />} />
-              <Route path="addresses" element={<div />} />
-              <Route path="favorites" element={<div />} />
+              <Route path="bookings" element={<div />} />
+              <Route path="history" element={<div />} />
+              <Route path="notifications" element={<div />} />
               <Route path="profile" element={<div />} />
             </Route>
 
@@ -241,8 +240,6 @@ export default function App() {
             <Route path="/product" element={<ProductsPage />} />
             <Route path="/category" element={<CategoryPage />} />
             <Route path="/customer" element={<CustomerPage />} />
-            <Route path="/customer/notifications" element={<CustomerNotifications />} />
-            <Route path="/customer/history" element={<CustomerHistory />} />
 
             <Route path="/driver" element={<DriverPage />} />
             <Route path="/driver-dashboard" element={<DriverDashboardPage />}>
@@ -250,6 +247,7 @@ export default function App() {
               <Route path="dashboard" element={<div />} />
               <Route path="orders" element={<div />} />
               <Route path="analytics" element={<div />} />
+              <Route path="notifications" element={<div />} />
               <Route path="profile" element={<div />} />
             </Route>
 

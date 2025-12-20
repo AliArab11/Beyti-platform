@@ -7,7 +7,8 @@ const ServiceDetailsSheet = ({
   isOpen,
   onClose,
   onBookService,
-  allReviews = []
+  allReviews = [],
+  bookings = []
 }) => {
   const [isFavorite, setIsFavorite] = useState(false);
   const [reviews, setReviews] = useState([]);
@@ -18,7 +19,7 @@ const ServiceDetailsSheet = ({
     if (service && isOpen) {
       filterServiceReviews();
     }
-  }, [service, isOpen, allReviews]);
+  }, [service, isOpen, allReviews, bookings]);
 
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -36,10 +37,13 @@ const ServiceDetailsSheet = ({
   const filterServiceReviews = () => {
     try {
       setLoadingReviews(true);
-      // Filter reviews for this specific service catalog and exclude hidden reviews
-      const serviceReviews = allReviews.filter(
-        review => review.serviceCatalogId === service.id && !review.isHidden
-      );
+      // Filter reviews for this specific service by matching review -> booking -> serviceId
+      const serviceReviews = allReviews.filter(review => {
+        // Find the booking for this review
+        const booking = bookings.find(b => b.id === review.serviceBookingId);
+        // Check if booking exists, matches this service ID, and review is not hidden
+        return booking && booking.serviceId === service.id && !review.isHidden;
+      });
       console.log(`[ServiceDetailsSheet] Service ${service.id}: Found ${serviceReviews.length} visible reviews out of ${allReviews.length} total reviews`);
       setReviews(serviceReviews);
     } catch (err) {
@@ -66,10 +70,13 @@ const ServiceDetailsSheet = ({
   };
 
   const calculateAverageRating = () => {
-    // Calculate rating from ALL reviews (including hidden ones) for this service
-    const allServiceReviews = allReviews.filter(
-      review => review.serviceCatalogId === service.id
-    );
+    // Calculate rating from ALL reviews (including hidden ones) for this specific service
+    const allServiceReviews = allReviews.filter(review => {
+      // Find the booking for this review
+      const booking = bookings.find(b => b.id === review.serviceBookingId);
+      // Check if booking exists and matches this service ID (include hidden reviews for rating calculation)
+      return booking && booking.serviceId === service.id;
+    });
 
     if (allServiceReviews.length === 0) return 0;
     const sum = allServiceReviews.reduce((acc, review) => acc + (review.overallRating || 0), 0);

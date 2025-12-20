@@ -31,17 +31,18 @@ const NotificationDropdown = ({ userId, className = '' }) => {
 
     try {
       setLoading(true);
-      console.log('Fetching notifications for userId:', userId);
+      console.log('🔔 NotificationDropdown: Fetching notifications for userId:', userId);
+      console.log('🔔 NotificationDropdown: userId type:', typeof userId);
       const [notifs, count] = await Promise.all([
         getUserNotifications(userId),
         getUnreadCount(userId)
       ]);
-      console.log('Fetched notifications:', notifs);
-      console.log('Unread count:', count);
+      console.log('🔔 NotificationDropdown: Fetched notifications:', notifs);
+      console.log('🔔 NotificationDropdown: Unread count:', count);
       setNotifications(notifs);
       setUnreadCount(count);
     } catch (error) {
-      console.error('Failed to fetch notifications:', error);
+      console.error('🔔 NotificationDropdown: Failed to fetch notifications:', error);
     } finally {
       setLoading(false);
     }

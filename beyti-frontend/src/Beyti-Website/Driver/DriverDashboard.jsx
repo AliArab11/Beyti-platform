@@ -11,7 +11,7 @@ import ProfilePage from '../../components/ProfilePage';
 
 import DriverOrdersPage from "./Components/DriverOrders";
 import DriverAnalytics from "./Components/DriverAnalytics";
-
+import NotificationsPage from '../ServiceProvider/components/NotificationsPage';
 
 import '../Seller/Components/modalAnimations.css';
 
@@ -126,6 +126,8 @@ const getPageTitle = () => {
     return "Order Management";
   } else if (location.pathname.includes("/driver-dashboard/analytics")) {
     return "Analytics";
+  } else if (location.pathname.includes("/driver-dashboard/notifications")) {
+    return "Notifications";
   } else if (location.pathname.includes("/driver-dashboard/profile")) {
     return "My Profile";
   } else {
@@ -306,11 +308,14 @@ const DriverDashboard = () => {
 const [isOnline, setIsOnline] = useState(true);
 
 // Map modal state
-const [viewMapModal, setViewMapModal] = useState({ 
-  show: false, 
-  pickup: null, 
-  delivery: null 
+const [viewMapModal, setViewMapModal] = useState({
+  show: false,
+  pickup: null,
+  delivery: null
 });
+
+// Notification search state
+const [notificationSearchQuery, setNotificationSearchQuery] = useState('');
 
 
 
@@ -1788,6 +1793,19 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
           </NavigationButton>
 
           <NavigationButton
+            selected={location.pathname.includes("/driver-dashboard/notifications")}
+            onClick={() => navigate("/driver-dashboard/notifications")}
+            icon={
+              <Icon.Bell
+                size={20}
+                weight={location.pathname.includes("/driver-dashboard/notifications") ? "fill" : "regular"}
+              />
+            }
+          >
+            Notifications
+          </NavigationButton>
+
+          <NavigationButton
             selected={location.pathname.includes("/driver-dashboard/profile")}
             onClick={() => navigate("profile")}
             icon={
@@ -1837,7 +1855,7 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
             updatedAt: Date.now()
           }}
           entityId={driverId}
-          userId={driverId}
+          userId={userProfileId}
           onProfileClick={() => navigate('profile')}
           onProfileUpdate={handleProfileUpdate}
         />
@@ -2581,7 +2599,12 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
               driverName={driverName}
               metrics={metrics}
               historyJobs={historyJobs}
-            />  
+            />
+          ) : location.pathname.includes("/driver-dashboard/notifications") ? (
+            <NotificationsPage
+              userId={userProfileId}
+              searchQuery={notificationSearchQuery}
+            />
           ) : location.pathname.includes("/driver-dashboard/profile") ? (
             <ProfilePage
               userProfile={{
