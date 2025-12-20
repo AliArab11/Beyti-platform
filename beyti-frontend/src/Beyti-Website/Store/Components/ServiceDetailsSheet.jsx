@@ -6,18 +6,19 @@ const ServiceDetailsSheet = ({
   provider,
   isOpen,
   onClose,
-  onBookService
+  onBookService,
+  allReviews = []
 }) => {
   const [isFavorite, setIsFavorite] = useState(false);
   const [reviews, setReviews] = useState([]);
   const [loadingReviews, setLoadingReviews] = useState(false);
 
-  // Fetch service reviews when service changes
+  // Filter reviews for this specific service when service changes
   useEffect(() => {
     if (service && isOpen) {
-      fetchServiceReviews();
+      filterServiceReviews();
     }
-  }, [service, isOpen]);
+  }, [service, isOpen, allReviews]);
 
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -32,16 +33,18 @@ const ServiceDetailsSheet = ({
     };
   }, [isOpen]);
 
-  const fetchServiceReviews = async () => {
+  const filterServiceReviews = () => {
     try {
       setLoadingReviews(true);
-      const response = await fetch(`https://localhost:7062/api/ServiceReviews?serviceId=${service.id}`);
-      if (response.ok) {
-        const data = await response.json();
-        setReviews(data);
-      }
+      // Filter reviews for this specific service catalog and exclude hidden reviews
+      const serviceReviews = allReviews.filter(
+        review => review.serviceCatalogId === service.id && !review.isHidden
+      );
+      console.log(`[ServiceDetailsSheet] Service ${service.id}: Found ${serviceReviews.length} visible reviews out of ${allReviews.length} total reviews`);
+      setReviews(serviceReviews);
     } catch (err) {
-      console.error("Error loading reviews:", err);
+      console.error("Error filtering reviews:", err);
+      setReviews([]);
     } finally {
       setLoadingReviews(false);
     }
@@ -63,9 +66,14 @@ const ServiceDetailsSheet = ({
   };
 
   const calculateAverageRating = () => {
-    if (reviews.length === 0) return 0;
-    const sum = reviews.reduce((acc, review) => acc + review.rating, 0);
-    return (sum / reviews.length).toFixed(1);
+    // Calculate rating from ALL reviews (including hidden ones) for this service
+    const allServiceReviews = allReviews.filter(
+      review => review.serviceCatalogId === service.id
+    );
+
+    if (allServiceReviews.length === 0) return 0;
+    const sum = allServiceReviews.reduce((acc, review) => acc + (review.overallRating || 0), 0);
+    return (sum / allServiceReviews.length).toFixed(1);
   };
 
   const formatDate = (dateString) => {
@@ -85,6 +93,7 @@ const ServiceDetailsSheet = ({
   if (!service) return null;
 
   const averageRating = calculateAverageRating();
+  const isActive = service?.isActive !== false; // Default to true if undefined
 
   return (
     <>
@@ -144,9 +153,19 @@ const ServiceDetailsSheet = ({
               <div className="flex-1 overflow-y-auto p-8 space-y-6">
                 {/* Service Title */}
                 <div>
-                  <h1 className="text-3xl font-bold text-charcoal-600 mb-2" style={{ fontFamily: 'Merriweather, serif' }}>
-                    {service.name}
-                  </h1>
+                  <div className="flex items-center gap-3 mb-2">
+                    <h1 className="text-3xl font-bold text-charcoal-600" style={{ fontFamily: 'Merriweather, serif' }}>
+                      {service.name}
+                    </h1>
+                    {/* Status Badge */}
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                      isActive
+                        ? 'bg-green-500 text-white'
+                        : 'bg-charcoal-500 text-white'
+                    }`} style={{ fontFamily: 'Inter, sans-serif' }}>
+                      {isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
                   {provider && (
                     <p className="text-base text-charcoal-400 font-medium" style={{ fontFamily: 'Inter, sans-serif' }}>
                       {provider.businessName || provider.displayName}
@@ -200,9 +219,6 @@ const ServiceDetailsSheet = ({
                     <span className="text-base font-bold text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>
                       {averageRating}
                     </span>
-                    <span className="text-charcoal-400 text-sm" style={{ fontFamily: 'Inter, sans-serif' }}>
-                      ({reviews.length} Review{reviews.length !== 1 ? 's' : ''})
-                    </span>
                   </div>
                 )}
 
@@ -226,63 +242,6 @@ const ServiceDetailsSheet = ({
                       <h3 className="text-lg font-bold text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>
                         Customer Reviews
                       </h3>
-                      {reviews.length > 3 && (
-                        <button className="text-sage-600 hover:text-sage-700 font-semibold text-sm transition-colors" style={{ fontFamily: 'Inter, sans-serif' }}>
-                          View all {reviews.length}
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Reviews Summary Bar */}
-                    <div className="flex items-center gap-4 mb-5 pb-5 border-b border-grey-stroke">
-                      <div className="flex flex-col items-center">
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-4xl font-black text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>
-                            {averageRating}
-                          </span>
-                          <span className="text-lg text-charcoal-400 font-medium" style={{ fontFamily: 'Inter, sans-serif' }}>
-                            / 5
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-0.5 mt-1">
-                          {[...Array(5)].map((_, i) => (
-                            <Star
-                              key={i}
-                              size={16}
-                              weight="fill"
-                              className={i < Math.round(averageRating) ? "text-[#F5C563]" : "text-grey-stroke"}
-                            />
-                          ))}
-                        </div>
-                        <span className="text-xs text-charcoal-400 mt-1" style={{ fontFamily: 'Inter, sans-serif' }}>
-                          Based on {reviews.length} review{reviews.length !== 1 ? 's' : ''}
-                        </span>
-                      </div>
-
-                      {/* Rating Distribution */}
-                      <div className="flex-1 space-y-1.5">
-                        {[5, 4, 3, 2, 1].map(rating => {
-                          const count = reviews.filter(r => r.rating === rating).length;
-                          const percentage = reviews.length > 0 ? (count / reviews.length) * 100 : 0;
-                          return (
-                            <div key={rating} className="flex items-center gap-2">
-                              <span className="text-xs font-semibold text-charcoal-500 w-3" style={{ fontFamily: 'Inter, sans-serif' }}>
-                                {rating}
-                              </span>
-                              <Star size={12} weight="fill" className="text-[#F5C563]" />
-                              <div className="flex-1 h-2 bg-cream-200 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-[#F5C563] rounded-full transition-all duration-300"
-                                  style={{ width: `${percentage}%` }}
-                                />
-                              </div>
-                              <span className="text-xs font-medium text-charcoal-400 w-8 text-right" style={{ fontFamily: 'Inter, sans-serif' }}>
-                                {count}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
                     </div>
 
                     {/* Individual Reviews */}
@@ -310,7 +269,7 @@ const ServiceDetailsSheet = ({
                                         key={i}
                                         size={13}
                                         weight="fill"
-                                        className={i < review.rating ? "text-[#F5C563]" : "text-grey-stroke"}
+                                        className={i < (review.overallRating || 0) ? "text-[#F5C563]" : "text-grey-stroke"}
                                       />
                                     ))}
                                   </div>
@@ -349,13 +308,28 @@ const ServiceDetailsSheet = ({
 
               {/* Bottom Action Bar - Fixed */}
               <div className="bg-white border-t-2 border-grey-stroke p-6">
+                {!isActive && (
+                  <div className="mb-3 bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-2">
+                    <div className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0">
+                      <span className="text-white text-xs font-bold">!</span>
+                    </div>
+                    <p className="text-sm text-amber-800 font-medium" style={{ fontFamily: 'Inter, sans-serif' }}>
+                      This service is currently unavailable for booking.
+                    </p>
+                  </div>
+                )}
                 <button
                   onClick={handleBookService}
-                  className="w-full bg-sage-500 hover:bg-sage-600 text-white font-bold py-3.5 px-6 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-3"
+                  disabled={!isActive}
+                  className={`w-full font-bold py-3.5 px-6 rounded-xl shadow-md transition-all flex items-center justify-center gap-3 ${
+                    isActive
+                      ? 'bg-sage-500 hover:bg-sage-600 hover:shadow-lg text-white cursor-pointer'
+                      : 'bg-grey-200 text-charcoal-400 cursor-not-allowed'
+                  }`}
                   style={{ fontFamily: 'Inter, sans-serif' }}
                 >
                   <Calendar size={22} weight="bold" />
-                  <span>Book Appointment</span>
+                  <span>{isActive ? 'Book Appointment' : 'Service Unavailable'}</span>
                 </button>
               </div>
             </div>

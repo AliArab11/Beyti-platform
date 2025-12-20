@@ -77,7 +77,7 @@ namespace Beyti_Backend.Controllers.Api
             address.Country = dto.Country;
             address.Latitude = dto.Latitude;
             address.Longitude = dto.Longitude;
-            address.UpdatedAt = DateTime.UtcNow;
+            address.UpdatedAt = DateTime.Now;
 
             _context.Entry(address).State = EntityState.Modified;
 
@@ -117,8 +117,8 @@ namespace Beyti_Backend.Controllers.Api
                 Longitude = dto.Longitude,
                 IsDefault = dto.IsDefault,
                 IsActive = true,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now,
+                UpdatedAt = DateTime.Now
             };
 
             _context.Addresses.Add(address);
@@ -140,7 +140,7 @@ namespace Beyti_Backend.Controllers.Api
 
             // Toggle active status instead of deleting
             address.IsActive = !address.IsActive;
-            address.UpdatedAt = DateTime.UtcNow;
+            address.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 

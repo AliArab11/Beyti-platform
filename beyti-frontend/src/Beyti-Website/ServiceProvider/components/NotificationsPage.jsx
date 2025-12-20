@@ -223,7 +223,7 @@ const NotificationsPage = ({ userId, searchQuery = '' }) => {
           <div className="bg-cream-50 dark:bg-charcoal-600 border border-grey-stroke dark:border-charcoal-400 rounded-lg p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-label-medium text-charcoal-400 dark:text-charcoal-300">Pending</p>
+                <p className="text-label-medium text-charcoal-400 dark:text-charcoal-300">UNREAD</p>
                 <p className="text-display-h2 text-charcoal-600 dark:text-cream-50 mt-2">{sentNotifications.filter(n => !n.isRead).length}</p>
               </div>
               <div className="w-12 h-12 bg-charcoal-100 dark:bg-charcoal-500 rounded-lg flex items-center justify-center">

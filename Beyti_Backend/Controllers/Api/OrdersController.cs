@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using BeytiDB.Data;
+using Beyti_Backend.Services;
 
 namespace Beyti_Backend.Controllers.Api
 {
@@ -14,10 +15,12 @@ namespace Beyti_Backend.Controllers.Api
     public class OrdersController : ControllerBase
     {
         private readonly BeytiContext _context;
+        private readonly INotificationService _notificationService;
 
-        public OrdersController(BeytiContext context)
+        public OrdersController(BeytiContext context, INotificationService notificationService)
         {
             _context = context;
+            _notificationService = notificationService;
         }
 
         // DTO for creating orders 
@@ -161,7 +164,7 @@ namespace Beyti_Backend.Controllers.Api
         // Helper method to auto-cancel expired orders
         private async Task AutoCancelExpiredOrders()
         {
-            var now = DateTime.UtcNow;
+            var now = DateTime.Now;
             var expiryThreshold = now.AddMinutes(-10); // 10 minutes ago
 
             var expiredOrders = await _context.Orders
@@ -288,7 +291,7 @@ namespace Beyti_Backend.Controllers.Api
                 if (dto.TotalAmount.HasValue)
                     order.TotalAmount = dto.TotalAmount.Value;
 
-                order.UpdatedAt = DateTime.UtcNow;
+                order.UpdatedAt = DateTime.Now;
                 await _context.SaveChangesAsync();
 
                 return NoContent();
@@ -336,13 +339,38 @@ namespace Beyti_Backend.Controllers.Api
                 SubtotalAmount = dto.SubtotalAmount,
                 DeliveryFee = dto.DeliveryFee,
                 TotalAmount = dto.TotalAmount,
-                OrderNote = dto.OrderNote, 
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now,
+                UpdatedAt = DateTime.Now,
+                OrderNote = dto.OrderNote
             };
 
             _context.Orders.Add(order);
             await _context.SaveChangesAsync();
+
+            // Send notification to seller about new order
+            var customer = await _context.Customers
+                .Include(c => c.UserProfile)
+                .FirstOrDefaultAsync(c => c.Id == dto.CustomerId);
+
+            var seller = await _context.Sellers
+                .Include(s => s.UserProfile)
+                .FirstOrDefaultAsync(s => s.Id == dto.SellerId);
+
+            if (seller?.UserProfile != null && customer?.UserProfile != null)
+            {
+                var customerName = customer.UserProfile.DisplayName ?? "A customer";
+                var notificationMessage = $"New order #{order.Id} received from {customerName}! Total: BHD {order.TotalAmount:F3}. Please respond within 10 minutes.";
+
+                await _notificationService.SendNotificationAsync(
+                    recipientUserId: seller.UserProfile.Id,
+                    senderUserId: customer.UserProfile.Id,
+                    type: "NewOrder",
+                    title: "New Order Received",
+                    body: notificationMessage,
+                    relatedEntityType: "Order",
+                    relatedEntityId: order.Id
+                );
+            }
 
             // Create delivery ticket immediately if delivery order
             if (order.FulfillmentType == "Delivery")
@@ -464,7 +492,7 @@ namespace Beyti_Backend.Controllers.Api
                     }
 
                     variant.StockQty -= item.Quantity;
-                    variant.UpdatedAt = DateTime.UtcNow;
+                    variant.UpdatedAt = DateTime.Now;
                 }
 
                 await _context.SaveChangesAsync();
@@ -494,7 +522,7 @@ namespace Beyti_Backend.Controllers.Api
                 if (variant != null)
                 {
                     variant.StockQty += item.Qty;
-                    variant.UpdatedAt = DateTime.UtcNow;
+                    variant.UpdatedAt = DateTime.Now;
                 }
             }
 
@@ -512,6 +540,10 @@ namespace Beyti_Backend.Controllers.Api
                     .Include(o => o.DeliveryTicket)
                     .Include(o => o.OrderItems)
                         .ThenInclude(oi => oi.ProductVariant)
+                    .Include(o => o.Customer)
+                        .ThenInclude(c => c.UserProfile)
+                    .Include(o => o.Seller)
+                        .ThenInclude(s => s.UserProfile)
                     .FirstOrDefaultAsync(o => o.Id == id);
 
                 if (order == null)
@@ -523,7 +555,7 @@ namespace Beyti_Backend.Controllers.Api
                 var oldStatus = order.Status;
 
                 order.Status = dto.Status;
-                order.UpdatedAt = DateTime.UtcNow;
+                order.UpdatedAt = DateTime.Now;
 
                 // Only restore stock if we're NEWLY cancelling (not already cancelled)
                 if (dto.Status == "Cancelled" && oldStatus != "Cancelled")
@@ -533,7 +565,7 @@ namespace Beyti_Backend.Controllers.Api
                         if (item.ProductVariant != null)
                         {
                             item.ProductVariant.StockQty += item.Qty;
-                            item.ProductVariant.UpdatedAt = DateTime.UtcNow;
+                            item.ProductVariant.UpdatedAt = DateTime.Now;
                         }
                     }
                 }
@@ -545,7 +577,7 @@ namespace Beyti_Backend.Controllers.Api
                     if (order.DeliveryTicket != null)
                     {
                         order.DeliveryTicket.Status = "Pending";
-                        order.DeliveryTicket.UpdatedAt = DateTime.UtcNow;
+                        order.DeliveryTicket.UpdatedAt = DateTime.Now;
                     }
                 }
 
@@ -553,10 +585,28 @@ namespace Beyti_Backend.Controllers.Api
                 if (dto.Status == "Cancelled" && order.DeliveryTicket != null)
                 {
                     order.DeliveryTicket.Status = "Cancelled";
-                    order.DeliveryTicket.UpdatedAt = DateTime.UtcNow;
+                    order.DeliveryTicket.UpdatedAt = DateTime.Now;
                 }
 
                 await _context.SaveChangesAsync();
+
+                // Send notification to customer about the status change
+                if (!string.IsNullOrEmpty(dto.Status) && order.Customer?.UserProfile != null)
+                {
+                    var sellerName = order.Seller?.UserProfile?.DisplayName ?? "seller";
+                    var notificationMessage = GetOrderStatusNotificationMessage(dto.Status, sellerName, order.Id);
+
+                    await _notificationService.SendNotificationAsync(
+                        recipientUserId: order.Customer.UserProfile.Id,
+                        senderUserId: order.Seller?.UserProfileId,
+                        type: "OrderUpdate",
+                        title: "Order Status Update",
+                        body: notificationMessage,
+                        relatedEntityType: "Order",
+                        relatedEntityId: id
+                    );
+                }
+
                 return NoContent();
             }
             catch (Exception ex)
@@ -573,6 +623,10 @@ namespace Beyti_Backend.Controllers.Api
             {
                 var order = await _context.Orders
                     .Include(o => o.DeliveryTicket)
+                    .Include(o => o.Customer)
+                        .ThenInclude(c => c.UserProfile)
+                    .Include(o => o.Seller)
+                        .ThenInclude(s => s.UserProfile)
                     .FirstOrDefaultAsync(o => o.Id == id);
 
                 if (order == null)
@@ -628,7 +682,7 @@ namespace Beyti_Backend.Controllers.Api
 
                             // Update delivery ticket to start offering to drivers
                             order.DeliveryTicket.Status = "Pending";
-                            order.DeliveryTicket.UpdatedAt = DateTime.UtcNow;
+                            order.DeliveryTicket.UpdatedAt = DateTime.Now;
                             await _context.SaveChangesAsync();
 
                             // Trigger the offering process
@@ -656,8 +710,25 @@ namespace Beyti_Backend.Controllers.Api
                     order.Status = dto.Status;
                 }
 
-                order.UpdatedAt = DateTime.UtcNow;
+                order.UpdatedAt = DateTime.Now;
                 await _context.SaveChangesAsync();
+
+                // Send notification to customer about the status change
+                if (!string.IsNullOrEmpty(dto.Status) && order.Customer?.UserProfile != null)
+                {
+                    var sellerName = order.Seller?.UserProfile?.DisplayName ?? "seller";
+                    var notificationMessage = GetOrderStatusNotificationMessage(dto.Status, sellerName, order.Id);
+
+                    await _notificationService.SendNotificationAsync(
+                        recipientUserId: order.Customer.UserProfile.Id,
+                        senderUserId: order.Seller?.UserProfileId,
+                        type: "OrderUpdate",
+                        title: "Order Status Update",
+                        body: notificationMessage,
+                        relatedEntityType: "Order",
+                        relatedEntityId: id
+                    );
+                }
 
                 Console.WriteLine($"✅ Order {id} - Status updated: {currentStatus} → {newStatus}");
                 return NoContent();
@@ -828,6 +899,20 @@ namespace Beyti_Backend.Controllers.Api
         private bool OrderExists(int id)
         {
             return _context.Orders.Any(e => e.Id == id);
+        }
+
+        // Helper method to generate notification messages based on order status
+        private string GetOrderStatusNotificationMessage(string status, string sellerName, int orderId)
+        {
+            return status switch
+            {
+                "Accepted" => $"Great news! {sellerName} has accepted your order #{orderId}. They will start preparing it soon.",
+                "Preparing" => $"{sellerName} is now preparing your order #{orderId}.",
+                "Ready for Pickup" => $"Your order #{orderId} from {sellerName} is ready for pickup!",
+                "Completed" => $"Your order #{orderId} from {sellerName} has been completed. Thank you for your purchase!",
+                "Cancelled" => $"Unfortunately, your order #{orderId} from {sellerName} has been cancelled. Please contact the seller for more information.",
+                _ => $"Your order #{orderId} status has been updated to: {status}"
+            };
         }
 
         private async Task<bool> OfferToNextClosestDriver(int ticketId)

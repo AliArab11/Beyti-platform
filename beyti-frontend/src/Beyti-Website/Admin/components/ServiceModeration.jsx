@@ -340,6 +340,7 @@ const ServiceModeration = ({ onNavigate, adminUserProfileId }) => {
                       columns={[
                         'Service ID',
                         'Service Name',
+                        'Provider',
                         'Category',
                         'Price Range',
                         'Duration',
@@ -372,6 +373,7 @@ const ServiceModeration = ({ onNavigate, adminUserProfileId }) => {
                                 </div>
                               )}
                             </div>,
+                            <span className="text-charcoal-600">{service.providerName || 'Unknown'}</span>,
                             <div>
                               <div className="text-charcoal-600">{service.category}</div>
                               <div className="text-label-medium text-charcoal-400">{service.subCategory}</div>
@@ -497,6 +499,21 @@ const ServiceModeration = ({ onNavigate, adminUserProfileId }) => {
                     {selectedService.description || 'No description provided'}
                   </p>
                 </div>
+
+                {/* Provider Info */}
+                {selectedService.providerName && (
+                  <div className="bg-cream-50 rounded-lg p-4">
+                    <h5 className="text-body-medium text-charcoal-600 font-semibold mb-3">
+                      Service Provider
+                    </h5>
+                    <div className="flex justify-between items-center">
+                      <span className="text-body-regular text-charcoal-400">Provider Name:</span>
+                      <span className="text-body-regular text-charcoal-600 font-semibold">
+                        {selectedService.providerName}
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Category Info */}
                 <div className="bg-cream-50 rounded-lg p-4">

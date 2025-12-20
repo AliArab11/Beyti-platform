@@ -32,7 +32,7 @@ namespace Beyti_Backend.Controllers.Api
                 // Pending products (you might need to add a Status field to Product table)
                 // For now, we'll use IsActive as the indicator
                 var recentProducts = await _context.Products
-                    .Where(p => p.CreatedAt >= DateTime.UtcNow.AddDays(-7))
+                    .Where(p => p.CreatedAt >= DateTime.Now.AddDays(-7))
                     .CountAsync();
 
                 return Ok(new
@@ -168,7 +168,7 @@ namespace Beyti_Backend.Controllers.Api
                 if (product == null) return NotFound();
 
                 product.IsActive = true;
-                product.UpdatedAt = DateTime.UtcNow;
+                product.UpdatedAt = DateTime.Now;
 
                 await _context.SaveChangesAsync();
 
@@ -216,7 +216,7 @@ namespace Beyti_Backend.Controllers.Api
                 if (product == null) return NotFound();
 
                 product.IsActive = false;
-                product.UpdatedAt = DateTime.UtcNow;
+                product.UpdatedAt = DateTime.Now;
 
                 // You could add a reason field to track why it was suspended
                 string? reason = null;

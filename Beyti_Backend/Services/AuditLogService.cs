@@ -36,7 +36,7 @@ namespace Beyti_Backend.Services
                 TargetId = targetUserId,
                 Description = $"Created new user '{displayName}' with role '{roleType}'",
                 Severity = "Low",
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             };
 
             _context.AuditLogs.Add(auditLog);
@@ -56,7 +56,7 @@ namespace Beyti_Backend.Services
                 TargetId = targetUserId,
                 Description = $"Updated user '{displayName}': {changeDescription}",
                 Severity = "Low",
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             };
 
             _context.AuditLogs.Add(auditLog);
@@ -76,7 +76,7 @@ namespace Beyti_Backend.Services
                 TargetId = targetUserId,
                 Description = $"Activated user account '{displayName}'",
                 Severity = "Medium",
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             };
 
             _context.AuditLogs.Add(auditLog);
@@ -96,7 +96,7 @@ namespace Beyti_Backend.Services
                 TargetId = targetUserId,
                 Description = $"Deactivated user account '{displayName}'",
                 Severity = "Medium",
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             };
 
             _context.AuditLogs.Add(auditLog);
@@ -116,7 +116,7 @@ namespace Beyti_Backend.Services
                 TargetId = targetUserId,
                 Description = $"Suspended user '{displayName}'. Reason: {reason}",
                 Severity = "High",
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             };
 
             _context.AuditLogs.Add(auditLog);
@@ -136,7 +136,7 @@ namespace Beyti_Backend.Services
                 TargetId = targetUserId,
                 Description = $"Reactivated previously suspended user '{displayName}'",
                 Severity = "Medium",
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             };
 
             _context.AuditLogs.Add(auditLog);
@@ -156,7 +156,7 @@ namespace Beyti_Backend.Services
                 TargetId = oldUserId,
                 Description = $"Changed user role from '{oldRole}' to '{newRole}'. Old user ID: {oldUserId}, New user ID: {newUserId}",
                 Severity = "High",
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             };
 
             _context.AuditLogs.Add(auditLog);

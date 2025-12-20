@@ -844,9 +844,23 @@ const handleSaveBanner = async (themeKey, accentColor) => {
         return 'bg-success-bg text-success-text';
       case 'Inactive':
         return 'bg-error-bg text-error-text';
+      case 'Suspended':
+        return 'bg-error-bg text-error-text';
       default:
         return 'bg-grey-300 text-charcoal-600 dark:bg-charcoal-400 dark:text-cream-50';
     }
+  };
+
+  // Determine account status based on user role
+  const getAccountStatus = () => {
+    // For Service Providers, account status is always based on accountStatus field
+    // For Customers, show accountStatus field which should be Active/Inactive
+    // Service Providers have a separate 'status' field for availability (Available/Busy/Unavailable)
+    if (userRole === 'ServiceProvider') {
+      return userProfile.accountStatus || 'Active';
+    }
+    // For all other roles (Customer, Admin, etc.), show accountStatus
+    return userProfile.accountStatus || userProfile.status || 'Active';
   };
 
   // Check if this user role should show phone and address fields
@@ -1464,8 +1478,8 @@ const handleSaveBanner = async (themeKey, accentColor) => {
           {/* Account Status */}
           <div className="flex flex-col">
             <p className="text-label-medium text-charcoal-400 dark:text-gray-400 mb-2">Account Status</p>
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-label-medium font-medium w-fit ${getStatusBadgeColor(userProfile.status)}`}>
-              {userProfile.status}
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-label-medium font-medium w-fit ${getStatusBadgeColor(getAccountStatus())}`}>
+              {getAccountStatus()}
             </span>
           </div>
         </div>

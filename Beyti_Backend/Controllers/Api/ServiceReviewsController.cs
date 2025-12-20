@@ -156,7 +156,7 @@ namespace Beyti_Backend.Controllers.Api
                 TimelinessRating = dto.TimelinessRating,
                 Comment = dto.Comment,
                 IsHidden = false,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             };
 
             _context.ServiceReviews.Add(serviceReview);
@@ -204,7 +204,7 @@ namespace Beyti_Backend.Controllers.Api
             }
 
             serviceReview.ProviderResponse = dto.ProviderResponse;
-            serviceReview.RespondedAt = DateTime.UtcNow;
+            serviceReview.RespondedAt = DateTime.Now;
 
             try
             {

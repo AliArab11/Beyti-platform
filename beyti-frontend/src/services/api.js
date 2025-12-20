@@ -1578,6 +1578,10 @@ export const getServiceCategories = async () => {
   return await fetchAPI('/ServiceProviderDashboard/Categories');
 };
 
+export const getProviderCategories = async (serviceProviderId) => {
+  return await fetchAPI(`/ServiceProviderDashboard/ProviderCategories/${serviceProviderId}`);
+};
+
 export const getMyServices = async (serviceProviderId) => {
   return await fetchAPI(`/ServiceProviderDashboard/MyServices/${serviceProviderId}`);
 };
@@ -2013,6 +2017,25 @@ export const toggleServiceReviewVisibility = async (reviewId) => {
 };
 
 /**
+ * Get service reviews by customer ID
+ * Note: Backend doesn't have a customer endpoint, so we fetch all and filter
+ * @param {number} customerId - Customer ID
+ * @returns {Promise<Array>} - Array of service review objects by the customer
+ */
+export const getCustomerServiceReviews = async (customerId) => {
+  try {
+    const allReviews = await fetchAPI('/ServiceReviews');
+    // Filter reviews by customer ID
+    return Array.isArray(allReviews)
+      ? allReviews.filter(review => review.customerId === customerId)
+      : [];
+  } catch (error) {
+    console.error('Error fetching customer service reviews:', error);
+    return [];
+  }
+};
+
+/**
  * Create a new service review
  * @param {Object} reviewData - Service review data
  *   Example: {
@@ -2068,6 +2091,31 @@ export const deleteNotification = async (id) => {
 // Fetch sent notifications for user
 export const getSentNotifications = async (userId) => {
   return await fetchAPI(`/Notifications/user/${userId}/sent`);
+};
+
+// Create announcement
+export const createAnnouncement = async (announcementData) => {
+  return await fetchAPI('/Announcements', {
+    method: 'POST',
+    body: JSON.stringify(announcementData),
+  });
+};
+
+// Get all announcements
+export const getAnnouncements = async () => {
+  return await fetchAPI('/Announcements');
+};
+
+// Get single announcement by ID
+export const getAnnouncement = async (id) => {
+  return await fetchAPI(`/Announcements/${id}`);
+};
+
+// Delete announcement
+export const deleteAnnouncement = async (id) => {
+  return await fetchAPI(`/Announcements/${id}`, {
+    method: 'DELETE',
+  });
 };
 
 // --- Service Category APIs ---
@@ -2246,6 +2294,44 @@ export const updateServiceBooking = async (id, data) => {
   return await fetchAPI(`/ServiceBookings/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Cancel a service booking
+ * @param {number} id - Service booking ID
+ * @param {object} currentBooking - Current booking object with all fields
+ * @param {string} canceledBy - Name of the person/system canceling
+ * @param {string} cancellationReason - Reason for cancellation
+ * @returns {Promise<Object>} - Updated service booking object
+ */
+export const cancelServiceBooking = async (id, currentBooking, canceledBy, cancellationReason) => {
+  // Extract only the fields needed for the update
+  // DO NOT send navigation properties (address, customer, serviceProvider, etc.)
+  const cleanedBooking = {
+    id: currentBooking.id,
+    customerId: currentBooking.customerId,
+    serviceProviderId: currentBooking.serviceProviderId,
+    serviceCatalogId: currentBooking.serviceCatalogId,
+    serviceId: currentBooking.serviceId || null,
+    serviceAddressId: currentBooking.serviceAddressId,
+    timeSlotId: currentBooking.timeSlotId,
+    bookingDateTime: currentBooking.bookingDateTime,
+    serviceType: currentBooking.serviceType,
+    quotedPrice: currentBooking.quotedPrice || null,
+    finalPrice: currentBooking.finalPrice || null,
+    paymentType: currentBooking.paymentType,
+    notes: currentBooking.notes,
+    createdAt: currentBooking.createdAt,
+    // Update status and cancellation fields
+    status: 'Cancelled',
+    canceledBy: canceledBy,
+    cancellationReason: cancellationReason
+  };
+
+  return await fetchAPI(`/ServiceBookings/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(cleanedBooking),
   });
 };
 
