@@ -491,7 +491,7 @@ export default function ReviewsManagement({ serviceProviderId, searchQuery = '' 
       )}
 
       {isResponding && selectedReview && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-grey-200 dark:bg-charcoal-500 rounded-lg p-6 max-w-2xl w-full mx-4">
             <h3 className="text-display-h3 text-charcoal-600 dark:text-white mb-4">
               {selectedReview.providerResponse ? 'Edit Response' : 'Respond to Review'}

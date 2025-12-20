@@ -32,6 +32,8 @@ import StatusChip from '../../../components/StatusChip';
 import { Table, TableHeader, TableBody, TableRow } from '../../../components/Table';
 import PageHeader from '../../../components/PageHeader';
 import AdminSidebar from './AdminSidebar';
+import Snackbar from '../../../components/Snackbar';
+import ConfirmModal from '../../../components/ConfirmModal';
 
 const ServiceModeration = ({ onNavigate, adminUserProfileId }) => {
   const [services, setServices] = useState([]);
@@ -48,10 +50,27 @@ const ServiceModeration = ({ onNavigate, adminUserProfileId }) => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
 
-  // Suspend modal state
-  const [showSuspendModal, setShowSuspendModal] = useState(false);
-  const [suspendReason, setSuspendReason] = useState('');
-  const [serviceToSuspend, setServiceToSuspend] = useState(null);
+  // Snackbar state
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', type: 'success' });
+
+  // ConfirmModal state
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    variant: 'danger'
+  });
+
+  // Input modal state for prompts (suspend reason)
+  const [inputModal, setInputModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    placeholder: '',
+    onConfirm: (value) => {},
+    inputValue: ''
+  });
 
   // Statistics
   const [stats, setStats] = useState({
@@ -130,6 +149,16 @@ const ServiceModeration = ({ onNavigate, adminUserProfileId }) => {
     fetchUserProfile();
   }, [filterStatus]);
 
+  // Auto-close snackbar after 5 seconds
+  useEffect(() => {
+    if (snackbar.open) {
+      const timer = setTimeout(() => {
+        setSnackbar({ ...snackbar, open: false });
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [snackbar.open]);
+
   // View service details
   const handleViewDetails = async (serviceId) => {
     try {
@@ -138,101 +167,152 @@ const ServiceModeration = ({ onNavigate, adminUserProfileId }) => {
       setShowDetailsModal(true);
     } catch (err) {
       console.error('Error fetching service details:', err);
-      alert('Error loading service details');
+      setSnackbar({
+        open: true,
+        message: 'Error loading service details. Please try again.',
+        type: 'error'
+      });
     }
   };
 
   // Approve service
-  const handleApprove = async (serviceId) => {
-    if (window.confirm('Are you sure you want to approve this service?')) {
-      try {
-        const service = services.find(s => s.id === serviceId);
-        await approveService(serviceId, adminUserProfileId);
+  const handleApprove = (serviceId) => {
+    const service = services.find(s => s.id === serviceId);
+    setConfirmModal({
+      isOpen: true,
+      title: 'Approve Service',
+      message: `Are you sure you want to approve "${service?.name || 'this service'}"?`,
+      variant: 'success',
+      onConfirm: async () => {
+        try {
+          await approveService(serviceId, adminUserProfileId);
 
-        // Log the admin activity
-        logAdminActivity(
-          'approval',
-          'Approved Service',
-          service?.name || `Service #${serviceId}`
-        );
+          // Log the admin activity
+          logAdminActivity(
+            'approval',
+            'Approved Service',
+            service?.name || `Service #${serviceId}`
+          );
 
-        alert('Service approved successfully!');
-        fetchServices();
-        fetchStatistics();
-        if (showDetailsModal) {
-          setShowDetailsModal(false);
+          setConfirmModal({ ...confirmModal, isOpen: false });
+          setSnackbar({
+            open: true,
+            message: 'Service approved successfully!',
+            type: 'success'
+          });
+          fetchServices();
+          fetchStatistics();
+          if (showDetailsModal) {
+            setShowDetailsModal(false);
+          }
+        } catch (err) {
+          console.error('Error approving service:', err);
+          setConfirmModal({ ...confirmModal, isOpen: false });
+          setSnackbar({
+            open: true,
+            message: 'Error approving service. Please try again.',
+            type: 'error'
+          });
         }
-      } catch (err) {
-        console.error('Error approving service:', err);
-        alert('Error approving service');
       }
-    }
+    });
   };
 
   // Open suspend modal
   const handleOpenSuspendModal = (service) => {
-    setServiceToSuspend(service);
-    setSuspendReason('');
-    setShowSuspendModal(true);
-  };
+    setInputModal({
+      isOpen: true,
+      title: `Suspend ${service.name}`,
+      message: 'Enter the reason for suspending this service:',
+      placeholder: 'Reason for suspension...',
+      inputValue: '',
+      onConfirm: (reason) => {
+        if (reason.trim()) {
+          setInputModal({ ...inputModal, isOpen: false });
+          setConfirmModal({
+            isOpen: true,
+            title: 'Confirm Suspension',
+            message: `Are you sure you want to suspend "${service.name}"? This will make it inactive.`,
+            variant: 'danger',
+            onConfirm: async () => {
+              try {
+                await suspendService(service.id, reason, adminUserProfileId);
 
-  // Suspend service
-  const handleSuspend = async () => {
-    if (!suspendReason.trim()) {
-      alert('Please provide a reason for suspension');
-      return;
-    }
+                // Log the admin activity
+                logAdminActivity(
+                  'suspension',
+                  'Suspended Service',
+                  service?.name || `Service #${service.id}`
+                );
 
-    try {
-      await suspendService(serviceToSuspend.id, suspendReason, adminUserProfileId);
-
-      // Log the admin activity
-      logAdminActivity(
-        'suspension',
-        'Suspended Service',
-        serviceToSuspend?.name || `Service #${serviceToSuspend.id}`
-      );
-
-      alert('Service suspended successfully!');
-      setShowSuspendModal(false);
-      setServiceToSuspend(null);
-      setSuspendReason('');
-      fetchServices();
-      fetchStatistics();
-      if (showDetailsModal) {
-        setShowDetailsModal(false);
+                setConfirmModal({ ...confirmModal, isOpen: false });
+                setSnackbar({
+                  open: true,
+                  message: 'Service suspended successfully!',
+                  type: 'success'
+                });
+                fetchServices();
+                fetchStatistics();
+                if (showDetailsModal) {
+                  setShowDetailsModal(false);
+                }
+              } catch (err) {
+                console.error('Error suspending service:', err);
+                setConfirmModal({ ...confirmModal, isOpen: false });
+                setSnackbar({
+                  open: true,
+                  message: 'Error suspending service. Please try again.',
+                  type: 'error'
+                });
+              }
+            }
+          });
+        }
       }
-    } catch (err) {
-      console.error('Error suspending service:', err);
-      alert('Error suspending service');
-    }
+    });
   };
 
   // Delete service
-  const handleDelete = async (serviceId) => {
-    if (window.confirm('Are you sure you want to DELETE this service? This action cannot be undone!')) {
-      try {
-        const service = services.find(s => s.id === serviceId);
-        await deleteService(serviceId);
+  const handleDelete = (serviceId) => {
+    const service = services.find(s => s.id === serviceId);
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Service',
+      message: `Are you sure you want to DELETE "${service?.name || 'this service'}"? This action cannot be undone!`,
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          await deleteService(serviceId);
 
-        // Log the admin activity
-        logAdminActivity(
-          'moderation',
-          'Deleted Service',
-          service?.name || `Service #${serviceId}`
-        );
+          // Log the admin activity
+          logAdminActivity(
+            'moderation',
+            'Deleted Service',
+            service?.name || `Service #${serviceId}`
+          );
 
-        alert('Service deleted successfully!');
-        fetchServices();
-        fetchStatistics();
-        if (showDetailsModal) {
-          setShowDetailsModal(false);
+          setConfirmModal({ ...confirmModal, isOpen: false });
+          setSnackbar({
+            open: true,
+            message: 'Service deleted successfully!',
+            type: 'success'
+          });
+          fetchServices();
+          fetchStatistics();
+          if (showDetailsModal) {
+            setShowDetailsModal(false);
+          }
+        } catch (err) {
+          console.error('Error deleting service:', err);
+          setConfirmModal({ ...confirmModal, isOpen: false });
+          setSnackbar({
+            open: true,
+            message: 'Error deleting service. Please try again.',
+            type: 'error'
+          });
         }
-      } catch (err) {
-        console.error('Error deleting service:', err);
-        alert('Error deleting service');
       }
-    }
+    });
   };
 
   // Filter services based on search
@@ -429,7 +509,7 @@ const ServiceModeration = ({ onNavigate, adminUserProfileId }) => {
 
       {/* Service Details Modal */}
       {showDetailsModal && selectedService && (
-        <div className="fixed inset-0 bg-charcoal-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift max-w-3xl w-full max-h-[90vh] overflow-y-auto transition-colors">
             {/* Modal Header */}
             <div className="p-6 border-b border-grey-stroke dark:border-charcoal-500">
@@ -618,68 +698,58 @@ const ServiceModeration = ({ onNavigate, adminUserProfileId }) => {
         </div>
       )}
 
-      {/* Suspend Modal */}
-      {showSuspendModal && serviceToSuspend && (
-        <div className="fixed inset-0 bg-charcoal-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift max-w-md w-full transition-colors">
-            {/* Modal Header */}
-            <div className="p-6 border-b border-grey-stroke dark:border-charcoal-500">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="text-display-h2 text-charcoal-600 dark:text-white">Suspend Service</h3>
-                  <p className="text-body-regular text-charcoal-400 dark:text-gray-400 mt-1">
-                    {serviceToSuspend.name}
-                  </p>
-                </div>
-                <button
-                  onClick={() => {
-                    setShowSuspendModal(false);
-                    setServiceToSuspend(null);
-                    setSuspendReason('');
-                  }}
-                  className="text-charcoal-400 hover:text-charcoal-600 transition-colors p-2"
-                >
-                  <X size={24} />
-                </button>
-              </div>
-            </div>
+      {/* Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        message={snackbar.message}
+        type={snackbar.type}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+      />
 
-            {/* Modal Body */}
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+        onConfirm={confirmModal.onConfirm}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+      />
+
+      {/* Input Modal for text inputs (suspend reason) */}
+      {inputModal.isOpen && (
+        <div className="fixed inset-0 bg-charcoal-900/50 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
+          <div className="bg-cream-50 rounded-2xl shadow-2xl max-w-md w-full">
+            <div className="p-6 border-b border-grey-stroke">
+              <h3 className="text-card-h2 text-charcoal-600 font-bold">{inputModal.title}</h3>
+            </div>
             <div className="p-6">
-              <label className="block text-body-regular text-charcoal-600 dark:text-white font-semibold mb-2">
-                Reason for Suspension *
-              </label>
+              <p className="text-body-regular text-charcoal-600 mb-4">{inputModal.message}</p>
               <textarea
-                placeholder="Enter the reason for suspending this service..."
-                value={suspendReason}
-                onChange={(e) => setSuspendReason(e.target.value)}
-                className="w-full border border-grey-stroke rounded-lg px-4 py-2 focus:ring-2 focus:ring-sage-500 focus:border-sage-500 text-body-regular bg-white min-h-[120px]"
-                required
+                className="w-full border border-grey-stroke rounded-lg px-4 py-2 focus:ring-2 focus:ring-sage-500 focus:border-sage-500 text-body-regular bg-white resize-none"
+                rows="4"
+                placeholder={inputModal.placeholder}
+                value={inputModal.inputValue}
+                onChange={(e) => setInputModal({ ...inputModal, inputValue: e.target.value })}
               />
-              <p className="text-label-medium text-charcoal-400 dark:text-gray-500 mt-2">
-                This reason will be recorded and the service will be marked as inactive.
-              </p>
             </div>
-
-            {/* Modal Footer */}
-            <div className="p-6 border-t border-grey-stroke flex justify-end gap-3">
-              <CRUDButton
-                variant="error"
-                onClick={() => {
-                  setShowSuspendModal(false);
-                  setServiceToSuspend(null);
-                  setSuspendReason('');
-                }}
+            <div className="p-6 border-t border-grey-stroke flex gap-3 justify-end">
+              <button
+                onClick={() => setInputModal({ ...inputModal, isOpen: false, inputValue: '' })}
+                className="px-6 py-2.5 bg-grey-200 text-charcoal-600 text-button font-semibold rounded-xl hover:bg-grey-300 border border-grey-stroke"
               >
                 Cancel
-              </CRUDButton>
-              <CRUDButton
-                variant="success"
-                onClick={handleSuspend}
+              </button>
+              <button
+                onClick={() => {
+                  if (inputModal.inputValue.trim()) {
+                    inputModal.onConfirm(inputModal.inputValue);
+                  }
+                }}
+                className="px-6 py-2.5 bg-sage-500 hover:bg-sage-600 text-white text-button font-semibold rounded-xl shadow-soft-lift"
               >
-                <ProhibitInset size={16} className="inline mr-1" />
-                Suspend Service
-              </CRUDButton>
+                Submit
+              </button>
             </div>
           </div>
         </div>

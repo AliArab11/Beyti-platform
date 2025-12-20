@@ -31,6 +31,8 @@ import CRUDButton from '../../../components/CRUDButton';
 import StatusChip from '../../../components/StatusChip';
 import PageHeader from '../../../components/PageHeader';
 import AdminSidebar from './AdminSidebar';
+import Snackbar from '../../../components/Snackbar';
+import ConfirmModal from '../../../components/ConfirmModal';
 
 const UsersFlagged = ({ onNavigate, adminUserProfileId, renderContentOnly = false }) => {
   const [flaggedData, setFlaggedData] = useState(null);
@@ -45,6 +47,28 @@ const UsersFlagged = ({ onNavigate, adminUserProfileId, renderContentOnly = fals
   // User profile state
   const [userProfile, setUserProfile] = useState(null);
   const [displayName, setDisplayName] = useState("Admin User");
+
+  // Snackbar state
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', type: 'success' });
+
+  // ConfirmModal state
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    variant: 'danger'
+  });
+
+  // Input modal state for prompts (warn/suspend reasons)
+  const [inputModal, setInputModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    placeholder: '',
+    onConfirm: (value) => {},
+    inputValue: ''
+  });
 
   const fetchFlaggedUsers = async () => {
     try {
@@ -100,6 +124,16 @@ const UsersFlagged = ({ onNavigate, adminUserProfileId, renderContentOnly = fals
     }
   }, [adminUserProfileId]);
 
+  // Auto-close snackbar after 5 seconds
+  useEffect(() => {
+    if (snackbar.open) {
+      const timer = setTimeout(() => {
+        setSnackbar({ ...snackbar, open: false });
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [snackbar.open]);
+
   const handleViewDetails = async (user) => {
     try {
       setLoadingViolations(true);
@@ -109,7 +143,12 @@ const UsersFlagged = ({ onNavigate, adminUserProfileId, renderContentOnly = fals
       setViolations(data.violations);
     } catch (err) {
       console.error('Error fetching violations:', err);
-      alert('Error loading violations');
+      setSnackbar({
+        open: true,
+        message: 'Error loading violations. Please try again.',
+        type: 'error'
+      });
+      setShowDetailsModal(false);
     } finally {
       setLoadingViolations(false);
     }
@@ -121,71 +160,130 @@ const UsersFlagged = ({ onNavigate, adminUserProfileId, renderContentOnly = fals
     setViolations([]);
   };
 
-  const handleSuspendUser = async (userId, userName) => {
-    const reason = prompt(`Enter reason for suspending ${userName}:`);
-    if (reason) {
-      if (window.confirm(`Are you sure you want to suspend ${userName}? This will deactivate all their products/services.`)) {
+  const handleSuspendUser = (userId, userName) => {
+    setInputModal({
+      isOpen: true,
+      title: `Suspend ${userName}`,
+      message: 'Enter the reason for suspending this user:',
+      placeholder: 'Reason for suspension...',
+      inputValue: '',
+      onConfirm: (reason) => {
+        if (reason.trim()) {
+          setInputModal({ ...inputModal, isOpen: false });
+          setConfirmModal({
+            isOpen: true,
+            title: 'Confirm Suspension',
+            message: `Are you sure you want to suspend ${userName}? This will deactivate all their products/services.`,
+            variant: 'danger',
+            onConfirm: async () => {
+              try {
+                await suspendUser(userId, reason, adminUserProfileId);
+
+                // Log the admin activity
+                logAdminActivity(
+                  'suspension',
+                  'User Account Suspended',
+                  userName
+                );
+
+                setConfirmModal({ ...confirmModal, isOpen: false });
+                setSnackbar({
+                  open: true,
+                  message: 'User suspended successfully!',
+                  type: 'success'
+                });
+                handleCloseModal();
+                fetchFlaggedUsers();
+              } catch (err) {
+                console.error('Error suspending user:', err);
+                setConfirmModal({ ...confirmModal, isOpen: false });
+                setSnackbar({
+                  open: true,
+                  message: 'Error suspending user. Please try again.',
+                  type: 'error'
+                });
+              }
+            }
+          });
+        }
+      }
+    });
+  };
+
+  const handleReactivateUser = (userId, userName) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Reactivate User',
+      message: `Are you sure you want to reactivate ${userName}?`,
+      variant: 'success',
+      onConfirm: async () => {
         try {
-          await suspendUser(userId, reason, adminUserProfileId);
+          await reactivateUser(userId, adminUserProfileId);
 
           // Log the admin activity
           logAdminActivity(
-            'suspension',
-            'User Account Suspended',
+            'approval',
+            'User Account Reactivated',
             userName
           );
 
-          alert('User suspended successfully!');
-          handleCloseModal();
+          setConfirmModal({ ...confirmModal, isOpen: false });
+          setSnackbar({
+            open: true,
+            message: 'User reactivated successfully!',
+            type: 'success'
+          });
           fetchFlaggedUsers();
         } catch (err) {
-          console.error('Error suspending user:', err);
-          alert('Error suspending user');
+          console.error('Error reactivating user:', err);
+          setConfirmModal({ ...confirmModal, isOpen: false });
+          setSnackbar({
+            open: true,
+            message: 'Error reactivating user. Please try again.',
+            type: 'error'
+          });
         }
       }
-    }
+    });
   };
 
-  const handleReactivateUser = async (userId, userName) => {
-    if (window.confirm(`Are you sure you want to reactivate ${userName}?`)) {
-      try {
-        await reactivateUser(userId, adminUserProfileId);
+  const handleWarnUser = (userId, userName) => {
+    setInputModal({
+      isOpen: true,
+      title: `Warn ${userName}`,
+      message: 'Enter the warning message to send to this user:',
+      placeholder: 'Warning message...',
+      inputValue: '',
+      onConfirm: async (message) => {
+        if (message.trim()) {
+          try {
+            await warnUser(userId, message, adminUserProfileId);
 
-        // Log the admin activity
-        logAdminActivity(
-          'approval',
-          'User Account Reactivated',
-          userName
-        );
+            // Log the admin activity
+            logAdminActivity(
+              'moderation',
+              'Warning Message Sent',
+              `to ${userName}`
+            );
 
-        alert('User reactivated successfully!');
-        fetchFlaggedUsers();
-      } catch (err) {
-        console.error('Error reactivating user:', err);
-        alert('Error reactivating user');
+            setInputModal({ ...inputModal, isOpen: false });
+            setSnackbar({
+              open: true,
+              message: 'Warning sent to user successfully!',
+              type: 'success'
+            });
+          } catch (err) {
+            console.error('Error warning user:', err);
+            setInputModal({ ...inputModal, isOpen: false });
+            setSnackbar({
+              open: true,
+              message: 'Error sending warning. Please try again.',
+              type: 'error'
+            });
+          }
+        }
       }
-    }
-  };
-
-  const handleWarnUser = async (userId, userName) => {
-    const message = prompt(`Enter warning message for ${userName}:`);
-    if (message) {
-      try {
-        await warnUser(userId, message, adminUserProfileId);
-
-        // Log the admin activity
-        logAdminActivity(
-          'moderation',
-          'Warning Message Sent',
-          `to ${userName}`
-        );
-
-        alert('Warning sent to user!');
-      } catch (err) {
-        console.error('Error warning user:', err);
-        alert('Error sending warning');
-      }
-    }
+    });
   };
 
   // Render main content
@@ -502,7 +600,7 @@ const UsersFlagged = ({ onNavigate, adminUserProfileId, renderContentOnly = fals
         {renderContent()}
         {/* Details Modal */}
         {showDetailsModal && selectedUser && (
-          <div className="fixed inset-0 bg-charcoal-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
             <div className="bg-white rounded-lg shadow-soft-lift max-w-3xl w-full max-h-[90vh] overflow-y-auto">
               {/* Modal Header */}
               <div className="p-6 border-b border-grey-stroke">
@@ -628,6 +726,63 @@ const UsersFlagged = ({ onNavigate, adminUserProfileId, renderContentOnly = fals
             </div>
           </div>
         )}
+
+        {/* Snackbar */}
+        <Snackbar
+          open={snackbar.open}
+          message={snackbar.message}
+          type={snackbar.type}
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+        />
+
+        {/* Confirm Modal */}
+        <ConfirmModal
+          isOpen={confirmModal.isOpen}
+          title={confirmModal.title}
+          message={confirmModal.message}
+          variant={confirmModal.variant}
+          onConfirm={confirmModal.onConfirm}
+          onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        />
+
+        {/* Input Modal for text inputs (warn/suspend) */}
+        {inputModal.isOpen && (
+          <div className="fixed inset-0 bg-charcoal-900/50 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
+            <div className="bg-cream-50 rounded-2xl shadow-2xl max-w-md w-full">
+              <div className="p-6 border-b border-grey-stroke">
+                <h3 className="text-card-h2 text-charcoal-600 font-bold">{inputModal.title}</h3>
+              </div>
+              <div className="p-6">
+                <p className="text-body-regular text-charcoal-600 mb-4">{inputModal.message}</p>
+                <textarea
+                  className="w-full border border-grey-stroke rounded-lg px-4 py-2 focus:ring-2 focus:ring-sage-500 focus:border-sage-500 text-body-regular bg-white resize-none"
+                  rows="4"
+                  placeholder={inputModal.placeholder}
+                  value={inputModal.inputValue}
+                  onChange={(e) => setInputModal({ ...inputModal, inputValue: e.target.value })}
+                />
+              </div>
+              <div className="p-6 border-t border-grey-stroke flex gap-3 justify-end">
+                <button
+                  onClick={() => setInputModal({ ...inputModal, isOpen: false, inputValue: '' })}
+                  className="px-6 py-2.5 bg-grey-200 text-charcoal-600 text-button font-semibold rounded-xl hover:bg-grey-300 border border-grey-stroke"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (inputModal.inputValue.trim()) {
+                      inputModal.onConfirm(inputModal.inputValue);
+                    }
+                  }}
+                  className="px-6 py-2.5 bg-sage-500 hover:bg-sage-600 text-white text-button font-semibold rounded-xl shadow-soft-lift"
+                >
+                  Submit
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </>
     );
   }
@@ -688,7 +843,7 @@ const UsersFlagged = ({ onNavigate, adminUserProfileId, renderContentOnly = fals
 
       {/* Details Modal */}
       {showDetailsModal && selectedUser && (
-        <div className="fixed inset-0 bg-charcoal-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-lg shadow-soft-lift max-w-3xl w-full max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="p-6 border-b border-grey-stroke">
@@ -810,6 +965,63 @@ const UsersFlagged = ({ onNavigate, adminUserProfileId, renderContentOnly = fals
                 <Prohibit size={16} className="inline mr-1" />
                 Suspend User
               </CRUDButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        message={snackbar.message}
+        type={snackbar.type}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+      />
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+        onConfirm={confirmModal.onConfirm}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+      />
+
+      {/* Input Modal for text inputs (warn/suspend) */}
+      {inputModal.isOpen && (
+        <div className="fixed inset-0 bg-charcoal-900/50 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
+          <div className="bg-cream-50 rounded-2xl shadow-2xl max-w-md w-full">
+            <div className="p-6 border-b border-grey-stroke">
+              <h3 className="text-card-h2 text-charcoal-600 font-bold">{inputModal.title}</h3>
+            </div>
+            <div className="p-6">
+              <p className="text-body-regular text-charcoal-600 mb-4">{inputModal.message}</p>
+              <textarea
+                className="w-full border border-grey-stroke rounded-lg px-4 py-2 focus:ring-2 focus:ring-sage-500 focus:border-sage-500 text-body-regular bg-white resize-none"
+                rows="4"
+                placeholder={inputModal.placeholder}
+                value={inputModal.inputValue}
+                onChange={(e) => setInputModal({ ...inputModal, inputValue: e.target.value })}
+              />
+            </div>
+            <div className="p-6 border-t border-grey-stroke flex gap-3 justify-end">
+              <button
+                onClick={() => setInputModal({ ...inputModal, isOpen: false, inputValue: '' })}
+                className="px-6 py-2.5 bg-grey-200 text-charcoal-600 text-button font-semibold rounded-xl hover:bg-grey-300 border border-grey-stroke"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (inputModal.inputValue.trim()) {
+                    inputModal.onConfirm(inputModal.inputValue);
+                  }
+                }}
+                className="px-6 py-2.5 bg-sage-500 hover:bg-sage-600 text-white text-button font-semibold rounded-xl shadow-soft-lift"
+              >
+                Submit
+              </button>
             </div>
           </div>
         </div>

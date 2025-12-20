@@ -6,7 +6,7 @@ import BookingTimer from '../../../components/BookingTimer';
 import { logProviderActivity } from '../../../utils/providerActivityLogger';
 import { Calendar } from '@phosphor-icons/react';
 
-export default function BookingsManagement({ serviceProviderId, initialFilter = null }) {
+export default function BookingsManagement({ serviceProviderId, initialFilter = null, initialViewMode = null }) {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState(initialFilter || '');
@@ -16,7 +16,11 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [finalPrice, setFinalPrice] = useState('');
   const [paymentType, setPaymentType] = useState('');
-  const [viewMode, setViewMode] = useState('upcoming'); // 'upcoming' or 'all'
+  const [viewMode, setViewMode] = useState(
+    initialViewMode === 'weekly' ? 'upcoming' :
+    initialViewMode === 'all' ? 'all' :
+    'upcoming'
+  ); // 'upcoming' or 'all'
   const [currentWeekStart, setCurrentWeekStart] = useState(getWeekStart(new Date()));
   const [timeSlots, setTimeSlots] = useState([]);
 

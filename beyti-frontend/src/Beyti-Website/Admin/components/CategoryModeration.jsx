@@ -31,7 +31,8 @@ import {
   updateUserProfile
 } from '../../../services/api';
 import { logAdminActivity } from '../../../utils/adminActivityLogger';
-
+import Snackbar from '../../../components/Snackbar';
+import ConfirmModal from '../../../components/ConfirmModal';
 // Import design system components
 import AnalyticsCard from '../../../components/AnalyticsCard';
 import CRUDButton from '../../../components/CRUDButton';
@@ -54,6 +55,17 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
   const [userProfile, setUserProfile] = useState(null);
   const [displayName, setDisplayName] = useState("Admin User");
 
+  // Snackbar state
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', type: 'success' });
+
+  // ConfirmModal state
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    variant: 'danger'
+  });
   // Modal states
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showSubCategoryModal, setShowSubCategoryModal] = useState(false);
@@ -160,6 +172,7 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
     }
   };
 
+  
   // Handle profile update
   const handleProfileUpdate = async (updates) => {
     try {
@@ -179,6 +192,15 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
     fetchUserProfile();
   }, []);
 
+  // Auto-close snackbar after 5 seconds
+  useEffect(() => {
+    if (snackbar.open) {
+      const timer = setTimeout(() => {
+        setSnackbar({ ...snackbar, open: false });
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [snackbar.open]);
 
   // Category handlers
   const handleCategorySubmit = async (e) => {
@@ -195,7 +217,11 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
             categoryFormData.Name
           );
 
-          alert('Category updated successfully!');
+          setSnackbar({
+            open: true,
+            message: 'Category updated successfully!',
+            type: 'success'
+          });
         } else {
           await createCategory(categoryFormData);
 
@@ -206,7 +232,11 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
             categoryFormData.Name
           );
 
-          alert('Category created successfully!');
+          setSnackbar({
+            open: true,
+            message: 'Category created successfully!',
+            type: 'success'
+          });
         }
       } else {
         // Service category operations
@@ -220,7 +250,11 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
             categoryFormData.Name
           );
 
-          alert('Service Category updated successfully!');
+          setSnackbar({
+            open: true,
+            message: 'Service Category updated successfully!',
+            type: 'success'
+          });
         } else {
           await createServiceCategory(categoryFormData);
 
@@ -231,7 +265,11 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
             categoryFormData.Name
           );
 
-          alert('Service Category created successfully!');
+          setSnackbar({
+            open: true,
+            message: 'Service Category created successfully!',
+            type: 'success'
+          });
         }
       }
       setCategoryFormData({ Name: '', Description: '', IsActive: true });
@@ -240,7 +278,11 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
       fetchCategories();
     } catch (err) {
       console.error('Error saving category:', err);
-      alert('Error saving category.');
+      setSnackbar({
+        open: true,
+        message: 'Error saving category. Please try again.',
+        type: 'error'
+      });
     }
   };
 
@@ -255,34 +297,51 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
   };
 
   const handleToggleCategoryStatus = async (category) => {
-    if (window.confirm(`Are you sure you want to ${category.isActive ? 'deactivate' : 'activate'} ${category.name}?`)) {
-      try {
-        const newStatus = !category.isActive;
-        const updateData = {
-          Name: category.name,
-          Description: category.description || '',
-          IsActive: newStatus
-        };
+    const newStatus = !category.isActive;
+    setConfirmModal({
+      isOpen: true,
+      title: `${newStatus ? 'Activate' : 'Deactivate'} Category`,
+      message: `Are you sure you want to ${newStatus ? 'activate' : 'deactivate'} "${category.name}"?`,
+      variant: newStatus ? 'success' : 'warning',
+      onConfirm: async () => {
+        try {
+          const updateData = {
+            Name: category.name,
+            Description: category.description || '',
+            IsActive: newStatus
+          };
 
-        if (viewMode === 'products') {
-          await updateCategory(category.id, updateData);
-        } else {
-          await updateServiceCategory(category.id, updateData);
+          if (viewMode === 'products') {
+            await updateCategory(category.id, updateData);
+          } else {
+            await updateServiceCategory(category.id, updateData);
+          }
+
+          // Log the admin activity
+          logAdminActivity(
+            newStatus ? 'approval' : 'suspension',
+            `${newStatus ? 'Activated' : 'Deactivated'} ${viewMode === 'products' ? 'Category' : 'Service Category'}`,
+            category.name
+          );
+
+          setConfirmModal({ ...confirmModal, isOpen: false });
+          setSnackbar({
+            open: true,
+            message: `Category ${newStatus ? 'activated' : 'deactivated'} successfully!`,
+            type: 'success'
+          });
+          fetchCategories();
+        } catch (err) {
+          console.error('Error toggling category status:', err);
+          setConfirmModal({ ...confirmModal, isOpen: false });
+          setSnackbar({
+            open: true,
+            message: 'Error toggling category status. Please try again.',
+            type: 'error'
+          });
         }
-
-        // Log the admin activity
-        logAdminActivity(
-          newStatus ? 'approval' : 'suspension',
-          `${newStatus ? 'Activated' : 'Deactivated'} ${viewMode === 'products' ? 'Category' : 'Service Category'}`,
-          category.name
-        );
-
-        fetchCategories();
-      } catch (err) {
-        console.error('Error toggling category status:', err);
-        alert('Error toggling category status.');
       }
-    }
+    });
   };
 
   const handleCancelCategoryForm = () => {
@@ -311,7 +370,11 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
             `${subCategoryFormData.Name} - ${selectedCategoryForSubCategory?.name || ''}`
           );
 
-          alert('SubCategory updated successfully!');
+          setSnackbar({
+            open: true,
+            message: 'SubCategory updated successfully!',
+            type: 'success'
+          });
         } else {
           await createSubCategory(subCategoryFormData);
 
@@ -322,7 +385,11 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
             `${subCategoryFormData.Name} - ${selectedCategoryForSubCategory?.name || ''}`
           );
 
-          alert('SubCategory created successfully!');
+          setSnackbar({
+            open: true,
+            message: 'SubCategory created successfully!',
+            type: 'success'
+          });
         }
       } else {
         // Service catalog operations
@@ -346,7 +413,11 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
             `${subCategoryFormData.Name} - ${selectedCategoryForSubCategory?.name || ''}`
           );
 
-          alert('Service Catalog updated successfully!');
+          setSnackbar({
+            open: true,
+            message: 'Service Catalog updated successfully!',
+            type: 'success'
+          });
         } else {
           await createServiceCatalog(catalogData);
 
@@ -357,7 +428,11 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
             `${subCategoryFormData.Name} - ${selectedCategoryForSubCategory?.name || ''}`
           );
 
-          alert('Service Catalog created successfully!');
+          setSnackbar({
+            open: true,
+            message: 'Service Catalog created successfully!',
+            type: 'success'
+          });
         }
       }
       setSubCategoryFormData({ Name: '', CategoryId: null, IsActive: true });
@@ -367,10 +442,13 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
       fetchCategories();
     } catch (err) {
       console.error('Error saving subcategory/catalog:', err);
-      alert('Error saving subcategory/catalog.');
+      setSnackbar({
+        open: true,
+        message: 'Error saving subcategory/catalog. Please try again.',
+        type: 'error'
+      });
     }
   };
-
   const handleAddSubCategory = (category) => {
     setSelectedCategoryForSubCategory(category);
     setSubCategoryFormData({ Name: '', CategoryId: category.id, IsActive: true });
@@ -394,48 +472,65 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
 
   const handleToggleSubCategoryStatus = async (category, subCategory) => {
     const currentStatus = subCategory.isActive !== undefined ? subCategory.isActive : true;
-    if (window.confirm(`Are you sure you want to ${currentStatus ? 'deactivate' : 'activate'} ${subCategory.name}?`)) {
-      try {
-        const newStatus = !currentStatus;
+    const newStatus = !currentStatus;
+    
+    setConfirmModal({
+      isOpen: true,
+      title: `${newStatus ? 'Activate' : 'Deactivate'} ${viewMode === 'products' ? 'SubCategory' : 'Service Catalog'}`,
+      message: `Are you sure you want to ${newStatus ? 'activate' : 'deactivate'} "${subCategory.name}"?`,
+      variant: newStatus ? 'success' : 'warning',
+      onConfirm: async () => {
+        try {
+          if (viewMode === 'products') {
+            await updateSubCategory(subCategory.id, {
+              Name: subCategory.name,
+              CategoryId: category.id,
+              IsActive: newStatus
+            });
 
-        if (viewMode === 'products') {
-          await updateSubCategory(subCategory.id, {
-            Name: subCategory.name,
-            CategoryId: category.id,
-            IsActive: newStatus
+            // Log the admin activity
+            logAdminActivity(
+              newStatus ? 'approval' : 'suspension',
+              `${newStatus ? 'Activated' : 'Deactivated'} SubCategory`,
+              `${subCategory.name} - ${category.name}`
+            );
+          } else {
+            await updateServiceCatalog(subCategory.id, {
+              Name: subCategory.name,
+              Description: subCategory.description || '',
+              ServiceCategoryId: parseInt(category.id),
+              IsActive: newStatus,
+              MinPrice: subCategory.minPrice ? parseFloat(subCategory.minPrice) : null,
+              MaxPrice: subCategory.maxPrice ? parseFloat(subCategory.maxPrice) : null,
+              EstimatedDuration: subCategory.estimatedDuration ? parseInt(subCategory.estimatedDuration) : null
+            });
+
+            // Log the admin activity
+            logAdminActivity(
+              newStatus ? 'approval' : 'suspension',
+              `${newStatus ? 'Activated' : 'Deactivated'} Service Catalog`,
+              `${subCategory.name} - ${category.name}`
+            );
+          }
+
+          setConfirmModal({ ...confirmModal, isOpen: false });
+          setSnackbar({
+            open: true,
+            message: `${viewMode === 'products' ? 'SubCategory' : 'Service Catalog'} ${newStatus ? 'activated' : 'deactivated'} successfully!`,
+            type: 'success'
           });
-
-          // Log the admin activity
-          logAdminActivity(
-            newStatus ? 'approval' : 'suspension',
-            `${newStatus ? 'Activated' : 'Deactivated'} SubCategory`,
-            `${subCategory.name} - ${category.name}`
-          );
-        } else {
-          await updateServiceCatalog(subCategory.id, {
-            Name: subCategory.name,
-            Description: subCategory.description || '',
-            ServiceCategoryId: parseInt(category.id),
-            IsActive: newStatus,
-            MinPrice: subCategory.minPrice ? parseFloat(subCategory.minPrice) : null,
-            MaxPrice: subCategory.maxPrice ? parseFloat(subCategory.maxPrice) : null,
-            EstimatedDuration: subCategory.estimatedDuration ? parseInt(subCategory.estimatedDuration) : null
+          fetchCategories();
+        } catch (err) {
+          console.error('Error toggling subcategory/catalog status:', err);
+          setConfirmModal({ ...confirmModal, isOpen: false });
+          setSnackbar({
+            open: true,
+            message: 'Error toggling status. Please try again.',
+            type: 'error'
           });
-
-          // Log the admin activity
-          logAdminActivity(
-            newStatus ? 'approval' : 'suspension',
-            `${newStatus ? 'Activated' : 'Deactivated'} Service Catalog`,
-            `${subCategory.name} - ${category.name}`
-          );
         }
-
-        fetchCategories();
-      } catch (err) {
-        console.error('Error toggling subcategory/catalog status:', err);
-        alert('Error toggling subcategory/catalog status.');
       }
-    }
+    });
   };
 
   const handleCancelSubCategoryForm = () => {
@@ -686,6 +781,7 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
                                       </>
                                     )}
                                   </CRUDButton>
+                                  
                                 </React.Fragment>
                               }
                             />
@@ -698,10 +794,26 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
             </div>
           </div>
         </div>
+                {/* Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        message={snackbar.message}
+        type={snackbar.type}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+      />
 
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+        onConfirm={confirmModal.onConfirm}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+      />
         {/* Category Modal */}
         {showCategoryModal && (
-          <div className="fixed inset-0 bg-charcoal-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
             <div className="bg-white rounded-lg shadow-soft-lift max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               {/* Modal Header */}
               <div className="p-6 border-b border-grey-stroke">
@@ -792,7 +904,7 @@ const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
 
         {/* SubCategory/Catalog Modal */}
         {showSubCategoryModal && (
-          <div className="fixed inset-0 bg-charcoal-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
             <div className="bg-white rounded-lg shadow-soft-lift max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               {/* Modal Header */}
               <div className="p-6 border-b border-grey-stroke">
