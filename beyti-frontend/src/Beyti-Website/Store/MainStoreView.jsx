@@ -7,6 +7,7 @@ import ActiveOrderBanner from './Components/ActiveOrderBanner';
 import Snackbar from './../../components/Snackbar';
 import CustomerHeader from '../../components/CustomerHeader';
 import { isStoreOpen } from '../Seller/Components/storeStatus';
+import { StoreBanner } from '../../components/StoreBanner';
 
 
 // Get customers function
@@ -263,115 +264,131 @@ const FeaturedCarousel = ({ stores, onStoreClick, subcategories = [], selectedCa
             
             return (
               <div 
-                key={store.id || idx} 
-                onClick={() => onStoreClick(store.id)}
-                className="flex-shrink-0 w-[calc(33.333%-16px)] bg-white rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all cursor-pointer"
-              >
-                <div className="relative h-32 bg-gradient-to-br from-cream-100 to-cream-200">
-                  {/* Store Status Badge */}
-                  <div className="absolute top-3 left-3">
-                    <div className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 ${
-                      isStoreOpen(store)
-                        ? 'bg-success-btn text-white'
-                        : 'bg-error-btn text-white'
-                    }`}>
-                      <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                      {isStoreOpen(store) ? 'OPEN' : 'CLOSED'}
-                    </div>
-                  </div>
+  key={store.id || idx} 
+  onClick={() => onStoreClick(store.id)}
+  className="flex-shrink-0 w-[calc(33.333%-16px)] bg-white rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all cursor-pointer"
+>
+  <div className="relative h-32">
+     {/* Banner layer (clipped) */}
+  <div className="absolute inset-0 overflow-hidden z-0">
+    <StoreBanner
+      storeName={store.storeName}
+      storeImageUrl={store.storeImageUrl ? `https://localhost:7062${store.storeImageUrl}` : null}
+      bannerThemeKey={store.bannerThemeKey || 'modern-gradient'}
+      bannerAccentColor={store.bannerAccentColor || '#F97316'}
+      variant="card"
+    />
+  </div>
+    
+    {/* Store Status Badge */}
+    <div className="absolute top-3 left-3">
+      <div className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 ${
+        isStoreOpen(store)
+          ? 'bg-success-btn text-white'
+          : 'bg-error-btn text-white'
+      }`}>
+        <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+        {isStoreOpen(store) ? 'OPEN' : 'CLOSED'}
+      </div>
+    </div>
 
-                  {/* Favorite Heart Button - NEW */}
-                  {onToggleFavorite && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleFavorite(store.id);
-                      }}
-                      className="absolute top-3 right-3 w-9 h-9 bg-white hover:bg-cream-50 rounded-full flex items-center justify-center shadow-md transition-all z-10"
-                    >
-                      <Heart 
-                        size={20} 
-                        weight={favoriteStores.includes(store.id) ? 'fill' : 'regular'} 
-                        className={favoriteStores.includes(store.id) ? 'text-error-btn' : 'text-charcoal-400'}
-                      />
-                    </button>
-                  )}
-                  
-                  <div className="absolute -bottom-8 left-4">
-                    <div className="w-16 h-16 rounded-full border-4 border-white flex items-center justify-center overflow-hidden bg-white shadow-[0_4px_12px_rgba(0,0,0,0.15)]">
-                      {store.storeImageUrl ? (
-                        <img 
-                          src={`https://localhost:7062${store.storeImageUrl}`}
-                          alt={store.storeName}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-grey-200 to-grey-300">
-                          <span className="text-lg font-black text-charcoal-600" style={{ fontFamily: "Inter, sans-serif" }}>
-                            {initials}
-                          </span>
-                        </div>
-                      )}
-                    </div>
+    {/* Favorite Heart Button */}
+    {onToggleFavorite && (
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleFavorite(store.id);
+        }}
+        className="absolute top-3 right-3 w-9 h-9 bg-white hover:bg-cream-50 rounded-full flex items-center justify-center shadow-md transition-all z-10"
+      >
+        <Heart 
+          size={20} 
+          weight={favoriteStores.includes(store.id) ? 'fill' : 'regular'} 
+          className={favoriteStores.includes(store.id) ? 'text-error-btn' : 'text-charcoal-400'}
+        />
+      </button>
+    )}
+    
+    {/* External Logo - positioned on LEFT, overlapping */}
+    <div className="absolute -bottom-8 left-4 z-20">
+    <div className="w-16 h-16 rounded-full border-4 border-white bg-white shadow-[0_4px_12px_rgba(0,0,0,0.15)] overflow-hidden">
+        {store.storeImageUrl ? (
+          <img 
+            src={`https://localhost:7062${store.storeImageUrl}`}
+            alt={store.storeName}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-grey-200 to-grey-300">
+            <span className="text-lg font-black text-charcoal-600" style={{ fontFamily: "Inter, sans-serif" }}>
+              {(() => {
+                const words = store.storeName.split(' ').filter(w => w.length > 0);
+                return words.length >= 2 
+                  ? words[0][0].toUpperCase() + words[words.length - 1][0].toUpperCase()
+                  : words[0].slice(0, 2).toUpperCase();
+              })()}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+  
+  <div className="pt-10 p-4 bg-white">
+    <h3 className="font-bold text-charcoal-600 text-base mb-2" style={{ fontFamily: 'Merriweather, serif' }}>{store.storeName}</h3>
+    <div className="flex items-center gap-1 mb-3">
+      {(() => {
+        const rating = store.averageRating || 0;
+        const hasEnoughReviews = store.averageRating !== null && store.averageRating !== undefined;
+        
+        if (!hasEnoughReviews) {
+          return (
+            <span className="px-3 py-1 bg-sage-500 text-white text-xs font-bold rounded-full" style={{ fontFamily: 'Inter, sans-serif' }}>
+              NEW
+            </span>
+          );
+        }
+        
+        return (
+          <>
+            {[0,1,2,3,4].map(i => {
+              const fillPercentage = Math.max(0, Math.min(100, (rating - i) * 100));
+              return (
+                <div key={i} className="relative w-3.5 h-3.5">
+                  <Star size={14} className="text-grey-stroke absolute" weight="fill" />
+                  <div className="overflow-hidden absolute" style={{ width: `${fillPercentage}%` }}>
+                    <Star size={14} className="text-sage-500" weight="fill" />
                   </div>
                 </div>
-                
-                <div className="pt-10 p-4 bg-white">
-                  <h3 className="font-bold text-charcoal-600 text-base mb-2" style={{ fontFamily: 'Merriweather, serif' }}>{store.storeName}</h3>
-                  <div className="flex items-center gap-1 mb-3">
-                    {(() => {
-                      const rating = store.averageRating || 0;
-                      const hasEnoughReviews = store.averageRating !== null && store.averageRating !== undefined;
-                      
-                      if (!hasEnoughReviews) {
-                        return (
-                          <span className="px-3 py-1 bg-sage-500 text-white text-xs font-bold rounded-full" style={{ fontFamily: 'Inter, sans-serif' }}>
-                            NEW
-                          </span>
-                        );
-                      }
-                      
-                      return (
-                        <>
-                          {[0,1,2,3,4].map(i => {
-                            const fillPercentage = Math.max(0, Math.min(100, (rating - i) * 100));
-                            return (
-                              <div key={i} className="relative w-3.5 h-3.5">
-                                <Star size={14} className="text-grey-stroke absolute" weight="fill" />
-                                <div className="overflow-hidden absolute" style={{ width: `${fillPercentage}%` }}>
-                                  <Star size={14} className="text-sage-500" weight="fill" />
-                                </div>
-                              </div>
-                            );
-                          })}
-                          <span className="text-xs font-semibold text-charcoal-600 ml-1" style={{ fontFamily: 'Inter, sans-serif' }}>
-                            {rating.toFixed(1)}
-                          </span>
-                        </>
-                      );
-                    })()}
-                  </div>
-                 <div className="flex gap-2 flex-wrap">
-                    {(() => {
-                      // Get subcategory names for this store
-                      const storeSubcategoryIds = store.subCategoryIds || [];
-                      const storeSubcategories = subcategories.filter(sub => storeSubcategoryIds.includes(sub.id));
-                      
-                      return storeSubcategories.length > 0 ? (
-                        storeSubcategories.map(subcat => (
-                          <span key={subcat.id} className="px-3 py-1 bg-cream-100 rounded-full text-xs font-medium text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>
-                            {subcat.name}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="px-3 py-1 bg-grey-200 rounded-full text-xs font-medium text-charcoal-400 italic" style={{ fontFamily: 'Inter, sans-serif' }}>
-                          No categories
-                        </span>
-                      );
-                    })()}
-                  </div>
-                </div>
-              </div>
+              );
+            })}
+            <span className="text-xs font-semibold text-charcoal-600 ml-1" style={{ fontFamily: 'Inter, sans-serif' }}>
+              {rating.toFixed(1)}
+            </span>
+          </>
+        );
+      })()}
+    </div>
+    <div className="flex gap-2 flex-wrap">
+      {(() => {
+        const storeSubcategoryIds = store.subCategoryIds || [];
+        const storeSubcategories = subcategories.filter(sub => storeSubcategoryIds.includes(sub.id));
+        
+        return storeSubcategories.length > 0 ? (
+          storeSubcategories.map(subcat => (
+            <span key={subcat.id} className="px-3 py-1 bg-cream-100 rounded-full text-xs font-medium text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>
+              {subcat.name}
+            </span>
+          ))
+        ) : (
+          <span className="px-3 py-1 bg-grey-200 rounded-full text-xs font-medium text-charcoal-400 italic" style={{ fontFamily: 'Inter, sans-serif' }}>
+            No categories
+          </span>
+        );
+      })()}
+    </div>
+  </div>
+</div>
             );
           })}
         </div>
@@ -411,54 +428,67 @@ const StoreCard = ({ store, subcategories = [], isFavorited = false, onToggleFav
 
   return (
     <div className="bg-white rounded-2xl overflow-hidden cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all">
-      <div className="relative h-32 bg-gradient-to-br from-cream-100 to-cream-200">
-        {/* Store Status Badge */}
-        <div className="absolute top-3 left-3">
-          <div className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 ${
-            isStoreOpen(store)
-              ? 'bg-success-btn text-white'
-              : 'bg-error-btn text-white'
-          }`}>
-            <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
-            {isStoreOpen(store) ? 'OPEN' : 'CLOSED'}
-          </div>
-        </div>
+      <div className="relative h-32">
 
-        {/* Favorite Heart Button - NEW */}
-        {onToggleFavorite && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleFavorite(store.id);
-            }}
-            className="absolute top-3 right-3 w-9 h-9 bg-white hover:bg-cream-50 rounded-full flex items-center justify-center shadow-md transition-all z-10"
-          >
-            <Heart 
-              size={20} 
-              weight={isFavorited ? 'fill' : 'regular'} 
-              className={isFavorited ? 'text-error-btn' : 'text-charcoal-400'}
-            />
-          </button>
-        )}
-        
-        <div className="absolute -bottom-8 left-4">
-          <div className="w-16 h-16 rounded-full border-4 border-white flex items-center justify-center overflow-hidden bg-white shadow-[0_4px_12px_rgba(0,0,0,0.15)]">
-            {store.storeImageUrl ? (
-              <img 
-                src={`https://localhost:7062${store.storeImageUrl}`}
-                alt={store.storeName}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-grey-200 to-grey-300">
-                <span className="text-lg font-black text-charcoal-600" style={{ fontFamily: "Inter, sans-serif" }}>
-                  {initials}
-                </span>
-              </div>
-            )}
-          </div>
+      <div className="absolute inset-0 overflow-hidden z-0">
+    <StoreBanner
+      storeName={store.storeName}
+      storeImageUrl={store.storeImageUrl ? `https://localhost:7062${store.storeImageUrl}` : null}
+      bannerThemeKey={store.bannerThemeKey || 'modern-gradient'}
+      bannerAccentColor={store.bannerAccentColor || '#F97316'}
+      variant="card"
+    />
+  </div>
+
+  {/* Store Status Badge */}
+  <div className="absolute top-3 left-3 z-30">
+    <div className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 ${
+      isStoreOpen(store)
+        ? 'bg-success-btn text-white'
+        : 'bg-error-btn text-white'
+    }`}>
+      <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+      {isStoreOpen(store) ? 'OPEN' : 'CLOSED'}
+    </div>
+  </div>
+
+  {/* Favorite Heart */}
+  {onToggleFavorite && (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggleFavorite(store.id);
+      }}
+      className="absolute top-3 right-3 w-9 h-9 bg-white hover:bg-cream-50 rounded-full flex items-center justify-center shadow-md transition-all z-30"
+    >
+      <Heart
+        size={20}
+        weight={isFavorited ? 'fill' : 'regular'}
+        className={isFavorited ? 'text-error-btn' : 'text-charcoal-400'}
+      />
+    </button>
+  )}
+
+  {/* Store Logo (OVERLAPS banner + card) */}
+  <div className="absolute -bottom-8 left-4 z-20">
+    <div className="w-16 h-16 rounded-full border-4 border-white bg-white shadow-[0_4px_12px_rgba(0,0,0,0.15)] overflow-hidden">
+      {store.storeImageUrl ? (
+        <img
+          src={`https://localhost:7062${store.storeImageUrl}`}
+          alt={store.storeName}
+          className="w-full h-full object-cover"
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-grey-200 to-grey-300">
+          <span className="text-lg font-black text-charcoal-600">
+            {initials}
+          </span>
         </div>
-      </div>
+      )}
+    </div>
+  </div>
+
+</div>
       
       <div className="pt-10 p-4 bg-white">
         <h3 className="font-bold text-charcoal-600 text-base mb-2" style={{ fontFamily: 'Merriweather, serif' }}>{store.storeName}</h3>
@@ -497,10 +527,7 @@ const StoreCard = ({ store, subcategories = [], isFavorited = false, onToggleFav
         </div>
         <div className="flex gap-2 flex-wrap">
           {(() => {
-            // Get subcategory names for this store
             const storeSubcategoryIds = store.subCategoryIds || [];
-            // We need to get subcategories from the parent scope
-            // Since StoreCard is used in MainStoreView, we'll need to pass subcategories as a prop
             return storeSubcategoryIds.length > 0 ? (
               storeSubcategoryIds.map(subId => {
                 const subcat = subcategories.find(s => s.id === subId);
@@ -1191,6 +1218,8 @@ const filteredStores = stores
         variant="store"
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}
+        showContextSwitch={true}
+        currentContext="stores"
       />
 
     {/* Active Order Banner */}

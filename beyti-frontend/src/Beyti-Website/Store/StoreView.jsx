@@ -9,6 +9,7 @@ import Snackbar from './../../components/Snackbar';
 import PageHeader from '../../components/PageHeader';
 import CustomerHeader from '../../components/CustomerHeader';
 import { isStoreOpen, formatTime } from '../Seller/Components/storeStatus';
+import { StoreBanner } from '../../components/StoreBanner';
 
 import OrderDetails from './Components/OrderDetails';
 import { createOrder, createOrderItem, getProductVariants, getOrder, getOrders } from '../../services/api';
@@ -39,7 +40,14 @@ const StoreInfo = ({ store, isFavorited, onToggleFavorite, customerId }) => (
       <div className="bg-white rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.08)] relative">
 
         {/* Banner Section (Top) */}
-        <div className="relative h-[180px] bg-gradient-to-br from-cream-100 to-cream-200 rounded-t-3xl overflow-hidden">
+        <div className="relative h-[180px] rounded-t-3xl overflow-hidden">
+          <StoreBanner
+            storeName={store?.storeName || 'Store'}
+            storeImageUrl={store?.storeImageUrl ? `https://localhost:7062${store.storeImageUrl}` : null}
+            bannerThemeKey={store?.bannerThemeKey || 'modern-gradient'}
+            bannerAccentColor={store?.bannerAccentColor || '#F97316'}
+            variant="header"
+          />
           {/* Store Status Badge */}
           <div className="absolute top-4 left-8 z-20">
             <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold shadow-lg ${

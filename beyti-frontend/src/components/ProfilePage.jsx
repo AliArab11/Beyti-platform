@@ -6,7 +6,8 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { User, Envelope, Phone, MapPin, Calendar, IdentificationCard, CheckCircle, XCircle, Buildings, Tag, X, Camera, Upload, Trash  } from '@phosphor-icons/react';
+import { User, Envelope, Phone, MapPin, Calendar, IdentificationCard, CheckCircle, XCircle, Buildings, Tag, X, Camera, Upload, Trash, Palette  } from '@phosphor-icons/react';
+import { StoreBanner, BannerThemeModal } from './StoreBanner';
 
 import ConfirmModal from './ConfirmModal'; 
 import { formatTime } from '../Beyti-Website/Seller/Components/storeStatus';
@@ -69,6 +70,8 @@ const [confirmModal, setConfirmModal] = useState({
   const [addressError, setAddressError] = useState(null);
   const [addingAddress, setAddingAddress] = useState(false);
   const [addressWasModified, setAddressWasModified] = useState(false); 
+
+  const [showBannerModal, setShowBannerModal] = useState(false);
 
   const [showCropper, setShowCropper] = useState(false);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
@@ -791,6 +794,39 @@ const handleDeleteCustomerAddress = async (addressId) => {
   });
 };
 
+const handleSaveBanner = async (themeKey, accentColor) => {
+  try {
+    console.log('🎨 Saving banner:', { themeKey, accentColor }); // ← ADD THIS
+    
+    const response = await fetch(`https://localhost:7062/api/Sellers/${entityId}/banner`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        bannerThemeKey: themeKey, 
+        bannerAccentColor: accentColor 
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to update banner');
+    }
+
+    const result = await response.json();
+    console.log('✅ Banner saved:', result); // ← ADD THIS
+
+    showSnackbar('Banner theme updated successfully!', 'success');
+    setShowBannerModal(false);
+    
+    // Trigger parent refresh
+    if (onProfileUpdate) {
+      await onProfileUpdate({ forceRefresh: true });
+    }
+  } catch (error) {
+    console.error('❌ Error updating banner:', error);
+    showSnackbar('Failed to update banner. Please try again.', 'error');
+  }
+};
+
   if (!userProfile) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -834,7 +870,30 @@ const handleDeleteCustomerAddress = async (addressId) => {
 
       {/* Header Card */}
       <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg border border-grey-stroke dark:border-charcoal-500 shadow-soft-lift dark:shadow-none overflow-hidden transition-colors">
-        <div className="h-32 bg-gradient-to-r from-sage-500 to-sage-700"></div>
+        {userRole === 'Seller' ? (
+          <div className="relative group h-[200px]">
+            <StoreBanner
+              storeName={formData.displayName || 'User Profile'}
+              storeImageUrl={imagePreview}
+              bannerThemeKey={userProfile?.bannerThemeKey || 'sunset-gradient'}
+              bannerAccentColor={userProfile?.bannerAccentColor || '#F97316'}
+              onClick={() => !readOnly && setShowBannerModal(true)}
+              variant="header"
+            />
+            {!readOnly && (
+              <button
+                onClick={() => setShowBannerModal(true)}
+                className="absolute top-4 right-4 p-3 bg-white/90 hover:bg-white dark:bg-charcoal-700/90 dark:hover:bg-charcoal-700 rounded-full shadow-lg transition-all opacity-0 group-hover:opacity-100 flex items-center gap-2"
+                title="Change Banner Theme"
+              >
+                <Palette size={20} weight="bold" className="text-sage-600 dark:text-sage-400" />
+                <span className="text-sm font-semibold text-sage-600 dark:text-sage-400">Change Theme</span>
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="h-32 bg-gradient-to-r from-sage-500 to-sage-700"></div>
+        )}
         <div className="px-8 pb-8">
           <div className="flex items-end justify-between -mt-16 mb-6">
             <div className="flex items-end gap-6">
@@ -1729,6 +1788,20 @@ const handleDeleteCustomerAddress = async (addressId) => {
   confirmText="Delete"
   variant={confirmModal.variant}
 />
+
+{/* Banner Theme Modal - Only for Sellers */}
+{userRole === 'Seller' && (
+  <BannerThemeModal
+    isOpen={showBannerModal}
+    onClose={() => setShowBannerModal(false)}
+    currentTheme={userProfile?.bannerThemeKey || 'sunset-gradient'}
+    currentAccentColor={userProfile?.bannerAccentColor || '#F97316'}
+    storeName={formData.displayName || 'User Profile'}
+    storeImageUrl={imagePreview}
+    onSave={handleSaveBanner}
+  />
+)}
+
     </div>
   );
 }

@@ -1519,6 +1519,8 @@ const productsArr = Array.from(productMap.values()).sort(
                               subCategoryIds: currentSeller?.subCategoryIds || [],
                               storeImageUrl: currentSeller?.storeImageUrl || null,
                               storeDescription: currentSeller?.storeDescription || '',
+                              bannerThemeKey: currentSeller?.bannerThemeKey || 'modern-gradient',
+                              bannerAccentColor: currentSeller?.bannerAccentColor || '#F97316',
                               openTime: currentSeller?.openTime || '',  
                               closeTime: currentSeller?.closeTime || '',  
                               isManuallyClosed: currentSeller?.isManuallyClosed || false,
