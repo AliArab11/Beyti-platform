@@ -258,7 +258,8 @@ namespace Beyti_Backend.Controllers.Api
                 Price = dto.Price,
                 StockQty = dto.StockQty,
                 CreatedAt = DateTime.Now,
-                UpdatedAt = DateTime.Now
+                UpdatedAt = DateTime.Now,
+                IsActive = true
             };
 
             _context.ProductVariants.Add(productVariant);

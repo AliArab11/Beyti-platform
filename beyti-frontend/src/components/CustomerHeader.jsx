@@ -8,6 +8,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MagnifyingGlass, Bell, ShoppingCartSimple, User, Package, MapPin, Gear, SignOut, House, ArrowLeft, CaretDown  } from '@phosphor-icons/react';
 import NotificationDropdown from './NotificationDropdown';
+import SettingsModal from './SettingsModal';
 
 const CustomerHeader = ({
   title = "Beyti",
@@ -33,6 +34,7 @@ const CustomerHeader = ({
 }) => {
   const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const handleSearchChange = (e) => {
     if (onSearchChange) {
@@ -298,7 +300,7 @@ const CustomerHeader = ({
                       <button
                         onClick={() => {
                           setIsDropdownOpen(false);
-                          // TODO: Navigate to settings page
+                          setIsSettingsOpen(true);
                         }}
                         className="w-full px-4 py-2.5 text-left text-body-regular text-charcoal-600 dark:text-cream-50 hover:bg-cream-100 dark:hover:bg-charcoal-400 transition-colors flex items-center gap-3"
                       >
@@ -336,8 +338,13 @@ const CustomerHeader = ({
           )}
         </div>
       </div>
+      
      </div>
+      {/* Settings Modal */}
+    <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </header>
+    
+    
   );
 };
 

@@ -315,7 +315,7 @@ const HomePage = () => {
           <div className="text-center mb-16">
             <div className="inline-block mb-6">
               <span className="px-6 py-2 bg-white/20 backdrop-blur-sm rounded-full text-white font-semibold text-sm border border-white/30">
-                🎉 Welcome to Your Local Marketplace
+                Welcome to Your Local Marketplace
               </span>
             </div>
             <h1 
@@ -362,7 +362,7 @@ const HomePage = () => {
       <div className="max-w-[1400px] mx-auto px-8 -mt-16 relative z-20 mb-16">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
           {/* Local Stores Section */}
-          <div className="bg-white rounded-3xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.15)] hover:shadow-[0_30px_80px_rgba(85,107,92,0.3)] transition-all duration-500 hover:scale-[1.03] cursor-pointer group relative">
+          <div onClick={handleNavigateToStores} className="bg-white rounded-3xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.15)] hover:shadow-[0_30px_80px_rgba(85,107,92,0.3)] transition-all duration-500 hover:scale-[1.03] cursor-pointer group relative">
             <div className="absolute top-0 right-0 w-32 h-32 bg-sage-500/10 rounded-full blur-3xl group-hover:bg-sage-500/20 transition-all"></div>
             <div className="p-12 pb-6 relative z-10">
               <div className="inline-flex items-center gap-2 px-4 py-2 bg-sage-100 rounded-full mb-4">
@@ -406,7 +406,7 @@ const HomePage = () => {
           </div>
 
           {/* Service Providers Section */}
-          <div className="bg-white rounded-3xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.15)] hover:shadow-[0_30px_80px_rgba(91,155,213,0.3)] transition-all duration-500 hover:scale-[1.03] cursor-pointer group relative">
+          <div onClick={handleNavigateToServices} className="bg-white rounded-3xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.15)] hover:shadow-[0_30px_80px_rgba(91,155,213,0.3)] transition-all duration-500 hover:scale-[1.03] cursor-pointer group relative">
             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl group-hover:bg-blue-500/20 transition-all"></div>
             <div className="p-12 pb-6 relative z-10">
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-4" style={{ backgroundColor: '#E3F2FD' }}>
@@ -462,7 +462,7 @@ const HomePage = () => {
           <div className="text-center mb-16">
             <div className="inline-block mb-4">
               <span className="px-5 py-2 bg-sage-100 text-sage-700 rounded-full text-sm font-bold" style={{ fontFamily: 'Inter, sans-serif' }}>
-                ⭐ FEATURED
+                 FEATURED
               </span>
             </div>
             <h2 
@@ -614,7 +614,7 @@ const HomePage = () => {
           <div className="text-center mb-20">
             <div className="inline-block mb-4">
               <span className="px-5 py-2 bg-sage-100 text-sage-700 rounded-full text-sm font-bold" style={{ fontFamily: 'Inter, sans-serif' }}>
-                💎 WHY CHOOSE US
+                 WHY CHOOSE US
               </span>
             </div>
             <h2 
@@ -674,60 +674,45 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="w-full px-8 py-28 bg-gradient-to-br from-sage-500 via-sage-600 to-sage-700 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-white rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-white rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
-        </div>
-
-        {/* Floating particles */}
-        <div className="absolute inset-0 overflow-hidden">
-          {[...Array(15)].map((_, i) => (
-            <div
-              key={i}
-              className="absolute w-2 h-2 bg-white/20 rounded-full"
-              style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                animation: `float ${5 + Math.random() * 10}s ease-in-out infinite`,
-                animationDelay: `${Math.random() * 5}s`
-              }}
-            />
-          ))}
-        </div>
-        
-        <div className="max-w-[1400px] mx-auto text-center relative z-10">
-          <div className="inline-block mb-6">
-            <span className="px-6 py-2 bg-white/20 backdrop-blur-sm rounded-full text-white font-bold text-sm border border-white/30">
-              🚀 JOIN US TODAY
-            </span>
-          </div>
-          <h2 
-            className="text-[56px] font-bold text-white mb-6 leading-tight" 
-            style={{ fontFamily: 'Merriweather, serif' }}
-          >
-            Ready to Get Started?
-          </h2>
-          <p 
-            className="text-2xl text-sage-100 mb-12 max-w-3xl mx-auto leading-relaxed" 
-            style={{ fontFamily: 'Inter, sans-serif' }}
-          >
-            Join thousands of customers who trust Beyti for their local shopping and service needs
-          </p>
-          <button
-            onClick={handleNavigateToStores}
-            className="bg-white text-sage-700 px-16 py-6 rounded-xl font-bold text-xl hover:bg-cream-50 transition-all shadow-2xl hover:scale-110 hover:shadow-white/30 inline-flex items-center gap-4 group"
-            style={{ fontFamily: 'Inter, sans-serif' }}
-          >
-            Start Exploring
-            <ArrowRight size={32} weight="bold" className="group-hover:translate-x-2 transition-transform" />
-          </button>
-          <p className="text-sage-200 mt-6 text-lg" style={{ fontFamily: 'Inter, sans-serif' }}>
-            No credit card required • Free to browse
-          </p>
-        </div>
-      </section>
+      {/* Footer */}
+<footer className="w-full px-8 py-12 bg-charcoal-700">
+  <div className="max-w-[1400px] mx-auto">
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+      <div>
+        <h3 className="text-xl font-bold text-white mb-4" style={{ fontFamily: 'Merriweather, serif' }}>Beyti</h3>
+        <p className="text-charcoal-300 text-sm" style={{ fontFamily: 'Inter, sans-serif' }}>
+          Your trusted local marketplace for stores and services.
+        </p>
+      </div>
+      <div>
+        <h4 className="text-white font-semibold mb-3" style={{ fontFamily: 'Inter, sans-serif' }}>Quick Links</h4>
+        <ul className="space-y-2">
+          <li><button onClick={handleNavigateToStores} className="text-charcoal-300 hover:text-white text-sm transition-colors">Browse Stores</button></li>
+          <li><button onClick={handleNavigateToServices} className="text-charcoal-300 hover:text-white text-sm transition-colors">Browse Services</button></li>
+        </ul>
+      </div>
+      <div>
+        <h4 className="text-white font-semibold mb-3" style={{ fontFamily: 'Inter, sans-serif' }}>Support</h4>
+        <ul className="space-y-2">
+          <li><a href="#" className="text-charcoal-300 hover:text-white text-sm transition-colors">Help Center</a></li>
+          <li><a href="#" className="text-charcoal-300 hover:text-white text-sm transition-colors">Contact Us</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4 className="text-white font-semibold mb-3" style={{ fontFamily: 'Inter, sans-serif' }}>Legal</h4>
+        <ul className="space-y-2">
+          <li><a href="#" className="text-charcoal-300 hover:text-white text-sm transition-colors">Privacy Policy</a></li>
+          <li><a href="#" className="text-charcoal-300 hover:text-white text-sm transition-colors">Terms of Service</a></li>
+        </ul>
+      </div>
+    </div>
+    <div className="border-t border-charcoal-600 pt-6 text-center">
+      <p className="text-charcoal-400 text-sm" style={{ fontFamily: 'Inter, sans-serif' }}>
+        © 2024 Beyti. All rights reserved.
+      </p>
+    </div>
+  </div>
+</footer>
     </div>
   );
 };
