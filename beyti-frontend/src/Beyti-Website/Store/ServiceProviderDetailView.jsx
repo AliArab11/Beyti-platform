@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Scissors, Star, MagnifyingGlass, ArrowLeft } from "@phosphor-icons/react";
-import { getServiceProviderById, getServiceCatalogs, getServiceProviderServices, getProviderServiceReviews, getServiceBookings } from "../../services/api";
-import { isAuthenticated } from "../../utils/authUtils";
-import PageHeader from "../../components/PageHeader";
+import { getServiceProviderById, getServiceCatalogs, getServiceProviderServices, getProviderServiceReviews, getServiceBookings, getUserProfile } from "../../services/api";
+import { isAuthenticated, getUserId } from "../../utils/authUtils";
+import CustomerHeader from "../../components/CustomerHeader";
+import ActiveOrderBanner from "./Components/ActiveOrderBanner";
 import ServiceDetailsSheet from "./Components/ServiceDetailsSheet";
 import ServiceCheckout from "./Components/ServiceCheckout";
+
 
 // Service Provider Info Section
 const ServiceProviderInfo = ({ provider }) => {
@@ -323,12 +325,157 @@ const ServiceProviderDetailView = () => {
   const [showServiceCheckout, setShowServiceCheckout] = useState(false);
   const [bookingData, setBookingData] = useState(null);
 
+
+  // User profile states
+const [displayName, setDisplayName] = useState("Customer");
+const [userProfile, setUserProfile] = useState(null);
+
+// Active order banner states
+const [activeOrderCount, setActiveOrderCount] = useState(0);
+const [showOrderBanner, setShowOrderBanner] = useState(false);
+
+const [cart, setCart] = useState([]);
+
+// User IDs
+const userProfileId = parseInt(getUserId()) || 4;
+const customerId = 1; // TODO: Get from API based on userProfileId
+
+
+
   // Check authentication on mount
   // useEffect(() => {
   //   if (!isAuthenticated()) {
   //     navigate('/login');
   //   }
   // }, [navigate]);
+
+  // Fetch user profile details
+const fetchUserProfile = async () => {
+  try {
+    const profile = await getUserProfile(userProfileId);
+    if (profile) {
+      const normalizedProfile = {
+        userProfileId: profile.UserProfileId,
+        displayName: profile.DisplayName,
+        roleType: profile.RoleType,
+        accountStatus: profile.AccountStatus,
+        phone: profile.Phone,
+        street: profile.Street,
+        city: profile.City,
+        region: profile.Region,
+        postalCode: profile.PostalCode,
+        country: profile.Country,
+        address: profile.Address,
+        createdAt: profile.CreatedAt,
+        updatedAt: profile.UpdatedAt,
+      };
+
+      setUserProfile(normalizedProfile);
+      if (normalizedProfile.displayName) {
+        setDisplayName(normalizedProfile.displayName);
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+  }
+};
+
+// Fetch user profile on mount
+useEffect(() => {
+  fetchUserProfile();
+}, [userProfileId]);
+
+// Check for active orders
+useEffect(() => {
+  if (customerId) {
+    const activeOrderKey = `beyti_activeOrder_${customerId}`;
+    const bannerDismissedKey = `beyti_bannerDismissed_${customerId}`;
+    
+    const activeOrder = localStorage.getItem(activeOrderKey);
+    const bannerDismissed = localStorage.getItem(bannerDismissedKey);
+    
+    if (activeOrder && !bannerDismissed) {
+      try {
+        const orderData = JSON.parse(activeOrder);
+        setActiveOrderCount(1);
+        setShowOrderBanner(true);
+      } catch (err) {
+        console.error('Error parsing active order:', err);
+      }
+    }
+  }
+}, [customerId]);
+
+// Load cart from localStorage
+useEffect(() => {
+  if (customerId) {
+    // Check all cart keys for this customer
+    let allCartItems = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(`beyti_cart_`) && key.endsWith(`_${customerId}`)) {
+        try {
+          const savedCart = localStorage.getItem(key);
+          if (savedCart) {
+            const parsedCart = JSON.parse(savedCart);
+            allCartItems = [...allCartItems, ...parsedCart];
+          }
+        } catch (err) {
+          console.error('Error parsing cart:', err);
+        }
+      }
+    }
+    setCart(allCartItems);
+  }
+}, [customerId]);
+
+const handleTrackOrder = () => {
+  navigate('/customer-dashboard');
+};
+
+const handleDismissBanner = () => {
+  setShowOrderBanner(false);
+  if (customerId) {
+    localStorage.setItem(`beyti_bannerDismissed_${customerId}`, 'true');
+  }
+};
+
+const handleCartClick = () => {
+  // Find store with items and navigate
+  let targetStoreId = null;
+  let targetStoreName = null;
+  
+  if (customerId) {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(`beyti_cart_`) && key.endsWith(`_${customerId}`)) {
+        try {
+          const savedCart = localStorage.getItem(key);
+          if (savedCart) {
+            const parsedCart = JSON.parse(savedCart);
+            if (parsedCart.length > 0) {
+              const parts = key.split('_');
+              targetStoreId = parts[2];
+              targetStoreName = parsedCart[0]?.storeName;
+              break;
+            }
+          }
+        } catch (err) {
+          console.error('Error parsing cart:', err);
+        }
+      }
+    }
+  }
+  
+  navigate("/checkout", { 
+    state: { 
+      customerId, 
+      customerName: displayName,
+      storeName: targetStoreName,
+      storeId: targetStoreId
+    } 
+  });
+};
 
   useEffect(() => {
     // Scroll to top when component mounts or providerId changes
@@ -535,23 +682,36 @@ const ServiceProviderDetailView = () => {
   }
 
   return (
-    <div className="min-h-screen bg-cream-50">
-      {/* Header with back button */}
-      <header className="bg-cream-50 py-4 px-8 border-b border-grey-stroke sticky top-0 z-10">
-        <div className="max-w-[1440px] mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <button
-              onClick={() => navigate(-1)}
-              className="p-2 hover:bg-grey-200 rounded-lg transition-all"
-            >
-              <ArrowLeft className="w-6 h-6 text-charcoal-600" weight="bold" />
-            </button>
-            <h1 className="text-[32px] font-bold text-charcoal-600" style={{ fontFamily: 'Merriweather, serif' }}>
-              Beyti
-            </h1>
-          </div>
-        </div>
-      </header>
+  <div className="min-h-screen bg-cream-50">
+    {/* Header */}
+    <CustomerHeader
+      pageTitle={provider?.businessName || provider?.displayName || "Service Provider"}
+      showSearch={false}
+      customerName={displayName}
+      customerId={customerId}
+      userProfileId={userProfileId}
+      cart={cart}
+      stores={[]}
+      customerAddresses={[]}
+      onCartClick={handleCartClick}
+      onCustomerClick={() => {
+        console.log('Auto-login triggered');
+      }}
+      onBack={() => navigate(-1)}
+      showBackButton={true}
+      variant="store"
+      currentContext="services"
+      showContextSwitch={true}
+    />
+
+    {/* Active Order Banner */}
+    {showOrderBanner && activeOrderCount > 0 && (
+      <ActiveOrderBanner
+        activeOrderCount={activeOrderCount}
+        onTrack={handleTrackOrder}
+        onDismiss={handleDismissBanner}
+      />
+    )}
 
       <ServiceProviderInfo provider={provider} />
 

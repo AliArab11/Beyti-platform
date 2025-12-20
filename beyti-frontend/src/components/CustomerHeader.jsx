@@ -12,25 +12,26 @@ import SettingsModal from './SettingsModal';
 
 const CustomerHeader = ({
   title = "Beyti",
+  pageTitle = null, // NEW: Center title for current page
   showSearch = true,
   searchPlaceholder = "Search stores, products...",
   searchValue = "",
   onSearchChange,
   customerName = null,
   customerId = null,
-  userProfileId = null, // UserProfile ID for notifications
+  userProfileId = null,
   cart = [],
   stores = [],
   customerAddresses = [],
   onCartClick,
-  onCustomerClick, // For login button
+  onCustomerClick,
   onLogout,
-  onBack, // Back button handler
-  showBackButton = false, // Show back arrow
-  variant = "store", // "store" or "dashboard"
+  onBack,
+  showBackButton = false,
+  variant = "store",
   className = "",
-  currentContext = "stores", // "stores" or "services"
-  showContextSwitch = false, 
+  currentContext = "stores",
+  showContextSwitch = false,
   ...props
 }) => {
   const navigate = useNavigate();
@@ -116,83 +117,67 @@ const CustomerHeader = ({
       `}
       {...props}
     >
-      <div className="w-full pl-8 py-4">
-        <div className="relative w-full flex items-center">
-        {/* Left: Back Button (if shown) OR Brand */}
-          <div className="flex items-center gap-6">
-            {showBackButton && (
-              <button 
-                onClick={onBack}
-                className="p-2 hover:bg-grey-200 dark:hover:bg-charcoal-400 rounded-lg transition-all"
-              >
-                <ArrowLeft className="w-6 h-6 text-charcoal-600 dark:text-cream-50" weight="bold" />
-              </button>
-            )}
-            <h1
-            className="text-[32px] font-bold text-sage-500 dark:text-sage-400"
-            style={{ fontFamily: 'Merriweather, serif' }}
-            >
-            {title}
-            </h1>
+      <div className="w-full px-8 py-4">
+  <div className="relative w-full flex items-center">
+    {/* Left: Back Button + Beyti Brand */}
+    <div className="flex items-center gap-4 min-w-[200px]">
+      {showBackButton && (
+        <button 
+          onClick={onBack}
+          className="p-2 hover:bg-grey-200 dark:hover:bg-charcoal-400 rounded-lg transition-all"
+        >
+          <ArrowLeft className="w-6 h-6 text-charcoal-600 dark:text-cream-50" weight="bold" />
+        </button>
+      )}
+      <h1
+        className="text-[28px] font-bold text-sage-500 dark:text-sage-400"
+        style={{ fontFamily: 'Merriweather, serif' }}
+      >
+        Beyti
+      </h1>
+    </div>
 
-          </div>
+    {/* Left Side: Context Switcher (after Beyti brand) */}
+    {showContextSwitch && (
+      <div className="ml-8 flex items-center">
+        <div className="inline-flex items-center bg-grey-200 dark:bg-charcoal-600 rounded-full p-1 border border-grey-stroke dark:border-charcoal-500">
+          <button
+            onClick={() => navigate('/mainStore', { state: { customerId, customerName } })}
+            className={`px-6 py-2 rounded-full text-sm font-semibold transition-all ${
+              currentContext === 'stores'
+                ? 'bg-sage-500 text-white shadow-sm'
+                : 'text-charcoal-500 dark:text-charcoal-300 hover:text-charcoal-600 dark:hover:text-white'
+            }`}
+            style={{ fontFamily: 'Inter, sans-serif' }}
+          >
+            Stores
+          </button>
+          <button
+            onClick={() => navigate('/serviceProviders', { state: { customerId, customerName } })}
+            className={`px-6 py-2 rounded-full text-sm font-semibold transition-all ${
+              currentContext === 'services'
+                ? 'bg-sage-500 text-white shadow-sm'
+                : 'text-charcoal-500 dark:text-charcoal-300 hover:text-charcoal-600 dark:hover:text-white'
+            }`}
+            style={{ fontFamily: 'Inter, sans-serif' }}
+          >
+            Services
+          </button>
+        </div>
+      </div>
+    )}
 
-          {/* Context Switcher - NEW */}
-          {showContextSwitch && (
-            <div className="ml-8 flex items-center">
-              <div className="inline-flex items-center bg-grey-200 dark:bg-charcoal-600 rounded-full p-1 border border-grey-stroke dark:border-charcoal-500">
-                <button
-                  onClick={() => navigate('/mainStore', { state: { customerId, customerName } })}
-                  className={`px-6 py-2 rounded-full text-sm font-semibold transition-all ${
-                    currentContext === 'stores'
-                      ? 'bg-sage-500 text-white shadow-sm'
-                      : 'text-charcoal-500 dark:text-charcoal-300 hover:text-charcoal-600 dark:hover:text-white'
-                  }`}
-                  style={{ fontFamily: 'Inter, sans-serif' }}
-                >
-                  Stores
-                </button>
-                <button
-                  onClick={() => navigate('/serviceProviders', { state: { customerId, customerName } })}
-                  className={`px-6 py-2 rounded-full text-sm font-semibold transition-all ${
-                    currentContext === 'services'
-                      ? 'bg-sage-500 text-white shadow-sm'
-                      : 'text-charcoal-500 dark:text-charcoal-300 hover:text-charcoal-600 dark:hover:text-white'
-                  }`}
-                  style={{ fontFamily: 'Inter, sans-serif' }}
-                >
-                  Services
-                </button>
-              </div>
-            </div>
-          )}
-
-        {/* Center: Search Bar */}
-          {showSearch && (
-            <div className="absolute left-1/2 -translate-x-1/2 w-full max-w-xl px-4">
-                <div className="relative">
-                <MagnifyingGlass
-                    size={20}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 text-charcoal-400"
-                />
-                <input
-                    type="text"
-                    placeholder={searchPlaceholder}
-                    value={searchValue}
-                    onChange={handleSearchChange}
-                    className="
-                    w-full h-[44px] pl-12 pr-4
-                    border-2 border-grey-stroke
-                    rounded-full
-                    bg-white
-                    text-charcoal-600
-                    placeholder:text-charcoal-400
-                    focus:outline-none focus:ring-2 focus:ring-sage-500
-                    "
-                />
-                </div>
-            </div>
-            )}
+    {/* Center: Page Title Only */}
+    {pageTitle && (
+      <div className="absolute left-1/2 -translate-x-1/2">
+        <h2 
+          className="text-[24px] font-bold text-charcoal-600 dark:text-cream-50 whitespace-nowrap"
+          style={{ fontFamily: 'Merriweather, serif' }}
+        >
+          {pageTitle}
+        </h2>
+      </div>
+    )}
 
 
         {/* Right: Actions */}
