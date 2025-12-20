@@ -9,8 +9,6 @@ import React, { useState, useEffect } from 'react';
 import {
   Warning,
   CheckCircle,
-  UserPlus,
-  ShieldCheck,
   Clock,
   Bell,
   User,
@@ -24,6 +22,7 @@ import {
   getUserProfile,
   updateUserProfile,
   createAnnouncement,
+  getAuditLogs,
 } from '../../services/api';
 
 // Import design system components
@@ -68,8 +67,8 @@ const AdminView = () => {
   // Notification count (placeholder for now)
   const [notificationCount, setNotificationCount] = useState(0);
 
-  // Recent activity state - storing last 3 admin actions
-  const [recentActivity, setRecentActivity] = useState([]);
+  // Latest logs state - storing last 3 audit logs
+  const [latestLogs, setLatestLogs] = useState([]);
 
   // User profile state
   const [userProfile, setUserProfile] = useState(null);
@@ -160,16 +159,17 @@ const AdminView = () => {
     }
   };
 
-  // Load recent activity from localStorage
-  const loadRecentActivity = () => {
-    const stored = localStorage.getItem('adminRecentActivity');
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        setRecentActivity(parsed.slice(0, 3)); // Only keep last 3
-      } catch (e) {
-        console.error('Error parsing recent activity:', e);
-      }
+  // Fetch latest 3 audit logs
+  const fetchLatestLogs = async () => {
+    try {
+      const logs = await getAuditLogs();
+      // Get the latest 3 logs (sorted by createdAt in descending order)
+      const latest = logs
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 3);
+      setLatestLogs(latest);
+    } catch (error) {
+      console.error('Error fetching latest logs:', error);
     }
   };
 
@@ -179,10 +179,10 @@ const AdminView = () => {
     fetchUserProfile();
   }, [userProfileId]);
 
-  // Load recent activity on mount and when returning to dashboard
+  // Fetch latest logs when returning to dashboard
   useEffect(() => {
     if (currentView === 'dashboard') {
-      loadRecentActivity();
+      fetchLatestLogs();
     }
   }, [currentView]);
 
@@ -372,18 +372,8 @@ const AdminView = () => {
       // Show success
       setAnnouncementSuccess(true);
 
-      // Log activity
-      const newActivity = {
-        type: 'announcement',
-        action: 'Sent Announcement',
-        details: announcementForm.title,
-        timestamp: new Date().toISOString(),
-      };
-
-      // Update recent activity
-      const updatedActivity = [newActivity, ...recentActivity].slice(0, 3);
-      setRecentActivity(updatedActivity);
-      localStorage.setItem('adminRecentActivity', JSON.stringify(updatedActivity));
+      // Refresh latest logs after sending announcement
+      fetchLatestLogs();
 
       // Close modal after a delay
       setTimeout(() => {
@@ -853,58 +843,87 @@ const AdminView = () => {
               </div>
             )}
 
-            {/* Recent Activity + Quick Actions */}
+            {/* Latest Logs + Quick Actions */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Recent Activity */}
+              {/* Latest Logs */}
               <div className="lg:col-span-2 bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-soft-lift dark:shadow-none p-6 transition-colors">
-                <h3 className="text-card-h2 text-charcoal-600 dark:text-white mb-4">Recent Activity</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-card-h2 text-charcoal-600 dark:text-white">Latest Logs</h3>
+                  <button
+                    onClick={() => handleNavigate('/admin/audit-logs')}
+                    className="text-body-regular text-sage-600 dark:text-sage-400 hover:text-sage-700 dark:hover:text-sage-300 font-medium"
+                  >
+                    View All
+                  </button>
+                </div>
                 {loading ? (
                   <div className="flex items-center justify-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sage-500"></div>
                   </div>
-                ) : recentActivity.length === 0 ? (
+                ) : latestLogs.length === 0 ? (
                   <div className="text-center py-8">
                     <Clock size={48} className="text-charcoal-300 mx-auto mb-3" weight="light" />
-                    <p className="text-body-regular text-charcoal-400 dark:text-gray-400">No recent activity</p>
+                    <p className="text-body-regular text-charcoal-400 dark:text-gray-400">No logs available</p>
                     <p className="text-label-medium text-charcoal-300 dark:text-gray-500 mt-1">
-                      Admin actions will appear here
+                      System activity will appear here
                     </p>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {recentActivity.map((activity, index) => (
-                      <div key={index} className="flex items-start gap-3 pb-4 border-b border-grey-stroke last:border-0 last:pb-0">
-                        {/* Icon based on action type */}
-                        <div className={`p-2 rounded-lg flex-shrink-0 ${
-                          activity.type === 'approval' ? 'bg-success-bg' :
-                          activity.type === 'user_created' ? 'bg-sage-100' :
-                          activity.type === 'suspension' ? 'bg-error-bg' :
-                          activity.type === 'announcement' ? 'bg-sage-100' :
-                          'bg-cream-100'
-                        }`}>
-                          {activity.type === 'approval' && <CheckCircle size={20} className="text-success-btn" weight="fill" />}
-                          {activity.type === 'user_created' && <UserPlus size={20} className="text-sage-600" weight="fill" />}
-                          {activity.type === 'suspension' && <Warning size={20} className="text-error-btn" weight="fill" />}
-                          {activity.type === 'moderation' && <ShieldCheck size={20} className="text-sage-600" weight="fill" />}
-                          {activity.type === 'announcement' && <ShieldCheck size={20} className="text-sage-600" weight="fill" />}
-                        </div>
+                    {latestLogs.map((log, index) => {
+                      const getSeverityColor = (severity) => {
+                        switch (severity) {
+                          case 'Critical':
+                            return 'bg-error-bg text-error-btn';
+                          case 'High':
+                            return 'bg-danger-bg text-danger-btn';
+                          case 'Medium':
+                            return 'bg-warning-bg text-warning-btn';
+                          case 'Low':
+                            return 'bg-success-bg text-success-btn';
+                          default:
+                            return 'bg-cream-100 text-charcoal-600';
+                        }
+                      };
 
-                        {/* Activity details */}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-body-medium text-charcoal-600 dark:text-white font-semibold">
-                            {activity.action}
-                          </p>
-                          {activity.details && (
-                            <p className="text-body-regular text-charcoal-400 dark:text-gray-400 mt-0.5">
-                              {activity.details}
+                      return (
+                        <div key={log.id || index} className="flex items-start gap-3 pb-4 border-b border-grey-stroke last:border-0 last:pb-0">
+                          {/* Icon based on severity */}
+                          <div className={`p-2 rounded-lg flex-shrink-0 ${getSeverityColor(log.severity)}`}>
+                            {log.severity === 'Critical' && <Warning size={20} weight="fill" />}
+                            {log.severity === 'High' && <Warning size={20} weight="fill" />}
+                            {log.severity === 'Medium' && <Clock size={20} weight="fill" />}
+                            {log.severity === 'Low' && <CheckCircle size={20} weight="fill" />}
+                            {!log.severity && <Clock size={20} weight="fill" />}
+                          </div>
+
+                          {/* Log details */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-body-medium text-charcoal-600 dark:text-white font-semibold">
+                              {log.eventType}
                             </p>
-                          )}
-                          <p className="text-label-medium text-charcoal-300 dark:text-gray-500 mt-1">
-                            {formatTimeAgo(activity.timestamp)}
-                          </p>
+                            {log.description && (
+                              <p className="text-body-regular text-charcoal-400 dark:text-gray-400 mt-0.5">
+                                {log.description}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-2 mt-1">
+                              <p className="text-label-medium text-charcoal-300 dark:text-gray-500">
+                                {formatTimeAgo(log.createdAt)}
+                              </p>
+                              {log.actorUserId && (
+                                <>
+                                  <span className="text-charcoal-300">•</span>
+                                  <p className="text-label-medium text-charcoal-400 dark:text-gray-400">
+                                    User #{log.actorUserId}
+                                  </p>
+                                </>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

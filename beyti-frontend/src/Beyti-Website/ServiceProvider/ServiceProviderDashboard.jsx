@@ -17,6 +17,7 @@ export default function ServiceProviderDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   const [bookingFilter, setBookingFilter] = useState(null);
+  const [bookingViewMode, setBookingViewMode] = useState(null);
   const [displayName, setDisplayName] = useState("Service Provider");
   const [userProfile, setUserProfile] = useState(null);
   const [providerStatus, setProviderStatus] = useState('Available');
@@ -166,16 +167,24 @@ export default function ServiceProviderDashboard() {
     }
   };
 
-  // Handler for navigating from dashboard stats to bookings with filter
-  const handleNavigateToBookings = (status) => {
-    setBookingFilter(status);
+  // Handler for navigating from dashboard stats to bookings with filter or view mode
+  const handleNavigateToBookings = (statusOrViewMode) => {
+    // Check if it's a view mode (weekly/all) or a status filter
+    if (statusOrViewMode === 'weekly' || statusOrViewMode === 'all') {
+      setBookingViewMode(statusOrViewMode);
+      setBookingFilter(null);
+    } else {
+      setBookingFilter(statusOrViewMode);
+      setBookingViewMode(null);
+    }
     setActiveTab('bookings');
   };
 
-  // Reset filter when manually switching to bookings tab
+  // Reset filter and view mode when manually switching to bookings tab
   const handleNavigate = (tabId) => {
     if (tabId === 'bookings' && activeTab !== 'bookings') {
       setBookingFilter(null); // Reset filter when manually clicking bookings tab
+      setBookingViewMode(null); // Reset view mode when manually clicking bookings tab
     }
     setActiveTab(tabId);
   };
@@ -300,6 +309,7 @@ export default function ServiceProviderDashboard() {
               <BookingsManagement
                 serviceProviderId={serviceProviderId}
                 initialFilter={bookingFilter}
+                initialViewMode={bookingViewMode}
               />
             )}
             {activeTab === 'reviews' && (
