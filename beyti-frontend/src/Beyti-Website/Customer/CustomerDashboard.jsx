@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import * as Icon from "@phosphor-icons/react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { CalendarCheck, Bell, PackageIcon, ScissorsIcon, ShoppingCartIcon, CalendarIcon, ChatCircleTextIcon, CheckCircle, Circle } from "@phosphor-icons/react";
 import PageHeader from "../../components/PageHeader";
 import NavigationButton from "../../components/NavigationButton";
 import AnalyticsCard from "../../components/AnalyticsCard";
@@ -11,10 +12,19 @@ import '../Seller/Components/modalAnimations.css';
 import OrderDetails from '../Store/Components/OrderDetails';
 import Snackbar from '../../components/Snackbar';
 import ProfilePage from '../../components/ProfilePage';
+import ViewOrderModal from '../../components/ViewOrderModal';
+import ViewServiceBookingModal from '../../components/ViewServiceBookingModal';
+import ServiceReviewModal from '../../components/ServiceReviewModal';
+import BookingTimer from '../../components/BookingTimer';
+import NotificationsPage from '../ServiceProvider/components/NotificationsPage';
 
 import {
   createReview,
   deleteReview,
+  getServiceBookings,
+  createServiceReview,
+  getCustomerServiceReviews,
+  cancelServiceBooking,
 } from "../../services/api";
 
 // API helpers
@@ -244,6 +254,9 @@ const CustomerDashboard = () => {
   const [customerName, setCustomerName] = useState(() => {
     return sessionStorage.getItem('beyti_customerName') || "My Account";
   });
+  const [userProfileId, setUserProfileId] = useState(() => {
+    return parseInt(sessionStorage.getItem('beyti_userProfileId')) || null;
+  });
 
   const [customerList, setCustomerList] = useState([]);
   const [selectModalOpen, setSelectModalOpen] = useState(false);
@@ -271,23 +284,46 @@ const CustomerDashboard = () => {
   const [pendingReorderItems, setPendingReorderItems] = useState(null);
   const [showClearCartModal, setShowClearCartModal] = useState(false);
 
+  const [mainTab, setMainTab] = useState('orders'); // Main navigation: orders or services
   const [activeTab, setActiveTab] = useState('all');
 
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('date-desc');
   const [fulfillmentFilter, setFulfillmentFilter] = useState('all');
 
+  // Service bookings filters
+  const [serviceSearchQuery, setServiceSearchQuery] = useState('');
+  const [serviceStatusFilter, setServiceStatusFilter] = useState('all');
+  const [serviceSortBy, setServiceSortBy] = useState('date-desc');
+
   // Review modal state
-const [reviewModal, setReviewModal] = useState({ 
-  show: false, 
-  orderId: null, 
+const [reviewModal, setReviewModal] = useState({
+  show: false,
+  orderId: null,
   productId: null,
   productName: "",
-  rating: 5, 
-  comment: "", 
-  loading: false, 
-  error: null 
+  rating: 5,
+  comment: "",
+  loading: false,
+  error: null
 });
+
+  // History page state
+  const [serviceBookings, setServiceBookings] = useState([]);
+  const [serviceReviews, setServiceReviews] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyActiveTab, setHistoryActiveTab] = useState('all');
+  const [historyViewMode, setHistoryViewMode] = useState('orders');
+  const [viewOrderModal, setViewOrderModal] = useState({ isOpen: false, order: null });
+  const [viewBookingModal, setViewBookingModal] = useState({ isOpen: false, booking: null });
+  const [serviceReviewModal, setServiceReviewModal] = useState({ isOpen: false, booking: null });
+  const [cancellingBookingId, setCancellingBookingId] = useState(null);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelBookingData, setCancelBookingData] = useState(null);
+  const [cancellationReason, setCancellationReason] = useState('');
+
+  // Notifications state
+  const [notificationSearchQuery, setNotificationSearchQuery] = useState('');
 
   // Cart state - load from localStorage
 const [cart, setCart] = useState(() => {
@@ -374,23 +410,23 @@ useEffect(() => {
  // Load orders with reviews - only on mount or when customerId changes
 useEffect(() => {
   if (!customerId) return;
-  
+
   // Only load if we don't have orders yet
   if (orders.length > 0) return;
-  
+
   const loadOrders = async () => {
   try {
     setLoading(true);
     setError(null);
     const data = await getCustomerOrders(customerId);
-    
+
     console.log('🔍 RAW ORDER DATA FROM BACKEND:', JSON.stringify(data, null, 2));
-    
+
     // Fetch reviews for all products in all orders
     const ordersWithReviews = await Promise.all(
       (data || []).map(async (order) => {
         console.log(`📦 Processing order #${order.id} - Status: ${order.status}`);
-        
+
         const itemsWithReviews = await Promise.all(
           (order.orderItems || []).map(async (item) => {
             try {
@@ -406,7 +442,7 @@ useEffect(() => {
         return { ...order, orderItems: itemsWithReviews };
       })
     );
-    
+
     console.log('✅ FINAL ORDERS WITH REVIEWS:', JSON.stringify(ordersWithReviews, null, 2));
     setOrders(ordersWithReviews);
   } catch (err) {
@@ -417,6 +453,58 @@ useEffect(() => {
 };
   loadOrders();
 }, [customerId]); // Removed orders from dependency to prevent infinite loops
+
+// Fetch history data (services and reviews)
+const fetchHistory = useCallback(async () => {
+  try {
+    setHistoryLoading(true);
+    console.log('🔍 Fetching service bookings for customer ID:', customerId);
+    const [bookingsData, reviewsData] = await Promise.all([
+      getServiceBookings(null, customerId),
+      getCustomerServiceReviews(customerId)
+    ]);
+
+    console.log('📦 Raw bookings data:', bookingsData);
+    console.log('⭐ Raw reviews data:', reviewsData);
+
+    const bookings = Array.isArray(bookingsData) ? bookingsData : [];
+    console.log('✅ Processed bookings array:', bookings.length, 'items');
+    setServiceBookings(bookings);
+
+    // Enrich reviews with booking data
+    const enrichedReviews = Array.isArray(reviewsData)
+      ? reviewsData.map(review => {
+          const booking = bookings.find(b => b.id === review.serviceBookingId);
+          return {
+            ...review,
+            providerName: booking?.businessName || booking?.providerName || null,
+            serviceName: booking?.serviceName || null
+          };
+        })
+      : [];
+
+    console.log('✅ Enriched reviews:', enrichedReviews.length, 'items');
+    setServiceReviews(enrichedReviews);
+  } catch (error) {
+    console.error('❌ Error fetching history:', error);
+    setServiceBookings([]);
+    setServiceReviews([]);
+  } finally {
+    setHistoryLoading(false);
+  }
+}, [customerId]);
+
+// Load history data (services and reviews) for the main page
+useEffect(() => {
+  if (customerId) {
+    fetchHistory();
+  }
+}, [customerId, fetchHistory]);
+
+// Sync historyViewMode with mainTab
+useEffect(() => {
+  setHistoryViewMode(mainTab);
+}, [mainTab]);
 
 
 
@@ -475,22 +563,61 @@ const displayedOrders = useMemo(() => {
   });
 }, [activeTab, orders, activeOrders, completedOrders, cancelledOrders, searchQuery, sortBy, fulfillmentFilter]);
 
+// Filter and sort service bookings
+const displayedServiceBookings = useMemo(() => {
+  let bookingsToDisplay = [...serviceBookings];
+
+  // Apply status filter
+  if (serviceStatusFilter !== 'all') {
+    bookingsToDisplay = bookingsToDisplay.filter(booking => {
+      const status = booking.status?.toLowerCase();
+      switch(serviceStatusFilter) {
+        case 'completed': return status === 'completed';
+        case 'confirmed': return status === 'confirmed';
+        case 'rejected': return status === 'rejected';
+        case 'cancelled': return status === 'canceled' || status === 'cancelled';
+        default: return true;
+      }
+    });
+  }
+
+  // Apply search
+  if (serviceSearchQuery.trim()) {
+    const query = serviceSearchQuery.toLowerCase();
+    bookingsToDisplay = bookingsToDisplay.filter(booking =>
+      booking.id?.toString().includes(query) ||
+      booking.serviceName?.toLowerCase().includes(query) ||
+      booking.businessName?.toLowerCase().includes(query) ||
+      booking.providerName?.toLowerCase().includes(query) ||
+      booking.serviceType?.toLowerCase().includes(query)
+    );
+  }
+
+  // Apply sort
+  return [...bookingsToDisplay].sort((a, b) => {
+    switch(serviceSortBy) {
+      case 'date-asc': return a.id - b.id; // Oldest (lowest ID first)
+      case 'amount-desc': return (b.finalPrice || b.quotedPrice || 0) - (a.finalPrice || a.quotedPrice || 0);
+      case 'amount-asc': return (a.finalPrice || a.quotedPrice || 0) - (b.finalPrice || b.quotedPrice || 0);
+      default: return b.id - a.id; // Newest (highest ID first)
+    }
+  });
+}, [serviceBookings, serviceSearchQuery, serviceStatusFilter, serviceSortBy]);
+
 // Set the currently displayed active order based on index
 const currentActiveOrder = activeOrders.length > 0 ? activeOrders[activeOrderIndex] : null;
 
 const getPageTitle = () => {
-  if (location.pathname === "/customer-dashboard" || location.pathname.includes("/customer-dashboard/orders")) {
-    return "My Orders";
-    } else if (location.pathname.includes("/customer-dashboard/addresses")) {
-      return "My Addresses";
-    } else if (location.pathname.includes("/customer-dashboard/favorites")) {
-      return "My Favorites";
-    } else if (location.pathname.includes("/customer-dashboard/profile")) {
-      return "My Profile";
-    } else {
-      return "Dashboard";
-    }
-  };
+  if (location.pathname === "/customer-dashboard" || location.pathname === "/customer-dashboard/" || location.pathname.includes("/customer-dashboard/bookings")) {
+    return "My History";
+  } else if (location.pathname.includes("/customer-dashboard/profile")) {
+    return "My Profile";
+  } else if (location.pathname.includes("/customer-dashboard/notifications")) {
+    return "Notifications";
+  } else {
+    return "Dashboard";
+  }
+};
 
   const openOrderModal = (order) => {
     setSelectedOrder(order);
@@ -664,7 +791,7 @@ const closeReviewModal = () => {
   });
 };
 
-const handleSubmitReview = async () => {
+const handleSubmitProductReview = async () => {
   if (!reviewModal.comment.trim()) {
     setReviewModal(prev => ({ ...prev, error: "Please write a comment" }));
     showSnackbar("Please write a comment", 'error');
@@ -720,7 +847,7 @@ const handleSubmitReview = async () => {
 
     showSnackbar('Review submitted successfully! ⭐', 'success');
     closeReviewModal();
-    
+
 
   } catch (err) {
     const errorMsg = err.message || "Failed to submit review";
@@ -732,7 +859,7 @@ const handleSubmitReview = async () => {
 const handleDeleteReview = async (reviewId) => {
   try {
     await deleteReview(reviewId);
-    
+
     // Optimistically update the UI immediately
     const updatedOrders = orders.map(order => ({
       ...order,
@@ -743,9 +870,9 @@ const handleDeleteReview = async (reviewId) => {
         return item;
       })
     }));
-    
+
     setOrders(updatedOrders);
-    
+
     // Update selected order if modal is open
     if (orderModalOpen && selectedOrder) {
       const updatedOrder = updatedOrders.find(o => o.id === selectedOrder.id);
@@ -753,10 +880,125 @@ const handleDeleteReview = async (reviewId) => {
         setSelectedOrder(updatedOrder);
       }
     }
-    
+
     showSnackbar('Review deleted successfully', 'success');
   } catch (err) {
     showSnackbar(err.message || 'Failed to delete review', 'error');
+  }
+};
+
+// ============ History Page Functions ============
+
+// Format time
+const formatTime = (dateString) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  return date.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+
+// Get status variant for orders (history version)
+const getOrderStatusVariant = (status) => {
+  const s = status?.toLowerCase();
+  if (!s) return 'neutral';
+  if (['placed', 'pending'].includes(s)) return 'warning';
+  if (['accepted', 'preparing', 'ready for pickup', 'processing'].includes(s)) return 'brand';
+  if (s === 'completed') return 'success';
+  if (s === 'cancelled') return 'error';
+  return 'neutral';
+};
+
+// Get status variant for service bookings
+const getBookingStatusVariant = (status) => {
+  switch (status) {
+    case 'Pending':
+    case 'PendingQuote':
+    case 'DepositPending':
+      return 'warning';
+    case 'Confirmed':
+    case 'Completed':
+      return 'success';
+    case 'InProgress':
+      return 'brand';
+    case 'Canceled':
+    case 'Cancelled':
+    case 'Rejected':
+      return 'error';
+    default:
+      return 'neutral';
+  }
+};
+
+// Handler functions for history
+const handleViewOrder = (order) => {
+  setViewOrderModal({ isOpen: true, order });
+};
+
+const handleViewBooking = (booking) => {
+  setViewBookingModal({ isOpen: true, booking });
+};
+
+const handleOpenReview = (booking) => {
+  setServiceReviewModal({ isOpen: true, booking });
+};
+
+// Check if a booking already has a review
+const bookingHasReview = (bookingId) => {
+  return serviceReviews.some(review => review.serviceBookingId === bookingId);
+};
+
+const handleSubmitServiceReview = async (reviewData) => {
+  try {
+    await createServiceReview(reviewData);
+    showSnackbar('Review submitted successfully!', 'success');
+    await fetchHistory();
+  } catch (error) {
+    console.error('Error submitting review:', error);
+    throw error;
+  }
+};
+
+const handleCancelBookingClick = (booking) => {
+  setCancelBookingData(booking);
+  setShowCancelDialog(true);
+};
+
+const handleConfirmCancelBooking = async () => {
+  if (!cancellationReason.trim()) {
+    showSnackbar('Please provide a reason for cancellation', 'warning');
+    return;
+  }
+
+  if (!cancelBookingData) return;
+
+  try {
+    setCancellingBookingId(cancelBookingData.id);
+    await cancelServiceBooking(cancelBookingData.id, cancelBookingData, customerName, cancellationReason);
+    showSnackbar('Booking cancelled successfully.', 'success');
+    setShowCancelDialog(false);
+    setCancellationReason('');
+    setCancelBookingData(null);
+    await fetchHistory();
+  } catch (error) {
+    console.error('Error cancelling booking:', error);
+    showSnackbar('Failed to cancel booking. Please try again.', 'error');
+  } finally {
+    setCancellingBookingId(null);
+  }
+};
+
+const handleTimerExpire = async (bookingId) => {
+  try {
+    console.log('Booking #' + bookingId + ' expired, auto-cancelling...');
+    const booking = serviceBookings.find(b => b.id === bookingId);
+    if (booking) {
+      await cancelServiceBooking(bookingId, booking, 'System', 'No response from provider within time limit');
+      await fetchHistory();
+    }
+  } catch (error) {
+    console.error('Error auto-cancelling booking:', error);
   }
 };
 
@@ -815,6 +1057,69 @@ const pastOrders = useMemo(() => {
     .slice(0, 5);
 }, [orders]);
 
+// History page metrics
+const historyMetrics = useMemo(() => {
+  const pendingOrders = orders.filter(o =>
+    ['placed', 'pending', 'accepted', 'preparing', 'ready for pickup', 'processing'].includes(o.status?.toLowerCase())
+  ).length;
+
+  const pendingBookings = serviceBookings.filter(b =>
+    ['Pending', 'PendingQuote', 'DepositPending', 'Confirmed', 'InProgress'].includes(b.status)
+  ).length;
+
+  const inProgressBookings = serviceBookings.filter(b =>
+    !['Completed', 'Rejected', 'Canceled', 'Cancelled'].includes(b.status)
+  );
+
+  return {
+    totalOrders: orders.length,
+    totalBookings: serviceBookings.length,
+    pendingOrders,
+    pendingBookings,
+    inProgressBookings,
+    completedOrders: orders.filter(o => o.status?.toLowerCase() === 'completed').length,
+    completedBookings: serviceBookings.filter(b => b.status === 'Completed').length,
+  };
+}, [orders, serviceBookings]);
+
+// Filter data based on active tab and view mode for history
+const historyFilteredData = useMemo(() => {
+  let filteredOrders = orders;
+  let filteredBookings = serviceBookings;
+
+  console.log('🔧 historyFilteredData - Input:', {
+    ordersCount: orders.length,
+    bookingsCount: serviceBookings.length,
+    historyActiveTab,
+    historyViewMode
+  });
+
+  if (historyActiveTab === 'pending') {
+    filteredOrders = orders.filter(o =>
+      ['placed', 'pending', 'accepted', 'preparing', 'ready for pickup', 'processing'].includes(o.status?.toLowerCase())
+    );
+    filteredBookings = serviceBookings.filter(b =>
+      ['Pending', 'PendingQuote', 'DepositPending', 'Confirmed', 'InProgress'].includes(b.status)
+    );
+  }
+
+  let result;
+  if (historyViewMode === 'orders') {
+    result = { orders: filteredOrders, bookings: [] };
+  } else if (historyViewMode === 'services') {
+    result = { orders: [], bookings: filteredBookings };
+  } else {
+    result = { orders: filteredOrders, bookings: filteredBookings };
+  }
+
+  console.log('✅ historyFilteredData - Output:', {
+    ordersCount: result.orders.length,
+    bookingsCount: result.bookings.length
+  });
+
+  return result;
+}, [orders, serviceBookings, historyActiveTab, historyViewMode]);
+
   // Customer Select Modal
   const CustomerSelectModal = () => {
     if (!selectModalOpen) return null;
@@ -835,9 +1140,21 @@ const pastOrders = useMemo(() => {
               const id = parseInt(e.target.value, 10);
               if (!id) return;
               const selected = customerList.find((c) => c.id === id);
-              setCustomerName(selected?.fullName || "My Account");
+              const name = selected?.fullName || "My Account";
+              const profileId = selected?.userProfileId || selected?.UserProfileId;
+
+              console.log("🔔 CustomerDashboard: Selected customer:", selected);
+              console.log("🔔 CustomerDashboard: userProfileId:", profileId);
+
+              setCustomerName(name);
               setCustomerId(id);
+              setUserProfileId(profileId);
               setSelectModalOpen(false);
+
+              // Save to sessionStorage
+              sessionStorage.setItem('beyti_customerId', id.toString());
+              sessionStorage.setItem('beyti_customerName', name);
+              sessionStorage.setItem('beyti_userProfileId', profileId?.toString() || '');
             }}
           >
             <option value="">-- Select Customer --</option>
@@ -881,43 +1198,27 @@ const pastOrders = useMemo(() => {
 
         <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
           <NavigationButton
-            selected={location.pathname === "/customer-dashboard" || location.pathname === "/customer-dashboard/"}
-            onClick={() => navigate("/customer-dashboard")}
-            icon={<Icon.Package size={20} weight={(location.pathname === "/customer-dashboard" || location.pathname === "/customer-dashboard/") ? "fill" : "regular"} />}
-          >
-            My Orders
-          </NavigationButton>
-
-          <NavigationButton
-            selected={location.pathname.includes("/customer-dashboard/orders")}
-            onClick={() => navigate("orders")}
-            icon={<Icon.Package size={20} weight={location.pathname.includes("/orders") ? "fill" : "regular"} />}
-          >
-            Order History
-          </NavigationButton>
-
-          <NavigationButton
-            selected={location.pathname.includes("/customer-dashboard/addresses")}
-            onClick={() => navigate("addresses")}
-            icon={<Icon.MapPin size={20} weight={location.pathname.includes("/addresses") ? "fill" : "regular"} />}
-          >
-            Addresses
-          </NavigationButton>
-
-          <NavigationButton
-            selected={location.pathname.includes("/customer-dashboard/favorites")}
-            onClick={() => navigate("favorites")}
-            icon={<Icon.Heart size={20} weight={location.pathname.includes("/favorites") ? "fill" : "regular"} />}
-          >
-            Favorites
-          </NavigationButton>
-
-          <NavigationButton
             selected={location.pathname.includes("/customer-dashboard/profile")}
             onClick={() => navigate("profile")}
             icon={<Icon.User size={20} weight={location.pathname.includes("/profile") ? "fill" : "regular"} />}
           >
             Profile
+          </NavigationButton>
+
+          <NavigationButton
+            selected={location.pathname === "/customer-dashboard" || location.pathname === "/customer-dashboard/" || location.pathname.includes("/customer-dashboard/bookings")}
+            onClick={() => navigate("/customer-dashboard")}
+            icon={<Icon.CalendarCheck size={20} weight={(location.pathname === "/customer-dashboard" || location.pathname === "/customer-dashboard/" || location.pathname.includes("/bookings")) ? "fill" : "regular"} />}
+          >
+            My History
+          </NavigationButton>
+
+          <NavigationButton
+            selected={location.pathname.includes("/customer-dashboard/notifications")}
+            onClick={() => navigate("/customer-dashboard/notifications")}
+            icon={<Icon.Bell size={20} weight={location.pathname.includes("/customer-dashboard/notifications") ? "fill" : "regular"} />}
+          >
+            Notifications
           </NavigationButton>
         </nav>
 
@@ -930,12 +1231,12 @@ const pastOrders = useMemo(() => {
       
           <div className="border-b border-grey-stroke bg-grey-200">
             <PageHeader
-              title="My Orders"
+              title={getPageTitle()}
               notificationCount={metrics.activeOrders || 0}
               userName={customerName}
               userRole="Customer"
               userProfile={{
-                userProfileId: customerId,
+                userProfileId: userProfileId,
                 displayName: customerName,
                 roleType: 'Customer',
                 status: 'Active',
@@ -944,7 +1245,7 @@ const pastOrders = useMemo(() => {
                 updatedAt: new Date().toISOString()
               }}
               entityId={customerId}
-              userId={customerId}
+              userId={userProfileId}
               onProfileClick={() => navigate('profile')}
               additionalActions={
                 <button
@@ -1048,7 +1349,8 @@ const pastOrders = useMemo(() => {
 
            {customerId && !loading && !error && (
             <>
-              {!location.pathname.includes("/customer-dashboard/profile") && (
+              {!location.pathname.includes("/customer-dashboard/profile") &&
+               !location.pathname.includes("/customer-dashboard/notifications") && (
                 <>
                   {/* Active Orders Carousel */}
                     {activeOrders.length > 0 && (
@@ -1157,134 +1459,595 @@ const pastOrders = useMemo(() => {
                     </section>
                     )}
 
-                    {/* Order Tabs */}
-                      <section className="mb-8">
-                        <div className="flex gap-2 mb-6 border-b border-grey-stroke">
-                          {[
-                            { id: 'all', label: 'All Orders', count: orders.length },
-                            { id: 'active', label: 'Active', count: activeOrders.length },
-                            { id: 'completed', label: 'Completed', count: completedOrders.length },
-                            { id: 'cancelled', label: 'Cancelled', count: cancelledOrders.length }
-                          ].map(tab => (
-                            <button
-                              key={tab.id}
-                              onClick={() => setActiveTab(tab.id)}
-                              className={`px-6 py-3 font-semibold transition-all relative ${
-                                activeTab === tab.id
-                                  ? 'text-sage-600'
-                                  : 'text-charcoal-400 hover:text-charcoal-600'
-                              }`}
-                            >
-                              {tab.label}
-                              {tab.count > 0 && (
-                                <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
-                                  activeTab === tab.id
-                                    ? 'bg-sage-500 text-white'
-                                    : 'bg-grey-200 text-charcoal-600'
-                                }`}>
-                                  {tab.count}
-                                </span>
-                              )}
-                              {activeTab === tab.id && (
-                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-sage-500" />
-                              )}
-                            </button>
-                          ))}
-                        </div>
-
-
-                        {/* Simple Filters */}
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className="flex-1 relative">
-                            <Icon.MagnifyingGlass 
-                              size={18} 
-                              className="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal-400"
-                            />
-                            <input
-                              type="text"
-                              value={searchQuery}
-                              onChange={(e) => setSearchQuery(e.target.value)}
-                              placeholder="Search orders..."
-                              className="w-full pl-10 pr-4 py-2 text-sm border border-grey-stroke rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500"
-                            />
-                          </div>
-                          
-                          <select
-                            value={sortBy}
-                            onChange={(e) => setSortBy(e.target.value)}
-                            className="px-3 py-2 text-sm border border-grey-stroke rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500 bg-white"
-                          >
-                            <option value="date-desc">Newest</option>
-                            <option value="date-asc">Oldest</option>
-                            <option value="amount-desc">Highest $</option>
-                            <option value="amount-asc">Lowest $</option>
-                          </select>
-                          <select
-                            value={fulfillmentFilter}
-                            onChange={(e) => setFulfillmentFilter(e.target.value)}
-                            className="px-3 py-2 text-sm border border-grey-stroke rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500 bg-white"
-                          >
-                            <option value="all">All Types</option>
-                            <option value="delivery">Delivery</option>
-                            <option value="pickup">Pickup</option>
-                          </select>
-                          
-                          <span className="text-sm text-charcoal-500 whitespace-nowrap">
-                            {displayedOrders.length} {displayedOrders.length === 1 ? 'order' : 'orders'}
-                          </span>
-                        </div>
-
-                        {/* Orders Display */}
-                      <div>
-                        {displayedOrders.length === 0 ? (
-                         <div className="text-center py-12 bg-white rounded-xl border border-grey-stroke shadow-sm">
-                            <Icon.Package size={48} className="mx-auto text-charcoal-300 mb-3" />
-                            <p className="text-body-regular text-charcoal-400 mb-4">
-                              No {activeTab !== 'all' ? activeTab : ''} orders yet
-                            </p>
-                            <button
-                              onClick={() => navigate('/mainStore', { state: { customerId, customerName } })}
-                              className="bg-sage-500 hover:bg-sage-600 text-white px-6 py-2 rounded-lg font-semibold transition-all"
-                            >
-                              Start Shopping
-                            </button>
-                          </div>
-                          
-                        ) : (
-                          <div className="bg-white rounded-xl border border-grey-stroke shadow-sm overflow-hidden">
-                           <Table>
-                            <TableHeader columns={["Order #", "Store", "Status", "Total", "Date", "Action"]} />
-                            <TableBody>
-                              {displayedOrders.map((order) => (
-                                <TableRow
-                                  key={order.id}
-                                  data={[
-                                    `#${order.id}`,
-                                    order.sellerName || "—",
-                                    <StatusChip variant={getStatusVariant(order.status)}>
-                                      {order.status || "Unknown"}
-                                    </StatusChip>,
-                                    formatCurrency(order.totalAmount || 0),
-                                    formatDate(order.createdAt),
-                                  ]}
-                                  actions={
-                                    <CRUDButton variant="neutral" onClick={() => openOrderModal(order)}>
-                                      View Details
-                                    </CRUDButton>
-                                  }
-                                />
-                              ))}
-                            </TableBody>
-                          </Table>
-                          </div>
-                        )}
+                    {/* Main Navigation Tabs - Orders / Services */}
+                    <section className="mb-8">
+                      <div className="flex gap-2 border-b-2 border-grey-stroke">
+                        <button
+                          onClick={() => setMainTab('orders')}
+                          className={`px-8 py-4 font-bold text-lg transition-all relative ${
+                            mainTab === 'orders'
+                              ? 'text-sage-600'
+                              : 'text-charcoal-400 hover:text-charcoal-600'
+                          }`}
+                        >
+                          Orders
+                          {mainTab === 'orders' && (
+                            <div className="absolute bottom-0 left-0 right-0 h-1 bg-sage-500 rounded-t-lg" />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => setMainTab('services')}
+                          className={`px-8 py-4 font-bold text-lg transition-all relative ${
+                            mainTab === 'services'
+                              ? 'text-sage-600'
+                              : 'text-charcoal-400 hover:text-charcoal-600'
+                          }`}
+                        >
+                          Services
+                          {mainTab === 'services' && (
+                            <div className="absolute bottom-0 left-0 right-0 h-1 bg-sage-500 rounded-t-lg" />
+                          )}
+                        </button>
                       </div>
+                    </section>
+
+                    {/* Orders Section */}
+                    {mainTab === 'orders' && (
+                      <section className="mb-8">
+                        <div className="bg-cream-50 dark:bg-charcoal-600 border border-grey-stroke dark:border-charcoal-400 rounded-lg overflow-hidden">
+                          <div className="bg-sage-100 dark:bg-sage-900/30 p-4 border-b border-grey-stroke dark:border-charcoal-400">
+                            <h3 className="text-card-h3 text-charcoal-600 dark:text-white font-semibold flex items-center gap-2">
+                              <Icon.Package size={24} className="text-sage-600 dark:text-sage-400" weight="fill" />
+                              Orders
+                            </h3>
+                            <p className="text-body-small text-charcoal-400 dark:text-charcoal-300 mt-1">
+                              Your product orders and purchases
+                            </p>
+                          </div>
+
+                          {/* Filters */}
+                          <div className="p-4 border-b border-grey-stroke dark:border-charcoal-400 bg-white dark:bg-charcoal-500">
+                            <div className="flex items-center gap-3 flex-wrap">
+                              <div className="flex-1 min-w-[200px] relative">
+                                <Icon.MagnifyingGlass
+                                  size={18}
+                                  className="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal-400"
+                                />
+                                <input
+                                  type="text"
+                                  value={searchQuery}
+                                  onChange={(e) => setSearchQuery(e.target.value)}
+                                  placeholder="Search orders..."
+                                  className="w-full pl-10 pr-4 py-2 text-sm border border-grey-stroke rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500"
+                                />
+                              </div>
+
+                              <select
+                                value={activeTab}
+                                onChange={(e) => setActiveTab(e.target.value)}
+                                className="px-3 py-2 text-sm border border-grey-stroke rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500 bg-white"
+                              >
+                                <option value="all">All Orders ({orders.length})</option>
+                                <option value="active">Active ({activeOrders.length})</option>
+                                <option value="completed">Completed ({completedOrders.length})</option>
+                                <option value="cancelled">Cancelled ({cancelledOrders.length})</option>
+                              </select>
+
+                              <select
+                                value={sortBy}
+                                onChange={(e) => setSortBy(e.target.value)}
+                                className="px-3 py-2 text-sm border border-grey-stroke rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500 bg-white"
+                              >
+                                <option value="date-desc">Newest</option>
+                                <option value="date-asc">Oldest</option>
+                                <option value="amount-desc">Highest $</option>
+                                <option value="amount-asc">Lowest $</option>
+                              </select>
+
+                              <select
+                                value={fulfillmentFilter}
+                                onChange={(e) => setFulfillmentFilter(e.target.value)}
+                                className="px-3 py-2 text-sm border border-grey-stroke rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500 bg-white"
+                              >
+                                <option value="all">All Types</option>
+                                <option value="delivery">Delivery</option>
+                                <option value="pickup">Pickup</option>
+                              </select>
+
+                              <span className="text-sm text-charcoal-500 dark:text-charcoal-300 whitespace-nowrap">
+                                {displayedOrders.length} {displayedOrders.length === 1 ? 'order' : 'orders'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Orders Display */}
+                          {displayedOrders.length === 0 ? (
+                            <div className="p-12 text-center text-charcoal-400 dark:text-charcoal-300">
+                              <Icon.Package size={48} className="mx-auto text-charcoal-300 mb-3" />
+                              <p className="text-body-regular mb-4">
+                                No {activeTab !== 'all' ? activeTab : ''} orders yet
+                              </p>
+                              <button
+                                onClick={() => navigate('/mainStore', { state: { customerId, customerName } })}
+                                className="bg-sage-500 hover:bg-sage-600 text-white px-6 py-2 rounded-lg font-semibold transition-all"
+                              >
+                                Start Shopping
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="overflow-x-auto">
+                              <table className="w-full">
+                                <thead>
+                                  <tr className="bg-grey-100 dark:bg-charcoal-500 border-b border-grey-stroke dark:border-charcoal-400">
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Order #</th>
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Store</th>
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Status</th>
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Total</th>
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Date</th>
+                                    <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Action</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-grey-stroke dark:divide-charcoal-400">
+                                  {displayedOrders.map((order) => (
+                                    <tr key={order.id} className="hover:bg-cream-100 dark:hover:bg-charcoal-500 transition-colors">
+                                      <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50 font-semibold">
+                                        #{order.id}
+                                      </td>
+                                      <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50">
+                                        {order.sellerName || "—"}
+                                      </td>
+                                      <td className="p-4">
+                                        <StatusChip variant={getStatusVariant(order.status)}>
+                                          {order.status || "Unknown"}
+                                        </StatusChip>
+                                      </td>
+                                      <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50">
+                                        {formatCurrency(order.totalAmount || 0)}
+                                      </td>
+                                      <td className="p-4 text-body-small text-charcoal-600 dark:text-cream-50">
+                                        {formatDate(order.createdAt)}
+                                      </td>
+                                      <td className="p-4 text-center">
+                                        <button
+                                          onClick={() => openOrderModal(order)}
+                                          className="px-4 py-2 bg-sage-500 hover:bg-sage-600 dark:bg-sage-700 dark:hover:bg-sage-600 text-cream-50 rounded-md text-body-small transition-colors"
+                                        >
+                                          View Details
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
                       </section>
-                   
+                      )}
+
+                      {/* Service Bookings Section */}
+                      {mainTab === 'services' && (
+                      <>
+                      <section className="mb-8">
+                        <div className="bg-cream-50 dark:bg-charcoal-600 border border-grey-stroke dark:border-charcoal-400 rounded-lg overflow-hidden">
+                          <div className="bg-sage-100 dark:bg-sage-900/30 p-4 border-b border-grey-stroke dark:border-charcoal-400">
+                            <h3 className="text-card-h3 text-charcoal-600 dark:text-white font-semibold flex items-center gap-2">
+                              <ScissorsIcon size={24} className="text-sage-600 dark:text-sage-400" weight="fill" />
+                              Service Bookings
+                            </h3>
+                            <p className="text-body-small text-charcoal-400 dark:text-charcoal-300 mt-1">
+                              Your service appointments and bookings
+                            </p>
+                          </div>
+
+                          {/* Filters */}
+                          <div className="p-4 border-b border-grey-stroke dark:border-charcoal-400 bg-white dark:bg-charcoal-500">
+                            <div className="flex items-center gap-3 flex-wrap">
+                              <div className="flex-1 min-w-[200px] relative">
+                                <Icon.MagnifyingGlass
+                                  size={18}
+                                  className="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal-400"
+                                />
+                                <input
+                                  type="text"
+                                  value={serviceSearchQuery}
+                                  onChange={(e) => setServiceSearchQuery(e.target.value)}
+                                  placeholder="Search bookings..."
+                                  className="w-full pl-10 pr-4 py-2 text-sm border border-grey-stroke rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500"
+                                />
+                              </div>
+
+                              <select
+                                value={serviceStatusFilter}
+                                onChange={(e) => setServiceStatusFilter(e.target.value)}
+                                className="px-3 py-2 text-sm border border-grey-stroke rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500 bg-white"
+                              >
+                                <option value="all">All Bookings ({serviceBookings.length})</option>
+                                <option value="completed">Completed ({serviceBookings.filter(b => b.status?.toLowerCase() === 'completed').length})</option>
+                                <option value="confirmed">Confirmed ({serviceBookings.filter(b => b.status?.toLowerCase() === 'confirmed').length})</option>
+                                <option value="rejected">Rejected ({serviceBookings.filter(b => b.status?.toLowerCase() === 'rejected').length})</option>
+                                <option value="cancelled">Cancelled ({serviceBookings.filter(b => b.status?.toLowerCase() === 'canceled' || b.status?.toLowerCase() === 'cancelled').length})</option>
+                              </select>
+
+                              <select
+                                value={serviceSortBy}
+                                onChange={(e) => setServiceSortBy(e.target.value)}
+                                className="px-3 py-2 text-sm border border-grey-stroke rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500 bg-white"
+                              >
+                                <option value="date-desc">Newest</option>
+                                <option value="date-asc">Oldest</option>
+                                <option value="amount-desc">Highest $</option>
+                                <option value="amount-asc">Lowest $</option>
+                              </select>
+
+                              <span className="text-sm text-charcoal-500 dark:text-charcoal-300 whitespace-nowrap">
+                                {displayedServiceBookings.length} {displayedServiceBookings.length === 1 ? 'booking' : 'bookings'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {historyMetrics && historyMetrics.inProgressBookings && historyMetrics.inProgressBookings.length > 0 && (
+                            <div className="p-4 space-y-4">
+                              {historyMetrics.inProgressBookings.map((booking) => {
+                                const getCheckpointStatus = (checkpointName) => {
+                                  const statusOrder = ['Pending', 'PendingQuote', 'DepositPending', 'Confirmed', 'InProgress'];
+                                  const currentIndex = statusOrder.indexOf(booking.status);
+                                  const checkpointIndex = statusOrder.indexOf(checkpointName);
+                                  if (currentIndex >= checkpointIndex) return 'completed';
+                                  return 'pending';
+                                };
+
+                                return (
+                                  <div
+                                    key={booking.id}
+                                    className="bg-grey-100 dark:bg-charcoal-500 border border-grey-stroke dark:border-charcoal-400 rounded-lg p-6 hover:shadow-md transition-shadow"
+                                  >
+                                    {/* Service Header */}
+                                    <div className="flex items-start justify-between gap-4 mb-4">
+                                      <div className="flex-1">
+                                        <h4 className="text-body-medium text-charcoal-600 dark:text-white font-semibold mb-1">
+                                          {booking.serviceName || 'Service'}
+                                        </h4>
+                                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-body-small text-charcoal-400 dark:text-charcoal-300">
+                                          <span><span className="font-medium">Provider:</span> {booking.businessName || booking.providerName || 'N/A'}</span>
+                                          <span><span className="font-medium">Date:</span> {formatDate(booking.serviceDate)}</span>
+                                          <span><span className="font-medium">Booking ID:</span> #{booking.id}</span>
+                                        </div>
+                                      </div>
+                                      <button
+                                        onClick={() => handleViewBooking(booking)}
+                                        className="px-4 py-2 bg-sage-500 hover:bg-sage-600 dark:bg-sage-700 dark:hover:bg-sage-600 text-cream-50 rounded-md text-body-small transition-colors flex-shrink-0"
+                                      >
+                                        View Details
+                                      </button>
+                                    </div>
+
+                                    {/* Checkpoint Timeline */}
+                                    <div className="relative">
+                                      <div className="flex items-center justify-between">
+                                        {/* Checkpoint 1: Pending */}
+                                        <div className="flex flex-col items-center flex-1">
+                                          <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${
+                                            getCheckpointStatus('Pending') === 'completed'
+                                              ? 'bg-sage-500 border-sage-500'
+                                              : 'bg-grey-200 dark:bg-charcoal-600 border-grey-stroke dark:border-charcoal-400'
+                                          }`}>
+                                            {getCheckpointStatus('Pending') === 'completed' ? (
+                                              <CheckCircle size={20} className="text-white" weight="fill" />
+                                            ) : (
+                                              <Circle size={20} className="text-charcoal-400 dark:text-charcoal-300" weight="regular" />
+                                            )}
+                                          </div>
+                                          <div className="mt-2 text-center">
+                                            <p className={`text-label-small font-medium ${
+                                              getCheckpointStatus('Pending') === 'completed'
+                                                ? 'text-sage-600 dark:text-sage-400'
+                                                : 'text-charcoal-400 dark:text-charcoal-300'
+                                            }`}>
+                                              Pending
+                                            </p>
+                                            <p className="text-label-small text-charcoal-400 dark:text-charcoal-300">
+                                              Awaiting Confirmation
+                                            </p>
+                                          </div>
+                                        </div>
+
+                                        {/* Connection Line 1 */}
+                                        <div className={`flex-1 h-0.5 mx-2 -mt-12 ${
+                                          getCheckpointStatus('Confirmed') === 'completed'
+                                            ? 'bg-sage-500'
+                                            : 'bg-grey-stroke dark:bg-charcoal-400'
+                                        }`} />
+
+                                        {/* Checkpoint 2: Confirmed */}
+                                        <div className="flex flex-col items-center flex-1">
+                                          <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${
+                                            getCheckpointStatus('Confirmed') === 'completed'
+                                              ? 'bg-sage-500 border-sage-500'
+                                              : 'bg-grey-200 dark:bg-charcoal-600 border-grey-stroke dark:border-charcoal-400'
+                                          }`}>
+                                            {getCheckpointStatus('Confirmed') === 'completed' ? (
+                                              <CheckCircle size={20} className="text-white" weight="fill" />
+                                            ) : (
+                                              <Circle size={20} className="text-charcoal-400 dark:text-charcoal-300" weight="regular" />
+                                            )}
+                                          </div>
+                                          <div className="mt-2 text-center">
+                                            <p className={`text-label-small font-medium ${
+                                              getCheckpointStatus('Confirmed') === 'completed'
+                                                ? 'text-sage-600 dark:text-sage-400'
+                                                : 'text-charcoal-400 dark:text-charcoal-300'
+                                            }`}>
+                                              Confirmed
+                                            </p>
+                                            <p className="text-label-small text-charcoal-400 dark:text-charcoal-300">
+                                              Booking Approved
+                                            </p>
+                                          </div>
+                                        </div>
+
+                                        {/* Connection Line 2 */}
+                                        <div className={`flex-1 h-0.5 mx-2 -mt-12 ${
+                                          getCheckpointStatus('InProgress') === 'completed'
+                                            ? 'bg-sage-500'
+                                            : 'bg-grey-stroke dark:bg-charcoal-400'
+                                        }`} />
+
+                                        {/* Checkpoint 3: In Progress */}
+                                        <div className="flex flex-col items-center flex-1">
+                                          <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${
+                                            getCheckpointStatus('InProgress') === 'completed'
+                                              ? 'bg-sage-500 border-sage-500'
+                                              : 'bg-grey-200 dark:bg-charcoal-600 border-grey-stroke dark:border-charcoal-400'
+                                          }`}>
+                                            {getCheckpointStatus('InProgress') === 'completed' ? (
+                                              <CheckCircle size={20} className="text-white" weight="fill" />
+                                            ) : (
+                                              <Circle size={20} className="text-charcoal-400 dark:text-charcoal-300" weight="regular" />
+                                            )}
+                                          </div>
+                                          <div className="mt-2 text-center">
+                                            <p className={`text-label-small font-medium ${
+                                              getCheckpointStatus('InProgress') === 'completed'
+                                                ? 'text-sage-600 dark:text-sage-400'
+                                                : 'text-charcoal-400 dark:text-charcoal-300'
+                                            }`}>
+                                              In Progress
+                                            </p>
+                                            <p className="text-label-small text-charcoal-400 dark:text-charcoal-300">
+                                              Service Started
+                                            </p>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {/* Current Status Badge */}
+                                      <div className="mt-4 flex items-center justify-center">
+                                        <div className="flex items-center gap-2 px-4 py-2 bg-cream-50 dark:bg-charcoal-600 rounded-full border border-grey-stroke dark:border-charcoal-400">
+                                          <span className="text-label-small text-charcoal-400 dark:text-charcoal-300">Current Status:</span>
+                                          <StatusChip variant={getBookingStatusVariant(booking.status)}>
+                                            {booking.status}
+                                          </StatusChip>
+                                        </div>
+                                      </div>
+
+                                      {/* Timer and Cancel for Pending Bookings */}
+                                      {booking.status === 'Pending' && booking.createdAt && (
+                                        <div className="mt-4 flex flex-col items-center gap-3">
+                                          <BookingTimer
+                                            createdAt={booking.createdAt}
+                                            durationMinutes={1}
+                                            onExpire={() => handleTimerExpire(booking.id)}
+                                          />
+                                          <button
+                                            onClick={() => handleCancelBookingClick(booking)}
+                                            disabled={cancellingBookingId === booking.id}
+                                            className="px-6 py-2 bg-error-bg hover:bg-error-hover text-error-text border-2 border-error-border rounded-lg text-body-small font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                          >
+                                            {cancellingBookingId === booking.id ? 'Cancelling...' : 'Cancel Booking'}
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                          {displayedServiceBookings && displayedServiceBookings.length > 0 ? (
+                            <div className="overflow-x-auto">
+                              <table className="w-full">
+                                <thead>
+                                  <tr className="bg-grey-100 dark:bg-charcoal-500 border-b border-grey-stroke dark:border-charcoal-400">
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Booking ID</th>
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Service Date & Time</th>
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Provider</th>
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Service</th>
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Type</th>
+                                    <th className="text-right p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Price</th>
+                                    <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Status</th>
+                                    <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Timer</th>
+                                    <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Actions</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-grey-stroke dark:divide-charcoal-400">
+                                  {displayedServiceBookings.map((booking) => (
+                                    <tr key={booking.id} className="hover:bg-cream-100 dark:hover:bg-charcoal-500 transition-colors">
+                                      <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50 font-semibold">
+                                        #{booking.id}
+                                      </td>
+                                      <td className="p-4 text-body-small text-charcoal-600 dark:text-cream-50">
+                                        <div>{formatDate(booking.serviceDate)}</div>
+                                        <div className="text-charcoal-400 dark:text-charcoal-300">{booking.serviceTime || 'Time TBD'}</div>
+                                      </td>
+                                      <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50">
+                                        {booking.businessName || booking.providerName || 'N/A'}
+                                      </td>
+                                      <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50">
+                                        {booking.serviceName || 'N/A'}
+                                      </td>
+                                      <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50">
+                                        {booking.serviceType || 'N/A'}
+                                      </td>
+                                      <td className="p-4 text-body-small text-charcoal-600 dark:text-cream-50 text-right">
+                                        {booking.finalPrice != null ? (
+                                          <div>
+                                            <div className="font-semibold">{formatCurrency(booking.finalPrice)}</div>
+                                            <div className="text-charcoal-400 dark:text-charcoal-300">Paid</div>
+                                          </div>
+                                        ) : booking.quotedPrice != null ? (
+                                          <div>
+                                            <div className="font-semibold">{formatCurrency(booking.quotedPrice)}</div>
+                                            <div className="text-charcoal-400 dark:text-charcoal-300">Quoted</div>
+                                          </div>
+                                        ) : (
+                                          'Pending'
+                                        )}
+                                      </td>
+                                      <td className="p-4 text-center">
+                                        <StatusChip variant={getBookingStatusVariant(booking.status)}>
+                                          {booking.status}
+                                        </StatusChip>
+                                      </td>
+                                      <td className="p-4 text-center">
+                                        {booking.status === 'Pending' && booking.createdAt && (
+                                          <BookingTimer
+                                            createdAt={booking.createdAt}
+                                            durationMinutes={1}
+                                            onExpire={() => handleTimerExpire(booking.id)}
+                                            compact={true}
+                                          />
+                                        )}
+                                        {booking.status !== 'Pending' && (
+                                          <span className="text-charcoal-400 dark:text-charcoal-300 text-label-small">—</span>
+                                        )}
+                                      </td>
+                                      <td className="p-4 text-center">
+                                        <div className="flex items-center justify-center gap-2">
+                                          <button
+                                            onClick={() => handleViewBooking(booking)}
+                                            className="px-4 py-2 bg-sage-500 hover:bg-sage-600 dark:bg-sage-700 dark:hover:bg-sage-600 text-cream-50 rounded-md text-body-small transition-colors"
+                                          >
+                                            View
+                                          </button>
+                                          {booking.status === 'Pending' && (
+                                            <button
+                                              onClick={() => handleCancelBookingClick(booking)}
+                                              disabled={cancellingBookingId === booking.id}
+                                              className="px-4 py-2 bg-error-bg hover:bg-error-hover text-error-text border border-error-border rounded-md text-body-small transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                              {cancellingBookingId === booking.id ? 'Cancelling...' : 'Cancel'}
+                                            </button>
+                                          )}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          ) : (
+                            <div className="p-12 text-center text-charcoal-400 dark:text-charcoal-300">
+                              <ScissorsIcon size={48} className="mx-auto text-charcoal-300 mb-3" />
+                              <p className="text-body-regular mb-4">
+                                {serviceSearchQuery || serviceStatusFilter !== 'all'
+                                  ? 'No bookings match your filters'
+                                  : 'No service bookings yet'
+                                }
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </section>
+
+                      {/* Service Reviews Section */}
+                      <section className="mb-8">
+                        <div className="bg-cream-50 dark:bg-charcoal-600 border border-grey-stroke dark:border-charcoal-400 rounded-lg overflow-hidden">
+                          <div className="bg-sage-100 dark:bg-sage-900/30 p-4 border-b border-grey-stroke dark:border-charcoal-400">
+                            <h3 className="text-card-h3 text-charcoal-600 dark:text-white font-semibold flex items-center gap-2">
+                              <ChatCircleTextIcon size={24} className="text-sage-600 dark:text-sage-400" weight="fill" />
+                              My Service Reviews
+                            </h3>
+                            <p className="text-body-small text-charcoal-400 dark:text-charcoal-300 mt-1">
+                              Reviews you've submitted for service providers
+                            </p>
+                          </div>
+                          {serviceReviews && serviceReviews.length > 0 ? (
+                            <div className="overflow-x-auto">
+                              <table className="w-full">
+                                <thead>
+                                  <tr className="bg-grey-100 dark:bg-charcoal-500 border-b border-grey-stroke dark:border-charcoal-400">
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Review ID</th>
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Date</th>
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Service Provider</th>
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Service</th>
+                                    <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Overall Rating</th>
+                                    <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Quality</th>
+                                    <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Professionalism</th>
+                                    <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Timeliness</th>
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Comment</th>
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Provider Response</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-grey-stroke dark:divide-charcoal-400">
+                                  {serviceReviews.map((review) => (
+                                    <tr key={review.id} className="hover:bg-cream-100 dark:hover:bg-charcoal-500 transition-colors">
+                                      <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50 font-semibold">
+                                        #{review.id}
+                                      </td>
+                                      <td className="p-4 text-body-small text-charcoal-600 dark:text-cream-50">
+                                        {formatDate(review.createdAt)}
+                                      </td>
+                                      <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50">
+                                        {review.providerName || review.businessName || 'N/A'}
+                                      </td>
+                                      <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50">
+                                        {review.serviceName || 'N/A'}
+                                      </td>
+                                      <td className="p-4 text-center">
+                                        <div className="flex items-center justify-center gap-1">
+                                          <span className="text-sage-600 dark:text-sage-400 font-semibold">{review.overallRating}</span>
+                                          <span className="text-charcoal-400 dark:text-charcoal-300">/5</span>
+                                        </div>
+                                      </td>
+                                      <td className="p-4 text-center text-body-small text-charcoal-600 dark:text-cream-50">
+                                        {review.qualityRating ? `${review.qualityRating}/5` : '—'}
+                                      </td>
+                                      <td className="p-4 text-center text-body-small text-charcoal-600 dark:text-cream-50">
+                                        {review.professionalismRating ? `${review.professionalismRating}/5` : '—'}
+                                      </td>
+                                      <td className="p-4 text-center text-body-small text-charcoal-600 dark:text-cream-50">
+                                        {review.timelinessRating ? `${review.timelinessRating}/5` : '—'}
+                                      </td>
+                                      <td className="p-4 text-body-small text-charcoal-600 dark:text-cream-50 max-w-xs">
+                                        <div className="truncate" title={review.comment}>
+                                          {review.comment || 'No comment'}
+                                        </div>
+                                      </td>
+                                      <td className="p-4 text-body-small text-charcoal-600 dark:text-cream-50 max-w-xs">
+                                        <div className="truncate" title={review.providerResponse}>
+                                          {review.providerResponse || 'No response yet'}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          ) : (
+                            <div className="p-12 text-center text-charcoal-400 dark:text-charcoal-300">
+                              No reviews found. Complete a service booking to leave a review!
+                            </div>
+                          )}
+                        </div>
+                      </section>
+                      </>
+                      )}
                </>
               )}
+
             </>
-          )}
+            )}
             {location.pathname.includes("/customer-dashboard/profile") && (
               <ProfilePage
                 userProfile={{
@@ -1318,10 +2081,19 @@ const pastOrders = useMemo(() => {
                     console.error('Error updating profile:', error);
                     throw error;
                   }
-                }}
-                readOnly={false}
-              />
-            )}
+                
+              }}
+              readOnly={false}
+            />
+          )}
+
+          {/* Notifications Section */}
+          {location.pathname.includes("/customer-dashboard/notifications") && (
+            <NotificationsPage
+              userId={userProfileId}
+              searchQuery={notificationSearchQuery}
+            />
+          )}
           </div>
         </main>
       </div>
@@ -1417,15 +2189,15 @@ const pastOrders = useMemo(() => {
                   </div>
 
                   <div className="flex gap-3">
-                    <button 
-                      onClick={handleSubmitReview} 
+                    <button
+                      onClick={handleSubmitProductReview}
                       disabled={reviewModal.loading}
                       className="flex-1 bg-sage-500 hover:bg-sage-600 text-white py-3 px-4 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       {reviewModal.loading ? "Submitting..." : "Submit Review"}
                     </button>
-                    <button 
-                      onClick={closeReviewModal} 
+                    <button
+                      onClick={closeReviewModal}
                       disabled={reviewModal.loading}
                       className="flex-1 bg-grey-300 hover:bg-grey-400 text-charcoal-700 py-3 px-4 rounded-lg font-semibold disabled:opacity-50 transition-colors"
                     >
@@ -1436,15 +2208,92 @@ const pastOrders = useMemo(() => {
               </div>
             )}
 
+          {/* History Page Modals */}
+          <ViewOrderModal
+            isOpen={viewOrderModal.isOpen}
+            onClose={() => setViewOrderModal({ isOpen: false, order: null })}
+            order={viewOrderModal.order}
+          />
+
+          <ViewServiceBookingModal
+            isOpen={viewBookingModal.isOpen}
+            onClose={() => setViewBookingModal({ isOpen: false, booking: null })}
+            booking={viewBookingModal.booking}
+            onOpenReview={handleOpenReview}
+            hasReview={viewBookingModal.booking ? bookingHasReview(viewBookingModal.booking.id) : false}
+            onCancelBooking={handleCancelBookingClick}
+            onTimerExpire={handleTimerExpire}
+          />
+
+          <ServiceReviewModal
+            isOpen={serviceReviewModal.isOpen}
+            onClose={() => setServiceReviewModal({ isOpen: false, booking: null })}
+            booking={serviceReviewModal.booking}
+            onSubmit={handleSubmitServiceReview}
+          />
+
+          {/* Cancel Booking Confirmation Dialog */}
+          {showCancelDialog && cancelBookingData && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-cream-50 dark:bg-charcoal-600 rounded-2xl shadow-2xl w-full max-w-md">
+                <div className="p-6 border-b border-grey-stroke dark:border-charcoal-400">
+                  <h3 className="text-card-h2 text-charcoal-600 dark:text-white font-bold">
+                    Cancel Booking?
+                  </h3>
+                  <p className="text-body-small text-charcoal-400 dark:text-charcoal-300 mt-2">
+                    Booking ID: #{cancelBookingData.id} - {cancelBookingData.serviceName}
+                  </p>
+                </div>
+
+                <div className="p-6">
+                  <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">
+                    Reason for cancellation *
+                  </label>
+                  <textarea
+                    value={cancellationReason}
+                    onChange={(e) => setCancellationReason(e.target.value)}
+                    placeholder="E.g., Changed my mind, Found another provider, etc."
+                    className="w-full h-24 border-2 border-grey-stroke dark:border-charcoal-400 dark:bg-charcoal-500 dark:text-white rounded-xl p-3 text-body-small resize-none focus:border-sage-500 focus:outline-none"
+                    maxLength={200}
+                    autoFocus
+                  />
+                  <p className="text-label-small text-charcoal-400 dark:text-charcoal-300 mt-2">
+                    {cancellationReason.length}/200 characters
+                  </p>
+                </div>
+
+                <div className="p-6 pt-0 flex gap-3">
+                  <button
+                    onClick={() => {
+                      setShowCancelDialog(false);
+                      setCancellationReason('');
+                      setCancelBookingData(null);
+                    }}
+                    className="flex-1 px-4 py-2 bg-grey-200 dark:bg-charcoal-400 text-charcoal-600 dark:text-white font-bold rounded-xl hover:bg-grey-300 dark:hover:bg-charcoal-300 transition-all"
+                  >
+                    Keep Booking
+                  </button>
+                  <button
+                    onClick={handleConfirmCancelBooking}
+                    disabled={!cancellationReason.trim() || cancellingBookingId}
+                    className="flex-1 px-4 py-2 bg-error-bg text-error-text border-2 border-error-border font-bold rounded-xl hover:bg-error-hover transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {cancellingBookingId ? 'Cancelling...' : 'Confirm Cancel'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Snackbar */}
-          <Snackbar 
+          <Snackbar
             open={snackbar.open}
             message={snackbar.message}
             type={snackbar.type}
             onClose={() => setSnackbar({ open: false, message: '', type: 'success' })}
           />
 
-        
+
     </div>
   );
 

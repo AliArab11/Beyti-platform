@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Scissors, Star, MagnifyingGlass, ArrowLeft } from "@phosphor-icons/react";
-import { getServiceProviderById, getServiceCatalogs, getServiceProviderServices, getProviderServiceReviews } from "../../services/api";
+import { getServiceProviderById, getServiceCatalogs, getServiceProviderServices, getProviderServiceReviews, getServiceBookings } from "../../services/api";
 import { isAuthenticated } from "../../utils/authUtils";
 import PageHeader from "../../components/PageHeader";
 import ServiceDetailsSheet from "./Components/ServiceDetailsSheet";
@@ -92,11 +92,20 @@ const ServiceProviderInfo = ({ provider }) => {
 
                   {/* Rating inline with name */}
                   <div className="flex items-center gap-2.5">
-                    <Star className="w-7 h-7 text-[#556B5C]" weight="fill" />
-                    <span className="text-[22px] font-semibold text-[#556B5C]"
-                          style={{ fontFamily: "Inter, sans-serif" }}>
-                      {provider?.averageRating ? provider.averageRating.toFixed(1) : "N/A"}
-                    </span>
+                    {provider?.averageRating && provider.averageRating > 0 ? (
+                      <>
+                        <Star className="w-7 h-7 text-sage-500" weight="fill" />
+                        <span className="text-[22px] font-semibold text-sage-500"
+                              style={{ fontFamily: "Inter, sans-serif" }}>
+                          {provider.averageRating.toFixed(1)}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="px-4 py-1.5 bg-sage-500 text-white text-sm font-bold rounded-full"
+                            style={{ fontFamily: 'Inter, sans-serif' }}>
+                        NEW
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -247,21 +256,29 @@ const ServiceCard = ({ service, onClick }) => {
 
         {/* Dynamic Star Rating */}
         <div className="flex items-center gap-1 mb-3">
-          {[...Array(5)].map((_, i) => (
-            <Star
-              key={i}
-              className="w-4 h-4"
-              weight="fill"
-              style={{
-                color: i < Math.floor(service?.averageRating || 0)
-                  ? '#F5C563'
-                  : '#E5E7EB'
-              }}
-            />
-          ))}
-          <span className="text-sm font-semibold text-charcoal-600 ml-1">
-            {service?.averageRating ? service.averageRating.toFixed(1) : "N/A"}
-          </span>
+          {service?.averageRating && service.averageRating > 0 ? (
+            <>
+              {[...Array(5)].map((_, i) => (
+                <Star
+                  key={i}
+                  className="w-4 h-4"
+                  weight="fill"
+                  style={{
+                    color: i < Math.floor(service.averageRating)
+                      ? '#556B5C'
+                      : '#E5E7EB'
+                  }}
+                />
+              ))}
+              <span className="text-sm font-semibold text-charcoal-600 ml-1">
+                {service.averageRating.toFixed(1)}
+              </span>
+            </>
+          ) : (
+            <span className="px-3 py-1 bg-sage-500 text-white text-xs font-bold rounded-full" style={{ fontFamily: 'Inter, sans-serif' }}>
+              NEW
+            </span>
+          )}
         </div>
 
         {service?.description && (
@@ -298,6 +315,7 @@ const ServiceProviderDetailView = () => {
   const [sortBy, setSortBy] = useState("popular");
   const [services, setServices] = useState([]);
   const [allReviews, setAllReviews] = useState([]);
+  const [bookings, setBookings] = useState([]);
 
   // Service booking states
   const [selectedService, setSelectedService] = useState(null);
@@ -335,17 +353,39 @@ const ServiceProviderDetailView = () => {
         const servicesData = await getServiceProviderServices(providerId);
         console.log('[ServiceProviderDetailView] Services data:', servicesData);
 
+        // Fetch all bookings for this provider
+        const bookingsData = await getServiceBookings(providerId);
+        console.log('[ServiceProviderDetailView] Bookings data:', bookingsData);
+        setBookings(Array.isArray(bookingsData) ? bookingsData : []);
+
         // Fetch all reviews for this provider
         const reviewsData = await getProviderServiceReviews(providerId);
         console.log('[ServiceProviderDetailView] Reviews data:', reviewsData);
         setAllReviews(Array.isArray(reviewsData) ? reviewsData : []);
 
-        // Calculate average rating for each service based on ALL reviews (including hidden)
-        const servicesWithRatings = (Array.isArray(servicesData) ? servicesData : []).map(service => {
-          // Filter ALL reviews for this specific service (including hidden ones for rating calculation)
-          const allServiceReviews = (Array.isArray(reviewsData) ? reviewsData : []).filter(
-            review => review.serviceCatalogId === service.id
+        // Create a map of reviews by serviceId using bookings
+        // Review -> Booking -> ServiceId
+        const reviewsByServiceId = {};
+        (Array.isArray(reviewsData) ? reviewsData : []).forEach(review => {
+          // Find the booking for this review
+          const booking = (Array.isArray(bookingsData) ? bookingsData : []).find(
+            b => b.id === review.serviceBookingId
           );
+
+          if (booking && booking.serviceId) {
+            if (!reviewsByServiceId[booking.serviceId]) {
+              reviewsByServiceId[booking.serviceId] = [];
+            }
+            reviewsByServiceId[booking.serviceId].push(review);
+          }
+        });
+
+        console.log('[ServiceProviderDetailView] Reviews grouped by serviceId:', reviewsByServiceId);
+
+        // Calculate average rating for each service based on reviews specific to that service
+        const servicesWithRatings = (Array.isArray(servicesData) ? servicesData : []).map(service => {
+          // Get ALL reviews for this specific service (including hidden ones for rating calculation)
+          const allServiceReviews = reviewsByServiceId[service.id] || [];
 
           // Filter only visible reviews for display count
           const visibleServiceReviews = allServiceReviews.filter(review => !review.isHidden);
@@ -357,7 +397,7 @@ const ServiceProviderDetailView = () => {
             // Calculate rating from ALL reviews (including hidden ones)
             const sum = allServiceReviews.reduce((acc, review) => acc + (review.overallRating || 0), 0);
             averageRating = sum / allServiceReviews.length;
-            console.log(`[Service ${service.id}] Average rating: ${averageRating.toFixed(2)} from all reviews`);
+            console.log(`[Service ${service.id}] Average rating: ${averageRating.toFixed(2)} from ${allServiceReviews.length} reviews`);
           }
 
           return {
@@ -593,6 +633,7 @@ const ServiceProviderDetailView = () => {
         onClose={closeServiceDetails}
         onBookService={handleBookService}
         allReviews={allReviews}
+        bookings={bookings}
       />
 
       {/* Service Checkout Modal */}

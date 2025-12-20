@@ -41,6 +41,8 @@ namespace Beyti_Backend.Controllers.Api
                 .Include(b => b.ServiceProvider)
                     .ThenInclude(sp => sp.UserProfile)
                 .Include(b => b.ServiceCatalog)
+                .Include(b => b.Service)
+                .Include(b => b.ServiceAddress)
                 .Include(b => b.TimeSlot)
                 .AsQueryable();
 
@@ -80,6 +82,7 @@ namespace Beyti_Backend.Controllers.Api
             }
 
             var results = await query
+                .OrderByDescending(b => b.CreatedAt)
                 .Select(b => new
                 {
                     b.Id,
@@ -103,14 +106,30 @@ namespace Beyti_Backend.Controllers.Api
                     b.CancellationFee,
                     b.CreatedAt,
                     b.UpdatedAt,
+                    // Provider info
                     providerName = b.ServiceProvider.UserProfile.DisplayName,
                     businessName = b.ServiceProvider.BusinessName,
-                    serviceName = b.ServiceCatalog.Name,
-                    customerName = b.Customer.UserProfile.DisplayName
+                    // Service info - use Service table if available, otherwise fall back to ServiceCatalog
+                    serviceName = b.Service != null ? b.Service.Name : b.ServiceCatalog.Name,
+                    serviceDescription = b.Service != null ? b.Service.Description : null,
+                    serviceCategoryName = b.ServiceCatalog.Name,
+                    // Customer info
+                    customerName = b.Customer.UserProfile.DisplayName,
+                    // Address info
+                    serviceAddress = b.ServiceAddress != null ? new
+                    {
+                        b.ServiceAddress.Id,
+                        b.ServiceAddress.Street,
+                        b.ServiceAddress.City,
+                        b.ServiceAddress.Region,
+                        b.ServiceAddress.PostalCode,
+                        b.ServiceAddress.Country
+                    } : null
                 })
                 .ToListAsync();
 
-            Console.WriteLine($"[ServiceBookings] Found {results.Count} bookings");
+            var count = results.Count;
+            Console.WriteLine($"[ServiceBookings] Found {count} bookings");
             return Ok(results);
         }
 

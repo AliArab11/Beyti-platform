@@ -12,10 +12,11 @@ import { Table, TableHeader, TableBody, TableRow } from "../../components/Table"
 
 import { getSellerOrders, getSellers, restoreStock, getProducts, getProductVariants } from "../../services/api";
 import OrderTimer from "./Components/OrderTimer";
-import Orders from "./Components/Orders"; 
+import Orders from "./Components/Orders";
 import Analytics from "./Components/Analytics";
 import Products from "./Components/Products";
 import Reviews from "./Components/Reviews";
+import NotificationsPage from '../ServiceProvider/components/NotificationsPage';
 
 import './Components/modalAnimations.css';
 
@@ -25,6 +26,7 @@ import { Outlet, useNavigate } from "react-router-dom";
 import { useLocation } from "react-router-dom";
 
 import * as Icon from "@phosphor-icons/react";
+import { getUserId } from "../../utils/auth";
 
 
 
@@ -519,9 +521,11 @@ const getPageTitle = () => {
     return "Customer Reviews";
   } else if (location.pathname.includes("/seller-dashboard/profile")) {
     return "My Profile";
+  } else if (location.pathname.includes("/seller-dashboard/notifications")) {
+    return "Notifications";
   } else {
     return "Seller Dashboard";
-  } 
+  }
 };
 
   const [isOpen, setIsOpen] = useState(false);
@@ -529,9 +533,14 @@ const getPageTitle = () => {
 
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   const [sellerId, setSellerId] = useState(null);
   const [sellerName, setSellerName] = useState("My Store");
+  const [sellerUserProfileId, setSellerUserProfileId] = useState(null);
+
+  // Get logged-in user ID for notifications (NOT the seller entity ID)
+  // This will be overridden by the seller's UserProfileId when a seller is selected
+  const loggedInUserId = sellerUserProfileId || getUserId();
 
   const [sellerList, setSellerList] = useState([]);
   const [selectModalOpen, setSelectModalOpen] = useState(true);
@@ -543,6 +552,9 @@ const getPageTitle = () => {
   const [sellerProducts, setSellerProducts] = useState([]);
 
   const [searchRecent, setSearchRecent] = useState("");
+
+  // Notifications state
+  const [notificationSearchQuery, setNotificationSearchQuery] = useState('');
 
   // order modal state
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -877,8 +889,12 @@ const productsArr = Array.from(productMap.values()).sort(
               if (id) {
                 const numericId = parseInt(id, 10);
                 const selected = sellerList.find((s) => s.id === numericId);
+                console.log('🔍 Selected seller:', selected);
+                console.log('🔍 Selected seller UserProfileId:', selected?.userProfileId || selected?.UserProfileId);
                 setSellerName(selected?.storeName || "My Store");
                 setSellerId(numericId);
+                // Set the UserProfileId for notifications
+                setSellerUserProfileId(selected?.userProfileId || selected?.UserProfileId || null);
                 setSelectModalOpen(false);
               }
             }}
@@ -1016,6 +1032,20 @@ const productsArr = Array.from(productMap.values()).sort(
             Reviews
           </NavigationButton>
 
+          {/* Notifications */}
+          <NavigationButton
+            selected={location.pathname.includes("/seller-dashboard/notifications")}
+            onClick={() => navigate("notifications")}
+            icon={
+              <Icon.Bell
+                size={20}
+                weight={location.pathname.includes("/seller-dashboard/notifications") ? "fill" : "regular"}
+              />
+            }
+          >
+            Notifications
+          </NavigationButton>
+
           {/* Profile */}
           <NavigationButton
             selected={location.pathname.includes("/seller-dashboard/profile")}
@@ -1054,7 +1084,6 @@ const productsArr = Array.from(productMap.values()).sort(
         <div className="border-b border-grey-stroke bg-grey-200">
          <PageHeader
           title={getPageTitle()}
-          notificationCount={metrics.pendingOrders || 0}
           userName={sellerName}
           userRole="Seller"
           userProfile={{
@@ -1068,7 +1097,7 @@ const productsArr = Array.from(productMap.values()).sort(
             updatedAt: new Date().toISOString()
           }}
           entityId={sellerId}
-          userId={sellerId}
+          userId={loggedInUserId}
           onProfileClick={() => navigate('profile')}
           onProfileUpdate={async (updates) => {
             try {
@@ -1558,6 +1587,11 @@ const productsArr = Array.from(productMap.values()).sort(
                     />
                     ) : location.pathname.includes("/seller-dashboard/reviews") ? (
                       <Reviews sellerId={sellerId} sellerName={sellerName} />
+                    ) : location.pathname.includes("/seller-dashboard/notifications") ? (
+                      <NotificationsPage
+                        userId={loggedInUserId}
+                        searchQuery={notificationSearchQuery}
+                      />
                     ) : location.pathname.includes("/seller-dashboard/profile") ? (
                       (() => {
                         const currentSeller = sellerList.find(s => s.id === sellerId);

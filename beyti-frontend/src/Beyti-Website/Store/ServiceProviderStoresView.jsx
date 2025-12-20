@@ -1,154 +1,269 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Scissors, Star } from "@phosphor-icons/react";
-import { getServiceProviders, getServiceCategoryList, getUserProfile, updateUserProfile, getServiceProviderServices, getProviderServiceReviews } from "../../services/api";
+import { Scissors, Star, Storefront, Heart, Briefcase, Users } from "@phosphor-icons/react";
+import { getServiceProviders, getServiceCategoryList, getServiceCatalogs, getUserProfile, updateUserProfile, getServiceProviderServices, getProviderServiceReviews } from "../../services/api";
 import { isAuthenticated, getUserId, handleSuspensionError } from "../../utils/authUtils";
 import PageHeader from "../../components/PageHeader";
-import CustomerSidebar from "../../components/CustomerSidebar";
 
 // Main Category Tabs Component
 const CategoryTabs = ({ categories, selected, onSelect }) => (
-  <div className="flex justify-center items-center gap-5 mb-6">
-    {categories.map((category, index) => (
+  <div className="flex justify-center items-center gap-5 mb-6 ml-32">
+    {/* "All Categories" option */}
+    <button
+      onClick={() => onSelect(null)}
+      className={`px-20 py-4 rounded-full font-semibold text-[19px] transition-all ${
+        selected === null
+          ? 'bg-sage-500 text-white shadow-[0_2px_12px_rgba(85,107,92,0.25)]'
+          : 'bg-cream-50 text-charcoal-600 border-2 border-grey-stroke hover:border-sage-500 shadow-[0_1px_3px_rgba(0,0,0,0.08)]'
+      }`}
+      style={{ fontFamily: 'Inter, sans-serif' }}
+    >
+      All Categories
+    </button>
+
+    {categories.map(category => (
       <button
-        key={`category-${index}-${category}`}
-        onClick={() => onSelect(category)}
+        key={category.id}
+        onClick={() => onSelect(category.id)}
         className={`px-20 py-4 rounded-full font-semibold text-[19px] transition-all ${
-          selected === category
+          selected === category.id
             ? 'bg-sage-500 text-white shadow-[0_2px_12px_rgba(85,107,92,0.25)]'
             : 'bg-cream-50 text-charcoal-600 border-2 border-grey-stroke hover:border-sage-500 shadow-[0_1px_3px_rgba(0,0,0,0.08)]'
         }`}
         style={{ fontFamily: 'Inter, sans-serif' }}
       >
-        {category}
+        {category.name}
       </button>
     ))}
   </div>
 );
 
-// Search Bar Component
-const SearchBar = ({ value, onChange, showFilterDropdown, setShowFilterDropdown, activeFilters, handleFilterChange, clearAllFilters, getActiveFilterCount }) => (
-  <div className="flex gap-4 items-center mb-8">
-    <div className="flex-1 relative">
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="Search Service Providers..."
-        className="w-full pl-12 pr-4 py-3.5 bg-white rounded-full border border-grey-stroke focus:outline-none focus:border-sage-500 text-charcoal-600 shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
-        style={{ fontFamily: 'Inter, sans-serif', fontSize: '16px' }}
-      />
-      <svg className="w-5 h-5 text-charcoal-400 absolute left-4 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-      </svg>
-    </div>
+// Service Catalog Sidebar Component
+const ServiceCatalogSidebar = ({ catalogs, selected, onSelect }) => {
+  // Icon mapping for service catalogs
+  const getIconForCatalog = (name) => {
+    const lowerName = name.toLowerCase();
+    if (lowerName.includes('beauty') || lowerName.includes('salon') || lowerName.includes('hair')) return <Scissors size={24} weight="regular" />;
+    if (lowerName.includes('health') || lowerName.includes('wellness') || lowerName.includes('spa')) return <Heart size={24} weight="regular" />;
+    if (lowerName.includes('professional') || lowerName.includes('business') || lowerName.includes('consulting')) return <Briefcase size={24} weight="regular" />;
+    if (lowerName.includes('personal') || lowerName.includes('training')) return <Users size={24} weight="regular" />;
+    return <Storefront size={24} weight="regular" />; // Default icon
+  };
 
-    {/* Filter Button with Dropdown */}
-    <div className="relative">
+  return (
+    <aside className="w-[280px] flex-shrink-0 mt-20">
+      <div className="space-y-3">
+        {/* "All Providers" option */}
+        <button
+          onClick={() => onSelect(null)}
+          className={`w-full flex items-center gap-4 px-6 py-4 rounded-full text-left transition-all font-medium text-[17px] ${
+            selected === null
+              ? 'bg-sage-500 text-white shadow-[0_2px_8px_rgba(85,107,92,0.3)]'
+              : 'bg-cream-50 text-sage-500 hover:bg-cream-100'
+          }`}
+          style={{ fontFamily: 'Inter, sans-serif' }}
+        >
+          <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
+            selected === null ? 'bg-sage-700' : 'bg-[#E8F0EA]'
+          }`}>
+            <div className={selected === null ? 'text-white' : 'text-sage-500'}>
+              <Storefront size={24} weight="regular" />
+            </div>
+          </div>
+          <span>All Providers</span>
+        </button>
+
+        {/* Service Catalogs */}
+        {catalogs.map(catalog => (
+          <button
+            key={catalog.id}
+            onClick={() => onSelect(catalog.id)}
+            className={`w-full flex items-center gap-4 px-6 py-4 rounded-full text-left transition-all font-medium text-[17px] ${
+              selected === catalog.id
+                ? 'bg-sage-500 text-white shadow-[0_2px_8px_rgba(85,107,92,0.3)]'
+                : 'bg-cream-50 text-sage-500 hover:bg-cream-100'
+            }`}
+            style={{ fontFamily: 'Inter, sans-serif' }}
+          >
+            <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
+              selected === catalog.id ? 'bg-sage-700' : 'bg-[#E8F0EA]'
+            }`}>
+              <div className={selected === catalog.id ? 'text-white' : 'text-sage-500'}>
+                {getIconForCatalog(catalog.name)}
+              </div>
+            </div>
+            <span>{catalog.name}</span>
+          </button>
+        ))}
+      </div>
+    </aside>
+  );
+};
+
+// Featured Carousel Component
+const FeaturedCarousel = ({ providers, onProviderClick, services }) => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Get top 5 rated providers only (must have a rating)
+  const featured = providers
+    .filter(provider => {
+      const rating = provider.averageRating;
+      return rating !== null && rating !== undefined && rating > 0;
+    })
+    .sort((a, b) => b.averageRating - a.averageRating)
+    .slice(0, 5);
+
+  useEffect(() => {
+    if (featured.length === 0) return;
+
+    const maxIndex = Math.max(0, featured.length - 3);
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % (maxIndex + 1));
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [featured.length]);
+
+  if (featured.length === 0) return null;
+
+  return (
+    <div className="relative mb-16 pb-4">
+      {/* Featured Section Title */}
+      <div className="flex items-center gap-3 mb-6">
+        <Star size={28} weight="fill" className="text-sage-500" />
+        <h2 className="text-2xl font-bold text-charcoal-600" style={{ fontFamily: 'Merriweather, serif' }}>
+          Top Rated Providers
+        </h2>
+      </div>
+
       <button
-        onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-        className="flex items-center gap-3 px-6 py-3.5 bg-white rounded-full border border-grey-stroke hover:border-sage-500 transition-all shadow-[0_2px_8px_rgba(0,0,0,0.06)] relative"
+        onClick={() => setCurrentIndex(Math.max(0, currentIndex - 1))}
+        disabled={currentIndex === 0}
+        className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white rounded-full shadow-[0_2px_10px_rgba(0,0,0,0.12)] flex items-center justify-center hover:bg-cream-50 transition-all disabled:opacity-30"
       >
-        <svg className="w-5 h-5 text-sage-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-        </svg>
-        <span className="text-charcoal-600 font-semibold text-[14px]" style={{ fontFamily: 'Inter, sans-serif' }}>
-          Filter
-        </span>
-        {getActiveFilterCount() > 0 && (
-          <span className="absolute -top-1 -right-1 w-5 h-5 bg-sage-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
-            {getActiveFilterCount()}
-          </span>
-        )}
-        <svg className="w-4 h-4 text-charcoal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        <svg className="w-5 h-5 text-charcoal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>
       </button>
 
-      {/* Filter Dropdown */}
-      {showFilterDropdown && (
-        <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-grey-stroke z-50">
-          <div className="p-6 space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-grey-stroke">
-              <h3 className="text-lg font-bold text-charcoal-600" style={{ fontFamily: 'Merriweather, serif' }}>
-                Filters
-              </h3>
-              {getActiveFilterCount() > 0 && (
-                <button
-                  onClick={clearAllFilters}
-                  className="text-sm text-sage-600 hover:text-sage-700 font-semibold"
-                  style={{ fontFamily: 'Inter, sans-serif' }}
-                >
-                  Clear All
-                </button>
-              )}
-            </div>
+      <div className="overflow-hidden px-12 py-3">
+        <div className="flex gap-6 transition-transform duration-500" style={{ transform: `translateX(-${currentIndex * (100 / 3)}%)` }}>
+          {featured.map((provider, idx) => {
+            const providerServices = services[provider.id] || [];
+            const activeServicesCount = providerServices.filter(s => s.isActive || s.IsActive).length || 0;
 
-            {/* Rating Slider */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-semibold text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>
-                  Minimum Rating
-                </p>
-                <div className="flex items-center gap-1 bg-sage-100 px-3 py-1 rounded-full">
-                  <Star size={14} weight="fill" className="text-sage-600" />
-                  <span className="text-sm font-bold text-sage-700" style={{ fontFamily: 'Inter, sans-serif' }}>
-                    {activeFilters.rating ? `${activeFilters.rating}+` : 'Any'}
-                  </span>
+            return (
+              <div
+                key={provider.id || idx}
+                onClick={() => onProviderClick(provider.id)}
+                className="flex-shrink-0 w-[calc(33.333%-16px)] bg-white rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all cursor-pointer"
+              >
+                <div className="relative h-32 bg-gradient-to-br from-[#E8D8E0] to-[#DFC9D8]">
+                  {/* Provider Status Badge */}
+                  {provider.status && (
+                    <div className="absolute top-3 left-3">
+                      <div className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 ${
+                        provider.status === 'Available' ? 'bg-success-btn text-white' :
+                        provider.status === 'Busy' ? 'bg-yellow-500 text-white' :
+                        provider.status === 'Unavailable' ? 'bg-error-btn text-white' :
+                        'bg-grey-500 text-white'
+                      }`}>
+                        <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                        {provider.status.toUpperCase()}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="absolute -bottom-8 left-4">
+                    <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.15)] border-4 border-white">
+                      <Scissors className="w-8 h-8 text-sage-500" weight="regular" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-10 p-4 bg-white">
+                  <h3 className="font-bold text-charcoal-600 text-base mb-2" style={{ fontFamily: 'Merriweather, serif' }}>
+                    {provider.businessName || provider.displayName || 'Service Provider'}
+                  </h3>
+                  <div className="flex items-center gap-1 mb-3">
+                    {(() => {
+                      const rating = provider.averageRating || 0;
+                      const hasRating =
+                        provider.averageRating !== null &&
+                        provider.averageRating !== undefined &&
+                        provider.averageRating > 0;
+
+
+                      if (!hasRating) {
+                        return (
+                          <span className="px-3 py-1 bg-sage-500 text-white text-xs font-bold rounded-full" style={{ fontFamily: 'Inter, sans-serif' }}>
+                            NEW
+                          </span>
+                        );
+                      }
+
+                      return (
+                        <>
+                          {[0,1,2,3,4].map(i => {
+                            const fillPercentage = Math.max(0, Math.min(100, (rating - i) * 100));
+                            return (
+                              <div key={i} className="relative w-3.5 h-3.5">
+                                <Star size={14} className="text-grey-stroke absolute" weight="fill" />
+                                <div className="overflow-hidden absolute" style={{ width: `${fillPercentage}%` }}>
+                                  <Star size={14} className="text-sage-500" weight="fill" />
+                                </div>
+                              </div>
+                            );
+                          })}
+                          <span className="text-xs font-semibold text-charcoal-600 ml-1" style={{ fontFamily: 'Inter, sans-serif' }}>
+                            {rating.toFixed(1)}
+                          </span>
+                        </>
+                      );
+                    })()}
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    {activeServicesCount > 0 ? (
+                      <span className="px-3 py-1 bg-cream-100 rounded-full text-xs font-medium text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>
+                        {activeServicesCount} {activeServicesCount === 1 ? 'Service' : 'Services'}
+                      </span>
+                    ) : (
+                      <span className="px-3 py-1 bg-grey-200 rounded-full text-xs font-medium text-charcoal-400 italic" style={{ fontFamily: 'Inter, sans-serif' }}>
+                        No services
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
-              <div className="relative">
-                <input
-                  type="range"
-                  min="0"
-                  max="5"
-                  step="1"
-                  value={activeFilters.rating || 0}
-                  onChange={(e) => {
-                    const value = parseInt(e.target.value);
-                    handleFilterChange('rating', value === 0 ? null : value);
-                  }}
-                  className="w-full h-2 bg-grey-200 rounded-full appearance-none cursor-pointer
-                           [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5
-                           [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-sage-500
-                           [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md
-                           [&::-webkit-slider-thumb]:hover:bg-sage-600 [&::-webkit-slider-thumb]:transition-colors
-                           [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:rounded-full
-                           [&::-moz-range-thumb]:bg-sage-500 [&::-moz-range-thumb]:border-0
-                           [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-md
-                           [&::-moz-range-thumb]:hover:bg-sage-600 [&::-moz-range-thumb]:transition-colors"
-                  style={{
-                    background: activeFilters.rating
-                      ? `linear-gradient(to right, #556B5C 0%, #556B5C ${((activeFilters.rating || 0) / 5) * 100}%, #E5E7EB ${((activeFilters.rating || 0) / 5) * 100}%, #E5E7EB 100%)`
-                      : '#E5E7EB'
-                  }}
-                />
-                <div className="flex justify-between mt-2 text-xs text-charcoal-400" style={{ fontFamily: 'Inter, sans-serif' }}>
-                  <span>Any</span>
-                  <span>1</span>
-                  <span>2</span>
-                  <span>3</span>
-                  <span>4</span>
-                  <span>5</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Apply Button */}
-            <button
-              onClick={() => setShowFilterDropdown(false)}
-              className="w-full bg-sage-500 hover:bg-sage-600 text-white font-bold py-3 rounded-xl transition-all shadow-soft-lift"
-              style={{ fontFamily: 'Inter, sans-serif' }}
-            >
-              Apply Filters
-            </button>
-          </div>
+            );
+          })}
         </div>
-      )}
+      </div>
+
+      <button
+        onClick={() => setCurrentIndex(Math.min(featured.length - 3, currentIndex + 1))}
+        disabled={currentIndex >= featured.length - 3}
+        className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white rounded-full shadow-[0_2px_10px_rgba(0,0,0,0.12)] flex items-center justify-center hover:bg-cream-50 transition-all disabled:opacity-30"
+      >
+        <svg className="w-5 h-5 text-charcoal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+
+      <div className="flex justify-center gap-2 mt-6">
+        {Array.from({ length: Math.max(1, featured.length - 2) }).map((_, idx) => (
+          <button
+            key={idx}
+            onClick={() => setCurrentIndex(idx)}
+            className={`h-2 rounded-full transition-all ${
+              currentIndex === idx ? 'bg-sage-500 w-8' : 'bg-grey-stroke w-2'
+            }`}
+          />
+        ))}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 
 // Star Rating Component
@@ -161,12 +276,12 @@ const StarRating = ({ rating }) => {
     <div className="flex items-center gap-2">
       <div className="flex items-center gap-0.5">
         {[...Array(fullStars)].map((_, idx) => (
-          <svg key={`full-${idx}`} className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+          <svg key={`full-${idx}`} className="w-4 h-4 text-sage-500" fill="currentColor" viewBox="0 0 20 20">
             <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
           </svg>
         ))}
         {hasHalfStar && (
-          <svg className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+          <svg className="w-4 h-4 text-sage-500" fill="currentColor" viewBox="0 0 20 20">
             <defs>
               <linearGradient id="half-fill">
                 <stop offset="50%" stopColor="currentColor" />
@@ -194,20 +309,6 @@ const ProviderCard = ({ provider, onClick, services }) => {
   console.log('[ProviderCard] Rendering provider:', provider);
   console.log('[ProviderCard] Services:', services);
 
-  // Get status color
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'Available':
-        return 'bg-green-100 text-green-700';
-      case 'Busy':
-        return 'bg-yellow-100 text-yellow-700';
-      case 'Unavailable':
-        return 'bg-red-100 text-red-700';
-      default:
-        return 'bg-grey-200 text-charcoal-600';
-    }
-  };
-
   // Get active services count
   // Handle both PascalCase and camelCase property names from API
   const activeServicesCount = services?.filter(s => s.isActive || s.IsActive).length || 0;
@@ -219,6 +320,21 @@ const ProviderCard = ({ provider, onClick, services }) => {
       className="bg-white rounded-2xl overflow-hidden cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all"
     >
       <div className="relative h-32 bg-gradient-to-br from-[#E8D8E0] to-[#DFC9D8]">
+        {/* Provider Status Badge */}
+        {provider.status && (
+          <div className="absolute top-3 left-3">
+            <div className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 ${
+              provider.status === 'Available' ? 'bg-success-btn text-white' :
+              provider.status === 'Busy' ? 'bg-yellow-500 text-white' :
+              provider.status === 'Unavailable' ? 'bg-error-btn text-white' :
+              'bg-grey-500 text-white'
+            }`}>
+              <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+              {provider.status.toUpperCase()}
+            </div>
+          </div>
+        )}
+
         <div className="absolute -bottom-8 left-4">
           <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.15)] border-4 border-white">
             <Scissors className="w-8 h-8 text-sage-500" weight="regular" />
@@ -234,8 +350,20 @@ const ProviderCard = ({ provider, onClick, services }) => {
 
         {/* Star Rating */}
         <div className="mb-2">
-          <StarRating rating={provider.averageRating || 0} />
+          {provider.averageRating === null ||
+          provider.averageRating === undefined ||
+          provider.averageRating <= 0 ? (
+            <span
+              className="inline-block px-3 py-1 bg-sage-500 text-white text-xs font-bold rounded-full"
+              style={{ fontFamily: 'Inter, sans-serif' }}
+            >
+              NEW
+            </span>
+          ) : (
+            <StarRating rating={provider.averageRating} />
+          )}
         </div>
+
 
         {/* Services List */}
         {displayServices.length > 0 && (
@@ -293,15 +421,6 @@ const ProviderCard = ({ provider, onClick, services }) => {
             {provider.phone}
           </p>
         )}
-
-        {/* Status from ServiceProvider */}
-        {provider.status && (
-          <div className="flex items-center gap-2">
-            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(provider.status)}`} style={{ fontFamily: 'Inter, sans-serif' }}>
-              {provider.status}
-            </span>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -314,11 +433,12 @@ const ServiceProviderStoresView = () => {
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [serviceCatalogs, setServiceCatalogs] = useState([]);
+  const [selectedCatalog, setSelectedCatalog] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [displayName, setDisplayName] = useState("Customer");
   const [userProfile, setUserProfile] = useState(null);
   const [providerServices, setProviderServices] = useState({}); // Map of providerId -> services array
-  const [activeView, setActiveView] = useState('services'); // Current view: stores, services, notifications, history
 
   // Filter state
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
@@ -404,6 +524,35 @@ const ServiceProviderStoresView = () => {
     fetchInitialData();
   }, []);
 
+  // Fetch Service Catalogs when selected category changes
+  useEffect(() => {
+    const fetchCatalogs = async () => {
+      if (!selectedCategory) {
+        setServiceCatalogs([]);
+        setSelectedCatalog(null);
+        return;
+      }
+
+      try {
+        console.log('[fetchCatalogs] Fetching catalogs for category:', selectedCategory);
+        const catalogs = await getServiceCatalogs(selectedCategory);
+        console.log('[fetchCatalogs] Received catalogs:', catalogs);
+        // Filter out inactive catalogs (IsActive === true)
+        const activeCatalogs = Array.isArray(catalogs)
+          ? catalogs.filter(catalog => catalog.IsActive === true || catalog.isActive === true)
+          : [];
+        console.log('[fetchCatalogs] Active catalogs:', activeCatalogs);
+        setServiceCatalogs(activeCatalogs);
+        setSelectedCatalog(null); // Reset to "All Providers" when category changes
+      } catch (error) {
+        console.error('Failed to fetch service catalogs:', error);
+        setServiceCatalogs([]);
+      }
+    };
+
+    fetchCatalogs();
+  }, [selectedCategory]);
+
   const fetchInitialData = async () => {
     try {
       setLoading(true);
@@ -421,7 +570,16 @@ const ServiceProviderStoresView = () => {
       console.log('[fetchInitialData] Providers to set:', normalizedProviders);
 
       setProviders(normalizedProviders);
-      setCategories(Array.isArray(categoriesData) ? categoriesData : []);
+
+      // Set categories - filter out inactive categories (IsActive === true)
+      const cats = Array.isArray(categoriesData)
+        ? categoriesData.filter(category => category.IsActive === true || category.isActive === true)
+        : [];
+      console.log('[fetchInitialData] Active categories:', cats);
+      setCategories(cats);
+
+      // Don't set a default category - let user choose
+      // Category will be null by default, showing all providers
 
       // Fetch services and reviews for each provider
       if (normalizedProviders.length > 0) {
@@ -461,9 +619,6 @@ const ServiceProviderStoresView = () => {
         setProviderServices(servicesMap);
         setProviders(updatedProviders);
       }
-
-      // Don't set any default category - show all providers initially
-      setSelectedCategory(null);
     } catch (error) {
       console.error("Failed to load initial data:", error);
       setProviders([]);
@@ -471,10 +626,6 @@ const ServiceProviderStoresView = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleCategorySelect = (categoryId) => {
-    setSelectedCategory(categoryId);
   };
 
   // Filter helper functions
@@ -516,9 +667,30 @@ const ServiceProviderStoresView = () => {
     const matchesSearch = displayName.toLowerCase().includes(searchLower) ||
                          businessName.toLowerCase().includes(searchLower);
 
-    // Filter by category if one is selected, otherwise show all
-    const matchesCategory = selectedCategory === null ||
-                          provider.serviceCategoryId === selectedCategory;
+    // Filter by category if one is selected
+    const matchesCategory = !selectedCategory || provider.serviceCategoryId === selectedCategory;
+
+    // Filter by service catalog - check if provider has at least one service with this catalog
+    let matchesCatalog = true;
+    if (selectedCatalog !== null) {
+      const services = providerServices[provider.id] || [];
+      // Provider must have at least one active service that belongs to the selected catalog
+      matchesCatalog = services.some(service => {
+        const isActive = service.isActive || service.IsActive;
+        const catalogId = service.serviceCatalogId || service.ServiceCatalogId;
+        const matches = isActive && catalogId === selectedCatalog;
+
+        if (matches) {
+          console.log(`[Filter] Provider ${provider.id} matches catalog ${selectedCatalog} via service:`, service.name || service.Name);
+        }
+
+        return matches;
+      });
+
+      if (!matchesCatalog && services.length > 0) {
+        console.log(`[Filter] Provider ${provider.id} (${provider.businessName || provider.displayName}) has NO services matching catalog ${selectedCatalog}`);
+      }
+    }
 
     // Rating filter - providers with no rating are always included
     if (activeFilters.rating) {
@@ -530,7 +702,7 @@ const ServiceProviderStoresView = () => {
       }
     }
 
-    return matchesSearch && matchesCategory;
+    return matchesSearch && matchesCategory && matchesCatalog;
   }).sort((a, b) => {
     // Sort providers: rated providers first (by rating desc), then providers without ratings
     const ratingA = a.averageRating;
@@ -558,60 +730,14 @@ const ServiceProviderStoresView = () => {
     return 0;
   });
 
-  // Handle sidebar navigation
-  const handleNavigate = (view) => {
-    setActiveView(view);
-
-    // Navigate to different routes based on selection
-    switch(view) {
-      case 'stores':
-        navigate('/mainStore');
-        break;
-      case 'services':
-        // Stay on current page (service providers view)
-        break;
-      case 'notifications':
-        navigate('/customer/notifications');
-        break;
-      case 'history':
-        navigate('/customer/history');
-        break;
-      default:
-        break;
-    }
-  };
-
-  // Get page title based on active view
-  const getPageTitle = () => {
-    switch (activeView) {
-      case 'stores':
-        return 'Stores';
-      case 'services':
-        return 'Service Providers';
-      case 'notifications':
-        return 'Notifications';
-      case 'history':
-        return 'Orders & Services History';
-      default:
-        return 'Service Providers';
-    }
-  };
 
   return (
     <div className="flex min-h-screen bg-cream-50 dark:bg-charcoal-600">
-      {/* Sidebar */}
-      <CustomerSidebar
-        currentPage={activeView}
-        onNavigate={handleNavigate}
-        userName={displayName}
-        userRole="Customer"
-      />
-
       {/* Main Content */}
-      <div className="flex-1 ml-[250px] flex flex-col">
+      <div className="flex-1 flex flex-col">
         {/* Header */}
         <PageHeader
-          title={getPageTitle()}
+          title="Beyti"
           withSearch={false}
           notificationCount={0}
           userName={displayName}
@@ -623,65 +749,182 @@ const ServiceProviderStoresView = () => {
         />
 
         {/* Main Content Area */}
-        <main className="flex-1 p-8 overflow-y-auto" style={{ backgroundColor: '#FAF7F2' }}>
-          <div className="max-w-[1440px] mx-auto">
+        <main className="flex-1 overflow-y-auto" style={{ backgroundColor: '#FAF7F2' }}>
+          <div className="max-w-[1440px] mx-auto px-8 py-8">
             <div className="flex justify-center">
               <CategoryTabs
-                categories={['All', ...categories.map(cat => cat.name)]}
-                selected={selectedCategory === null ? 'All' : (categories.find(cat => cat.id === selectedCategory)?.name || '')}
-                onSelect={(name) => {
-                  if (name === 'All') {
-                    handleCategorySelect(null);
-                  } else {
-                    const category = categories.find(cat => cat.name === name);
-                    if (category) handleCategorySelect(category.id);
-                  }
-                }}
+                categories={categories}
+                selected={selectedCategory}
+                onSelect={setSelectedCategory}
               />
             </div>
 
-            <div className="mt-8">
-              <SearchBar
-                value={searchQuery}
-                onChange={setSearchQuery}
-                showFilterDropdown={showFilterDropdown}
-                setShowFilterDropdown={setShowFilterDropdown}
-                activeFilters={activeFilters}
-                handleFilterChange={handleFilterChange}
-                clearAllFilters={clearAllFilters}
-                getActiveFilterCount={getActiveFilterCount}
+            <div className="flex gap-4 mt-2">
+              <ServiceCatalogSidebar
+                catalogs={serviceCatalogs}
+                selected={selectedCatalog}
+                onSelect={setSelectedCatalog}
               />
 
-              {loading ? (
-                <div className="flex items-center justify-center py-16">
-                  <div className="w-12 h-12 border-4 border-grey-stroke border-t-sage-500 rounded-full animate-spin"></div>
-                </div>
-              ) : filteredProviders.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16">
-                  <div className="w-24 h-24 bg-cream-100 rounded-full flex items-center justify-center mb-4">
-                    <Scissors className="w-12 h-12 text-charcoal-400" weight="regular" />
-                  </div>
-                  <h3 className="text-xl font-bold text-charcoal-600 mb-2" style={{ fontFamily: 'Merriweather, serif' }}>
-                    No Service Providers Found
-                  </h3>
-                  <p className="text-charcoal-400 text-center max-w-md" style={{ fontFamily: 'Inter, sans-serif' }}>
-                    {searchQuery
-                      ? `No service providers match "${searchQuery}". Try a different search term.`
-                      : 'There are no service providers available at the moment. Please check back later.'}
-                  </p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {filteredProviders.map((provider, idx) => (
-                    <ProviderCard
-                      key={provider.id || `provider-${idx}`}
-                      provider={provider}
-                      services={providerServices[provider.id] || []}
-                      onClick={() => navigate(`/service-provider/${provider.id}`)}
+              <div className="flex-1">
+                <div className="flex gap-4 items-center mb-8">
+                  <div className="flex-1 relative">
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search Service Providers..."
+                      className="w-full pl-12 pr-4 py-3.5 bg-white rounded-full border border-grey-stroke focus:outline-none focus:border-sage-500 text-charcoal-600 shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
+                      style={{ fontFamily: 'Inter, sans-serif', fontSize: '16px' }}
                     />
-                  ))}
+                    <svg className="w-5 h-5 text-charcoal-400 absolute left-4 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+
+                  {/* Filter Button */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                      className="flex items-center gap-3 px-6 py-3.5 bg-white rounded-full border border-grey-stroke hover:border-sage-500 transition-all shadow-[0_2px_8px_rgba(0,0,0,0.06)] relative"
+                    >
+                      <svg className="w-5 h-5 text-sage-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                      </svg>
+                      <span className="text-charcoal-600 font-semibold text-[14px]" style={{ fontFamily: 'Inter, sans-serif' }}>
+                        Filter
+                      </span>
+                      {getActiveFilterCount() > 0 && (
+                        <span className="absolute -top-1 -right-1 w-5 h-5 bg-sage-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                          {getActiveFilterCount()}
+                        </span>
+                      )}
+                      <svg className="w-4 h-4 text-charcoal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+
+                    {/* Filter Dropdown */}
+                    {showFilterDropdown && (
+                      <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-grey-stroke z-50">
+                        <div className="p-6 space-y-6">
+                          {/* Header */}
+                          <div className="flex items-center justify-between pb-4 border-b border-grey-stroke">
+                            <h3 className="text-lg font-bold text-charcoal-600" style={{ fontFamily: 'Merriweather, serif' }}>
+                              Filters
+                            </h3>
+                            {getActiveFilterCount() > 0 && (
+                              <button
+                                onClick={clearAllFilters}
+                                className="text-sm text-sage-600 hover:text-sage-700 font-semibold"
+                                style={{ fontFamily: 'Inter, sans-serif' }}
+                              >
+                                Clear All
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Rating Slider */}
+                          <div>
+                            <div className="flex items-center justify-between mb-3">
+                              <p className="text-sm font-semibold text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>
+                                Minimum Rating
+                              </p>
+                              <div className="flex items-center gap-1 bg-sage-100 px-3 py-1 rounded-full">
+                                <Star size={14} weight="fill" className="text-sage-600" />
+                                <span className="text-sm font-bold text-sage-700" style={{ fontFamily: 'Inter, sans-serif' }}>
+                                  {activeFilters.rating ? `${activeFilters.rating}+` : 'Any'}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="relative">
+                              <input
+                                type="range"
+                                min="0"
+                                max="5"
+                                step="1"
+                                value={activeFilters.rating || 0}
+                                onChange={(e) => {
+                                  const value = parseInt(e.target.value);
+                                  handleFilterChange('rating', value === 0 ? null : value);
+                                }}
+                                className="w-full h-2 bg-grey-200 rounded-full appearance-none cursor-pointer
+                                         [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5
+                                         [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-sage-500
+                                         [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md
+                                         [&::-webkit-slider-thumb]:hover:bg-sage-600 [&::-webkit-slider-thumb]:transition-colors
+                                         [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:rounded-full
+                                         [&::-moz-range-thumb]:bg-sage-500 [&::-moz-range-thumb]:border-0
+                                         [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-md
+                                         [&::-moz-range-thumb]:hover:bg-sage-600 [&::-moz-range-thumb]:transition-colors"
+                                style={{
+                                  background: activeFilters.rating
+                                    ? `linear-gradient(to right, #556B5C 0%, #556B5C ${((activeFilters.rating || 0) / 5) * 100}%, #E5E7EB ${((activeFilters.rating || 0) / 5) * 100}%, #E5E7EB 100%)`
+                                    : '#E5E7EB'
+                                }}
+                              />
+                              <div className="flex justify-between mt-2 text-xs text-charcoal-400" style={{ fontFamily: 'Inter, sans-serif' }}>
+                                <span>Any</span>
+                                <span>1</span>
+                                <span>2</span>
+                                <span>3</span>
+                                <span>4</span>
+                                <span>5</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Apply Button */}
+                          <button
+                            onClick={() => setShowFilterDropdown(false)}
+                            className="w-full bg-sage-500 hover:bg-sage-600 text-white font-bold py-3 rounded-xl transition-all shadow-soft-lift"
+                            style={{ fontFamily: 'Inter, sans-serif' }}
+                          >
+                            Apply Filters
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
+
+                <FeaturedCarousel
+                  providers={filteredProviders}
+                  onProviderClick={(id) => navigate(`/service-provider/${id}`)}
+                  services={providerServices}
+                />
+
+                {loading ? (
+                  <div className="flex items-center justify-center py-16">
+                    <div className="w-12 h-12 border-4 border-grey-stroke border-t-sage-500 rounded-full animate-spin"></div>
+                  </div>
+                ) : filteredProviders.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16">
+                    <div className="w-24 h-24 bg-cream-100 rounded-full flex items-center justify-center mb-4">
+                      <Scissors className="w-12 h-12 text-charcoal-400" weight="regular" />
+                    </div>
+                    <h3 className="text-xl font-bold text-charcoal-600 mb-2" style={{ fontFamily: 'Merriweather, serif' }}>
+                      No Service Providers Found
+                    </h3>
+                    <p className="text-charcoal-400 text-center max-w-md" style={{ fontFamily: 'Inter, sans-serif' }}>
+                      {searchQuery
+                        ? `No service providers match "${searchQuery}". Try a different search term.`
+                        : 'There are no service providers available at the moment. Please check back later.'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {filteredProviders.map((provider, idx) => (
+                      <ProviderCard
+                        key={provider.id || `provider-${idx}`}
+                        provider={provider}
+                        services={providerServices[provider.id] || []}
+                        onClick={() => navigate(`/service-provider/${provider.id}`)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </main>
