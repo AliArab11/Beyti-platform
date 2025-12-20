@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import * as Icon from "@phosphor-icons/react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { CalendarCheck, Bell, PackageIcon, ScissorsIcon, ShoppingCartIcon, CalendarIcon, ChatCircleTextIcon, CheckCircle, Circle } from "@phosphor-icons/react";
@@ -291,6 +291,11 @@ const CustomerDashboard = () => {
   const [sortBy, setSortBy] = useState('date-desc');
   const [fulfillmentFilter, setFulfillmentFilter] = useState('all');
 
+  // Service bookings filters
+  const [serviceSearchQuery, setServiceSearchQuery] = useState('');
+  const [serviceStatusFilter, setServiceStatusFilter] = useState('all');
+  const [serviceSortBy, setServiceSortBy] = useState('date-desc');
+
   // Review modal state
 const [reviewModal, setReviewModal] = useState({
   show: false,
@@ -449,12 +454,57 @@ useEffect(() => {
   loadOrders();
 }, [customerId]); // Removed orders from dependency to prevent infinite loops
 
+// Fetch history data (services and reviews)
+const fetchHistory = useCallback(async () => {
+  try {
+    setHistoryLoading(true);
+    console.log('🔍 Fetching service bookings for customer ID:', customerId);
+    const [bookingsData, reviewsData] = await Promise.all([
+      getServiceBookings(null, customerId),
+      getCustomerServiceReviews(customerId)
+    ]);
+
+    console.log('📦 Raw bookings data:', bookingsData);
+    console.log('⭐ Raw reviews data:', reviewsData);
+
+    const bookings = Array.isArray(bookingsData) ? bookingsData : [];
+    console.log('✅ Processed bookings array:', bookings.length, 'items');
+    setServiceBookings(bookings);
+
+    // Enrich reviews with booking data
+    const enrichedReviews = Array.isArray(reviewsData)
+      ? reviewsData.map(review => {
+          const booking = bookings.find(b => b.id === review.serviceBookingId);
+          return {
+            ...review,
+            providerName: booking?.businessName || booking?.providerName || null,
+            serviceName: booking?.serviceName || null
+          };
+        })
+      : [];
+
+    console.log('✅ Enriched reviews:', enrichedReviews.length, 'items');
+    setServiceReviews(enrichedReviews);
+  } catch (error) {
+    console.error('❌ Error fetching history:', error);
+    setServiceBookings([]);
+    setServiceReviews([]);
+  } finally {
+    setHistoryLoading(false);
+  }
+}, [customerId]);
+
 // Load history data (services and reviews) for the main page
 useEffect(() => {
   if (customerId) {
     fetchHistory();
   }
-}, [customerId]);
+}, [customerId, fetchHistory]);
+
+// Sync historyViewMode with mainTab
+useEffect(() => {
+  setHistoryViewMode(mainTab);
+}, [mainTab]);
 
 
 
@@ -512,6 +562,47 @@ const displayedOrders = useMemo(() => {
     }
   });
 }, [activeTab, orders, activeOrders, completedOrders, cancelledOrders, searchQuery, sortBy, fulfillmentFilter]);
+
+// Filter and sort service bookings
+const displayedServiceBookings = useMemo(() => {
+  let bookingsToDisplay = [...serviceBookings];
+
+  // Apply status filter
+  if (serviceStatusFilter !== 'all') {
+    bookingsToDisplay = bookingsToDisplay.filter(booking => {
+      const status = booking.status?.toLowerCase();
+      switch(serviceStatusFilter) {
+        case 'completed': return status === 'completed';
+        case 'confirmed': return status === 'confirmed';
+        case 'rejected': return status === 'rejected';
+        case 'cancelled': return status === 'canceled' || status === 'cancelled';
+        default: return true;
+      }
+    });
+  }
+
+  // Apply search
+  if (serviceSearchQuery.trim()) {
+    const query = serviceSearchQuery.toLowerCase();
+    bookingsToDisplay = bookingsToDisplay.filter(booking =>
+      booking.id?.toString().includes(query) ||
+      booking.serviceName?.toLowerCase().includes(query) ||
+      booking.businessName?.toLowerCase().includes(query) ||
+      booking.providerName?.toLowerCase().includes(query) ||
+      booking.serviceType?.toLowerCase().includes(query)
+    );
+  }
+
+  // Apply sort
+  return [...bookingsToDisplay].sort((a, b) => {
+    switch(serviceSortBy) {
+      case 'date-asc': return a.id - b.id; // Oldest (lowest ID first)
+      case 'amount-desc': return (b.finalPrice || b.quotedPrice || 0) - (a.finalPrice || a.quotedPrice || 0);
+      case 'amount-asc': return (a.finalPrice || a.quotedPrice || 0) - (b.finalPrice || b.quotedPrice || 0);
+      default: return b.id - a.id; // Newest (highest ID first)
+    }
+  });
+}, [serviceBookings, serviceSearchQuery, serviceStatusFilter, serviceSortBy]);
 
 // Set the currently displayed active order based on index
 const currentActiveOrder = activeOrders.length > 0 ? activeOrders[activeOrderIndex] : null;
@@ -911,40 +1002,6 @@ const handleTimerExpire = async (bookingId) => {
   }
 };
 
-// Fetch history data
-const fetchHistory = async () => {
-  try {
-    setHistoryLoading(true);
-    const [bookingsData, reviewsData] = await Promise.all([
-      getServiceBookings(null, customerId),
-      getCustomerServiceReviews(customerId)
-    ]);
-
-    const bookings = Array.isArray(bookingsData) ? bookingsData : [];
-    setServiceBookings(bookings);
-
-    // Enrich reviews with booking data
-    const enrichedReviews = Array.isArray(reviewsData)
-      ? reviewsData.map(review => {
-          const booking = bookings.find(b => b.id === review.serviceBookingId);
-          return {
-            ...review,
-            providerName: booking?.businessName || booking?.providerName || null,
-            serviceName: booking?.serviceName || null
-          };
-        })
-      : [];
-
-    setServiceReviews(enrichedReviews);
-  } catch (error) {
-    console.error('Error fetching history:', error);
-    setServiceBookings([]);
-    setServiceReviews([]);
-  } finally {
-    setHistoryLoading(false);
-  }
-};
-
 // Metrics (next section starts here)
 const { metrics, recentOrders } = useMemo(() => {
     if (!orders || orders.length === 0) {
@@ -1030,6 +1087,13 @@ const historyFilteredData = useMemo(() => {
   let filteredOrders = orders;
   let filteredBookings = serviceBookings;
 
+  console.log('🔧 historyFilteredData - Input:', {
+    ordersCount: orders.length,
+    bookingsCount: serviceBookings.length,
+    historyActiveTab,
+    historyViewMode
+  });
+
   if (historyActiveTab === 'pending') {
     filteredOrders = orders.filter(o =>
       ['placed', 'pending', 'accepted', 'preparing', 'ready for pickup', 'processing'].includes(o.status?.toLowerCase())
@@ -1039,13 +1103,21 @@ const historyFilteredData = useMemo(() => {
     );
   }
 
+  let result;
   if (historyViewMode === 'orders') {
-    return { orders: filteredOrders, bookings: [] };
+    result = { orders: filteredOrders, bookings: [] };
   } else if (historyViewMode === 'services') {
-    return { orders: [], bookings: filteredBookings };
+    result = { orders: [], bookings: filteredBookings };
   } else {
-    return { orders: filteredOrders, bookings: filteredBookings };
+    result = { orders: filteredOrders, bookings: filteredBookings };
   }
+
+  console.log('✅ historyFilteredData - Output:', {
+    ordersCount: result.orders.length,
+    bookingsCount: result.bookings.length
+  });
+
+  return result;
 }, [orders, serviceBookings, historyActiveTab, historyViewMode]);
 
   // Customer Select Modal
@@ -1567,6 +1639,53 @@ const historyFilteredData = useMemo(() => {
                               Your service appointments and bookings
                             </p>
                           </div>
+
+                          {/* Filters */}
+                          <div className="p-4 border-b border-grey-stroke dark:border-charcoal-400 bg-white dark:bg-charcoal-500">
+                            <div className="flex items-center gap-3 flex-wrap">
+                              <div className="flex-1 min-w-[200px] relative">
+                                <Icon.MagnifyingGlass
+                                  size={18}
+                                  className="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal-400"
+                                />
+                                <input
+                                  type="text"
+                                  value={serviceSearchQuery}
+                                  onChange={(e) => setServiceSearchQuery(e.target.value)}
+                                  placeholder="Search bookings..."
+                                  className="w-full pl-10 pr-4 py-2 text-sm border border-grey-stroke rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500"
+                                />
+                              </div>
+
+                              <select
+                                value={serviceStatusFilter}
+                                onChange={(e) => setServiceStatusFilter(e.target.value)}
+                                className="px-3 py-2 text-sm border border-grey-stroke rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500 bg-white"
+                              >
+                                <option value="all">All Bookings ({serviceBookings.length})</option>
+                                <option value="completed">Completed ({serviceBookings.filter(b => b.status?.toLowerCase() === 'completed').length})</option>
+                                <option value="confirmed">Confirmed ({serviceBookings.filter(b => b.status?.toLowerCase() === 'confirmed').length})</option>
+                                <option value="rejected">Rejected ({serviceBookings.filter(b => b.status?.toLowerCase() === 'rejected').length})</option>
+                                <option value="cancelled">Cancelled ({serviceBookings.filter(b => b.status?.toLowerCase() === 'canceled' || b.status?.toLowerCase() === 'cancelled').length})</option>
+                              </select>
+
+                              <select
+                                value={serviceSortBy}
+                                onChange={(e) => setServiceSortBy(e.target.value)}
+                                className="px-3 py-2 text-sm border border-grey-stroke rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500 bg-white"
+                              >
+                                <option value="date-desc">Newest</option>
+                                <option value="date-asc">Oldest</option>
+                                <option value="amount-desc">Highest $</option>
+                                <option value="amount-asc">Lowest $</option>
+                              </select>
+
+                              <span className="text-sm text-charcoal-500 dark:text-charcoal-300 whitespace-nowrap">
+                                {displayedServiceBookings.length} {displayedServiceBookings.length === 1 ? 'booking' : 'bookings'}
+                              </span>
+                            </div>
+                          </div>
+
                           {historyMetrics && historyMetrics.inProgressBookings && historyMetrics.inProgressBookings.length > 0 && (
                             <div className="p-4 space-y-4">
                               {historyMetrics.inProgressBookings.map((booking) => {
@@ -1735,7 +1854,7 @@ const historyFilteredData = useMemo(() => {
                               })}
                             </div>
                           )}
-                          {historyFilteredData && historyFilteredData.bookings && historyFilteredData.bookings.length > 0 ? (
+                          {displayedServiceBookings && displayedServiceBookings.length > 0 ? (
                             <div className="overflow-x-auto">
                               <table className="w-full">
                                 <thead>
@@ -1752,7 +1871,7 @@ const historyFilteredData = useMemo(() => {
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-grey-stroke dark:divide-charcoal-400">
-                                  {historyFilteredData.bookings.map((booking) => (
+                                  {displayedServiceBookings.map((booking) => (
                                     <tr key={booking.id} className="hover:bg-cream-100 dark:hover:bg-charcoal-500 transition-colors">
                                       <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50 font-semibold">
                                         #{booking.id}
@@ -1829,7 +1948,13 @@ const historyFilteredData = useMemo(() => {
                             </div>
                           ) : (
                             <div className="p-12 text-center text-charcoal-400 dark:text-charcoal-300">
-                              No service bookings found
+                              <ScissorsIcon size={48} className="mx-auto text-charcoal-300 mb-3" />
+                              <p className="text-body-regular mb-4">
+                                {serviceSearchQuery || serviceStatusFilter !== 'all'
+                                  ? 'No bookings match your filters'
+                                  : 'No service bookings yet'
+                                }
+                              </p>
                             </div>
                           )}
                         </div>
