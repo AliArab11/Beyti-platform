@@ -25,6 +25,10 @@ public partial class Customer
     [Precision(3)]
     public DateTime UpdatedAt { get; set; }
 
+    [InverseProperty(nameof(CustomerFavoriteSeller.Customer))]
+    public virtual ICollection<CustomerFavoriteSeller> FavoriteSellers { get; set; }
+    = new List<CustomerFavoriteSeller>();
+
     [InverseProperty("Customer")]
     public virtual ICollection<CustomerAddress> CustomerAddresses { get; set; } = new List<CustomerAddress>();
 

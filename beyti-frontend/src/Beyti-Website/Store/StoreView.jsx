@@ -9,6 +9,7 @@ import Snackbar from './../../components/Snackbar';
 import PageHeader from '../../components/PageHeader';
 import CustomerHeader from '../../components/CustomerHeader';
 import { isStoreOpen, formatTime } from '../Seller/Components/storeStatus';
+import { StoreBanner } from '../../components/StoreBanner';
 
 import OrderDetails from './Components/OrderDetails';
 import { createOrder, createOrderItem, getProductVariants, getOrder, getOrders } from '../../services/api';
@@ -31,7 +32,7 @@ const getStoreDetails = async (storeId) => {
 
 
 // Store Info Section
-const StoreInfo = ({ store }) => (
+const StoreInfo = ({ store, isFavorited, onToggleFavorite, customerId }) => (
   <div className="bg-cream-50 px-8 py-6">
     <div className="max-w-[1400px] mx-auto">
       
@@ -39,138 +40,176 @@ const StoreInfo = ({ store }) => (
       <div className="bg-white rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.08)] relative">
 
         {/* Banner Section (Top) */}
-          <div className="relative h-[180px] bg-gradient-to-br from-cream-100 to-cream-200 rounded-t-3xl overflow-hidden">
-            {/* Store Status Badge */}
-            <div className="absolute top-4 right-8 z-20">
-              <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold shadow-lg ${
-                isStoreOpen(store)
-                  ? 'bg-success-btn text-white'
-                  : 'bg-error-btn text-white'
-              }`}>
-                <div className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
-                {isStoreOpen(store) ? 'OPEN' : 'CLOSED'}
-              </div>
+        <div className="relative h-[180px] rounded-t-3xl overflow-hidden">
+          <StoreBanner
+            storeName={store?.storeName || 'Store'}
+            storeImageUrl={store?.storeImageUrl ? `https://localhost:7062${store.storeImageUrl}` : null}
+            bannerThemeKey={store?.bannerThemeKey || 'modern-gradient'}
+            bannerAccentColor={store?.bannerAccentColor || '#F97316'}
+            variant="header"
+          />
+          {/* Store Status Badge */}
+          <div className="absolute top-4 left-8 z-20">
+            <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold shadow-lg ${
+              isStoreOpen(store)
+                ? 'bg-success-btn text-white'
+                : 'bg-error-btn text-white'
+            }`}>
+              <div className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
+              {isStoreOpen(store) ? 'OPEN' : 'CLOSED'}
             </div>
           </div>
+
+          {/* Favorite Heart Button */}
+          {onToggleFavorite && customerId && (
+            <div className="absolute top-4 right-8 z-20">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleFavorite(store.id);
+                }}
+                className="w-12 h-12 bg-white hover:bg-cream-50 rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-110"
+              >
+                <Heart 
+                  size={24} 
+                  weight={isFavorited ? 'fill' : 'regular'} 
+                  className={isFavorited ? 'text-error-btn' : 'text-charcoal-400'}
+                />
+              </button>
+            </div>
+          )}
+        </div>
         
         {/* Circular Logo */}
-          <div className="absolute -bottom-[112px] left-12 z-30">
-            <div className="w-[140px] h-[140px] rounded-full border-[6px] border-white flex items-center justify-center overflow-hidden bg-white shadow-[0_8px_30px_rgba(0,0,0,0.15)]">
-              {store?.storeImageUrl ? (
-                <img 
-                  src={`https://localhost:7062${store.storeImageUrl}`}
-                  alt={store.storeName}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-grey-200 to-grey-300">
-                  <span className="text-5xl font-black text-charcoal-600" style={{ fontFamily: "Inter, sans-serif" }}>
-                    {(() => {
-                      const storeName = store?.storeName || "Store";
-                      const words = storeName.split(' ').filter(w => w.length > 0);
-                      return words.length >= 2 
-                        ? words[0][0].toUpperCase() + words[words.length - 1][0].toUpperCase()
-                        : words[0].slice(0, 2).toUpperCase();
-                    })()}
-                  </span>
+        <div className="absolute -bottom-[112px] left-12 z-30">
+          <div className="w-[140px] h-[140px] rounded-full border-[6px] border-white flex items-center justify-center overflow-hidden bg-white shadow-[0_8px_30px_rgba(0,0,0,0.15)]">
+            {store?.storeImageUrl ? (
+              <img 
+                src={`https://localhost:7062${store.storeImageUrl}`}
+                alt={store.storeName}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-grey-200 to-grey-300">
+                <span className="text-5xl font-black text-charcoal-600" style={{ fontFamily: "Inter, sans-serif" }}>
+                  {(() => {
+                    const storeName = store?.storeName || "Store";
+                    const words = storeName.split(' ').filter(w => w.length > 0);
+                    return words.length >= 2 
+                      ? words[0][0].toUpperCase() + words[words.length - 1][0].toUpperCase()
+                      : words[0].slice(0, 2).toUpperCase();
+                  })()}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* White Info Section (Bottom) */}
+      <div className="pt-7 pb-6 px-10 bg-white rounded-b-3xl">
+        
+        {/* HORIZONTAL LAYOUT */}
+        <div className="flex items-start gap-8">
+          
+          {/* LEFT SIDE: Logo space + Store Name + Rating + Categories */}
+          <div className="flex items-start gap-6 flex-1 min-w-0">
+            {/* Spacer for logo */}
+            <div className="w-[140px] flex-shrink-0"></div>
+            
+            {/* Store Name and Info next to logo */}
+            <div className="flex-1 min-w-0">
+              {/* Store Name with Rating inline */}
+              <div className="flex items-center gap-4 mb-1.5 flex-wrap">
+                <h1 className="text-[32px] font-bold text-charcoal-600 leading-tight drop-shadow-[0_3px_8px_rgba(0,0,0,0.2)]" 
+                    style={{ fontFamily: "Merriweather, serif" }}>
+                  {store?.storeName || "Cookies by Maryam"}
+                </h1>
+                
+                {/* Rating inline with name */}
+                <div className="flex items-center gap-2.5">
+                  {(() => {
+                    const reviewCount = store?.products?.reduce((count, product) => 
+                      count + (product.reviews?.filter(r => !r.isCommentHiddenBySeller)?.length || 0), 0
+                    ) || 0;
+                    
+                    const rating = store?.averageRating || 0;
+                    
+                    if (reviewCount < 5) {
+                      return (
+                        <span className="px-4 py-1.5 bg-sage-500 text-white text-sm font-bold rounded-full" style={{ fontFamily: 'Inter, sans-serif' }}>
+                          NEW
+                        </span>
+                      );
+                    }
+                    
+                    return (
+                      <>
+                        <Star className="w-7 h-7 !text-sage-500" weight="fill" />
+                        <span className="text-[22px] font-semibold text-[#556B5C]" 
+                              style={{ fontFamily: "Inter, sans-serif" }}>
+                          {rating.toFixed(1)}
+                        </span>
+                      </>
+                    );
+                  })()}
                 </div>
+              </div>
+              
+              {/* Categories */}
+              <p className="text-[15px] text-charcoal-500 mb-2" 
+                style={{ fontFamily: "Inter, sans-serif" }}>
+                {store?.subCategoryNames?.length > 0 
+                  ? store.subCategoryNames.join(' • ') 
+                  : 'No categories'}
+              </p>
+
+              {/* Store Hours */}
+              {store?.openTime && store?.closeTime && (
+                <p className="text-[14px] text-charcoal-400 flex items-center gap-2" 
+                  style={{ fontFamily: "Inter, sans-serif" }}>
+                  <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="font-semibold">Store Hours:</span>
+                  <span>{formatTime(store.openTime)} - {formatTime(store.closeTime)}</span>
+                </p>
               )}
             </div>
           </div>
-        </div>
 
-        {/* White Info Section (Bottom) */}
-        <div className="pt-7 pb-3 px-10 bg-white rounded-b-3xl">
-          
-          {/* HORIZONTAL LAYOUT */}
-          <div className="flex items-start gap-8">
-            
-            {/* LEFT SIDE: Logo space + Store Name + Rating + Categories */}
-            <div className="flex items-start gap-6 flex-1">
-              {/* Spacer for logo */}
-              <div className="w-[140px] flex-shrink-0"></div>
+          {/* VERTICAL DIVIDER LINE */}
+          <div className="w-[2px] self-stretch bg-grey-stroke"></div>
+
+          {/* RIGHT SIDE: Store Information */}
+          <div className="flex-1 min-w-0">
+            <div className="space-y-3 text-[15px]" 
+                 style={{ fontFamily: "Inter, sans-serif", lineHeight: '1.6' }}>
               
-              {/* Store Name and Info next to logo */}
-              <div className="flex-1">
-                {/* Store Name with Rating inline */}
-                <div className="flex items-center gap-4 mb-1.5">
-                   <h1 className="text-[32px] font-bold text-charcoal-600 leading-tight drop-shadow-[0_3px_8px_rgba(0,0,0,0.2)]" 
-                      style={{ fontFamily: "Merriweather, serif" }}>
-                    {store?.storeName || "Cookies by Maryam"}
-                  </h1>
-                  
-                  {/* Rating inline with name */}
-                    <div className="flex items-center gap-2.5">
-                      {(() => {
-                        const reviewCount = store?.products?.reduce((count, product) => 
-                          count + (product.reviews?.filter(r => !r.isCommentHiddenBySeller)?.length || 0), 0
-                        ) || 0;
-                        
-                        const rating = store?.averageRating || 0;
-                        
-                        if (reviewCount < 5) {
-                          return (
-                            <span className="px-4 py-1.5 bg-sage-500 text-white text-sm font-bold rounded-full" style={{ fontFamily: 'Inter, sans-serif' }}>
-                              NEW
-                            </span>
-                          );
-                        }
-                        
-                        return (
-                          <>
-                            <Star className="w-7 h-7 !text-sage-500" weight="fill" />
-                            <span className="text-[22px] font-semibold text-[#556B5C]" 
-                                  style={{ fontFamily: "Inter, sans-serif" }}>
-                              {rating.toFixed(1)}
-                            </span>
-                          </>
-                        );
-                      })()}
-                    </div>
-                </div>
-                
-                {/* Categories */}
-                <p className="text-[15px] text-charcoal-500" 
-                  style={{ fontFamily: "Inter, sans-serif" }}>
-                  {store?.subCategoryNames?.length > 0 
-                    ? store.subCategoryNames.join(' • ') 
-                    : 'No categories'}
+              {/* Description - with max height and scroll if needed */}
+              <div className="max-h-[120px] overflow-y-auto pr-2">
+                <p className="text-charcoal-500 leading-relaxed">
+                  {store?.storeDescription }
                 </p>
-                {/* Store Hours */}
-                  {store?.openTime && store?.closeTime && (
-                    <p className="text-[14px] text-charcoal-400 mt-2 flex items-center gap-2" 
-                      style={{ fontFamily: "Inter, sans-serif" }}>
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <span className="font-semibold">Store Hours:</span>
-                      {formatTime(store.openTime)} - {formatTime(store.closeTime)}
-                    </p>
-                  )}
               </div>
-            </div>
 
-            {/* VERTICAL DIVIDER LINE */}
-            <div className="w-[2px] h-16 bg-grey-stroke self-start"></div>
-
-            {/* RIGHT SIDE: Store Information */}
-            <div className="flex-1 pr-8">
-              {/* Inline Details */}
-              <div className="space-y-1.5 text-[15px]" 
-                   style={{ fontFamily: "Inter, sans-serif", lineHeight: '1.6' }}>
-                
-                <p className="text-charcoal-500">
-                  {store?.storeDescription || "----------"}
-                </p>
-
-                <p>
-                  <span className="font-semibold text-[#556B5C]">Phone:</span>{" "}
+              {/* Contact Info - condensed */}
+              <div className="space-y-1.5 pt-2 border-t border-grey-stroke/30">
+                <p className="flex items-center gap-2">
+                  <svg className="w-4 h-4 flex-shrink-0 text-sage-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
+                  <span className="font-semibold text-sage-700">Phone:</span>
                   <span className="text-charcoal-600">{store?.phone || "+1 555-1234"}</span>
                 </p>
 
-                <p>
-                  <span className="font-semibold text-[#556B5C]">Address:</span>{" "}
-                  <span className="text-charcoal-600">
+                <p className="flex items-start gap-2">
+                  <svg className="w-4 h-4 flex-shrink-0 text-sage-600 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <span className="font-semibold text-sage-700">Address:</span>
+                  <span className="text-charcoal-600 flex-1">
                     {store?.sellerAddresses?.[0]?.address 
                       ? `${store.sellerAddresses[0].address.street}, ${store.sellerAddresses[0].address.city}`
                       : "123 Baker Street, Beyti City"}
@@ -178,11 +217,11 @@ const StoreInfo = ({ store }) => (
                 </p>
               </div>
             </div>
-
           </div>
         </div>
       </div>
     </div>
+  </div>
 );
 
 const CategorySidebar = ({ selected, onSelect, sections = [], systemSections }) => {
@@ -190,30 +229,34 @@ const CategorySidebar = ({ selected, onSelect, sections = [], systemSections }) 
     { id: "all", label: "All Products", icon: <Package size={24} weight="regular" /> },
   ];
 
-  // Add system sections
-  const systemCategories = [];
-  
-  if (systemSections?.mostPopular?.products?.length > 0) {
-    systemCategories.push({
-      id: "system-popular",
-      label: "Most Popular",
-      icon: <Star size={24} weight="fill" />,
-      sortOrder: -1,
-      isSystemSection: true
-    });
-  }
-  
-  if (systemSections?.discounts?.products?.length > 0) {
-    systemCategories.push({
-      id: "system-discounts",
-      label: "Discounts",
-      icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/>
-      </svg>,
-      sortOrder: -2,
-      isSystemSection: true
-    });
-  }
+    // Add system sections
+    const systemCategories = [];
+
+    if (systemSections?.mostPopular?.products?.length > 0) {
+      systemCategories.push({
+        id: "system-popular",
+        label: "Most Popular",
+        icon: <Star size={24} weight="regular" />,
+        iconFilled: <Star size={24} weight="fill" />,
+        sortOrder: -1,
+        isSystemSection: true
+      });
+    }
+
+    if (systemSections?.discounts?.products?.length > 0) {
+      systemCategories.push({
+        id: "system-discounts",
+        label: "Discounts",
+        icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/>
+        </svg>,
+        iconFilled: <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/>
+        </svg>,
+        sortOrder: -2,
+        isSystemSection: true
+      });
+    }
 
   const sectionCategories = sections
     .filter(s => s.isActive)
@@ -245,7 +288,7 @@ const CategorySidebar = ({ selected, onSelect, sections = [], systemSections }) 
               selected === cat.id ? 'bg-sage-700' : 'bg-[#E8F0EA]'
             }`}>
               <div className={selected === cat.id ? 'text-white' : 'text-sage-500'}>
-                {cat.icon}
+                {selected === cat.id && cat.iconFilled ? cat.iconFilled : cat.icon}
               </div>
             </div>
             <span>{cat.label}</span>
@@ -292,15 +335,22 @@ const ProductCard = ({ product, onClick }) => {
         )}
       </div>
 
-      {/* Product Info - Compact & Organized */}
-      <div className="p-4 space-y-1">
-        {/* Product Name - Bigger */}
-        <h3 className="font-bold text-charcoal-600 text-xl leading-tight line-clamp-2 group-hover:text-sage-600 transition-colors min-h-[3rem]" style={{ fontFamily: 'Merriweather, serif' }}>
-          {product?.name || "Dream Cookie"}
-        </h3>
-        
-        {/* Rating or NEW badge */}
-        <div className="flex items-center gap-1.5 mt-1 mb-1">
+{/* Product Info - Compact & Organized */}
+<div className="p-4">
+  {/* Product Name - Bigger */}
+  <h3 className="font-bold text-charcoal-600 text-xl leading-tight line-clamp-2 group-hover:text-sage-600 transition-colors" style={{ fontFamily: 'Merriweather, serif' }}>
+    {product?.name || "Dream Cookie"}
+  </h3>
+  
+  {/* Product Description - NEW */}
+  {product?.description && (
+    <p className="text-xs text-charcoal-400 line-clamp-1 leading-relaxed mt-1" style={{ fontFamily: 'Inter, sans-serif' }}>
+      {product.description}
+    </p>
+  )}
+  
+  {/* Rating or NEW badge */}
+  <div className="flex items-center gap-1.5 mt-2 mb-1">
           {!hasEnoughReviews ? (
             <span className="px-3 py-1 bg-sage-500 text-white text-xs font-bold rounded-full" style={{ fontFamily: 'Inter, sans-serif' }}>
               NEW
@@ -386,6 +436,8 @@ const StoreView = () => {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("popular");
+
+  const [isFavorited, setIsFavorited] = useState(false);
 
 
   const [bannerDismissed, setBannerDismissed] = useState(() => {
@@ -638,7 +690,29 @@ useEffect(() => {
 
 
 
+// Check if this store is favorited
+useEffect(() => {
+  const checkFavorite = async () => {
+    if (!customerId || !storeId) {
+      setIsFavorited(false);
+      return;
+    }
 
+    try {
+      const response = await fetch(
+        `https://localhost:7062/api/CustomerFavorites/check/${customerId}/${storeId}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setIsFavorited(data.isFavorited);
+      }
+    } catch (error) {
+      console.error('Error checking favorite:', error);
+    }
+  };
+
+  checkFavorite();
+}, [customerId, storeId]);
 
 
 
@@ -776,6 +850,43 @@ const handleUpdateQuantity = (productId, newQuantity) => {
 
 const handleRemoveFromCart = (productId) => {
   setCart(cart.filter(item => item.id !== productId));
+};
+
+const toggleFavorite = async (sellerId) => {
+  if (!customerId) {
+    showSnackbar('Please sign in to save favorites', 'warning');
+    return;
+  }
+
+  try {
+    if (isFavorited) {
+      // Remove from favorites
+      const response = await fetch(
+        `https://localhost:7062/api/CustomerFavorites/${customerId}/${sellerId}`,
+        { method: 'DELETE' }
+      );
+
+      if (response.ok) {
+        setIsFavorited(false);
+        showSnackbar('Removed from favorites', 'success');
+      }
+    } else {
+      // Add to favorites
+      const response = await fetch('https://localhost:7062/api/CustomerFavorites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customerId, sellerId })
+      });
+
+      if (response.ok) {
+        setIsFavorited(true);
+        showSnackbar('Added to favorites', 'success');
+      }
+    }
+  } catch (error) {
+    console.error('Error toggling favorite:', error);
+    showSnackbar('Failed to update favorites', 'error');
+  }
 };
 
 // Effect 1: Load store data
@@ -1019,7 +1130,12 @@ const filteredProducts = (() => {
       })()}
 
 
-      <StoreInfo store={store} />
+      <StoreInfo 
+        store={store} 
+        isFavorited={isFavorited}
+        onToggleFavorite={toggleFavorite}
+        customerId={customerId}
+      />
       
       <div className="max-w-[1440px] mx-auto px-12 py-8">
         <div className="flex gap-8">

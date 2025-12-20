@@ -8,6 +8,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MagnifyingGlass, Bell, ShoppingCartSimple, User, Package, MapPin, Gear, SignOut, House, ArrowLeft, CaretDown  } from '@phosphor-icons/react';
 import NotificationDropdown from './NotificationDropdown';
+import SettingsModal from './SettingsModal';
 
 const CustomerHeader = ({
   title = "Beyti",
@@ -28,10 +29,13 @@ const CustomerHeader = ({
   showBackButton = false, // Show back arrow
   variant = "store", // "store" or "dashboard"
   className = "",
+  currentContext = "stores", // "stores" or "services"
+  showContextSwitch = false, 
   ...props
 }) => {
   const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const handleSearchChange = (e) => {
     if (onSearchChange) {
@@ -132,6 +136,36 @@ const CustomerHeader = ({
             </h1>
 
           </div>
+
+          {/* Context Switcher - NEW */}
+          {showContextSwitch && (
+            <div className="ml-8 flex items-center">
+              <div className="inline-flex items-center bg-grey-200 dark:bg-charcoal-600 rounded-full p-1 border border-grey-stroke dark:border-charcoal-500">
+                <button
+                  onClick={() => navigate('/mainStore', { state: { customerId, customerName } })}
+                  className={`px-6 py-2 rounded-full text-sm font-semibold transition-all ${
+                    currentContext === 'stores'
+                      ? 'bg-sage-500 text-white shadow-sm'
+                      : 'text-charcoal-500 dark:text-charcoal-300 hover:text-charcoal-600 dark:hover:text-white'
+                  }`}
+                  style={{ fontFamily: 'Inter, sans-serif' }}
+                >
+                  Stores
+                </button>
+                <button
+                  onClick={() => navigate('/serviceProviders', { state: { customerId, customerName } })}
+                  className={`px-6 py-2 rounded-full text-sm font-semibold transition-all ${
+                    currentContext === 'services'
+                      ? 'bg-sage-500 text-white shadow-sm'
+                      : 'text-charcoal-500 dark:text-charcoal-300 hover:text-charcoal-600 dark:hover:text-white'
+                  }`}
+                  style={{ fontFamily: 'Inter, sans-serif' }}
+                >
+                  Services
+                </button>
+              </div>
+            </div>
+          )}
 
         {/* Center: Search Bar */}
           {showSearch && (
@@ -267,7 +301,7 @@ const CustomerHeader = ({
                       <button
                         onClick={() => {
                           setIsDropdownOpen(false);
-                          // TODO: Navigate to settings page
+                          setIsSettingsOpen(true);
                         }}
                         className="w-full px-4 py-2.5 text-left text-body-regular text-charcoal-600 dark:text-cream-50 hover:bg-cream-100 dark:hover:bg-charcoal-400 transition-colors flex items-center gap-3"
                       >
@@ -305,8 +339,13 @@ const CustomerHeader = ({
           )}
         </div>
       </div>
+      
      </div>
+      {/* Settings Modal */}
+    <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </header>
+    
+    
   );
 };
 

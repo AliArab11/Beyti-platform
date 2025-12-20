@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, MapPin, Package, CheckCircle, Clock, Storefront, Phone, User } from '@phosphor-icons/react';
+import StatusChip from '../../../components/StatusChip';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -12,6 +13,19 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
+
+
+// Helper function for status chip colors
+const getStatusVariant = (status) => {
+  const s = status?.toLowerCase();
+  if (!s) return "neutral";
+  if (s === "placed" || s === "pending") return "danger";
+  if (["accepted", "preparing", "ready for pickup", "picked up"].includes(s)) return "brand";
+  if (s === "completed" || s === "delivered") return "success";
+  if (s === "cancelled") return "error";
+  return "neutral";
+};
+
 
 const OrderDetails = ({ order, onClose }) => {
 
@@ -74,6 +88,13 @@ const OrderDetails = ({ order, onClose }) => {
     return null;
   }
 
+  // Map backend status to customer-facing status
+    // For DELIVERY orders: hide "Ready for Pickup" and show "Preparing" instead
+    // For PICKUP orders: show "Ready for Pickup" normally
+    const displayStatus = (order.status === "Ready for Pickup" && order.fulfillmentType === "Delivery") 
+      ? "Preparing" 
+      : order.status;
+
 
         // Order status progression
         const statuses = [
@@ -93,13 +114,8 @@ const OrderDetails = ({ order, onClose }) => {
             { key: "Delivered", label: "Completed", icon: CheckCircle }
           );
         }
-                // Remove "Ready for Pickup" if delivery
-        if (order.fulfillmentType === "Delivery") {
-          const index = statuses.findIndex(s => s.key === "Ready for Pickup");
-          if (index !== -1) statuses.splice(index, 1);
-        }
 
-  const currentStatusIndex = statuses.findIndex(s => s.key === order.status);
+  const currentStatusIndex = statuses.findIndex(s => s.key === displayStatus);
   const isPickup = order.fulfillmentType === 'Pickup';
 
   useEffect(() => {
@@ -151,9 +167,14 @@ return (
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Status Timeline - Line Based */}
           <div className="bg-white rounded-2xl p-6 border-2 border-grey-stroke">
-            <h3 className="text-xl font-bold text-charcoal-700 mb-4" style={{ fontFamily: 'Merriweather, serif' }}>
-              Order Status
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-charcoal-700" style={{ fontFamily: 'Merriweather, serif' }}>
+                Order Status
+              </h3>
+              <StatusChip variant={getStatusVariant(displayStatus)}>
+                {displayStatus || "Unknown"}
+              </StatusChip>
+            </div>
             {/* Progress Line */}
             <div className="relative">
               {/* Background Line */}
@@ -207,16 +228,18 @@ return (
             </div>
                             
          
-            {/* Dynamic Status Message */}
+           {/* Dynamic Status Message */}
               <div className="mt-6 p-4 bg-sage-50 rounded-xl">
                 <p className="text-lg font-bold text-sage-700">
                   {currentStatusIndex === 0 && "Order placed successfully! Your order has been received and the seller has been notified."}
                   {currentStatusIndex === 1 && "Order accepted! The seller has confirmed your order and is getting it ready."}
-                  {currentStatusIndex === 2 && "Your order is being prepared by the seller."}
-                  {currentStatusIndex === 3 && (order.fulfillmentType === 'Delivery' ? "Your order is ready and waiting for pickup by the driver." : "Your order is ready for pickup! You can now head to the store to collect it.")}
+                  {currentStatusIndex === 2 && order.fulfillmentType === 'Pickup' && "Your order is being prepared by the seller."}
+                  {currentStatusIndex === 2 && order.fulfillmentType === 'Delivery' && "Your order is being prepared by the seller."}
+                  {currentStatusIndex === 3 && order.fulfillmentType === 'Pickup' && "Your order is ready for pickup! You can now head to the store to collect it."}
+                  {currentStatusIndex === 3 && order.fulfillmentType === 'Delivery' && "Your order is ready and waiting for pickup by the driver."}
+                  {currentStatusIndex === 4 && order.fulfillmentType === 'Pickup' && "Order completed! Thank you for your order."}
                   {currentStatusIndex === 4 && order.fulfillmentType === 'Delivery' && "On the way! Your order is out for delivery and will arrive soon."}
                   {currentStatusIndex === 5 && order.fulfillmentType === 'Delivery' && "Delivered! Your order has been completed."}
-                  {order.status === 'Completed' && order.fulfillmentType === 'Pickup' && "Order completed! Thank you for your order."}
                   {order.status === 'Cancelled' && "This order has been cancelled. If you have questions, please contact support."}
                 </p>
               </div>
@@ -328,10 +351,8 @@ return (
                 </div>
               </div>
 
-              {/* READY MESSAGE */}
-              {(order.status === "Ready" ||
-                order.status === "Ready for Pickup" ||
-                order.status === "Completed") && (
+              {/* READY MESSAGE - Only show when backend status is actually "Ready for Pickup" or "Completed" */}
+              {(order.status === "Ready for Pickup" || order.status === "Completed") && (
                 <div className="mt-3 p-3 bg-sage-600 rounded-lg">
                   <p className="text-sm font-bold text-white">
                     ✓ Your order is ready! Head to the Store to collect it.

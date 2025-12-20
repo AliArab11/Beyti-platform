@@ -20,6 +20,12 @@ namespace Beyti_Backend.Controllers.Api
         public string? Description { get; set; }
     }
 
+    public class UpdateBannerDto
+    {
+        public string? BannerThemeKey { get; set; }
+        public string? BannerAccentColor { get; set; }
+    }
+
 
     [Route("api/[controller]")]
     [ApiController]
@@ -75,8 +81,11 @@ namespace Beyti_Backend.Controllers.Api
                     isOpen = seller.IsOpen,
                     storeImageUrl = seller.StoreImageUrl,
                     storeDescription = seller.StoreDescription,
+                    bannerThemeKey = seller.BannerThemeKey,   
+                    bannerAccentColor = seller.BannerAccentColor,
                     subCategoryIds = seller.SellerSubCategories.Select(ssc => ssc.SubCategoryId).ToList(),
                     subCategoryNames = seller.SellerSubCategories
+
                     .Select(ssc => ssc.SubCategory.Name)
                     .ToList(),
                     sellerAddresses = seller.SellerAddresses.Select(sa => new
@@ -147,6 +156,8 @@ namespace Beyti_Backend.Controllers.Api
                     DisplayName = seller.UserProfile.DisplayName,
                     RoleType = seller.UserProfile.RoleType,
                     CategoryId = seller.CategoryId,
+                    BannerThemeKey = seller.BannerThemeKey,
+                    BannerAccentColor = seller.BannerAccentColor,
                     SubCategoryIds = seller.SellerSubCategories.Select(ssc => ssc.SubCategoryId).ToList(),
                     isOpen = seller.IsOpen,
                     StoreImageUrl = seller.StoreImageUrl,  // ← ADD THIS LINE
@@ -354,6 +365,8 @@ namespace Beyti_Backend.Controllers.Api
                     averageRating = averageRating,
                     storeImageUrl = seller.StoreImageUrl,
                     storeDescription = seller.StoreDescription,
+                    bannerThemeKey = seller.BannerThemeKey,      
+                    bannerAccentColor = seller.BannerAccentColor,
                     subCategoryIds = seller.SellerSubCategories.Select(ssc => ssc.SubCategoryId).ToList(),
                     subCategoryNames = seller.SellerSubCategories.Select(ssc => ssc.SubCategory.Name).ToList(),
                     storeSections = seller.StoreSections
@@ -864,6 +877,39 @@ namespace Beyti_Backend.Controllers.Api
                 return StatusCode(500, new
                 {
                     message = "Error updating store description",
+                    error = ex.Message
+                });
+            }
+        }
+
+        // PUT: api/Sellers/{id}/banner
+        [HttpPut("{id}/banner")]
+        public async Task<IActionResult> UpdateBanner(int id, [FromBody] UpdateBannerDto dto)
+        {
+            try
+            {
+                var seller = await _context.Sellers.FindAsync(id);
+                if (seller == null)
+                    return NotFound(new { message = "Seller not found" });
+
+                seller.BannerThemeKey = dto.BannerThemeKey;
+                seller.BannerAccentColor = dto.BannerAccentColor;
+                seller.UpdatedAt = DateTime.UtcNow;
+
+                await _context.SaveChangesAsync();
+
+                return Ok(new
+                {
+                    message = "Banner updated successfully",
+                    bannerThemeKey = seller.BannerThemeKey,
+                    bannerAccentColor = seller.BannerAccentColor
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Error updating banner",
                     error = ex.Message
                 });
             }

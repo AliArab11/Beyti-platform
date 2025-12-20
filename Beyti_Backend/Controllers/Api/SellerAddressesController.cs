@@ -44,6 +44,21 @@ namespace Beyti_Backend.Controllers.Api
             return sellerAddress;
         }
 
+        // Add this method after GetSellerAddress(int id)
+        // GET: api/SellerAddresses/Seller/5
+        [HttpGet("Seller/{sellerId}")]
+        public async Task<ActionResult<SellerAddress>> GetSellerAddressBySellerId(int sellerId)
+        {
+            var sellerAddress = await _context.SellerAddresses
+                .Include(sa => sa.Address)
+                .FirstOrDefaultAsync(sa => sa.SellerId == sellerId);
+
+            if (sellerAddress == null)
+                return NotFound();
+
+            return sellerAddress;
+        }
+
         // POST: api/SellerAddresses
         [HttpPost]
         public async Task<ActionResult<SellerAddress>> PostSellerAddress(CreateSellerAddressDto dto)

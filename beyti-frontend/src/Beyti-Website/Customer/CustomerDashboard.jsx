@@ -2049,36 +2049,39 @@ const historyFilteredData = useMemo(() => {
             </>
             )}
             {location.pathname.includes("/customer-dashboard/profile") && (
-            <ProfilePage
-              userProfile={{
-                userProfileId: customerId,
-                displayName: customerName,
-                phone: customerList.find(c => c.id === customerId)?.phone || '',
-                street: customerList.find(c => c.id === customerId)?.street || '',
-                city: customerList.find(c => c.id === customerId)?.city || '',
-                region: customerList.find(c => c.id === customerId)?.region || '',
-                postalCode: customerList.find(c => c.id === customerId)?.postalCode || '',
-                country: customerList.find(c => c.id === customerId)?.country || 'Bahrain',
-                address: customerList.find(c => c.id === customerId)?.customerAddresses?.[0]?.fullAddress || '',
-                status: 'Active',
-                createdAt: customerList.find(c => c.id === customerId)?.createdAt,
-                updatedAt: new Date().toISOString()
-              }}
-              userRole="Customer"
-              entityId={customerId}
-              onProfileUpdate={async (updates) => {
-                try {
-                  console.log('Profile updates:', updates);
-                  // Reload customer data after update
-                  const customers = await getCustomers();
-                  const updatedCustomer = customers.find(c => c.id === customerId);
-                  if (updatedCustomer) {
-                    setCustomerName(updatedCustomer.fullName || customerName);
+              <ProfilePage
+                userProfile={{
+                  userProfileId: customerId,
+                  displayName: customerName,
+                  phone: customerList.find(c => c.id === customerId)?.phone || '',
+                  street: customerList.find(c => c.id === customerId)?.street || '',
+                  city: customerList.find(c => c.id === customerId)?.city || '',
+                  region: customerList.find(c => c.id === customerId)?.region || '',
+                  postalCode: customerList.find(c => c.id === customerId)?.postalCode || '',
+                  country: customerList.find(c => c.id === customerId)?.country || 'Bahrain',
+                  address: customerList.find(c => c.id === customerId)?.customerAddresses?.[0]?.fullAddress || '',
+                  status: 'Active',
+                  createdAt: customerList.find(c => c.id === customerId)?.createdAt,
+                  updatedAt: new Date().toISOString()
+                }}
+                userRole="Customer"
+                entityId={customerId}
+                customerAddresses={customerList.find(c => c.id === customerId)?.customerAddresses || []} // ADD THIS LINE
+                onProfileUpdate={async (updates) => {
+                  try {
+                    console.log('Profile updates:', updates);
+                    // Reload customer data after update
+                    const customers = await getCustomers();
+                    setCustomerList(customers); // UPDATE THE ENTIRE LIST
+                    const updatedCustomer = customers.find(c => c.id === customerId);
+                    if (updatedCustomer) {
+                      setCustomerName(updatedCustomer.fullName || customerName);
+                    }
+                  } catch (error) {
+                    console.error('Error updating profile:', error);
+                    throw error;
                   }
-                } catch (error) {
-                  console.error('Error updating profile:', error);
-                  throw error;
-                }
+                
               }}
               readOnly={false}
             />

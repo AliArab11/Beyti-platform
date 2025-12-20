@@ -40,6 +40,13 @@ public partial class Seller
     [StringLength(500)]
     public string? StoreImageUrl { get; set; }   // main store picture
 
+    // 🔹 STORE BANNER (PRESET THEMES – NO UPLOADS)
+    [StringLength(50)]
+    public string? BannerThemeKey { get; set; }   
+
+    [StringLength(20)]
+    public string? BannerAccentColor { get; set; }
+
     public TimeSpan? OpenTime { get; set; }
     public TimeSpan? CloseTime { get; set; }
     public bool? IsManuallyClosed { get; set; }
@@ -65,6 +72,10 @@ public partial class Seller
     [InverseProperty("Seller")]
     public virtual ICollection<StoreSection> StoreSections { get; set; }
     = new List<StoreSection>();
+
+    [InverseProperty(nameof(CustomerFavoriteSeller.Seller))]
+    public virtual ICollection<CustomerFavoriteSeller> FavoritedByCustomers { get; set; }
+    = new List<CustomerFavoriteSeller>();
 
 
     [InverseProperty("Seller")]
