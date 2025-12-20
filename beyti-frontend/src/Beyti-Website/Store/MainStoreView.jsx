@@ -7,6 +7,7 @@ import ActiveOrderBanner from './Components/ActiveOrderBanner';
 import Snackbar from './../../components/Snackbar';
 import CustomerHeader from '../../components/CustomerHeader';
 import { isStoreOpen } from '../Seller/Components/storeStatus';
+import { StoreBanner } from '../../components/StoreBanner';
 
 
 // Get customers function
@@ -108,9 +109,7 @@ const CategoryTabs = ({ categories, selected, onSelect }) => (
   </div>
 );
 
-// Subcategory Sidebar Component
-const SubcategorySidebar = ({ subcategories, selected, onSelect }) => {
-  // Icon mapping for common subcategory names
+const SubcategorySidebar = ({ subcategories, selected, onSelect, onShowFavorites }) => {
   const getIconForSubcategory = (name) => {
     const lowerName = name.toLowerCase();
     if (lowerName.includes('sweet') || lowerName.includes('dessert')) return <Cake size={24} weight="regular" />;
@@ -118,12 +117,32 @@ const SubcategorySidebar = ({ subcategories, selected, onSelect }) => {
     if (lowerName.includes('healthy')) return <Heart size={24} weight="regular" />;
     if (lowerName.includes('bake') || lowerName.includes('bread')) return <Bread size={24} weight="regular" />;
     if (lowerName.includes('beverage') || lowerName.includes('drink')) return <Coffee size={24} weight="regular" />;
-    return <Storefront size={24} weight="regular" />; // Default icon
+    return <Storefront size={24} weight="regular" />;
   };
 
   return (
     <aside className="w-[280px] flex-shrink-0 mt-20">
       <div className="space-y-3">
+        {/* MY FAVORITES - NEW */}
+          <button
+            onClick={onShowFavorites}
+            className={`w-full flex items-center gap-4 px-6 py-4 rounded-full text-left transition-all font-medium text-[17px] ${
+              selected === 'favorites'
+                ? 'bg-sage-500 text-white shadow-[0_2px_8px_rgba(85,107,92,0.3)]'
+                : 'bg-cream-50 text-sage-500 hover:bg-cream-100'
+            }`}
+            style={{ fontFamily: 'Inter, sans-serif' }}
+          >
+            <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
+              selected === 'favorites' ? 'bg-sage-700' : 'bg-[#E8F0EA]'
+            }`}>
+              <div className={selected === 'favorites' ? 'text-white' : 'text-sage-500'}>
+                <Heart size={24} weight={selected === 'favorites' ? 'fill' : 'regular'} />
+              </div>
+            </div>
+            <span>My Favorites</span>
+          </button>
+
         {/* "All Stores" option */}
         <button
           onClick={() => onSelect(null)}
@@ -200,7 +219,7 @@ const SearchBar = ({ value, onChange }) => (
 );
 
 // Featured Carousel Component
-const FeaturedCarousel = ({ stores, onStoreClick, subcategories = [], selectedCategory }) => {
+const FeaturedCarousel = ({ stores, onStoreClick, subcategories = [], selectedCategory, favoriteStores = [], onToggleFavorite }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   
   // Filter stores by selected category only (ignore subcategory filter)
@@ -245,98 +264,131 @@ const FeaturedCarousel = ({ stores, onStoreClick, subcategories = [], selectedCa
             
             return (
               <div 
-                key={store.id || idx} 
-                onClick={() => onStoreClick(store.id)}
-                className="flex-shrink-0 w-[calc(33.333%-16px)] bg-white rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all cursor-pointer"
-              >
-                <div className="relative h-32 bg-gradient-to-br from-cream-100 to-cream-200">
-                      {/* Store Status Badge*/}
-                        <div className="absolute top-3 left-3">
-                          <div className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 ${
-                            isStoreOpen(store)
-                              ? 'bg-success-btn text-white'
-                              : 'bg-error-btn text-white'
-                          }`}>
-                            <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                            {isStoreOpen(store) ? 'OPEN' : 'CLOSED'}
-                          </div>
-                        </div>
-                  
-                  <div className="absolute -bottom-8 left-4">
-                    <div className="w-16 h-16 rounded-full border-4 border-white flex items-center justify-center overflow-hidden bg-white shadow-[0_4px_12px_rgba(0,0,0,0.15)]">
-                      {store.storeImageUrl ? (
-                        <img 
-                          src={`https://localhost:7062${store.storeImageUrl}`}
-                          alt={store.storeName}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-grey-200 to-grey-300">
-                          <span className="text-lg font-black text-charcoal-600" style={{ fontFamily: "Inter, sans-serif" }}>
-                            {initials}
-                          </span>
-                        </div>
-                      )}
-                    </div>
+  key={store.id || idx} 
+  onClick={() => onStoreClick(store.id)}
+  className="flex-shrink-0 w-[calc(33.333%-16px)] bg-white rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all cursor-pointer"
+>
+  <div className="relative h-32">
+     {/* Banner layer (clipped) */}
+  <div className="absolute inset-0 overflow-hidden z-0">
+    <StoreBanner
+      storeName={store.storeName}
+      storeImageUrl={store.storeImageUrl ? `https://localhost:7062${store.storeImageUrl}` : null}
+      bannerThemeKey={store.bannerThemeKey || 'modern-gradient'}
+      bannerAccentColor={store.bannerAccentColor || '#F97316'}
+      variant="card"
+    />
+  </div>
+    
+    {/* Store Status Badge */}
+    <div className="absolute top-3 left-3">
+      <div className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 ${
+        isStoreOpen(store)
+          ? 'bg-success-btn text-white'
+          : 'bg-error-btn text-white'
+      }`}>
+        <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+        {isStoreOpen(store) ? 'OPEN' : 'CLOSED'}
+      </div>
+    </div>
+
+    {/* Favorite Heart Button */}
+    {onToggleFavorite && (
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleFavorite(store.id);
+        }}
+        className="absolute top-3 right-3 w-9 h-9 bg-white hover:bg-cream-50 rounded-full flex items-center justify-center shadow-md transition-all z-10"
+      >
+        <Heart 
+          size={20} 
+          weight={favoriteStores.includes(store.id) ? 'fill' : 'regular'} 
+          className={favoriteStores.includes(store.id) ? 'text-error-btn' : 'text-charcoal-400'}
+        />
+      </button>
+    )}
+    
+    {/* External Logo - positioned on LEFT, overlapping */}
+    <div className="absolute -bottom-8 left-4 z-20">
+    <div className="w-16 h-16 rounded-full border-4 border-white bg-white shadow-[0_4px_12px_rgba(0,0,0,0.15)] overflow-hidden">
+        {store.storeImageUrl ? (
+          <img 
+            src={`https://localhost:7062${store.storeImageUrl}`}
+            alt={store.storeName}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-grey-200 to-grey-300">
+            <span className="text-lg font-black text-charcoal-600" style={{ fontFamily: "Inter, sans-serif" }}>
+              {(() => {
+                const words = store.storeName.split(' ').filter(w => w.length > 0);
+                return words.length >= 2 
+                  ? words[0][0].toUpperCase() + words[words.length - 1][0].toUpperCase()
+                  : words[0].slice(0, 2).toUpperCase();
+              })()}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+  
+  <div className="pt-10 p-4 bg-white">
+    <h3 className="font-bold text-charcoal-600 text-base mb-2" style={{ fontFamily: 'Merriweather, serif' }}>{store.storeName}</h3>
+    <div className="flex items-center gap-1 mb-3">
+      {(() => {
+        const rating = store.averageRating || 0;
+        const hasEnoughReviews = store.averageRating !== null && store.averageRating !== undefined;
+        
+        if (!hasEnoughReviews) {
+          return (
+            <span className="px-3 py-1 bg-sage-500 text-white text-xs font-bold rounded-full" style={{ fontFamily: 'Inter, sans-serif' }}>
+              NEW
+            </span>
+          );
+        }
+        
+        return (
+          <>
+            {[0,1,2,3,4].map(i => {
+              const fillPercentage = Math.max(0, Math.min(100, (rating - i) * 100));
+              return (
+                <div key={i} className="relative w-3.5 h-3.5">
+                  <Star size={14} className="text-grey-stroke absolute" weight="fill" />
+                  <div className="overflow-hidden absolute" style={{ width: `${fillPercentage}%` }}>
+                    <Star size={14} className="text-sage-500" weight="fill" />
                   </div>
                 </div>
-                
-                <div className="pt-10 p-4 bg-white">
-                  <h3 className="font-bold text-charcoal-600 text-base mb-2" style={{ fontFamily: 'Merriweather, serif' }}>{store.storeName}</h3>
-                  <div className="flex items-center gap-1 mb-3">
-                    {(() => {
-                      const rating = store.averageRating || 0;
-                      const hasEnoughReviews = store.averageRating !== null && store.averageRating !== undefined;
-                      
-                      if (!hasEnoughReviews) {
-                        return (
-                          <span className="px-3 py-1 bg-sage-500 text-white text-xs font-bold rounded-full" style={{ fontFamily: 'Inter, sans-serif' }}>
-                            NEW
-                          </span>
-                        );
-                      }
-                      
-                      return (
-                        <>
-                          {[0,1,2,3,4].map(i => {
-                            const fillPercentage = Math.max(0, Math.min(100, (rating - i) * 100));
-                            return (
-                              <div key={i} className="relative w-3.5 h-3.5">
-                                <Star size={14} className="text-grey-stroke absolute" weight="fill" />
-                                <div className="overflow-hidden absolute" style={{ width: `${fillPercentage}%` }}>
-                                  <Star size={14} className="text-sage-500" weight="fill" />
-                                </div>
-                              </div>
-                            );
-                          })}
-                          <span className="text-xs font-semibold text-charcoal-600 ml-1" style={{ fontFamily: 'Inter, sans-serif' }}>
-                            {rating.toFixed(1)}
-                          </span>
-                        </>
-                      );
-                    })()}
-                  </div>
-                 <div className="flex gap-2 flex-wrap">
-                    {(() => {
-                      // Get subcategory names for this store
-                      const storeSubcategoryIds = store.subCategoryIds || [];
-                      const storeSubcategories = subcategories.filter(sub => storeSubcategoryIds.includes(sub.id));
-                      
-                      return storeSubcategories.length > 0 ? (
-                        storeSubcategories.map(subcat => (
-                          <span key={subcat.id} className="px-3 py-1 bg-cream-100 rounded-full text-xs font-medium text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>
-                            {subcat.name}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="px-3 py-1 bg-grey-200 rounded-full text-xs font-medium text-charcoal-400 italic" style={{ fontFamily: 'Inter, sans-serif' }}>
-                          No categories
-                        </span>
-                      );
-                    })()}
-                  </div>
-                </div>
-              </div>
+              );
+            })}
+            <span className="text-xs font-semibold text-charcoal-600 ml-1" style={{ fontFamily: 'Inter, sans-serif' }}>
+              {rating.toFixed(1)}
+            </span>
+          </>
+        );
+      })()}
+    </div>
+    <div className="flex gap-2 flex-wrap">
+      {(() => {
+        const storeSubcategoryIds = store.subCategoryIds || [];
+        const storeSubcategories = subcategories.filter(sub => storeSubcategoryIds.includes(sub.id));
+        
+        return storeSubcategories.length > 0 ? (
+          storeSubcategories.map(subcat => (
+            <span key={subcat.id} className="px-3 py-1 bg-cream-100 rounded-full text-xs font-medium text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>
+              {subcat.name}
+            </span>
+          ))
+        ) : (
+          <span className="px-3 py-1 bg-grey-200 rounded-full text-xs font-medium text-charcoal-400 italic" style={{ fontFamily: 'Inter, sans-serif' }}>
+            No categories
+          </span>
+        );
+      })()}
+    </div>
+  </div>
+</div>
             );
           })}
         </div>
@@ -368,7 +420,7 @@ const FeaturedCarousel = ({ stores, onStoreClick, subcategories = [], selectedCa
 };
 
 // Store Card Component
-const StoreCard = ({ store, subcategories = [] }) => {
+const StoreCard = ({ store, subcategories = [], isFavorited = false, onToggleFavorite }) => {
   const words = store.storeName.split(' ').filter(w => w.length > 0);
   const initials = words.length >= 2 
     ? words[0][0].toUpperCase() + words[words.length - 1][0].toUpperCase()
@@ -376,38 +428,67 @@ const StoreCard = ({ store, subcategories = [] }) => {
 
   return (
     <div className="bg-white rounded-2xl overflow-hidden cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all">
-      <div className="relative h-32 bg-gradient-to-br from-cream-100 to-cream-200">
+      <div className="relative h-32">
 
-             {/* Store Status Badge */}
-              <div className="absolute top-3 left-3">
-                <div className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 ${
-                  isStoreOpen(store)
-                    ? 'bg-success-btn text-white'
-                    : 'bg-error-btn text-white'
-                }`}>
-                  <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                  {isStoreOpen(store) ? 'OPEN' : 'CLOSED'}
-                </div>
-              </div>
-        
-        <div className="absolute -bottom-8 left-4">
-          <div className="w-16 h-16 rounded-full border-4 border-white flex items-center justify-center overflow-hidden bg-white shadow-[0_4px_12px_rgba(0,0,0,0.15)]">
-            {store.storeImageUrl ? (
-              <img 
-                src={`https://localhost:7062${store.storeImageUrl}`}
-                alt={store.storeName}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-grey-200 to-grey-300">
-                <span className="text-lg font-black text-charcoal-600" style={{ fontFamily: "Inter, sans-serif" }}>
-                  {initials}
-                </span>
-              </div>
-            )}
-          </div>
+      <div className="absolute inset-0 overflow-hidden z-0">
+    <StoreBanner
+      storeName={store.storeName}
+      storeImageUrl={store.storeImageUrl ? `https://localhost:7062${store.storeImageUrl}` : null}
+      bannerThemeKey={store.bannerThemeKey || 'modern-gradient'}
+      bannerAccentColor={store.bannerAccentColor || '#F97316'}
+      variant="card"
+    />
+  </div>
+
+  {/* Store Status Badge */}
+  <div className="absolute top-3 left-3 z-30">
+    <div className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 ${
+      isStoreOpen(store)
+        ? 'bg-success-btn text-white'
+        : 'bg-error-btn text-white'
+    }`}>
+      <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+      {isStoreOpen(store) ? 'OPEN' : 'CLOSED'}
+    </div>
+  </div>
+
+  {/* Favorite Heart */}
+  {onToggleFavorite && (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggleFavorite(store.id);
+      }}
+      className="absolute top-3 right-3 w-9 h-9 bg-white hover:bg-cream-50 rounded-full flex items-center justify-center shadow-md transition-all z-30"
+    >
+      <Heart
+        size={20}
+        weight={isFavorited ? 'fill' : 'regular'}
+        className={isFavorited ? 'text-error-btn' : 'text-charcoal-400'}
+      />
+    </button>
+  )}
+
+  {/* Store Logo (OVERLAPS banner + card) */}
+  <div className="absolute -bottom-8 left-4 z-20">
+    <div className="w-16 h-16 rounded-full border-4 border-white bg-white shadow-[0_4px_12px_rgba(0,0,0,0.15)] overflow-hidden">
+      {store.storeImageUrl ? (
+        <img
+          src={`https://localhost:7062${store.storeImageUrl}`}
+          alt={store.storeName}
+          className="w-full h-full object-cover"
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-grey-200 to-grey-300">
+          <span className="text-lg font-black text-charcoal-600">
+            {initials}
+          </span>
         </div>
-      </div>
+      )}
+    </div>
+  </div>
+
+</div>
       
       <div className="pt-10 p-4 bg-white">
         <h3 className="font-bold text-charcoal-600 text-base mb-2" style={{ fontFamily: 'Merriweather, serif' }}>{store.storeName}</h3>
@@ -446,10 +527,7 @@ const StoreCard = ({ store, subcategories = [] }) => {
         </div>
         <div className="flex gap-2 flex-wrap">
           {(() => {
-            // Get subcategory names for this store
             const storeSubcategoryIds = store.subCategoryIds || [];
-            // We need to get subcategories from the parent scope
-            // Since StoreCard is used in MainStoreView, we'll need to pass subcategories as a prop
             return storeSubcategoryIds.length > 0 ? (
               storeSubcategoryIds.map(subId => {
                 const subcat = subcategories.find(s => s.id === subId);
@@ -573,6 +651,9 @@ useEffect(() => {
   const [customerName, setCustomerName] = useState(null);
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [customerAddresses, setCustomerAddresses] = useState([]);
+
+  const [favoriteStores, setFavoriteStores] = useState([]);
+  const [loadingFavorites, setLoadingFavorites] = useState(false);
 
   // Add Snackbar state
 const [snackbar, setSnackbar] = useState({ open: false, message: '', type: 'success' });
@@ -802,6 +883,16 @@ useEffect(() => {
   // Removed auto-opening modal - let user browse as guest
 }, []);
 
+
+// Fetch favorites when customer changes
+useEffect(() => {
+  if (customerId) {
+    fetchFavorites(customerId);
+  } else {
+    setFavoriteStores([]);
+  }
+}, [customerId]);
+
 // Fetch customer addresses when customerId changes
 useEffect(() => {
   const fetchCustomerAddresses = async () => {
@@ -934,6 +1025,69 @@ const handleTrackOrder = () => {
     }
   };
 
+  const fetchFavorites = async (custId) => {
+  if (!custId) {
+    setFavoriteStores([]);
+    return;
+  }
+
+  try {
+    setLoadingFavorites(true);
+    const response = await fetch(`https://localhost:7062/api/CustomerFavorites/${custId}`);
+    if (response.ok) {
+      const data = await response.json();
+      setFavoriteStores(Array.isArray(data) ? data.map(f => f.sellerId) : []);
+    } else {
+      setFavoriteStores([]);
+    }
+  } catch (error) {
+    console.error("Failed to load favorites:", error);
+    setFavoriteStores([]);
+  } finally {
+    setLoadingFavorites(false);
+  }
+};
+
+
+const toggleFavorite = async (sellerId) => {
+  if (!customerId) {
+    showSnackbar('Please select a customer account to save favorites', 'warning');
+    return;
+  }
+
+  const isFavorited = favoriteStores.includes(sellerId);
+
+  try {
+    if (isFavorited) {
+      // Remove from favorites
+      const response = await fetch(
+        `https://localhost:7062/api/CustomerFavorites/${customerId}/${sellerId}`,
+        { method: 'DELETE' }
+      );
+
+      if (response.ok) {
+        setFavoriteStores(prev => prev.filter(id => id !== sellerId));
+        showSnackbar('Removed from favorites', 'success');
+      }
+    } else {
+      // Add to favorites
+      const response = await fetch('https://localhost:7062/api/CustomerFavorites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customerId, sellerId })
+      });
+
+      if (response.ok) {
+        setFavoriteStores(prev => [...prev, sellerId]);
+        showSnackbar('Added to favorites', 'success');
+      }
+    }
+  } catch (error) {
+    console.error('Error toggling favorite:', error);
+    showSnackbar('Failed to update favorites', 'error');
+  }
+};
+
   const handleFilterChange = (filterType, value) => {
   setActiveFilters(prev => ({
     ...prev,
@@ -1064,6 +1218,8 @@ const filteredStores = stores
         variant="store"
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}
+        showContextSwitch={true}
+        currentContext="stores"
       />
 
     {/* Active Order Banner */}
@@ -1094,7 +1250,13 @@ const filteredStores = stores
           <SubcategorySidebar 
             subcategories={filteredSubcategories}
             selected={selectedSubcategory} 
-            onSelect={setSelectedSubcategory} 
+            onSelect={(value) => {
+              setSelectedSubcategory(value);
+              if (value !== 'favorites') {
+                // Only change if not clicking favorites
+              }
+            }}
+            onShowFavorites={() => setSelectedSubcategory('favorites')}
           />
 
           <div className="flex-1">
@@ -1291,35 +1453,71 @@ const filteredStores = stores
               onStoreClick={handleStoreNavigation}
               subcategories={subcategories}
               selectedCategory={selectedCategory}
+              favoriteStores={favoriteStores}
+              onToggleFavorite={toggleFavorite}
             />
 
             {loading ? (
-              <div className="flex items-center justify-center py-16">
-                <div className="w-12 h-12 border-4 border-grey-stroke border-t-sage-500 rounded-full animate-spin"></div>
-              </div>
-            ) : filteredStores.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16">
-                <div className="w-24 h-24 bg-cream-100 rounded-full flex items-center justify-center mb-4">
-                  <Storefront className="w-12 h-12 text-charcoal-400" weight="regular" />
+                <div className="flex items-center justify-center py-16">
+                  <div className="w-12 h-12 border-4 border-grey-stroke border-t-sage-500 rounded-full animate-spin"></div>
                 </div>
-                <h3 className="text-xl font-bold text-charcoal-600 mb-2" style={{ fontFamily: 'Merriweather, serif' }}>
-                  No Stores Found
-                </h3>
-                <p className="text-charcoal-400 text-center max-w-md" style={{ fontFamily: 'Inter, sans-serif' }}>
-                  {searchQuery
-                    ? `No stores match "${searchQuery}". Try a different search term.`
-                    : 'There are no stores available at the moment. Please check back later.'}
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {filteredStores.map(store => (
-                  <div key={store.id} onClick={() => handleStoreNavigation(store.id)}>
-                    <StoreCard store={store} subcategories={subcategories} />
+              ) : (() => {
+                // Calculate which stores to show
+                const storesToShow = selectedSubcategory === 'favorites' 
+                  ? stores
+                      .filter(s => favoriteStores.includes(s.id))
+                      .filter(s => !searchQuery || s.storeName?.toLowerCase().includes(searchQuery.toLowerCase()))
+                      .sort((a, b) => {
+                        const aIsOpen = isStoreOpen(a);
+                        const bIsOpen = isStoreOpen(b);
+                        
+                        if (aIsOpen && !bIsOpen) return -1;
+                        if (!aIsOpen && bIsOpen) return 1;
+                        
+                        const ratingA = a.averageRating || 0;
+                        const ratingB = b.averageRating || 0;
+                        
+                        if (ratingA !== 0 && ratingB !== 0) return ratingB - ratingA;
+                        if (ratingA !== 0) return -1;
+                        if (ratingB !== 0) return 1;
+                        
+                        return 0;
+                      })
+                  : filteredStores;
+
+                return storesToShow.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16">
+                    <div className="w-24 h-24 bg-cream-100 rounded-full flex items-center justify-center mb-4">
+                      <Storefront className="w-12 h-12 text-charcoal-400" weight="regular" />
+                    </div>
+                    <h3 className="text-xl font-bold text-charcoal-600 mb-2" style={{ fontFamily: 'Merriweather, serif' }}>
+                      No Stores Found
+                    </h3>
+                    <p className="text-charcoal-400 text-center max-w-md" style={{ fontFamily: 'Inter, sans-serif' }}>
+                      {selectedSubcategory === 'favorites' 
+                        ? (searchQuery 
+                            ? `No favorite stores match "${searchQuery}".`
+                            : 'No favorite stores yet. Click the ❤️ icon on stores to save them here!')
+                        : (searchQuery
+                            ? `No stores match "${searchQuery}". Try a different search term.`
+                            : 'There are no stores available at the moment. Please check back later.')}
+                    </p>
                   </div>
-                ))}
-              </div>
-            )}
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {storesToShow.map(store => (
+                      <div key={store.id} onClick={() => handleStoreNavigation(store.id)}>
+                        <StoreCard 
+                          store={store} 
+                          subcategories={subcategories}
+                          isFavorited={favoriteStores.includes(store.id)}
+                          onToggleFavorite={toggleFavorite}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
           </div>
         </div>
       </div>

@@ -27,6 +27,8 @@ const CustomerHeader = ({
   showBackButton = false, // Show back arrow
   variant = "store", // "store" or "dashboard"
   className = "",
+  currentContext = "stores", // "stores" or "services"
+  showContextSwitch = false, 
   ...props
 }) => {
   const navigate = useNavigate();
@@ -131,6 +133,36 @@ const CustomerHeader = ({
             </h1>
 
           </div>
+
+          {/* Context Switcher - NEW */}
+          {showContextSwitch && (
+            <div className="ml-8 flex items-center">
+              <div className="inline-flex items-center bg-grey-200 dark:bg-charcoal-600 rounded-full p-1 border border-grey-stroke dark:border-charcoal-500">
+                <button
+                  onClick={() => navigate('/mainStore', { state: { customerId, customerName } })}
+                  className={`px-6 py-2 rounded-full text-sm font-semibold transition-all ${
+                    currentContext === 'stores'
+                      ? 'bg-sage-500 text-white shadow-sm'
+                      : 'text-charcoal-500 dark:text-charcoal-300 hover:text-charcoal-600 dark:hover:text-white'
+                  }`}
+                  style={{ fontFamily: 'Inter, sans-serif' }}
+                >
+                  Stores
+                </button>
+                <button
+                  onClick={() => navigate('/serviceProviders', { state: { customerId, customerName } })}
+                  className={`px-6 py-2 rounded-full text-sm font-semibold transition-all ${
+                    currentContext === 'services'
+                      ? 'bg-sage-500 text-white shadow-sm'
+                      : 'text-charcoal-500 dark:text-charcoal-300 hover:text-charcoal-600 dark:hover:text-white'
+                  }`}
+                  style={{ fontFamily: 'Inter, sans-serif' }}
+                >
+                  Services
+                </button>
+              </div>
+            </div>
+          )}
 
         {/* Center: Search Bar */}
           {showSearch && (
