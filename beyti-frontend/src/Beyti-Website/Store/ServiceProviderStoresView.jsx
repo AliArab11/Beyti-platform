@@ -1,104 +1,139 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Scissors, Star, Storefront, Heart, Briefcase, Users } from "@phosphor-icons/react";
 import { getServiceProviders, getServiceCategoryList, getServiceCatalogs, getUserProfile, updateUserProfile, getServiceProviderServices, getProviderServiceReviews } from "../../services/api";
 import { isAuthenticated, getUserId, handleSuspensionError } from "../../utils/authUtils";
-import PageHeader from "../../components/PageHeader";
+import CustomerHeader from "../../components/CustomerHeader";
+import ActiveOrderBanner from "./Components/ActiveOrderBanner";
 
-// Main Category Tabs Component
-const CategoryTabs = ({ categories, selected, onSelect }) => (
-  <div className="flex justify-center items-center gap-5 mb-6 ml-32">
-    {/* "All Categories" option */}
-    <button
-      onClick={() => onSelect(null)}
-      className={`px-20 py-4 rounded-full font-semibold text-[19px] transition-all ${
-        selected === null
-          ? 'bg-sage-500 text-white shadow-[0_2px_12px_rgba(85,107,92,0.25)]'
-          : 'bg-cream-50 text-charcoal-600 border-2 border-grey-stroke hover:border-sage-500 shadow-[0_1px_3px_rgba(0,0,0,0.08)]'
-      }`}
-      style={{ fontFamily: 'Inter, sans-serif' }}
-    >
-      All Categories
-    </button>
+// Main Category Tabs Component with Scrolling
+const CategoryTabs = ({ categories, selected, onSelect }) => {
+  const scrollContainerRef = useRef(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
 
-    {categories.map(category => (
-      <button
-        key={category.id}
-        onClick={() => onSelect(category.id)}
-        className={`px-20 py-4 rounded-full font-semibold text-[19px] transition-all ${
-          selected === category.id
-            ? 'bg-sage-500 text-white shadow-[0_2px_12px_rgba(85,107,92,0.25)]'
-            : 'bg-cream-50 text-charcoal-600 border-2 border-grey-stroke hover:border-sage-500 shadow-[0_1px_3px_rgba(0,0,0,0.08)]'
-        }`}
-        style={{ fontFamily: 'Inter, sans-serif' }}
-      >
-        {category.name}
-      </button>
-    ))}
-  </div>
-);
+  const updateArrows = () => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
 
-// Service Catalog Sidebar Component
-const ServiceCatalogSidebar = ({ catalogs, selected, onSelect }) => {
-  // Icon mapping for service catalogs
-  const getIconForCatalog = (name) => {
-    const lowerName = name.toLowerCase();
-    if (lowerName.includes('beauty') || lowerName.includes('salon') || lowerName.includes('hair')) return <Scissors size={24} weight="regular" />;
-    if (lowerName.includes('health') || lowerName.includes('wellness') || lowerName.includes('spa')) return <Heart size={24} weight="regular" />;
-    if (lowerName.includes('professional') || lowerName.includes('business') || lowerName.includes('consulting')) return <Briefcase size={24} weight="regular" />;
-    if (lowerName.includes('personal') || lowerName.includes('training')) return <Users size={24} weight="regular" />;
-    return <Storefront size={24} weight="regular" />; // Default icon
+    const scrollLeft = Math.round(container.scrollLeft);
+    const scrollWidth = container.scrollWidth;
+    const clientWidth = container.clientWidth;
+    
+    setCanScrollLeft(scrollLeft > 1);
+    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
   };
 
-  return (
-    <aside className="w-[280px] flex-shrink-0 mt-20">
-      <div className="space-y-3">
-        {/* "All Providers" option */}
-        <button
-          onClick={() => onSelect(null)}
-          className={`w-full flex items-center gap-4 px-6 py-4 rounded-full text-left transition-all font-medium text-[17px] ${
-            selected === null
-              ? 'bg-sage-500 text-white shadow-[0_2px_8px_rgba(85,107,92,0.3)]'
-              : 'bg-cream-50 text-sage-500 hover:bg-cream-100'
-          }`}
-          style={{ fontFamily: 'Inter, sans-serif' }}
-        >
-          <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
-            selected === null ? 'bg-sage-700' : 'bg-[#E8F0EA]'
-          }`}>
-            <div className={selected === null ? 'text-white' : 'text-sage-500'}>
-              <Storefront size={24} weight="regular" />
-            </div>
-          </div>
-          <span>All Providers</span>
-        </button>
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
 
-        {/* Service Catalogs */}
-        {catalogs.map(catalog => (
+    container.scrollLeft = 0;
+    
+    const timer = setTimeout(updateArrows, 200);
+    
+    container.addEventListener('scroll', updateArrows);
+    window.addEventListener('resize', updateArrows);
+    
+    return () => {
+      clearTimeout(timer);
+      container.removeEventListener('scroll', updateArrows);
+      window.removeEventListener('resize', updateArrows);
+    };
+  }, [categories]);
+
+  const scroll = (direction) => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const scrollAmount = 360;
+    container.scrollBy({
+      left: direction === 'left' ? -scrollAmount : scrollAmount,
+      behavior: 'smooth'
+    });
+  };
+
+  const showArrows = categories.length > 3;
+
+  return (
+    <div className="flex justify-center items-center mb-6 w-full relative">
+      {showArrows && canScrollLeft && (
+        <button
+          onClick={() => scroll('left')}
+          className="absolute left-4 z-10 w-10 h-10 bg-white rounded-full shadow-[0_2px_10px_rgba(0,0,0,0.12)] flex items-center justify-center hover:bg-cream-50 transition-all"
+        >
+          <svg className="w-5 h-5 text-charcoal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+      )}
+
+      <div 
+        ref={scrollContainerRef}
+        className="overflow-x-auto py-2 scrollbar-hide snap-x snap-mandatory" 
+        style={{ 
+          maxWidth: '1400px',
+          width: '100%',
+          scrollbarWidth: 'none', 
+          msOverflowStyle: 'none',
+          WebkitOverflowScrolling: 'touch'
+        }}
+      >
+        <style>{`
+          .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+          }
+        `}</style>
+        <div className="flex gap-5 justify-start" style={{ 
+          marginLeft: (categories.length + 1) <= 3 ? 'auto' : '0',
+          marginRight: (categories.length + 1) <= 3 ? 'auto' : '0',
+          width: (categories.length + 1) <= 3 ? 'fit-content' : 'auto'
+        }}>
+          {/* All Categories Button */}
           <button
-            key={catalog.id}
-            onClick={() => onSelect(catalog.id)}
-            className={`w-full flex items-center gap-4 px-6 py-4 rounded-full text-left transition-all font-medium text-[17px] ${
-              selected === catalog.id
-                ? 'bg-sage-500 text-white shadow-[0_2px_8px_rgba(85,107,92,0.3)]'
-                : 'bg-cream-50 text-sage-500 hover:bg-cream-100'
+            onClick={() => onSelect(null)}
+            className={`px-20 py-4 rounded-full font-semibold text-[19px] transition-all whitespace-nowrap flex-shrink-0 snap-start ${
+              selected === null
+                ? 'bg-sage-500 text-white shadow-[0_2px_12px_rgba(85,107,92,0.25)]'
+                : 'bg-cream-50 text-charcoal-600 border-2 border-grey-stroke hover:border-sage-500 shadow-[0_1px_3px_rgba(0,0,0,0.08)]'
             }`}
             style={{ fontFamily: 'Inter, sans-serif' }}
           >
-            <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
-              selected === catalog.id ? 'bg-sage-700' : 'bg-[#E8F0EA]'
-            }`}>
-              <div className={selected === catalog.id ? 'text-white' : 'text-sage-500'}>
-                {getIconForCatalog(catalog.name)}
-              </div>
-            </div>
-            <span>{catalog.name}</span>
+            All Categories
           </button>
-        ))}
+
+          {categories.map(category => (
+            <button
+              key={category.id}
+              onClick={() => onSelect(category.id)}
+              className={`px-20 py-4 rounded-full font-semibold text-[19px] transition-all whitespace-nowrap flex-shrink-0 snap-start ${
+                selected === category.id
+                  ? 'bg-sage-500 text-white shadow-[0_2px_12px_rgba(85,107,92,0.25)]'
+                  : 'bg-cream-50 text-charcoal-600 border-2 border-grey-stroke hover:border-sage-500 shadow-[0_1px_3px_rgba(0,0,0,0.08)]'
+              }`}
+              style={{ fontFamily: 'Inter, sans-serif' }}
+            >
+              {category.name}
+            </button>
+          ))}
+        </div>
       </div>
-    </aside>
+
+      {showArrows && canScrollRight && (
+        <button
+          onClick={() => scroll('right')}
+          className="absolute right-4 z-10 w-10 h-10 bg-white rounded-full shadow-[0_2px_10px_rgba(0,0,0,0.12)] flex items-center justify-center hover:bg-cream-50 transition-all"
+        >
+          <svg className="w-5 h-5 text-charcoal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      )}
+    </div>
   );
 };
+
+
 
 // Featured Carousel Component
 const FeaturedCarousel = ({ providers, onProviderClick, services }) => {
@@ -128,13 +163,6 @@ const FeaturedCarousel = ({ providers, onProviderClick, services }) => {
 
   return (
     <div className="relative mb-16 pb-4">
-      {/* Featured Section Title */}
-      <div className="flex items-center gap-3 mb-6">
-        <Star size={28} weight="fill" className="text-sage-500" />
-        <h2 className="text-2xl font-bold text-charcoal-600" style={{ fontFamily: 'Merriweather, serif' }}>
-          Top Rated Providers
-        </h2>
-      </div>
 
       <button
         onClick={() => setCurrentIndex(Math.max(0, currentIndex - 1))}
@@ -440,6 +468,19 @@ const ServiceProviderStoresView = () => {
   const [userProfile, setUserProfile] = useState(null);
   const [providerServices, setProviderServices] = useState({}); // Map of providerId -> services array
 
+  const categoryScrollRef = useRef(null);
+  const [canScrollCatLeft, setCanScrollCatLeft] = useState(false);
+  const [canScrollCatRight, setCanScrollCatRight] = useState(false);
+
+  const serviceCatalogScrollRef = useRef(null);
+  const [canScrollCatalogLeft, setCanScrollCatalogLeft] = useState(false);
+  const [canScrollCatalogRight, setCanScrollCatalogRight] = useState(false);
+
+  const [activeOrderCount, setActiveOrderCount] = useState(0);
+  const [showOrderBanner, setShowOrderBanner] = useState(false);
+
+  const [cart, setCart] = useState([]);
+
   // Filter state
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [activeFilters, setActiveFilters] = useState({
@@ -454,8 +495,8 @@ const ServiceProviderStoresView = () => {
   // }, [navigate]);
 
   // Get user ID from localStorage (Customer: UserProfileId = 2, CustomerId = 1)
-  const userProfileId = parseInt(getUserId()) || 1002;
-  const customerId = 2; // TODO: Get from API based on userProfileId
+  const userProfileId = parseInt(getUserId()) || 4;
+  const customerId = 1; // TODO: Get from API based on userProfileId
 
   // Fetch user profile details
   const fetchUserProfile = async () => {
@@ -503,6 +544,100 @@ const ServiceProviderStoresView = () => {
       }
     }
   };
+
+  // Check for active orders
+useEffect(() => {
+  if (customerId) {
+    const activeOrderKey = `beyti_activeOrder_${customerId}`;
+    const bannerDismissedKey = `beyti_bannerDismissed_${customerId}`;
+    
+    const activeOrder = localStorage.getItem(activeOrderKey);
+    const bannerDismissed = localStorage.getItem(bannerDismissedKey);
+    
+    if (activeOrder && !bannerDismissed) {
+      try {
+        const orderData = JSON.parse(activeOrder);
+        setActiveOrderCount(1); // Currently tracking 1 order at a time
+        setShowOrderBanner(true);
+      } catch (err) {
+        console.error('Error parsing active order:', err);
+      }
+    }
+  }
+}, [customerId]);
+
+
+// Load cart from localStorage
+useEffect(() => {
+  if (customerId) {
+    // Check all cart keys for this customer
+    let allCartItems = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(`beyti_cart_`) && key.endsWith(`_${customerId}`)) {
+        try {
+          const savedCart = localStorage.getItem(key);
+          if (savedCart) {
+            const parsedCart = JSON.parse(savedCart);
+            allCartItems = [...allCartItems, ...parsedCart];
+          }
+        } catch (err) {
+          console.error('Error parsing cart:', err);
+        }
+      }
+    }
+    setCart(allCartItems);
+  }
+}, [customerId]);
+
+const handleTrackOrder = () => {
+  navigate('/customer-dashboard');
+};
+
+const handleDismissBanner = () => {
+  setShowOrderBanner(false);
+  if (customerId) {
+    localStorage.setItem(`beyti_bannerDismissed_${customerId}`, 'true');
+  }
+};
+
+
+const handleCartClick = () => {
+  // Find store with items and navigate
+  let targetStoreId = null;
+  let targetStoreName = null;
+  
+  if (customerId) {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(`beyti_cart_`) && key.endsWith(`_${customerId}`)) {
+        try {
+          const savedCart = localStorage.getItem(key);
+          if (savedCart) {
+            const parsedCart = JSON.parse(savedCart);
+            if (parsedCart.length > 0) {
+              const parts = key.split('_');
+              targetStoreId = parts[2];
+              targetStoreName = parsedCart[0]?.storeName;
+              break;
+            }
+          }
+        } catch (err) {
+          console.error('Error parsing cart:', err);
+        }
+      }
+    }
+  }
+  
+  navigate("/checkout", { 
+    state: { 
+      customerId, 
+      customerName: displayName,
+      storeName: targetStoreName,
+      storeId: targetStoreId
+    } 
+  });
+};
 
   // Handle profile update
   const handleProfileUpdate = async (updates) => {
@@ -658,6 +793,34 @@ const ServiceProviderStoresView = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showFilterDropdown]);
 
+
+  // Update service catalog scroll arrows
+useEffect(() => {
+  const updateScrollArrows = () => {
+    const container = serviceCatalogScrollRef.current;
+    if (!container) return;
+
+    const scrollLeft = Math.round(container.scrollLeft);
+    const scrollWidth = container.scrollWidth;
+    const clientWidth = container.clientWidth;
+    
+    setCanScrollCatalogLeft(scrollLeft > 1);
+    setCanScrollCatalogRight(scrollLeft < scrollWidth - clientWidth - 1);
+  };
+
+  const timer = setTimeout(updateScrollArrows, 200);
+  
+  const container = serviceCatalogScrollRef.current;
+  if (container) {
+    window.addEventListener('resize', updateScrollArrows);
+  }
+  
+  return () => {
+    clearTimeout(timer);
+    window.removeEventListener('resize', updateScrollArrows);
+  };
+}, [serviceCatalogs, selectedCatalog]);
+
   const filteredProviders = providers.filter(provider => {
     const searchLower = searchQuery.toLowerCase();
     const displayName = provider.displayName || '';
@@ -736,21 +899,38 @@ const ServiceProviderStoresView = () => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <PageHeader
-          title="Beyti"
-          withSearch={false}
-          notificationCount={0}
-          userName={displayName}
-          userRole="Customer"
-          userProfile={userProfile}
-          entityId={customerId}
-          userId={userProfileId}
-          onProfileUpdate={handleProfileUpdate}
+        <CustomerHeader
+          pageTitle="Service Providers"
+          showSearch={false}
+          customerName={displayName}
+          customerId={customerId}
+          userProfileId={userProfileId}
+          cart={cart}
+          stores={[]}
+          customerAddresses={[]}
+          onCartClick={handleCartClick}
+          onCustomerClick={() => {
+            // Auto-login with fixed credentials
+            // This mimics what happens when user is already logged in
+            console.log('Auto-login triggered');
+          }}
+          variant="store"
+          currentContext="services"
+          showContextSwitch={true}
         />
+
+        {/* Active Order Banner */}
+        {showOrderBanner && activeOrderCount > 0 && (
+          <ActiveOrderBanner
+            activeOrderCount={activeOrderCount}
+            onTrack={handleTrackOrder}
+            onDismiss={handleDismissBanner}
+          />
+        )}
 
         {/* Main Content Area */}
         <main className="flex-1 overflow-y-auto" style={{ backgroundColor: '#FAF7F2' }}>
-          <div className="max-w-[1440px] mx-auto px-8 py-8">
+         <div className="max-w-[1600px] mx-auto px-8 py-8">
             <div className="flex justify-center">
               <CategoryTabs
                 categories={categories}
@@ -759,14 +939,35 @@ const ServiceProviderStoresView = () => {
               />
             </div>
 
-            <div className="flex gap-4 mt-2">
-              <ServiceCatalogSidebar
-                catalogs={serviceCatalogs}
-                selected={selectedCatalog}
-                onSelect={setSelectedCatalog}
-              />
+            <div className="mt-2">
+              <div className="flex-1 max-w-[1400px] mx-auto">
+                {/* Featured Section - Only show if there are featured providers */}
+                  {(() => {
+                    const hasFeaturedProviders = filteredProviders
+                      .filter(provider => {
+                        const rating = provider.averageRating;
+                        return rating !== null && rating !== undefined && rating > 0;
+                      }).length > 0;
 
-              <div className="flex-1">
+                    return hasFeaturedProviders ? (
+                      <>
+                        <div className="mb-3">
+                          <h2 className="text-2xl font-bold text-charcoal-700" style={{ fontFamily: 'Merriweather, serif' }}>
+                            Top Rated Providers
+                          </h2>
+                        </div>
+                        
+                        <FeaturedCarousel
+                          providers={filteredProviders}
+                          onProviderClick={(id) => navigate(`/service-provider/${id}`)}
+                          services={providerServices}
+                        />
+                      </>
+                    ) : null;
+                  })()}
+                  
+
+                  {/* Search Bar */}
                 <div className="flex gap-4 items-center mb-8">
                   <div className="flex-1 relative">
                     <input
@@ -885,14 +1086,104 @@ const ServiceProviderStoresView = () => {
                         </div>
                       </div>
                     )}
+                    
                   </div>
                 </div>
+                {/* Horizontal Service Catalog Chips */}
+                      {serviceCatalogs.length > 0 && (
+                        <div className="mb-8 relative pl-2">
+                          {/* Left Arrow */}
+                          {canScrollCatalogLeft && (
+                            <button
+                              onClick={() => {
+                                const container = serviceCatalogScrollRef.current;
+                                if (container) {
+                                  container.scrollBy({ left: -300, behavior: 'smooth' });
+                                }
+                              }}
+                              className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.15)] flex items-center justify-center hover:bg-cream-50 transition-all"
+                            >
+                              <svg className="w-5 h-5 text-charcoal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                              </svg>
+                            </button>
+                          )}
 
-                <FeaturedCarousel
-                  providers={filteredProviders}
-                  onProviderClick={(id) => navigate(`/service-provider/${id}`)}
-                  services={providerServices}
-                />
+                          {/* Scrollable Container */}
+                          <div className="relative overflow-hidden px-12">
+                            {canScrollCatalogLeft && (
+                              <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-[#FAF7F2] to-transparent pointer-events-none z-10" />
+                            )}
+                            
+                            {canScrollCatalogRight && (
+                              <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-[#FAF7F2] to-transparent pointer-events-none z-10" />
+                            )}
+
+                            <div 
+                              ref={serviceCatalogScrollRef}
+                              className="overflow-x-auto scrollbar-hide"
+                              onScroll={() => {
+                                const container = serviceCatalogScrollRef.current;
+                                if (!container) return;
+                                const scrollLeft = Math.round(container.scrollLeft);
+                                const scrollWidth = container.scrollWidth;
+                                const clientWidth = container.clientWidth;
+                                setCanScrollCatalogLeft(scrollLeft > 1);
+                                setCanScrollCatalogRight(scrollLeft < scrollWidth - clientWidth - 1);
+                              }}
+                            >
+                              <div className="flex gap-4 pb-2">
+                                {/* All Providers Chip */}
+                                <button
+                                  onClick={() => setSelectedCatalog(null)}
+                                  className={`flex items-center gap-3 px-8 py-4 rounded-full text-base font-semibold transition-all whitespace-nowrap flex-shrink-0 ${
+                                    selectedCatalog === null
+                                      ? 'bg-sage-500 text-white shadow-[0_2px_8px_rgba(85,107,92,0.3)]'
+                                      : 'bg-cream-50 text-sage-500 hover:bg-cream-100 border border-grey-stroke'
+                                  }`}
+                                  style={{ fontFamily: 'Inter, sans-serif' }}
+                                >
+                                  <Storefront size={20} weight="regular" />
+                                  <span>All Providers</span>
+                                </button>
+
+                                {/* Service Catalog Chips */}
+                                  {serviceCatalogs.map(catalog => (
+                                    <button
+                                      key={catalog.id}
+                                      onClick={() => setSelectedCatalog(catalog.id)}
+                                      className={`px-8 py-4 rounded-full text-base font-semibold transition-all whitespace-nowrap flex-shrink-0 ${
+                                        selectedCatalog === catalog.id
+                                          ? 'bg-sage-500 text-white shadow-[0_2px_8px_rgba(85,107,92,0.3)]'
+                                          : 'bg-cream-50 text-sage-500 hover:bg-cream-100 border border-grey-stroke'
+                                      }`}
+                                      style={{ fontFamily: 'Inter, sans-serif' }}
+                                    >
+                                      {catalog.name}
+                                    </button>
+                                  ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Right Arrow */}
+                          {canScrollCatalogRight && (
+                            <button
+                              onClick={() => {
+                                const container = serviceCatalogScrollRef.current;
+                                if (container) {
+                                  container.scrollBy({ left: 300, behavior: 'smooth' });
+                                }
+                              }}
+                              className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.15)] flex items-center justify-center hover:bg-cream-50 transition-all"
+                            >
+                              <svg className="w-5 h-5 text-charcoal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+                      )}
 
                 {loading ? (
                   <div className="flex items-center justify-center py-16">

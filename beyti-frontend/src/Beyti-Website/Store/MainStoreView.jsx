@@ -1325,6 +1325,7 @@ const filteredStores = stores
       />
       
       <CustomerHeader
+        pageTitle="Stores"
         customerName={customerName}
         customerId={customerId}
         userProfileId={userProfileId}
@@ -1334,8 +1335,7 @@ const filteredStores = stores
         onCustomerClick={handleCustomerClick}
         onLogout={handleCustomerLogout}
         variant="store"
-        searchValue={searchQuery}
-        onSearchChange={setSearchQuery}
+        showSearch={false}
         showContextSwitch={true}
         currentContext="stores"
       />
