@@ -95,7 +95,7 @@ const AdminView = () => {
   // ADMIN CREDENTIALS - CONFIGURED HERE
   // ========================================
   // Set the admin credentials directly
-  const userProfileId = 4;  // Admin UserProfileId
+  const userProfileId = 3;  // Admin UserProfileId
   const adminProfileId = 1;  // Admin Id
   const userRole = 'Admin';  // User role type
 

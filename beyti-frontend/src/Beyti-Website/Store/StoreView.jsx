@@ -1101,7 +1101,7 @@ const filteredProducts = (() => {
   return (
     <div className="min-h-screen bg-cream-50">
       <CustomerHeader
-        title={store?.storeName || "Beyti"}
+        pageTitle={store?.storeName || "Store"}
         customerName={customerName}
         customerId={customerId}
         cart={cart}
@@ -1113,6 +1113,8 @@ const filteredProducts = (() => {
         showBackButton={true}
         variant="store"
         showSearch={false}
+        currentContext="stores"
+        showContextSwitch={true}
       />
 
     {/* Active Order Banner */}
