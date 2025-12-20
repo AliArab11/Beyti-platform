@@ -9,6 +9,8 @@ import NotificationsPage from './components/NotificationsPage';
 import ProfilePage from '../../components/ProfilePage';
 import ServiceProviderSidebar from './components/ServiceProviderSidebar';
 import PageHeader from '../../components/PageHeader';
+import Snackbar from '../../components/Snackbar';
+import ConfirmModal from '../../components/ConfirmModal';
 import { getUserProfile, updateUserProfile, updateProviderStatus, getProviderProfile } from '../../services/api';
 import { logProviderActivity } from '../../utils/providerActivityLogger';
 import { isAuthenticated, getUserId, handleSuspensionError } from '../../utils/authUtils';
@@ -28,6 +30,18 @@ export default function ServiceProviderDashboard() {
   const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   const [serviceProviderId, setServiceProviderId] = useState(null);
 
+  // Snackbar state
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', type: 'success' });
+
+  // ConfirmModal state
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    variant: 'danger'
+  });
+
   // Check authentication on mount
   // useEffect(() => {
   //   if (!isAuthenticated()) {
@@ -38,6 +52,16 @@ export default function ServiceProviderDashboard() {
   // Get user ID from localStorage (will be replaced with context in future)
   // const userProfileId = parseInt(getUserId()) || 1;
   const userProfileId = 1; // Hardcoded for testing
+
+  // Auto-close snackbar after 5 seconds
+  useEffect(() => {
+    if (snackbar.open) {
+      const timer = setTimeout(() => {
+        setSnackbar({ ...snackbar, open: false });
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [snackbar.open]);
 
   // Fetch user profile details
   const fetchUserProfile = async () => {
@@ -107,6 +131,11 @@ export default function ServiceProviderDashboard() {
       if (!handleSuspensionError(error, navigate)) {
         // Handle other errors
         console.error('Failed to load profile');
+        setSnackbar({
+          open: true,
+          message: 'Error loading profile. Please try again.',
+          type: 'error'
+        });
       }
     }
   };
@@ -124,10 +153,21 @@ export default function ServiceProviderDashboard() {
         updates.displayName ? `Changed display name to ${updates.displayName}` : 'Updated profile information'
       );
 
+      setSnackbar({
+        open: true,
+        message: 'Profile updated successfully!',
+        type: 'success'
+      });
+
       // Refresh the profile after update
       await fetchUserProfile();
     } catch (error) {
       console.error('Error updating profile:', error);
+      setSnackbar({
+        open: true,
+        message: 'Error updating profile. Please try again.',
+        type: 'error'
+      });
       throw error;
     }
   };
@@ -138,33 +178,63 @@ export default function ServiceProviderDashboard() {
     }
   }, [userProfileId]);
 
-  // Handle status change
+  // Handle status change with confirmation
   const handleStatusChange = async (newStatus) => {
     const previousStatus = providerStatus;
-    console.log(`[handleStatusChange] Changing status from '${previousStatus}' to '${newStatus}'`);
-    setIsUpdatingStatus(true);
-    try {
-      setProviderStatus(newStatus); // Optimistic update
-      const response = await updateProviderStatus(serviceProviderId, newStatus);
-      console.log('[handleStatusChange] Update response:', response);
+    
+    // Get status descriptions
+    const statusDescriptions = {
+      'Available': 'You will be visible to customers and can receive new booking requests',
+      'Busy': 'You will appear as busy to customers but can still receive booking requests',
+      'Unavailable': 'You will not be visible to customers and cannot receive new booking requests'
+    };
 
-      // Log activity for status change
-      logProviderActivity(
-        serviceProviderId,
-        'profile',
-        'Changed Availability Status',
-        `Status updated from ${previousStatus} to ${newStatus}`
-      );
+    setConfirmModal({
+      isOpen: true,
+      title: `Change Status to ${newStatus}`,
+      message: statusDescriptions[newStatus],
+      variant: newStatus === 'Available' ? 'success' : newStatus === 'Busy' ? 'warning' : 'danger',
+      onConfirm: async () => {
+        console.log(`[handleStatusChange] Changing status from '${previousStatus}' to '${newStatus}'`);
+        setIsUpdatingStatus(true);
+        
+        try {
+          setProviderStatus(newStatus); // Optimistic update
+          const response = await updateProviderStatus(serviceProviderId, newStatus);
+          console.log('[handleStatusChange] Update response:', response);
 
-      // Trigger activity refresh by updating the key
-      setActivityRefreshKey(prev => prev + 1);
-    } catch (error) {
-      console.error('Error updating provider status:', error);
-      // Revert on error
-      setProviderStatus(previousStatus);
-    } finally {
-      setIsUpdatingStatus(false);
-    }
+          // Log activity for status change
+          logProviderActivity(
+            serviceProviderId,
+            'profile',
+            'Changed Availability Status',
+            `Status updated from ${previousStatus} to ${newStatus}`
+          );
+
+          setConfirmModal({ ...confirmModal, isOpen: false });
+          setSnackbar({
+            open: true,
+            message: `Status updated to ${newStatus} successfully!`,
+            type: 'success'
+          });
+
+          // Trigger activity refresh by updating the key
+          setActivityRefreshKey(prev => prev + 1);
+        } catch (error) {
+          console.error('Error updating provider status:', error);
+          // Revert on error
+          setProviderStatus(previousStatus);
+          setConfirmModal({ ...confirmModal, isOpen: false });
+          setSnackbar({
+            open: true,
+            message: 'Error updating status. Please try again.',
+            type: 'error'
+          });
+        } finally {
+          setIsUpdatingStatus(false);
+        }
+      }
+    });
   };
 
   // Handler for navigating from dashboard stats to bookings with filter or view mode
@@ -332,6 +402,24 @@ export default function ServiceProviderDashboard() {
           </div>
         </main>
       </div>
+
+      {/* Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        message={snackbar.message}
+        type={snackbar.type}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+      />
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+        onConfirm={confirmModal.onConfirm}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+      />
     </div>
   );
 }

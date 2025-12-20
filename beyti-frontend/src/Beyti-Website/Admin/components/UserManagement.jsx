@@ -34,6 +34,8 @@ import StatusChip from '../../../components/StatusChip';
 import { Table, TableHeader, TableBody, TableRow } from '../../../components/Table';
 import PageHeader from '../../../components/PageHeader';
 import AdminSidebar from './AdminSidebar';
+import Snackbar from '../../../components/Snackbar';
+import ConfirmModal from '../../../components/ConfirmModal';
 
 const UserManagement = ({ onNavigate, adminUserProfileId, renderContentOnly = false }) => {
 
@@ -49,6 +51,18 @@ const UserManagement = ({ onNavigate, adminUserProfileId, renderContentOnly = fa
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [notificationCount] = useState(0);
+
+  // Snackbar state
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', type: 'success' });
+
+  // ConfirmModal state
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    variant: 'danger'
+  });
 
   // Category and Service Category state
   const [categories, setCategories] = useState([]);
@@ -185,13 +199,33 @@ const UserManagement = ({ onNavigate, adminUserProfileId, renderContentOnly = fa
     }
   }, [renderContentOnly]);
 
+  // Auto-close snackbar after 5 seconds
+  useEffect(() => {
+    if (snackbar.open) {
+      const timer = setTimeout(() => {
+        setSnackbar({ ...snackbar, open: false });
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [snackbar.open]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       if (editingId) {
         const result = await updateUser(editingId, formData, adminUserProfileId);
         if (result.message) {
-          alert(`${result.message}\nOld user (${result.oldUser.roleType}) marked as "Role Changed".\nNew user created as ${result.newUser.roleType}.`);
+          setSnackbar({
+            open: true,
+            message: `${result.message}. Old user (${result.oldUser.roleType}) marked as "Role Changed". New user created as ${result.newUser.roleType}.`,
+            type: 'success'
+          });
+        } else {
+          setSnackbar({
+            open: true,
+            message: 'User updated successfully!',
+            type: 'success'
+          });
         }
 
         // Log the admin activity
@@ -213,7 +247,11 @@ const UserManagement = ({ onNavigate, adminUserProfileId, renderContentOnly = fa
           `${formData.displayName} - ${formData.roleType}`
         );
 
-        alert('User created successfully!');
+        setSnackbar({
+          open: true,
+          message: 'User created successfully!',
+          type: 'success'
+        });
       }
       setFormData({ displayName: '', roleType: '', status: 'Active', categoryId: '', serviceCategoryId: '' });
       setShowEditModal(false);
@@ -224,7 +262,11 @@ const UserManagement = ({ onNavigate, adminUserProfileId, renderContentOnly = fa
       console.error('Error saving user:', err);
       // Display the actual error message from the backend
       const errorMessage = err.message || err.error || 'Error saving user. Please try again.';
-      alert(errorMessage);
+      setSnackbar({
+        open: true,
+        message: errorMessage,
+        type: 'error'
+      });
     }
   };
 
@@ -251,25 +293,43 @@ const UserManagement = ({ onNavigate, adminUserProfileId, renderContentOnly = fa
     setSelectedUser(null);
   };
 
-  const handleToggleStatus = async (user) => {
-    if (window.confirm(`Are you sure you want to ${user.status === 'Active' ? 'deactivate' : 'activate'} ${user.displayName}?`)) {
-      try {
-        await toggleUserStatus(user.id, adminUserProfileId);
+  const handleToggleStatus = (user) => {
+    const action = user.status === 'Active' ? 'deactivate' : 'activate';
+    setConfirmModal({
+      isOpen: true,
+      title: `${action.charAt(0).toUpperCase() + action.slice(1)} User`,
+      message: `Are you sure you want to ${action} ${user.displayName}?`,
+      variant: user.status === 'Active' ? 'danger' : 'success',
+      onConfirm: async () => {
+        try {
+          await toggleUserStatus(user.id, adminUserProfileId);
 
-        // Log the admin activity
-        const action = user.status === 'Active' ? 'Deactivated' : 'Activated';
-        logAdminActivity(
-          user.status === 'Active' ? 'suspension' : 'approval',
-          `${action} User Account`,
-          `${user.displayName} - ${user.roleType}`
-        );
+          // Log the admin activity
+          const actionLabel = user.status === 'Active' ? 'Deactivated' : 'Activated';
+          logAdminActivity(
+            user.status === 'Active' ? 'suspension' : 'approval',
+            `${actionLabel} User Account`,
+            `${user.displayName} - ${user.roleType}`
+          );
 
-        fetchUsersList();
-      } catch (err) {
-        console.error('Error toggling status:', err);
-        alert('Error toggling status.');
+          setConfirmModal({ ...confirmModal, isOpen: false });
+          setSnackbar({
+            open: true,
+            message: `User ${actionLabel.toLowerCase()} successfully!`,
+            type: 'success'
+          });
+          fetchUsersList();
+        } catch (err) {
+          console.error('Error toggling status:', err);
+          setConfirmModal({ ...confirmModal, isOpen: false });
+          setSnackbar({
+            open: true,
+            message: 'Error toggling status. Please try again.',
+            type: 'error'
+          });
+        }
       }
-    }
+    });
   };
 
   const handleViewDetails = (user) => {
@@ -514,7 +574,7 @@ const UserManagement = ({ onNavigate, adminUserProfileId, renderContentOnly = fa
 
       {/* Details Modal */}
       {showDetailsModal && selectedUser && (
-        <div className="fixed inset-0 bg-charcoal-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-lg shadow-soft-lift max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="p-6 border-b border-grey-stroke">
@@ -682,7 +742,7 @@ const UserManagement = ({ onNavigate, adminUserProfileId, renderContentOnly = fa
 
       {/* Edit Modal */}
       {showEditModal && selectedUser && (
-        <div className="fixed inset-0 bg-charcoal-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-lg shadow-soft-lift max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="p-6 border-b border-grey-stroke">
@@ -832,7 +892,7 @@ const UserManagement = ({ onNavigate, adminUserProfileId, renderContentOnly = fa
 
       {/* Add User Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-charcoal-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-lg shadow-soft-lift max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="p-6 border-b border-grey-stroke">
@@ -968,6 +1028,24 @@ const UserManagement = ({ onNavigate, adminUserProfileId, renderContentOnly = fa
           </div>
         </div>
       )}
+
+      {/* Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        message={snackbar.message}
+        type={snackbar.type}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+      />
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+        onConfirm={confirmModal.onConfirm}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+      />
       </>
     );
   };
