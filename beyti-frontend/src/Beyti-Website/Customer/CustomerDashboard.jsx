@@ -284,6 +284,7 @@ const CustomerDashboard = () => {
   const [pendingReorderItems, setPendingReorderItems] = useState(null);
   const [showClearCartModal, setShowClearCartModal] = useState(false);
 
+  const [mainTab, setMainTab] = useState('orders'); // Main navigation: orders or services
   const [activeTab, setActiveTab] = useState('all');
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -448,12 +449,12 @@ useEffect(() => {
   loadOrders();
 }, [customerId]); // Removed orders from dependency to prevent infinite loops
 
-// Load history data when on history page
+// Load history data (services and reviews) for the main page
 useEffect(() => {
-  if (customerId && location.pathname.includes("/customer-dashboard/history")) {
+  if (customerId) {
     fetchHistory();
   }
-}, [customerId, location.pathname]);
+}, [customerId]);
 
 
 
@@ -517,11 +518,9 @@ const currentActiveOrder = activeOrders.length > 0 ? activeOrders[activeOrderInd
 
 const getPageTitle = () => {
   if (location.pathname === "/customer-dashboard" || location.pathname === "/customer-dashboard/" || location.pathname.includes("/customer-dashboard/bookings")) {
-    return "My Bookings";
+    return "My History";
   } else if (location.pathname.includes("/customer-dashboard/profile")) {
     return "My Profile";
-  } else if (location.pathname.includes("/customer-dashboard/history")) {
-    return "My History";
   } else if (location.pathname.includes("/customer-dashboard/notifications")) {
     return "Notifications";
   } else {
@@ -1139,14 +1138,6 @@ const historyFilteredData = useMemo(() => {
             onClick={() => navigate("/customer-dashboard")}
             icon={<Icon.CalendarCheck size={20} weight={(location.pathname === "/customer-dashboard" || location.pathname === "/customer-dashboard/" || location.pathname.includes("/bookings")) ? "fill" : "regular"} />}
           >
-            My Bookings
-          </NavigationButton>
-
-          <NavigationButton
-            selected={location.pathname.includes("/customer-dashboard/history")}
-            onClick={() => navigate("/customer-dashboard/history")}
-            icon={<Icon.Scroll size={20} weight={location.pathname.includes("/customer-dashboard/history") ? "fill" : "regular"} />}
-          >
             My History
           </NavigationButton>
 
@@ -1287,7 +1278,6 @@ const historyFilteredData = useMemo(() => {
            {customerId && !loading && !error && (
             <>
               {!location.pathname.includes("/customer-dashboard/profile") &&
-               !location.pathname.includes("/customer-dashboard/history") &&
                !location.pathname.includes("/customer-dashboard/notifications") && (
                 <>
                   {/* Active Orders Carousel */}
@@ -1397,134 +1387,542 @@ const historyFilteredData = useMemo(() => {
                     </section>
                     )}
 
-                    {/* Order Tabs */}
-                      <section className="mb-8">
-                        <div className="flex gap-2 mb-6 border-b border-grey-stroke">
-                          {[
-                            { id: 'all', label: 'All Orders', count: orders.length },
-                            { id: 'active', label: 'Active', count: activeOrders.length },
-                            { id: 'completed', label: 'Completed', count: completedOrders.length },
-                            { id: 'cancelled', label: 'Cancelled', count: cancelledOrders.length }
-                          ].map(tab => (
-                            <button
-                              key={tab.id}
-                              onClick={() => setActiveTab(tab.id)}
-                              className={`px-6 py-3 font-semibold transition-all relative ${
-                                activeTab === tab.id
-                                  ? 'text-sage-600'
-                                  : 'text-charcoal-400 hover:text-charcoal-600'
-                              }`}
-                            >
-                              {tab.label}
-                              {tab.count > 0 && (
-                                <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
-                                  activeTab === tab.id
-                                    ? 'bg-sage-500 text-white'
-                                    : 'bg-grey-200 text-charcoal-600'
-                                }`}>
-                                  {tab.count}
-                                </span>
-                              )}
-                              {activeTab === tab.id && (
-                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-sage-500" />
-                              )}
-                            </button>
-                          ))}
-                        </div>
-
-
-                        {/* Simple Filters */}
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className="flex-1 relative">
-                            <Icon.MagnifyingGlass 
-                              size={18} 
-                              className="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal-400"
-                            />
-                            <input
-                              type="text"
-                              value={searchQuery}
-                              onChange={(e) => setSearchQuery(e.target.value)}
-                              placeholder="Search orders..."
-                              className="w-full pl-10 pr-4 py-2 text-sm border border-grey-stroke rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500"
-                            />
-                          </div>
-                          
-                          <select
-                            value={sortBy}
-                            onChange={(e) => setSortBy(e.target.value)}
-                            className="px-3 py-2 text-sm border border-grey-stroke rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500 bg-white"
-                          >
-                            <option value="date-desc">Newest</option>
-                            <option value="date-asc">Oldest</option>
-                            <option value="amount-desc">Highest $</option>
-                            <option value="amount-asc">Lowest $</option>
-                          </select>
-                          <select
-                            value={fulfillmentFilter}
-                            onChange={(e) => setFulfillmentFilter(e.target.value)}
-                            className="px-3 py-2 text-sm border border-grey-stroke rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500 bg-white"
-                          >
-                            <option value="all">All Types</option>
-                            <option value="delivery">Delivery</option>
-                            <option value="pickup">Pickup</option>
-                          </select>
-                          
-                          <span className="text-sm text-charcoal-500 whitespace-nowrap">
-                            {displayedOrders.length} {displayedOrders.length === 1 ? 'order' : 'orders'}
-                          </span>
-                        </div>
-
-                        {/* Orders Display */}
-                      <div>
-                        {displayedOrders.length === 0 ? (
-                         <div className="text-center py-12 bg-white rounded-xl border border-grey-stroke shadow-sm">
-                            <Icon.Package size={48} className="mx-auto text-charcoal-300 mb-3" />
-                            <p className="text-body-regular text-charcoal-400 mb-4">
-                              No {activeTab !== 'all' ? activeTab : ''} orders yet
-                            </p>
-                            <button
-                              onClick={() => navigate('/mainStore', { state: { customerId, customerName } })}
-                              className="bg-sage-500 hover:bg-sage-600 text-white px-6 py-2 rounded-lg font-semibold transition-all"
-                            >
-                              Start Shopping
-                            </button>
-                          </div>
-                          
-                        ) : (
-                          <div className="bg-white rounded-xl border border-grey-stroke shadow-sm overflow-hidden">
-                           <Table>
-                            <TableHeader columns={["Order #", "Store", "Status", "Total", "Date", "Action"]} />
-                            <TableBody>
-                              {displayedOrders.map((order) => (
-                                <TableRow
-                                  key={order.id}
-                                  data={[
-                                    `#${order.id}`,
-                                    order.sellerName || "—",
-                                    <StatusChip variant={getStatusVariant(order.status)}>
-                                      {order.status || "Unknown"}
-                                    </StatusChip>,
-                                    formatCurrency(order.totalAmount || 0),
-                                    formatDate(order.createdAt),
-                                  ]}
-                                  actions={
-                                    <CRUDButton variant="neutral" onClick={() => openOrderModal(order)}>
-                                      View Details
-                                    </CRUDButton>
-                                  }
-                                />
-                              ))}
-                            </TableBody>
-                          </Table>
-                          </div>
-                        )}
+                    {/* Main Navigation Tabs - Orders / Services */}
+                    <section className="mb-8">
+                      <div className="flex gap-2 border-b-2 border-grey-stroke">
+                        <button
+                          onClick={() => setMainTab('orders')}
+                          className={`px-8 py-4 font-bold text-lg transition-all relative ${
+                            mainTab === 'orders'
+                              ? 'text-sage-600'
+                              : 'text-charcoal-400 hover:text-charcoal-600'
+                          }`}
+                        >
+                          Orders
+                          {mainTab === 'orders' && (
+                            <div className="absolute bottom-0 left-0 right-0 h-1 bg-sage-500 rounded-t-lg" />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => setMainTab('services')}
+                          className={`px-8 py-4 font-bold text-lg transition-all relative ${
+                            mainTab === 'services'
+                              ? 'text-sage-600'
+                              : 'text-charcoal-400 hover:text-charcoal-600'
+                          }`}
+                        >
+                          Services
+                          {mainTab === 'services' && (
+                            <div className="absolute bottom-0 left-0 right-0 h-1 bg-sage-500 rounded-t-lg" />
+                          )}
+                        </button>
                       </div>
+                    </section>
+
+                    {/* Orders Section */}
+                    {mainTab === 'orders' && (
+                      <section className="mb-8">
+                        <div className="bg-cream-50 dark:bg-charcoal-600 border border-grey-stroke dark:border-charcoal-400 rounded-lg overflow-hidden">
+                          <div className="bg-sage-100 dark:bg-sage-900/30 p-4 border-b border-grey-stroke dark:border-charcoal-400">
+                            <h3 className="text-card-h3 text-charcoal-600 dark:text-white font-semibold flex items-center gap-2">
+                              <Icon.Package size={24} className="text-sage-600 dark:text-sage-400" weight="fill" />
+                              Orders
+                            </h3>
+                            <p className="text-body-small text-charcoal-400 dark:text-charcoal-300 mt-1">
+                              Your product orders and purchases
+                            </p>
+                          </div>
+
+                          {/* Filters */}
+                          <div className="p-4 border-b border-grey-stroke dark:border-charcoal-400 bg-white dark:bg-charcoal-500">
+                            <div className="flex items-center gap-3 flex-wrap">
+                              <div className="flex-1 min-w-[200px] relative">
+                                <Icon.MagnifyingGlass
+                                  size={18}
+                                  className="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal-400"
+                                />
+                                <input
+                                  type="text"
+                                  value={searchQuery}
+                                  onChange={(e) => setSearchQuery(e.target.value)}
+                                  placeholder="Search orders..."
+                                  className="w-full pl-10 pr-4 py-2 text-sm border border-grey-stroke rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500"
+                                />
+                              </div>
+
+                              <select
+                                value={activeTab}
+                                onChange={(e) => setActiveTab(e.target.value)}
+                                className="px-3 py-2 text-sm border border-grey-stroke rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500 bg-white"
+                              >
+                                <option value="all">All Orders ({orders.length})</option>
+                                <option value="active">Active ({activeOrders.length})</option>
+                                <option value="completed">Completed ({completedOrders.length})</option>
+                                <option value="cancelled">Cancelled ({cancelledOrders.length})</option>
+                              </select>
+
+                              <select
+                                value={sortBy}
+                                onChange={(e) => setSortBy(e.target.value)}
+                                className="px-3 py-2 text-sm border border-grey-stroke rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500 bg-white"
+                              >
+                                <option value="date-desc">Newest</option>
+                                <option value="date-asc">Oldest</option>
+                                <option value="amount-desc">Highest $</option>
+                                <option value="amount-asc">Lowest $</option>
+                              </select>
+
+                              <select
+                                value={fulfillmentFilter}
+                                onChange={(e) => setFulfillmentFilter(e.target.value)}
+                                className="px-3 py-2 text-sm border border-grey-stroke rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500 bg-white"
+                              >
+                                <option value="all">All Types</option>
+                                <option value="delivery">Delivery</option>
+                                <option value="pickup">Pickup</option>
+                              </select>
+
+                              <span className="text-sm text-charcoal-500 dark:text-charcoal-300 whitespace-nowrap">
+                                {displayedOrders.length} {displayedOrders.length === 1 ? 'order' : 'orders'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Orders Display */}
+                          {displayedOrders.length === 0 ? (
+                            <div className="p-12 text-center text-charcoal-400 dark:text-charcoal-300">
+                              <Icon.Package size={48} className="mx-auto text-charcoal-300 mb-3" />
+                              <p className="text-body-regular mb-4">
+                                No {activeTab !== 'all' ? activeTab : ''} orders yet
+                              </p>
+                              <button
+                                onClick={() => navigate('/mainStore', { state: { customerId, customerName } })}
+                                className="bg-sage-500 hover:bg-sage-600 text-white px-6 py-2 rounded-lg font-semibold transition-all"
+                              >
+                                Start Shopping
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="overflow-x-auto">
+                              <table className="w-full">
+                                <thead>
+                                  <tr className="bg-grey-100 dark:bg-charcoal-500 border-b border-grey-stroke dark:border-charcoal-400">
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Order #</th>
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Store</th>
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Status</th>
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Total</th>
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Date</th>
+                                    <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Action</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-grey-stroke dark:divide-charcoal-400">
+                                  {displayedOrders.map((order) => (
+                                    <tr key={order.id} className="hover:bg-cream-100 dark:hover:bg-charcoal-500 transition-colors">
+                                      <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50 font-semibold">
+                                        #{order.id}
+                                      </td>
+                                      <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50">
+                                        {order.sellerName || "—"}
+                                      </td>
+                                      <td className="p-4">
+                                        <StatusChip variant={getStatusVariant(order.status)}>
+                                          {order.status || "Unknown"}
+                                        </StatusChip>
+                                      </td>
+                                      <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50">
+                                        {formatCurrency(order.totalAmount || 0)}
+                                      </td>
+                                      <td className="p-4 text-body-small text-charcoal-600 dark:text-cream-50">
+                                        {formatDate(order.createdAt)}
+                                      </td>
+                                      <td className="p-4 text-center">
+                                        <button
+                                          onClick={() => openOrderModal(order)}
+                                          className="px-4 py-2 bg-sage-500 hover:bg-sage-600 dark:bg-sage-700 dark:hover:bg-sage-600 text-cream-50 rounded-md text-body-small transition-colors"
+                                        >
+                                          View Details
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
                       </section>
-                   
+                      )}
+
+                      {/* Service Bookings Section */}
+                      {mainTab === 'services' && (
+                      <>
+                      <section className="mb-8">
+                        <div className="bg-cream-50 dark:bg-charcoal-600 border border-grey-stroke dark:border-charcoal-400 rounded-lg overflow-hidden">
+                          <div className="bg-sage-100 dark:bg-sage-900/30 p-4 border-b border-grey-stroke dark:border-charcoal-400">
+                            <h3 className="text-card-h3 text-charcoal-600 dark:text-white font-semibold flex items-center gap-2">
+                              <ScissorsIcon size={24} className="text-sage-600 dark:text-sage-400" weight="fill" />
+                              Service Bookings
+                            </h3>
+                            <p className="text-body-small text-charcoal-400 dark:text-charcoal-300 mt-1">
+                              Your service appointments and bookings
+                            </p>
+                          </div>
+                          {historyMetrics && historyMetrics.inProgressBookings && historyMetrics.inProgressBookings.length > 0 && (
+                            <div className="p-4 space-y-4">
+                              {historyMetrics.inProgressBookings.map((booking) => {
+                                const getCheckpointStatus = (checkpointName) => {
+                                  const statusOrder = ['Pending', 'PendingQuote', 'DepositPending', 'Confirmed', 'InProgress'];
+                                  const currentIndex = statusOrder.indexOf(booking.status);
+                                  const checkpointIndex = statusOrder.indexOf(checkpointName);
+                                  if (currentIndex >= checkpointIndex) return 'completed';
+                                  return 'pending';
+                                };
+
+                                return (
+                                  <div
+                                    key={booking.id}
+                                    className="bg-grey-100 dark:bg-charcoal-500 border border-grey-stroke dark:border-charcoal-400 rounded-lg p-6 hover:shadow-md transition-shadow"
+                                  >
+                                    {/* Service Header */}
+                                    <div className="flex items-start justify-between gap-4 mb-4">
+                                      <div className="flex-1">
+                                        <h4 className="text-body-medium text-charcoal-600 dark:text-white font-semibold mb-1">
+                                          {booking.serviceName || 'Service'}
+                                        </h4>
+                                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-body-small text-charcoal-400 dark:text-charcoal-300">
+                                          <span><span className="font-medium">Provider:</span> {booking.businessName || booking.providerName || 'N/A'}</span>
+                                          <span><span className="font-medium">Date:</span> {formatDate(booking.serviceDate)}</span>
+                                          <span><span className="font-medium">Booking ID:</span> #{booking.id}</span>
+                                        </div>
+                                      </div>
+                                      <button
+                                        onClick={() => handleViewBooking(booking)}
+                                        className="px-4 py-2 bg-sage-500 hover:bg-sage-600 dark:bg-sage-700 dark:hover:bg-sage-600 text-cream-50 rounded-md text-body-small transition-colors flex-shrink-0"
+                                      >
+                                        View Details
+                                      </button>
+                                    </div>
+
+                                    {/* Checkpoint Timeline */}
+                                    <div className="relative">
+                                      <div className="flex items-center justify-between">
+                                        {/* Checkpoint 1: Pending */}
+                                        <div className="flex flex-col items-center flex-1">
+                                          <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${
+                                            getCheckpointStatus('Pending') === 'completed'
+                                              ? 'bg-sage-500 border-sage-500'
+                                              : 'bg-grey-200 dark:bg-charcoal-600 border-grey-stroke dark:border-charcoal-400'
+                                          }`}>
+                                            {getCheckpointStatus('Pending') === 'completed' ? (
+                                              <CheckCircle size={20} className="text-white" weight="fill" />
+                                            ) : (
+                                              <Circle size={20} className="text-charcoal-400 dark:text-charcoal-300" weight="regular" />
+                                            )}
+                                          </div>
+                                          <div className="mt-2 text-center">
+                                            <p className={`text-label-small font-medium ${
+                                              getCheckpointStatus('Pending') === 'completed'
+                                                ? 'text-sage-600 dark:text-sage-400'
+                                                : 'text-charcoal-400 dark:text-charcoal-300'
+                                            }`}>
+                                              Pending
+                                            </p>
+                                            <p className="text-label-small text-charcoal-400 dark:text-charcoal-300">
+                                              Awaiting Confirmation
+                                            </p>
+                                          </div>
+                                        </div>
+
+                                        {/* Connection Line 1 */}
+                                        <div className={`flex-1 h-0.5 mx-2 -mt-12 ${
+                                          getCheckpointStatus('Confirmed') === 'completed'
+                                            ? 'bg-sage-500'
+                                            : 'bg-grey-stroke dark:bg-charcoal-400'
+                                        }`} />
+
+                                        {/* Checkpoint 2: Confirmed */}
+                                        <div className="flex flex-col items-center flex-1">
+                                          <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${
+                                            getCheckpointStatus('Confirmed') === 'completed'
+                                              ? 'bg-sage-500 border-sage-500'
+                                              : 'bg-grey-200 dark:bg-charcoal-600 border-grey-stroke dark:border-charcoal-400'
+                                          }`}>
+                                            {getCheckpointStatus('Confirmed') === 'completed' ? (
+                                              <CheckCircle size={20} className="text-white" weight="fill" />
+                                            ) : (
+                                              <Circle size={20} className="text-charcoal-400 dark:text-charcoal-300" weight="regular" />
+                                            )}
+                                          </div>
+                                          <div className="mt-2 text-center">
+                                            <p className={`text-label-small font-medium ${
+                                              getCheckpointStatus('Confirmed') === 'completed'
+                                                ? 'text-sage-600 dark:text-sage-400'
+                                                : 'text-charcoal-400 dark:text-charcoal-300'
+                                            }`}>
+                                              Confirmed
+                                            </p>
+                                            <p className="text-label-small text-charcoal-400 dark:text-charcoal-300">
+                                              Booking Approved
+                                            </p>
+                                          </div>
+                                        </div>
+
+                                        {/* Connection Line 2 */}
+                                        <div className={`flex-1 h-0.5 mx-2 -mt-12 ${
+                                          getCheckpointStatus('InProgress') === 'completed'
+                                            ? 'bg-sage-500'
+                                            : 'bg-grey-stroke dark:bg-charcoal-400'
+                                        }`} />
+
+                                        {/* Checkpoint 3: In Progress */}
+                                        <div className="flex flex-col items-center flex-1">
+                                          <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${
+                                            getCheckpointStatus('InProgress') === 'completed'
+                                              ? 'bg-sage-500 border-sage-500'
+                                              : 'bg-grey-200 dark:bg-charcoal-600 border-grey-stroke dark:border-charcoal-400'
+                                          }`}>
+                                            {getCheckpointStatus('InProgress') === 'completed' ? (
+                                              <CheckCircle size={20} className="text-white" weight="fill" />
+                                            ) : (
+                                              <Circle size={20} className="text-charcoal-400 dark:text-charcoal-300" weight="regular" />
+                                            )}
+                                          </div>
+                                          <div className="mt-2 text-center">
+                                            <p className={`text-label-small font-medium ${
+                                              getCheckpointStatus('InProgress') === 'completed'
+                                                ? 'text-sage-600 dark:text-sage-400'
+                                                : 'text-charcoal-400 dark:text-charcoal-300'
+                                            }`}>
+                                              In Progress
+                                            </p>
+                                            <p className="text-label-small text-charcoal-400 dark:text-charcoal-300">
+                                              Service Started
+                                            </p>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {/* Current Status Badge */}
+                                      <div className="mt-4 flex items-center justify-center">
+                                        <div className="flex items-center gap-2 px-4 py-2 bg-cream-50 dark:bg-charcoal-600 rounded-full border border-grey-stroke dark:border-charcoal-400">
+                                          <span className="text-label-small text-charcoal-400 dark:text-charcoal-300">Current Status:</span>
+                                          <StatusChip variant={getBookingStatusVariant(booking.status)}>
+                                            {booking.status}
+                                          </StatusChip>
+                                        </div>
+                                      </div>
+
+                                      {/* Timer and Cancel for Pending Bookings */}
+                                      {booking.status === 'Pending' && booking.createdAt && (
+                                        <div className="mt-4 flex flex-col items-center gap-3">
+                                          <BookingTimer
+                                            createdAt={booking.createdAt}
+                                            durationMinutes={1}
+                                            onExpire={() => handleTimerExpire(booking.id)}
+                                          />
+                                          <button
+                                            onClick={() => handleCancelBookingClick(booking)}
+                                            disabled={cancellingBookingId === booking.id}
+                                            className="px-6 py-2 bg-error-bg hover:bg-error-hover text-error-text border-2 border-error-border rounded-lg text-body-small font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                          >
+                                            {cancellingBookingId === booking.id ? 'Cancelling...' : 'Cancel Booking'}
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                          {historyFilteredData && historyFilteredData.bookings && historyFilteredData.bookings.length > 0 ? (
+                            <div className="overflow-x-auto">
+                              <table className="w-full">
+                                <thead>
+                                  <tr className="bg-grey-100 dark:bg-charcoal-500 border-b border-grey-stroke dark:border-charcoal-400">
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Booking ID</th>
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Service Date & Time</th>
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Provider</th>
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Service</th>
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Type</th>
+                                    <th className="text-right p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Price</th>
+                                    <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Status</th>
+                                    <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Timer</th>
+                                    <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Actions</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-grey-stroke dark:divide-charcoal-400">
+                                  {historyFilteredData.bookings.map((booking) => (
+                                    <tr key={booking.id} className="hover:bg-cream-100 dark:hover:bg-charcoal-500 transition-colors">
+                                      <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50 font-semibold">
+                                        #{booking.id}
+                                      </td>
+                                      <td className="p-4 text-body-small text-charcoal-600 dark:text-cream-50">
+                                        <div>{formatDate(booking.serviceDate)}</div>
+                                        <div className="text-charcoal-400 dark:text-charcoal-300">{booking.serviceTime || 'Time TBD'}</div>
+                                      </td>
+                                      <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50">
+                                        {booking.businessName || booking.providerName || 'N/A'}
+                                      </td>
+                                      <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50">
+                                        {booking.serviceName || 'N/A'}
+                                      </td>
+                                      <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50">
+                                        {booking.serviceType || 'N/A'}
+                                      </td>
+                                      <td className="p-4 text-body-small text-charcoal-600 dark:text-cream-50 text-right">
+                                        {booking.finalPrice != null ? (
+                                          <div>
+                                            <div className="font-semibold">{formatCurrency(booking.finalPrice)}</div>
+                                            <div className="text-charcoal-400 dark:text-charcoal-300">Paid</div>
+                                          </div>
+                                        ) : booking.quotedPrice != null ? (
+                                          <div>
+                                            <div className="font-semibold">{formatCurrency(booking.quotedPrice)}</div>
+                                            <div className="text-charcoal-400 dark:text-charcoal-300">Quoted</div>
+                                          </div>
+                                        ) : (
+                                          'Pending'
+                                        )}
+                                      </td>
+                                      <td className="p-4 text-center">
+                                        <StatusChip variant={getBookingStatusVariant(booking.status)}>
+                                          {booking.status}
+                                        </StatusChip>
+                                      </td>
+                                      <td className="p-4 text-center">
+                                        {booking.status === 'Pending' && booking.createdAt && (
+                                          <BookingTimer
+                                            createdAt={booking.createdAt}
+                                            durationMinutes={1}
+                                            onExpire={() => handleTimerExpire(booking.id)}
+                                            compact={true}
+                                          />
+                                        )}
+                                        {booking.status !== 'Pending' && (
+                                          <span className="text-charcoal-400 dark:text-charcoal-300 text-label-small">—</span>
+                                        )}
+                                      </td>
+                                      <td className="p-4 text-center">
+                                        <div className="flex items-center justify-center gap-2">
+                                          <button
+                                            onClick={() => handleViewBooking(booking)}
+                                            className="px-4 py-2 bg-sage-500 hover:bg-sage-600 dark:bg-sage-700 dark:hover:bg-sage-600 text-cream-50 rounded-md text-body-small transition-colors"
+                                          >
+                                            View
+                                          </button>
+                                          {booking.status === 'Pending' && (
+                                            <button
+                                              onClick={() => handleCancelBookingClick(booking)}
+                                              disabled={cancellingBookingId === booking.id}
+                                              className="px-4 py-2 bg-error-bg hover:bg-error-hover text-error-text border border-error-border rounded-md text-body-small transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                              {cancellingBookingId === booking.id ? 'Cancelling...' : 'Cancel'}
+                                            </button>
+                                          )}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          ) : (
+                            <div className="p-12 text-center text-charcoal-400 dark:text-charcoal-300">
+                              No service bookings found
+                            </div>
+                          )}
+                        </div>
+                      </section>
+
+                      {/* Service Reviews Section */}
+                      <section className="mb-8">
+                        <div className="bg-cream-50 dark:bg-charcoal-600 border border-grey-stroke dark:border-charcoal-400 rounded-lg overflow-hidden">
+                          <div className="bg-sage-100 dark:bg-sage-900/30 p-4 border-b border-grey-stroke dark:border-charcoal-400">
+                            <h3 className="text-card-h3 text-charcoal-600 dark:text-white font-semibold flex items-center gap-2">
+                              <ChatCircleTextIcon size={24} className="text-sage-600 dark:text-sage-400" weight="fill" />
+                              My Service Reviews
+                            </h3>
+                            <p className="text-body-small text-charcoal-400 dark:text-charcoal-300 mt-1">
+                              Reviews you've submitted for service providers
+                            </p>
+                          </div>
+                          {serviceReviews && serviceReviews.length > 0 ? (
+                            <div className="overflow-x-auto">
+                              <table className="w-full">
+                                <thead>
+                                  <tr className="bg-grey-100 dark:bg-charcoal-500 border-b border-grey-stroke dark:border-charcoal-400">
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Review ID</th>
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Date</th>
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Service Provider</th>
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Service</th>
+                                    <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Overall Rating</th>
+                                    <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Quality</th>
+                                    <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Professionalism</th>
+                                    <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Timeliness</th>
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Comment</th>
+                                    <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Provider Response</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-grey-stroke dark:divide-charcoal-400">
+                                  {serviceReviews.map((review) => (
+                                    <tr key={review.id} className="hover:bg-cream-100 dark:hover:bg-charcoal-500 transition-colors">
+                                      <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50 font-semibold">
+                                        #{review.id}
+                                      </td>
+                                      <td className="p-4 text-body-small text-charcoal-600 dark:text-cream-50">
+                                        {formatDate(review.createdAt)}
+                                      </td>
+                                      <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50">
+                                        {review.providerName || review.businessName || 'N/A'}
+                                      </td>
+                                      <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50">
+                                        {review.serviceName || 'N/A'}
+                                      </td>
+                                      <td className="p-4 text-center">
+                                        <div className="flex items-center justify-center gap-1">
+                                          <span className="text-sage-600 dark:text-sage-400 font-semibold">{review.overallRating}</span>
+                                          <span className="text-charcoal-400 dark:text-charcoal-300">/5</span>
+                                        </div>
+                                      </td>
+                                      <td className="p-4 text-center text-body-small text-charcoal-600 dark:text-cream-50">
+                                        {review.qualityRating ? `${review.qualityRating}/5` : '—'}
+                                      </td>
+                                      <td className="p-4 text-center text-body-small text-charcoal-600 dark:text-cream-50">
+                                        {review.professionalismRating ? `${review.professionalismRating}/5` : '—'}
+                                      </td>
+                                      <td className="p-4 text-center text-body-small text-charcoal-600 dark:text-cream-50">
+                                        {review.timelinessRating ? `${review.timelinessRating}/5` : '—'}
+                                      </td>
+                                      <td className="p-4 text-body-small text-charcoal-600 dark:text-cream-50 max-w-xs">
+                                        <div className="truncate" title={review.comment}>
+                                          {review.comment || 'No comment'}
+                                        </div>
+                                      </td>
+                                      <td className="p-4 text-body-small text-charcoal-600 dark:text-cream-50 max-w-xs">
+                                        <div className="truncate" title={review.providerResponse}>
+                                          {review.providerResponse || 'No response yet'}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          ) : (
+                            <div className="p-12 text-center text-charcoal-400 dark:text-charcoal-300">
+                              No reviews found. Complete a service booking to leave a review!
+                            </div>
+                          )}
+                        </div>
+                      </section>
+                      </>
+                      )}
                </>
               )}
+
             </>
-          )}
+            )}
             {location.pathname.includes("/customer-dashboard/profile") && (
             <ProfilePage
               userProfile={{
@@ -1559,595 +1957,6 @@ const historyFilteredData = useMemo(() => {
               }}
               readOnly={false}
             />
-          )}
-
-          {/* History Section */}
-          {location.pathname.includes("/customer-dashboard/history") && (
-            <div className="space-y-6">
-              {/* Service Tracking - Show services in progress until Completed or Rejected */}
-              {historyMetrics && historyMetrics.inProgressBookings && historyMetrics.inProgressBookings.length > 0 && (
-                <div className="bg-cream-50 dark:bg-charcoal-600 border border-grey-stroke dark:border-charcoal-400 rounded-lg overflow-hidden">
-                  <div className="bg-sage-100 dark:bg-sage-900/30 p-4 border-b border-grey-stroke dark:border-charcoal-400">
-                    <h3 className="text-card-h3 text-charcoal-600 dark:text-white font-semibold flex items-center gap-2">
-                      <CalendarCheck size={24} className="text-sage-600 dark:text-sage-400" weight="fill" />
-                      Services In Progress ({historyMetrics.inProgressBookings.length})
-                    </h3>
-                    <p className="text-body-small text-charcoal-400 dark:text-charcoal-300 mt-1">
-                      Track your service bookings until they are completed or rejected
-                    </p>
-                  </div>
-
-                  <div className="p-4 space-y-4">
-                    {historyMetrics.inProgressBookings.map((booking) => {
-                      const getCheckpointStatus = (checkpointName) => {
-                        const statusOrder = ['Pending', 'PendingQuote', 'DepositPending', 'Confirmed', 'InProgress'];
-                        const currentIndex = statusOrder.indexOf(booking.status);
-                        const checkpointIndex = statusOrder.indexOf(checkpointName);
-                        if (currentIndex >= checkpointIndex) return 'completed';
-                        return 'pending';
-                      };
-
-                      return (
-                        <div
-                          key={booking.id}
-                          className="bg-grey-100 dark:bg-charcoal-500 border border-grey-stroke dark:border-charcoal-400 rounded-lg p-6 hover:shadow-md transition-shadow"
-                        >
-                          {/* Service Header */}
-                          <div className="flex items-start justify-between gap-4 mb-4">
-                            <div className="flex-1">
-                              <h4 className="text-body-medium text-charcoal-600 dark:text-white font-semibold mb-1">
-                                {booking.serviceName || 'Service'}
-                              </h4>
-                              <div className="flex flex-wrap gap-x-4 gap-y-1 text-body-small text-charcoal-400 dark:text-charcoal-300">
-                                <span><span className="font-medium">Provider:</span> {booking.businessName || booking.providerName || 'N/A'}</span>
-                                <span><span className="font-medium">Date:</span> {formatDate(booking.serviceDate)}</span>
-                                <span><span className="font-medium">Booking ID:</span> #{booking.id}</span>
-                              </div>
-                            </div>
-                            <button
-                              onClick={() => handleViewBooking(booking)}
-                              className="px-4 py-2 bg-sage-500 hover:bg-sage-600 dark:bg-sage-700 dark:hover:bg-sage-600 text-cream-50 rounded-md text-body-small transition-colors flex-shrink-0"
-                            >
-                              View Details
-                            </button>
-                          </div>
-
-                          {/* Checkpoint Timeline */}
-                          <div className="relative">
-                            <div className="flex items-center justify-between">
-                              {/* Checkpoint 1: Pending */}
-                              <div className="flex flex-col items-center flex-1">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${
-                                  getCheckpointStatus('Pending') === 'completed'
-                                    ? 'bg-sage-500 border-sage-500'
-                                    : 'bg-grey-200 dark:bg-charcoal-600 border-grey-stroke dark:border-charcoal-400'
-                                }`}>
-                                  {getCheckpointStatus('Pending') === 'completed' ? (
-                                    <CheckCircle size={20} className="text-white" weight="fill" />
-                                  ) : (
-                                    <Circle size={20} className="text-charcoal-400 dark:text-charcoal-300" weight="regular" />
-                                  )}
-                                </div>
-                                <div className="mt-2 text-center">
-                                  <p className={`text-label-small font-medium ${
-                                    getCheckpointStatus('Pending') === 'completed'
-                                      ? 'text-sage-600 dark:text-sage-400'
-                                      : 'text-charcoal-400 dark:text-charcoal-300'
-                                  }`}>
-                                    Pending
-                                  </p>
-                                  <p className="text-label-small text-charcoal-400 dark:text-charcoal-300">
-                                    Awaiting Confirmation
-                                  </p>
-                                </div>
-                              </div>
-
-                              {/* Connection Line 1 */}
-                              <div className={`flex-1 h-0.5 mx-2 -mt-12 ${
-                                getCheckpointStatus('Confirmed') === 'completed'
-                                  ? 'bg-sage-500'
-                                  : 'bg-grey-stroke dark:bg-charcoal-400'
-                              }`} />
-
-                              {/* Checkpoint 2: Confirmed */}
-                              <div className="flex flex-col items-center flex-1">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${
-                                  getCheckpointStatus('Confirmed') === 'completed'
-                                    ? 'bg-sage-500 border-sage-500'
-                                    : 'bg-grey-200 dark:bg-charcoal-600 border-grey-stroke dark:border-charcoal-400'
-                                }`}>
-                                  {getCheckpointStatus('Confirmed') === 'completed' ? (
-                                    <CheckCircle size={20} className="text-white" weight="fill" />
-                                  ) : (
-                                    <Circle size={20} className="text-charcoal-400 dark:text-charcoal-300" weight="regular" />
-                                  )}
-                                </div>
-                                <div className="mt-2 text-center">
-                                  <p className={`text-label-small font-medium ${
-                                    getCheckpointStatus('Confirmed') === 'completed'
-                                      ? 'text-sage-600 dark:text-sage-400'
-                                      : 'text-charcoal-400 dark:text-charcoal-300'
-                                  }`}>
-                                    Confirmed
-                                  </p>
-                                  <p className="text-label-small text-charcoal-400 dark:text-charcoal-300">
-                                    Booking Approved
-                                  </p>
-                                </div>
-                              </div>
-
-                              {/* Connection Line 2 */}
-                              <div className={`flex-1 h-0.5 mx-2 -mt-12 ${
-                                getCheckpointStatus('InProgress') === 'completed'
-                                  ? 'bg-sage-500'
-                                  : 'bg-grey-stroke dark:bg-charcoal-400'
-                              }`} />
-
-                              {/* Checkpoint 3: In Progress */}
-                              <div className="flex flex-col items-center flex-1">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${
-                                  getCheckpointStatus('InProgress') === 'completed'
-                                    ? 'bg-sage-500 border-sage-500'
-                                    : 'bg-grey-200 dark:bg-charcoal-600 border-grey-stroke dark:border-charcoal-400'
-                                }`}>
-                                  {getCheckpointStatus('InProgress') === 'completed' ? (
-                                    <CheckCircle size={20} className="text-white" weight="fill" />
-                                  ) : (
-                                    <Circle size={20} className="text-charcoal-400 dark:text-charcoal-300" weight="regular" />
-                                  )}
-                                </div>
-                                <div className="mt-2 text-center">
-                                  <p className={`text-label-small font-medium ${
-                                    getCheckpointStatus('InProgress') === 'completed'
-                                      ? 'text-sage-600 dark:text-sage-400'
-                                      : 'text-charcoal-400 dark:text-charcoal-300'
-                                  }`}>
-                                    In Progress
-                                  </p>
-                                  <p className="text-label-small text-charcoal-400 dark:text-charcoal-300">
-                                    Service Started
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Current Status Badge */}
-                            <div className="mt-4 flex items-center justify-center">
-                              <div className="flex items-center gap-2 px-4 py-2 bg-cream-50 dark:bg-charcoal-600 rounded-full border border-grey-stroke dark:border-charcoal-400">
-                                <span className="text-label-small text-charcoal-400 dark:text-charcoal-300">Current Status:</span>
-                                <StatusChip variant={getBookingStatusVariant(booking.status)}>
-                                  {booking.status}
-                                </StatusChip>
-                              </div>
-                            </div>
-
-                            {/* Timer and Cancel for Pending Bookings */}
-                            {booking.status === 'Pending' && booking.createdAt && (
-                              <div className="mt-4 flex flex-col items-center gap-3">
-                                <BookingTimer
-                                  createdAt={booking.createdAt}
-                                  durationMinutes={1}
-                                  onExpire={() => handleTimerExpire(booking.id)}
-                                />
-                                <button
-                                  onClick={() => handleCancelBookingClick(booking)}
-                                  disabled={cancellingBookingId === booking.id}
-                                  className="px-6 py-2 bg-error-bg hover:bg-error-hover text-error-text border-2 border-error-border rounded-lg text-body-small font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  {cancellingBookingId === booking.id ? 'Cancelling...' : 'Cancel Booking'}
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Metrics Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className="bg-cream-50 dark:bg-charcoal-600 border border-grey-stroke dark:border-charcoal-400 rounded-lg p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-label-medium text-charcoal-400 dark:text-charcoal-300">Total Orders</p>
-                      <p className="text-display-h2 text-charcoal-600 dark:text-cream-50 mt-2">{historyMetrics.totalOrders}</p>
-                    </div>
-                    <div className="w-12 h-12 bg-sage-100 dark:bg-sage-900/30 rounded-lg flex items-center justify-center">
-                      <ShoppingCartIcon size={24} className="text-sage-600 dark:text-sage-400" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-cream-50 dark:bg-charcoal-600 border border-grey-stroke dark:border-charcoal-400 rounded-lg p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-label-medium text-charcoal-400 dark:text-charcoal-300">Total Services</p>
-                      <p className="text-display-h2 text-charcoal-600 dark:text-cream-50 mt-2">{historyMetrics.totalBookings}</p>
-                    </div>
-                    <div className="w-12 h-12 bg-sage-100 dark:bg-sage-900/30 rounded-lg flex items-center justify-center">
-                      <ScissorsIcon size={24} className="text-sage-600 dark:text-sage-400" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-cream-50 dark:bg-charcoal-600 border border-grey-stroke dark:border-charcoal-400 rounded-lg p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-label-medium text-charcoal-400 dark:text-charcoal-300">Pending Items</p>
-                      <p className="text-display-h2 text-sage-600 dark:text-sage-400 mt-2">
-                        {historyMetrics.pendingOrders + historyMetrics.pendingBookings}
-                      </p>
-                    </div>
-                    <div className="w-12 h-12 bg-sage-100 dark:bg-sage-900/30 rounded-lg flex items-center justify-center">
-                      <CalendarIcon size={24} className="text-sage-600 dark:text-sage-400" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-cream-50 dark:bg-charcoal-600 border border-grey-stroke dark:border-charcoal-400 rounded-lg p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-label-medium text-charcoal-400 dark:text-charcoal-300">Completed</p>
-                      <p className="text-display-h2 text-charcoal-600 dark:text-cream-50 mt-2">
-                        {historyMetrics.completedOrders + historyMetrics.completedBookings}
-                      </p>
-                    </div>
-                    <div className="w-12 h-12 bg-charcoal-100 dark:bg-charcoal-500 rounded-lg flex items-center justify-center">
-                      <PackageIcon size={24} className="text-charcoal-500 dark:text-charcoal-300" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* View Mode and Filter Tabs */}
-              <div className="bg-cream-50 dark:bg-charcoal-600 border border-grey-stroke dark:border-charcoal-400 rounded-lg p-4">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  {/* View Mode Toggle */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setHistoryViewMode('orders')}
-                      className={`px-6 py-3 rounded-md text-body-regular transition-colors ${
-                        historyViewMode === 'orders'
-                          ? 'bg-sage-500 text-cream-50 dark:bg-sage-700'
-                          : 'bg-grey-200 dark:bg-charcoal-500 text-charcoal-600 dark:text-cream-50 hover:bg-grey-300 dark:hover:bg-charcoal-400'
-                      }`}
-                    >
-                      <ShoppingCartIcon size={18} className="inline mr-2" />
-                      Orders ({historyMetrics.totalOrders})
-                    </button>
-                    <button
-                      onClick={() => setHistoryViewMode('services')}
-                      className={`px-6 py-3 rounded-md text-body-regular transition-colors ${
-                        historyViewMode === 'services'
-                          ? 'bg-sage-500 text-cream-50 dark:bg-sage-700'
-                          : 'bg-grey-200 dark:bg-charcoal-500 text-charcoal-600 dark:text-cream-50 hover:bg-grey-300 dark:hover:bg-charcoal-400'
-                      }`}
-                    >
-                      <ScissorsIcon size={18} className="inline mr-2" />
-                      Services ({historyMetrics.totalBookings})
-                    </button>
-                    <button
-                      onClick={() => setHistoryViewMode('reviews')}
-                      className={`px-6 py-3 rounded-md text-body-regular transition-colors ${
-                        historyViewMode === 'reviews'
-                          ? 'bg-sage-500 text-cream-50 dark:bg-sage-700'
-                          : 'bg-grey-200 dark:bg-charcoal-500 text-charcoal-600 dark:text-cream-50 hover:bg-grey-300 dark:hover:bg-charcoal-400'
-                      }`}
-                    >
-                      <ChatCircleTextIcon size={18} className="inline mr-2" />
-                      My Reviews ({serviceReviews.length})
-                    </button>
-                  </div>
-
-                  {/* Status Filter */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setHistoryActiveTab('all')}
-                      className={`px-4 py-2 rounded-md text-body-regular transition-colors ${
-                        historyActiveTab === 'all'
-                          ? 'bg-sage-500 text-cream-50 dark:bg-sage-700'
-                          : 'bg-grey-200 dark:bg-charcoal-500 text-charcoal-600 dark:text-cream-50 hover:bg-grey-300 dark:hover:bg-charcoal-400'
-                      }`}
-                    >
-                      All
-                    </button>
-                    <button
-                      onClick={() => setHistoryActiveTab('pending')}
-                      className={`px-4 py-2 rounded-md text-body-regular transition-colors ${
-                        historyActiveTab === 'pending'
-                          ? 'bg-sage-500 text-cream-50 dark:bg-sage-700'
-                          : 'bg-grey-200 dark:bg-charcoal-500 text-charcoal-600 dark:text-cream-50 hover:bg-grey-300 dark:hover:bg-charcoal-400'
-                      }`}
-                    >
-                      Pending ({historyMetrics.pendingOrders + historyMetrics.pendingBookings})
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Content Area */}
-              {historyLoading ? (
-                <div className="flex items-center justify-center py-16">
-                  <div className="w-12 h-12 border-4 border-grey-stroke border-t-sage-500 rounded-full animate-spin"></div>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {/* Orders Table */}
-                  {historyViewMode === 'orders' && (
-                    <div className="bg-cream-50 dark:bg-charcoal-600 border border-grey-stroke dark:border-charcoal-400 rounded-lg overflow-hidden">
-                      <div className="p-4 border-b border-grey-stroke dark:border-charcoal-400">
-                        <h3 className="text-card-h3 text-charcoal-600 dark:text-cream-50">
-                          Your Orders ({historyFilteredData.orders.length})
-                        </h3>
-                      </div>
-                      {historyFilteredData.orders.length === 0 ? (
-                        <div className="p-12 text-center text-charcoal-400 dark:text-charcoal-300">
-                          No orders found
-                        </div>
-                      ) : (
-                        <div className="overflow-x-auto">
-                          <table className="w-full">
-                            <thead>
-                              <tr className="bg-grey-100 dark:bg-charcoal-500 border-b border-grey-stroke dark:border-charcoal-400">
-                                <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Order ID</th>
-                                <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Date & Time</th>
-                                <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Seller</th>
-                                <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Items</th>
-                                <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Fulfillment</th>
-                                <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Payment</th>
-                                <th className="text-right p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Total</th>
-                                <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Status</th>
-                                <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Actions</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-grey-stroke dark:divide-charcoal-400">
-                              {historyFilteredData.orders.map((order) => (
-                                <tr key={order.id} className="hover:bg-cream-100 dark:hover:bg-charcoal-500 transition-colors">
-                                  <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50 font-semibold">
-                                    #{order.id}
-                                  </td>
-                                  <td className="p-4 text-body-small text-charcoal-600 dark:text-cream-50">
-                                    <div>{formatDate(order.createdAt)}</div>
-                                    <div className="text-charcoal-400 dark:text-charcoal-300">{formatTime(order.createdAt)}</div>
-                                  </td>
-                                  <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50">
-                                    {order.sellerName || 'N/A'}
-                                  </td>
-                                  <td className="p-4 text-body-small text-charcoal-600 dark:text-cream-50">
-                                    {order.orderItems && order.orderItems.length > 0 ? (
-                                      <div className="space-y-1">
-                                        {order.orderItems.map((item, idx) => (
-                                          <div key={item.id || idx}>
-                                            {item.productName || 'Product'} (×{item.qty})
-                                          </div>
-                                        ))}
-                                      </div>
-                                    ) : (
-                                      'N/A'
-                                    )}
-                                  </td>
-                                  <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50">
-                                    {order.fulfillmentType || 'N/A'}
-                                  </td>
-                                  <td className="p-4 text-body-small text-charcoal-600 dark:text-cream-50">
-                                    <div>{order.paymentMethod || 'N/A'}</div>
-                                    <div className="text-charcoal-400 dark:text-charcoal-300">{order.paymentStatus || 'N/A'}</div>
-                                  </td>
-                                  <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50 font-semibold text-right">
-                                    {formatCurrency(order.totalAmount)}
-                                  </td>
-                                  <td className="p-4 text-center">
-                                    <StatusChip variant={getOrderStatusVariant(order.status)}>
-                                      {order.status}
-                                    </StatusChip>
-                                  </td>
-                                  <td className="p-4 text-center">
-                                    <button
-                                      onClick={() => handleViewOrder(order)}
-                                      className="px-4 py-2 bg-sage-500 hover:bg-sage-600 dark:bg-sage-700 dark:hover:bg-sage-600 text-cream-50 rounded-md text-body-small transition-colors"
-                                    >
-                                      View
-                                    </button>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Service Bookings Table */}
-                  {historyViewMode === 'services' && (
-                    <div className="bg-cream-50 dark:bg-charcoal-600 border border-grey-stroke dark:border-charcoal-400 rounded-lg overflow-hidden">
-                      <div className="p-4 border-b border-grey-stroke dark:border-charcoal-400">
-                        <h3 className="text-card-h3 text-charcoal-600 dark:text-cream-50">
-                          Your Service Bookings ({historyFilteredData.bookings.length})
-                        </h3>
-                      </div>
-                      {historyFilteredData.bookings.length === 0 ? (
-                        <div className="p-12 text-center text-charcoal-400 dark:text-charcoal-300">
-                          No service bookings found
-                        </div>
-                      ) : (
-                        <div className="overflow-x-auto">
-                          <table className="w-full">
-                            <thead>
-                              <tr className="bg-grey-100 dark:bg-charcoal-500 border-b border-grey-stroke dark:border-charcoal-400">
-                                <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Booking ID</th>
-                                <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Service Date & Time</th>
-                                <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Provider</th>
-                                <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Service</th>
-                                <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Type</th>
-                                <th className="text-right p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Price</th>
-                                <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Status</th>
-                                <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Timer</th>
-                                <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Actions</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-grey-stroke dark:divide-charcoal-400">
-                              {historyFilteredData.bookings.map((booking) => (
-                                <tr key={booking.id} className="hover:bg-cream-100 dark:hover:bg-charcoal-500 transition-colors">
-                                  <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50 font-semibold">
-                                    #{booking.id}
-                                  </td>
-                                  <td className="p-4 text-body-small text-charcoal-600 dark:text-cream-50">
-                                    <div>{formatDate(booking.serviceDate)}</div>
-                                    <div className="text-charcoal-400 dark:text-charcoal-300">{booking.serviceTime || 'Time TBD'}</div>
-                                  </td>
-                                  <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50">
-                                    {booking.businessName || booking.providerName || 'N/A'}
-                                  </td>
-                                  <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50">
-                                    {booking.serviceName || 'N/A'}
-                                  </td>
-                                  <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50">
-                                    {booking.serviceType || 'N/A'}
-                                  </td>
-                                  <td className="p-4 text-body-small text-charcoal-600 dark:text-cream-50 text-right">
-                                    {booking.finalPrice != null ? (
-                                      <div>
-                                        <div className="font-semibold">{formatCurrency(booking.finalPrice)}</div>
-                                        <div className="text-charcoal-400 dark:text-charcoal-300">Paid</div>
-                                      </div>
-                                    ) : booking.quotedPrice != null ? (
-                                      <div>
-                                        <div className="font-semibold">{formatCurrency(booking.quotedPrice)}</div>
-                                        <div className="text-charcoal-400 dark:text-charcoal-300">Quoted</div>
-                                      </div>
-                                    ) : (
-                                      'Pending'
-                                    )}
-                                  </td>
-                                  <td className="p-4 text-center">
-                                    <StatusChip variant={getBookingStatusVariant(booking.status)}>
-                                      {booking.status}
-                                    </StatusChip>
-                                  </td>
-                                  <td className="p-4 text-center">
-                                    {booking.status === 'Pending' && booking.createdAt && (
-                                      <BookingTimer
-                                        createdAt={booking.createdAt}
-                                        durationMinutes={1}
-                                        onExpire={() => handleTimerExpire(booking.id)}
-                                        compact={true}
-                                      />
-                                    )}
-                                    {booking.status !== 'Pending' && (
-                                      <span className="text-charcoal-400 dark:text-charcoal-300 text-label-small">—</span>
-                                    )}
-                                  </td>
-                                  <td className="p-4 text-center">
-                                    <div className="flex items-center justify-center gap-2">
-                                      <button
-                                        onClick={() => handleViewBooking(booking)}
-                                        className="px-4 py-2 bg-sage-500 hover:bg-sage-600 dark:bg-sage-700 dark:hover:bg-sage-600 text-cream-50 rounded-md text-body-small transition-colors"
-                                      >
-                                        View
-                                      </button>
-                                      {booking.status === 'Pending' && (
-                                        <button
-                                          onClick={() => handleCancelBookingClick(booking)}
-                                          disabled={cancellingBookingId === booking.id}
-                                          className="px-4 py-2 bg-error-bg hover:bg-error-hover text-error-text border border-error-border rounded-md text-body-small transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                          {cancellingBookingId === booking.id ? 'Cancelling...' : 'Cancel'}
-                                        </button>
-                                      )}
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Reviews Table */}
-                  {historyViewMode === 'reviews' && (
-                    <div className="bg-cream-50 dark:bg-charcoal-600 border border-grey-stroke dark:border-charcoal-400 rounded-lg overflow-hidden">
-                      <div className="p-4 border-b border-grey-stroke dark:border-charcoal-400">
-                        <h3 className="text-card-h3 text-charcoal-600 dark:text-cream-50">
-                          My Service Reviews ({serviceReviews.length})
-                        </h3>
-                      </div>
-                      {serviceReviews.length === 0 ? (
-                        <div className="p-12 text-center text-charcoal-400 dark:text-charcoal-300">
-                          No reviews found. Complete a service booking to leave a review!
-                        </div>
-                      ) : (
-                        <div className="overflow-x-auto">
-                          <table className="w-full">
-                            <thead>
-                              <tr className="bg-grey-100 dark:bg-charcoal-500 border-b border-grey-stroke dark:border-charcoal-400">
-                                <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Review ID</th>
-                                <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Date</th>
-                                <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Service Provider</th>
-                                <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Service</th>
-                                <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Overall Rating</th>
-                                <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Quality</th>
-                                <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Professionalism</th>
-                                <th className="text-center p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Timeliness</th>
-                                <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Comment</th>
-                                <th className="text-left p-4 text-label-medium text-charcoal-600 dark:text-cream-50">Provider Response</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-grey-stroke dark:divide-charcoal-400">
-                              {serviceReviews.map((review) => (
-                                <tr key={review.id} className="hover:bg-cream-100 dark:hover:bg-charcoal-500 transition-colors">
-                                  <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50 font-semibold">
-                                    #{review.id}
-                                  </td>
-                                  <td className="p-4 text-body-small text-charcoal-600 dark:text-cream-50">
-                                    {formatDate(review.createdAt)}
-                                  </td>
-                                  <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50">
-                                    {review.providerName || review.businessName || 'N/A'}
-                                  </td>
-                                  <td className="p-4 text-body-regular text-charcoal-600 dark:text-cream-50">
-                                    {review.serviceName || 'N/A'}
-                                  </td>
-                                  <td className="p-4 text-center">
-                                    <div className="flex items-center justify-center gap-1">
-                                      <span className="text-sage-600 dark:text-sage-400 font-semibold">{review.overallRating}</span>
-                                      <span className="text-charcoal-400 dark:text-charcoal-300">/5</span>
-                                    </div>
-                                  </td>
-                                  <td className="p-4 text-center text-body-small text-charcoal-600 dark:text-cream-50">
-                                    {review.qualityRating ? `${review.qualityRating}/5` : '—'}
-                                  </td>
-                                  <td className="p-4 text-center text-body-small text-charcoal-600 dark:text-cream-50">
-                                    {review.professionalismRating ? `${review.professionalismRating}/5` : '—'}
-                                  </td>
-                                  <td className="p-4 text-center text-body-small text-charcoal-600 dark:text-cream-50">
-                                    {review.timelinessRating ? `${review.timelinessRating}/5` : '—'}
-                                  </td>
-                                  <td className="p-4 text-body-small text-charcoal-600 dark:text-cream-50 max-w-xs">
-                                    <div className="truncate" title={review.comment}>
-                                      {review.comment || 'No comment'}
-                                    </div>
-                                  </td>
-                                  <td className="p-4 text-body-small text-charcoal-600 dark:text-cream-50 max-w-xs">
-                                    <div className="truncate" title={review.providerResponse}>
-                                      {review.providerResponse || 'No response yet'}
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
           )}
 
           {/* Notifications Section */}
