@@ -90,105 +90,120 @@ const getSellers = async () => {
 
 
 // Main Category Tabs Component
-const CategoryTabs = ({ categories, selected, onSelect }) => (
-  <div className="flex justify-center items-center gap-5 mb-6 ml-32">
-    {categories.map(category => (
-      <button
-        key={category.id}
-        onClick={() => onSelect(category.id)}
-        className={`px-20 py-4 rounded-full font-semibold text-[19px] transition-all ${
-          selected === category.id
-            ? 'bg-sage-500 text-white shadow-[0_2px_12px_rgba(85,107,92,0.25)]'
-            : 'bg-cream-50 text-charcoal-600 border-2 border-grey-stroke hover:border-sage-500 shadow-[0_1px_3px_rgba(0,0,0,0.08)]'
-        }`}
-        style={{ fontFamily: 'Inter, sans-serif' }}
-      >
-        {category.name}
-      </button>
-    ))}
-  </div>
-);
+const CategoryTabs = ({ categories, selected, onSelect }) => {
+  const scrollContainerRef = useRef(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
 
-const SubcategorySidebar = ({ subcategories, selected, onSelect, onShowFavorites }) => {
-  const getIconForSubcategory = (name) => {
-    const lowerName = name.toLowerCase();
-    if (lowerName.includes('sweet') || lowerName.includes('dessert')) return <Cake size={24} weight="regular" />;
-    if (lowerName.includes('traditional')) return <BowlFood size={24} weight="regular" />;
-    if (lowerName.includes('healthy')) return <Heart size={24} weight="regular" />;
-    if (lowerName.includes('bake') || lowerName.includes('bread')) return <Bread size={24} weight="regular" />;
-    if (lowerName.includes('beverage') || lowerName.includes('drink')) return <Coffee size={24} weight="regular" />;
-    return <Storefront size={24} weight="regular" />;
+  const updateArrows = () => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const scrollLeft = Math.round(container.scrollLeft);
+    const scrollWidth = container.scrollWidth;
+    const clientWidth = container.clientWidth;
+    
+    setCanScrollLeft(scrollLeft > 1);
+    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
   };
 
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    // Force scroll to 0 on mount
+    container.scrollLeft = 0;
+    
+    const timer = setTimeout(updateArrows, 200);
+    
+    container.addEventListener('scroll', updateArrows);
+    window.addEventListener('resize', updateArrows);
+    
+    return () => {
+      clearTimeout(timer);
+      container.removeEventListener('scroll', updateArrows);
+      window.removeEventListener('resize', updateArrows);
+    };
+  }, [categories]);
+
+  const scroll = (direction) => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const scrollAmount = 360;
+    container.scrollBy({
+      left: direction === 'left' ? -scrollAmount : scrollAmount,
+      behavior: 'smooth'
+    });
+  };
+
+  const showArrows = categories.length > 3;
+
   return (
-    <aside className="w-[280px] flex-shrink-0 mt-20">
-      <div className="space-y-3">
-        {/* MY FAVORITES - NEW */}
-          <button
-            onClick={onShowFavorites}
-            className={`w-full flex items-center gap-4 px-6 py-4 rounded-full text-left transition-all font-medium text-[17px] ${
-              selected === 'favorites'
-                ? 'bg-sage-500 text-white shadow-[0_2px_8px_rgba(85,107,92,0.3)]'
-                : 'bg-cream-50 text-sage-500 hover:bg-cream-100'
-            }`}
-            style={{ fontFamily: 'Inter, sans-serif' }}
-          >
-            <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
-              selected === 'favorites' ? 'bg-sage-700' : 'bg-[#E8F0EA]'
-            }`}>
-              <div className={selected === 'favorites' ? 'text-white' : 'text-sage-500'}>
-                <Heart size={24} weight={selected === 'favorites' ? 'fill' : 'regular'} />
-              </div>
-            </div>
-            <span>My Favorites</span>
-          </button>
-
-        {/* "All Stores" option */}
+    <div className="flex justify-center items-center mb-6 w-full relative">
+      {showArrows && canScrollLeft && (
         <button
-          onClick={() => onSelect(null)}
-          className={`w-full flex items-center gap-4 px-6 py-4 rounded-full text-left transition-all font-medium text-[17px] ${
-            selected === null
-              ? 'bg-sage-500 text-white shadow-[0_2px_8px_rgba(85,107,92,0.3)]'
-              : 'bg-cream-50 text-sage-500 hover:bg-cream-100'
-          }`}
-          style={{ fontFamily: 'Inter, sans-serif' }}
+          onClick={() => scroll('left')}
+          className="absolute left-4 z-10 w-10 h-10 bg-white rounded-full shadow-[0_2px_10px_rgba(0,0,0,0.12)] flex items-center justify-center hover:bg-cream-50 transition-all"
         >
-          <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
-            selected === null ? 'bg-sage-700' : 'bg-[#E8F0EA]'
-          }`}>
-            <div className={selected === null ? 'text-white' : 'text-sage-500'}>
-              <Storefront size={24} weight="regular" />
-            </div>
-          </div>
-          <span>All Stores</span>
+          <svg className="w-5 h-5 text-charcoal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
         </button>
+      )}
 
-        {/* Actual subcategories */}
-        {subcategories.map(subcat => (
-          <button
-            key={subcat.id}
-            onClick={() => onSelect(subcat.id)}
-            className={`w-full flex items-center gap-4 px-6 py-4 rounded-full text-left transition-all font-medium text-[17px] ${
-              selected === subcat.id
-                ? 'bg-sage-500 text-white shadow-[0_2px_8px_rgba(85,107,92,0.3)]'
-                : 'bg-cream-50 text-sage-500 hover:bg-cream-100'
-            }`}
-            style={{ fontFamily: 'Inter, sans-serif' }}
-          >
-            <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
-              selected === subcat.id ? 'bg-sage-700' : 'bg-[#E8F0EA]'
-            }`}>
-              <div className={selected === subcat.id ? 'text-white' : 'text-sage-500'}>
-                {getIconForSubcategory(subcat.name)}
-              </div>
-            </div>
-            <span>{subcat.name}</span>
-          </button>
-        ))}
+      <div 
+        ref={scrollContainerRef}
+        className="overflow-x-auto py-2 scrollbar-hide snap-x snap-mandatory" 
+        style={{ 
+          maxWidth: '1400px',
+          width: '100%',
+          scrollbarWidth: 'none', 
+          msOverflowStyle: 'none',
+          WebkitOverflowScrolling: 'touch'
+        }}
+      >
+        <style>{`
+          .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+          }
+        `}</style>
+        <div className="flex gap-5 justify-start" style={{ 
+          marginLeft: categories.length <= 3 ? 'auto' : '0',
+          marginRight: categories.length <= 3 ? 'auto' : '0',
+          width: categories.length <= 3 ? 'fit-content' : 'auto'
+        }}>
+          {categories.map(category => (
+            <button
+              key={category.id}
+              onClick={() => onSelect(category.id)}
+              className={`px-20 py-4 rounded-full font-semibold text-[19px] transition-all whitespace-nowrap flex-shrink-0 snap-start ${
+                selected === category.id
+                  ? 'bg-sage-500 text-white shadow-[0_2px_12px_rgba(85,107,92,0.25)]'
+                  : 'bg-cream-50 text-charcoal-600 border-2 border-grey-stroke hover:border-sage-500 shadow-[0_1px_3px_rgba(0,0,0,0.08)]'
+              }`}
+              style={{ fontFamily: 'Inter, sans-serif' }}
+            >
+              {category.name}
+            </button>
+          ))}
+        </div>
       </div>
-    </aside>
+
+      {showArrows && canScrollRight && (
+        <button
+          onClick={() => scroll('right')}
+          className="absolute right-4 z-10 w-10 h-10 bg-white rounded-full shadow-[0_2px_10px_rgba(0,0,0,0.12)] flex items-center justify-center hover:bg-cream-50 transition-all"
+        >
+          <svg className="w-5 h-5 text-charcoal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      )}
+    </div>
   );
 };
+
 
 // Search Bar Component
 const SearchBar = ({ value, onChange }) => (
@@ -198,7 +213,7 @@ const SearchBar = ({ value, onChange }) => (
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="Search Food Stores..."
+        placeholder="Search Stores..."
         className="w-full pl-12 pr-4 py-3.5 bg-white rounded-full border border-grey-stroke focus:outline-none focus:border-sage-500 text-charcoal-600 shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
         style={{ fontFamily: 'Inter, sans-serif', fontSize: '16px' }}
       />
@@ -218,12 +233,21 @@ const SearchBar = ({ value, onChange }) => (
   </div>
 );
 
+
 // Featured Carousel Component
 const FeaturedCarousel = ({ stores, onStoreClick, subcategories = [], selectedCategory, favoriteStores = [], onToggleFavorite }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   
   // Filter stores by selected category only (ignore subcategory filter)
   const categoryFilteredStores = stores.filter(store => {
+    // Filter out stores with no active products
+    const hasActiveProducts = store.products && 
+                             store.products.length > 0 && 
+                             store.products.some(p => p.isActive === true);
+    if (!hasActiveProducts) {
+      return false;
+    }
+    
     if (!selectedCategory) return true;
     return store.categoryId === selectedCategory;
   });
@@ -234,7 +258,7 @@ const FeaturedCarousel = ({ stores, onStoreClick, subcategories = [], selectedCa
     if (featured.length === 0) return;
     
     const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % Math.max(1, featured.length - 2));
+      setCurrentIndex((prev) => (prev + 1) % Math.max(1, featured.length - 3));
     }, 3000);
 
     return () => clearInterval(interval);
@@ -255,7 +279,7 @@ const FeaturedCarousel = ({ stores, onStoreClick, subcategories = [], selectedCa
       </button>
 
       <div className="overflow-hidden px-12 py-3">
-        <div className="flex gap-6 transition-transform duration-500" style={{ transform: `translateX(-${currentIndex * (100 / 3)}%)` }}>
+        <div className="flex gap-6 transition-transform duration-500" style={{ transform: `translateX(-${currentIndex * (100 / 4)}%)` }}>
           {featured.map((store, idx) => {
             const words = store.storeName.split(' ').filter(w => w.length > 0);
             const initials = words.length >= 2 
@@ -266,7 +290,7 @@ const FeaturedCarousel = ({ stores, onStoreClick, subcategories = [], selectedCa
               <div 
   key={store.id || idx} 
   onClick={() => onStoreClick(store.id)}
-  className="flex-shrink-0 w-[calc(33.333%-16px)] bg-white rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all cursor-pointer"
+  className="flex-shrink-0 w-[calc(25%-18px)] bg-white rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all cursor-pointer"
 >
   <div className="relative h-32">
      {/* Banner layer (clipped) */}
@@ -396,7 +420,7 @@ const FeaturedCarousel = ({ stores, onStoreClick, subcategories = [], selectedCa
 
       <button
         onClick={() => setCurrentIndex(Math.min(featured.length - 3, currentIndex + 1))}
-        disabled={currentIndex >= featured.length - 3}
+        disabled={currentIndex >= featured.length - 4}
         className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white rounded-full shadow-[0_2px_10px_rgba(0,0,0,0.12)] flex items-center justify-center hover:bg-cream-50 transition-all disabled:opacity-30"
       >
         <svg className="w-5 h-5 text-charcoal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -405,7 +429,7 @@ const FeaturedCarousel = ({ stores, onStoreClick, subcategories = [], selectedCa
       </button>
 
       <div className="flex justify-center gap-2 mt-6">
-        {Array.from({ length: Math.max(1, featured.length - 2) }).map((_, idx) => (
+        {Array.from({ length: Math.max(1, featured.length - 3) }).map((_, idx) => (
           <button
             key={idx}
             onClick={() => setCurrentIndex(idx)}
@@ -619,6 +643,11 @@ const MainStoreView = () => {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [subcategories, setSubcategories] = useState([]);
   const [selectedSubcategory, setSelectedSubcategory] = useState(null); // null means "All Stores"
+
+  const subcategoryScrollRef = useRef(null);
+  const [canScrollSubLeft, setCanScrollSubLeft] = useState(false);
+  const [canScrollSubRight, setCanScrollSubRight] = useState(false);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStoreId, setSelectedStoreId] = useState(null);
 
@@ -636,6 +665,36 @@ useEffect(() => {
   setFilteredSubcategories(filtered);
   setSelectedSubcategory(null); // Reset to "All Stores" when category changes
 }, [selectedCategory, subcategories]);
+
+// Update subcategory scroll arrows
+useEffect(() => {
+  const updateSubScrollArrows = () => {
+    const container = subcategoryScrollRef.current;
+    if (!container) return;
+
+    const scrollLeft = Math.round(container.scrollLeft);
+    const scrollWidth = container.scrollWidth;
+    const clientWidth = container.clientWidth;
+    
+    setCanScrollSubLeft(scrollLeft > 1);
+    setCanScrollSubRight(scrollLeft < scrollWidth - clientWidth - 1);
+  };
+
+  updateSubScrollArrows();
+  
+  const container = subcategoryScrollRef.current;
+  if (container) {
+    container.addEventListener('scroll', updateSubScrollArrows);
+    window.addEventListener('resize', updateSubScrollArrows);
+  }
+  
+  return () => {
+    if (container) {
+      container.removeEventListener('scroll', updateSubScrollArrows);
+    }
+    window.removeEventListener('resize', updateSubScrollArrows);
+  };
+}, [filteredSubcategories, selectedSubcategory]);
 
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [activeFilters, setActiveFilters] = useState({
@@ -970,6 +1029,17 @@ useEffect(() => {
   return () => document.removeEventListener('mousedown', handleClickOutside);
 }, [showFilterDropdown]);
 
+const scrollSubcategories = (direction) => {
+  const container = subcategoryScrollRef.current;
+  if (!container) return;
+
+  const scrollAmount = 300;
+  container.scrollBy({
+    left: direction === 'left' ? -scrollAmount : scrollAmount,
+    behavior: 'smooth'
+  });
+};
+
 const handleCustomerSelect = (customer) => {
   const name = customer.fullName || customer.name || `Customer #${customer.id}`;
   setCustomerId(customer.id);
@@ -1120,6 +1190,16 @@ const handleStoreNavigation = (targetStoreId) => {
 
 const filteredStores = stores
   .filter(store => {
+
+  // Filter out stores with no active products - ADD THIS FIRST
+      const hasActiveProducts = store.products && 
+                              store.products.length > 0 && 
+                              store.products.some(p => p.isActive === true);
+      if (!hasActiveProducts) {
+        return false;
+      }
+
+
     // Category filter - MOST IMPORTANT
     if (selectedCategory && store.categoryId !== selectedCategory) {
       return false;
@@ -1237,7 +1317,7 @@ const filteredStores = stores
       })()}
 
 
-      <div className="max-w-[1440px] mx-auto px-8 py-8">
+      <div className="max-w-[1600px] mx-auto px-8 py-8">
         <div className="flex justify-center">
           <CategoryTabs 
             categories={categories} 
@@ -1246,27 +1326,35 @@ const filteredStores = stores
           />
         </div>
         
-        <div className="flex gap-4 mt-2">
-          <SubcategorySidebar 
-            subcategories={filteredSubcategories}
-            selected={selectedSubcategory} 
-            onSelect={(value) => {
-              setSelectedSubcategory(value);
-              if (value !== 'favorites') {
-                // Only change if not clicking favorites
-              }
-            }}
-            onShowFavorites={() => setSelectedSubcategory('favorites')}
-          />
+        <div className="mt-2">
+         <div className="flex-1 max-w-[1400px] mx-auto">
 
           <div className="flex-1">
+            
+
+            {/* Featured Stores Section */}
+            <div className="mb-3">
+              <h2 className="text-2xl font-bold text-charcoal-700" style={{ fontFamily: 'Merriweather, serif' }}>
+                Featured Stores
+              </h2>
+            </div>
+            
+            <FeaturedCarousel 
+              stores={stores} 
+              onStoreClick={handleStoreNavigation}
+              subcategories={subcategories}
+              selectedCategory={selectedCategory}
+              favoriteStores={favoriteStores}
+              onToggleFavorite={toggleFavorite}
+            />
+
             <div className="flex gap-4 items-center mb-8">
               <div className="flex-1 relative">
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search Food Stores..."
+                  placeholder="Search Stores..."
                   className="w-full pl-12 pr-4 py-3.5 bg-white rounded-full border border-grey-stroke focus:outline-none focus:border-sage-500 text-charcoal-600 shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
                   style={{ fontFamily: 'Inter, sans-serif', fontSize: '16px' }}
                 />
@@ -1448,14 +1536,104 @@ const filteredStores = stores
 )}
               </div>
             </div>
-            <FeaturedCarousel 
-              stores={stores} 
-              onStoreClick={handleStoreNavigation}
-              subcategories={subcategories}
-              selectedCategory={selectedCategory}
-              favoriteStores={favoriteStores}
-              onToggleFavorite={toggleFavorite}
-            />
+
+           {/* Horizontal Subcategory Chips */}
+{filteredSubcategories.length > 0 && (
+  <div className="mb-8 relative pl-2">
+    {/* Left Arrow */}
+    {canScrollSubLeft && (
+      <button
+        onClick={() => scrollSubcategories('left')}
+        className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.15)] flex items-center justify-center hover:bg-cream-50 transition-all"
+      >
+        <svg className="w-5 h-5 text-charcoal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
+    )}
+
+    {/* Scrollable Container with Fade */}
+    <div className="relative overflow-hidden px-12">
+      {/* Left Fade */}
+      {canScrollSubLeft && (
+        <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-[#FAF7F2] to-transparent pointer-events-none z-10" />
+      )}
+      
+      {/* Right Fade */}
+      {canScrollSubRight && (
+        <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-[#FAF7F2] to-transparent pointer-events-none z-10" />
+      )}
+
+      <div 
+        ref={subcategoryScrollRef}
+        className="overflow-x-auto scrollbar-hide"
+      >
+        <style>{`
+          .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+          }
+        `}</style>
+        <div className="flex gap-4 pb-2">
+          {/* My Favorites Chip */}
+          <button
+            onClick={() => setSelectedSubcategory('favorites')}
+            className={`flex items-center gap-3 px-8 py-4 rounded-full text-base font-semibold transition-all whitespace-nowrap flex-shrink-0 ${
+              selectedSubcategory === 'favorites'
+                ? 'bg-sage-500 text-white shadow-[0_2px_8px_rgba(85,107,92,0.3)]'
+                : 'bg-cream-50 text-sage-500 hover:bg-cream-100 border border-grey-stroke'
+            }`}
+            style={{ fontFamily: 'Inter, sans-serif' }}
+          >
+            <Heart size={20} weight={selectedSubcategory === 'favorites' ? 'fill' : 'regular'} />
+            <span>My Favorites</span>
+          </button>
+
+          {/* All Stores Chip */}
+          <button
+            onClick={() => setSelectedSubcategory(null)}
+            className={`flex items-center gap-3 px-8 py-4 rounded-full text-base font-semibold transition-all whitespace-nowrap flex-shrink-0 ${
+              selectedSubcategory === null
+                ? 'bg-sage-500 text-white shadow-[0_2px_8px_rgba(85,107,92,0.3)]'
+                : 'bg-cream-50 text-sage-500 hover:bg-cream-100 border border-grey-stroke'
+            }`}
+            style={{ fontFamily: 'Inter, sans-serif' }}
+          >
+            <Storefront size={20} weight="regular" />
+            <span>All Stores</span>
+          </button>
+
+          {/* Subcategory Chips */}
+          {filteredSubcategories.map(subcat => (
+            <button
+              key={subcat.id}
+              onClick={() => setSelectedSubcategory(subcat.id)}
+              className={`px-8 py-4 rounded-full text-base font-semibold transition-all whitespace-nowrap flex-shrink-0 ${
+                selectedSubcategory === subcat.id
+                  ? 'bg-sage-500 text-white shadow-[0_2px_8px_rgba(85,107,92,0.3)]'
+                  : 'bg-cream-50 text-sage-500 hover:bg-cream-100 border border-grey-stroke'
+              }`}
+              style={{ fontFamily: 'Inter, sans-serif' }}
+            >
+              {subcat.name}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+
+    {/* Right Arrow */}
+    {canScrollSubRight && (
+      <button
+        onClick={() => scrollSubcategories('right')}
+        className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.15)] flex items-center justify-center hover:bg-cream-50 transition-all"
+      >
+        <svg className="w-5 h-5 text-charcoal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+    )}
+  </div>
+)}
 
             {loading ? (
                 <div className="flex items-center justify-center py-16">
@@ -1504,7 +1682,7 @@ const filteredStores = stores
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
                     {storesToShow.map(store => (
                       <div key={store.id} onClick={() => handleStoreNavigation(store.id)}>
                         <StoreCard 
@@ -1520,6 +1698,7 @@ const filteredStores = stores
               })()}
           </div>
         </div>
+      </div>
       </div>
       {/* Snackbar */}
       <Snackbar 

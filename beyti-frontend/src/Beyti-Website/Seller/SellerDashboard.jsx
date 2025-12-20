@@ -724,14 +724,30 @@ useEffect(() => {
   loadData();
 }, [sellerId]);
 
+// Add this new useEffect AFTER the existing ones
+useEffect(() => {
+  const handleOpenAddProduct = () => {
+    openNew();
+  };
+
+  window.addEventListener('openAddProduct', handleOpenAddProduct);
+
+  return () => {
+    window.removeEventListener('openAddProduct', handleOpenAddProduct);
+  };
+}, []);
+
   // ---------- Derived metrics & views ----------
   const { metrics, recentOrders, topProducts, analyticsPreview } = useMemo(() => {
+    // Calculate active products count FIRST, outside the orders check
+    const activeProducts = sellerProducts.filter(p => p.isActive === true).length;
+    
     if (!orders || orders.length === 0) {
       return {
         metrics: {
           totalOrders: 0,
           pendingOrders: 0,
-          activeProducts: 0,
+          activeProducts: activeProducts,  // ← NOW USES REAL COUNT
           totalRevenue: 0,
         },
         recentOrders: [],
@@ -793,20 +809,11 @@ orders.forEach((order) => {
         record.totalOrders += 1;
         record.totalQty += item.qty || 0;
         
-        // Track ONLY active products - check isActive explicitly
-        if (item.isActive === true && item.productId) {
-          activeProductIds.add(item.productId);
-        }
       });
     });
 
 const totalOrders = orders.length;
-// Count active products from order items if sellerProducts isn't loaded yet
-// Always use sellerProducts as source of truth for active products count
-// Only fall back to activeProductIds if sellerProducts hasn't loaded yet
-const activeProducts = sellerProducts.length > 0 
-  ? sellerProducts.filter(p => p.isActive === true).length 
-  : activeProductIds.size;
+// Always use sellerProducts as the source of truth for active products count
 
 const productsArr = Array.from(productMap.values()).sort(
   (a, b) => b.totalOrders - a.totalOrders
@@ -1297,92 +1304,135 @@ const productsArr = Array.from(productMap.values()).sort(
                     )}
                   </div>
 
-                                    {/* Top Products */}
-                  <div className="bg-grey-200 rounded-lg p-6 shadow-soft-lift border border-grey-stroke space-y-4 flex flex-col">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h2 className="text-card-h2 text-charcoal-600">
-                          Top Products
-                        </h2>
-                        <p className="text-body-regular text-charcoal-400">
-                          Most ordered items in your store.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        className="text-sm font-medium text-sage-600 hover:text-sage-700 underline cursor-pointer"
-                        onClick={() => {
-                          navigate("products");
-                          window.scrollTo({ top: 0, behavior: 'smooth' });
-                        }}
-                      >
-                        View all
-                      </button>
-                    </div>
-
-                    {topProducts.length === 0 ? (
-                      <div className="flex-1 flex flex-col items-center justify-center text-center py-12 px-4">
-                        {/* Icon */}
-                        <div className="w-20 h-20 rounded-full bg-sage-100 flex items-center justify-center mb-6">
-                          <Icon.Package size={40} className="text-sage-500" weight="duotone" />
+                 {/* Top Products */}
+                    <div className="bg-grey-200 rounded-lg p-6 shadow-soft-lift border border-grey-stroke space-y-4 flex flex-col">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h2 className="text-card-h2 text-charcoal-600">
+                            {topProducts.length === 0 && sellerProducts.length > 0 ? "Your Products" : "Top Products"}
+                          </h2>
+                          <p className="text-body-regular text-charcoal-400">
+                            {topProducts.length === 0 && sellerProducts.length > 0 
+                              ? "Start getting orders to see top performers" 
+                              : "Most ordered items in your store."}
+                          </p>
                         </div>
-
-                        {/* Text Content */}
-                        <h3 className="text-card-h2 text-charcoal-600 mb-2">
-                          Stock Your Shelves
-                        </h3>
-                        <p className="text-body-regular text-charcoal-400 mb-6 max-w-xs">
-                          Your shop is looking a little empty. Add your first product to get ready for launch.
-                        </p>
-
-                        {/* CTA Button */}
                         <button
                           type="button"
+                          className="text-sm font-medium text-sage-600 hover:text-sage-700 underline cursor-pointer"
                           onClick={() => {
                             navigate("products");
                             window.scrollTo({ top: 0, behavior: 'smooth' });
                           }}
-                          className="w-full max-w-xs bg-sage-500 hover:bg-sage-600 text-cream-50 py-3 px-6 rounded-lg font-semibold text-sm shadow-soft-lift transition-colors"
                         >
-                          Add Your First Product
+                          View all
                         </button>
                       </div>
-                    ) : (
-                      <ul className="space-y-3">
-                        {topProducts.map((product) => (
-                          <li
-                            key={product.productId || product.productName}
-                            className="flex items-center justify-between bg-cream-50 rounded-lg px-3 py-2 border border-grey-stroke"
+
+                      {/* Show empty state ONLY if NO products exist at all */}
+                      {topProducts.length === 0 && sellerProducts.filter(p => p.isActive).length === 0 ? (
+                        <div className="flex-1 flex flex-col items-center justify-center text-center py-12 px-4">
+                          {/* Icon */}
+                          <div className="w-20 h-20 rounded-full bg-sage-100 flex items-center justify-center mb-6">
+                            <Icon.Package size={40} className="text-sage-500" weight="duotone" />
+                          </div>
+
+                          {/* Text Content */}
+                          <h3 className="text-card-h2 text-charcoal-600 mb-2">
+                            Stock Your Shelves
+                          </h3>
+                          <p className="text-body-regular text-charcoal-400 mb-6 max-w-xs">
+                            Your shop is looking a little empty. Add your first product to get ready for launch.
+                          </p>
+
+                          {/* CTA Button */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigate("products");
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                            className="w-full max-w-xs bg-sage-500 hover:bg-sage-600 text-cream-50 py-3 px-6 rounded-lg font-semibold text-sm shadow-soft-lift transition-colors"
                           >
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-lg bg-grey-200 flex items-center justify-center overflow-hidden">
-                                {product.productImage ? (
-                                  <img
-                                    src={product.productImage}
-                                    alt={product.productName}
-                                    className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  <span className="text-xs text-charcoal-400">
-                                    No image
-                                  </span>
-                                )}
+                            Add Your First Product
+                          </button>
+                        </div>
+                      ) : topProducts.length === 0 && sellerProducts.filter(p => p.isActive).length > 0 ? (
+                        /* Show products when they exist but have no orders yet */
+                        <div className="space-y-3">
+                          <ul className="space-y-3">
+                            {sellerProducts
+                              .filter(p => p.isActive)
+                              .slice(0, 3)
+                              .map((product) => (
+                                <li
+                                  key={product.id}
+                                  className="flex items-center justify-between bg-cream-50 rounded-lg px-3 py-2 border border-grey-stroke"
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-lg bg-grey-200 flex items-center justify-center overflow-hidden">
+                                        {product.productImage || product.imageUrl ? (
+                                          <img
+                                            src={`https://localhost:7062${product.productImage || product.imageUrl}`}
+                                            alt={product.productName}
+                                            className="w-full h-full object-cover"
+                                          />
+                                        ) : (
+                                          <span className="text-xs text-charcoal-400">
+                                            No image
+                                          </span>
+                                        )}
+                                      </div>
+                                    <div>
+                                      <p className="text-body-medium text-charcoal-600">
+                                        {product.name}
+                                      </p>
+                                      <p className="text-label-medium text-charcoal-400">
+                                        {formatCurrency(product.basePrice)} • {product.variants?.length || 0} variant{product.variants?.length === 1 ? '' : 's'}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </li>
+                              ))}
+                          </ul>
+                        </div>
+                      ) : (
+                        /* Show top products when orders exist */
+                        <ul className="space-y-3">
+                          {topProducts.map((product) => (
+                            <li
+                              key={product.productId || product.productName}
+                              className="flex items-center justify-between bg-cream-50 rounded-lg px-3 py-2 border border-grey-stroke"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-grey-200 flex items-center justify-center overflow-hidden">
+                                  {product.productImage || product.imageUrl ? (
+                                    <img
+                                      src={`https://localhost:7062${product.productImage || product.imageUrl}`}
+                                      alt={product.productName}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <span className="text-xs text-charcoal-400">
+                                      No image
+                                    </span>
+                                  )}
+                                </div>
+                                <div>
+                                  <p className="text-body-medium text-charcoal-600">
+                                    {product.productName}
+                                  </p>
+                                  <p className="text-label-medium text-charcoal-400">
+                                    {product.totalOrders} orders •{" "}
+                                    {product.totalQty} items sold
+                                  </p>
+                                </div>
                               </div>
-                              <div>
-                                <p className="text-body-medium text-charcoal-600">
-                                  {product.productName}
-                                </p>
-                                <p className="text-label-medium text-charcoal-400">
-                                  {product.totalOrders} orders •{" "}
-                                  {product.totalQty} items sold
-                                </p>
-                              </div>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                 </section>
 
                 {/* ANALYTICS PREVIEW + QUICK ACTIONS */}
@@ -1451,21 +1501,35 @@ const productsArr = Array.from(productMap.values()).sort(
                       <button
                         type="button"
                         className="w-full py-2.5 rounded-full bg-sage-500 hover:bg-sage-600 text-cream-50 font-semibold text-sm shadow-soft-lift"
-                        onClick={() => console.log("Add product")}
+                        onClick={() => {
+                          navigate("products");
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                          // Trigger the "Add Product" modal after navigation
+                          setTimeout(() => {
+                            // The Products component will need to expose this functionality
+                            window.dispatchEvent(new CustomEvent('openAddProduct'));
+                          }, 100);
+                        }}
                       >
                         + Add Product
                       </button>
                       <button
                         type="button"
                         className="w-full py-2.5 rounded-full bg-sage-100 hover:bg-sage-200 text-sage-700 font-semibold text-sm"
-                        onClick={() => console.log("View all orders")}
+                        onClick={() => {
+                          navigate("orders");
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
                       >
                         View All Orders
                       </button>
                       <button
                         type="button"
                         className="w-full py-2.5 rounded-full bg-grey-300 hover:bg-grey-400 text-charcoal-600 font-semibold text-sm"
-                        onClick={() => console.log("Manage store")}
+                        onClick={() => {
+                          navigate("profile");
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
                       >
                         Manage Store
                       </button>

@@ -19,7 +19,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MagnifyingGlass, Bell, CaretDown, User } from '@phosphor-icons/react';
+import { MagnifyingGlass, Bell, CaretDown, User, House, Gear, SignOut } from '@phosphor-icons/react';
 import SettingsModal from './SettingsModal';
 import { logout } from '../utils/auth';
 import NotificationDropdown from './NotificationDropdown';
@@ -207,31 +207,31 @@ const handleProfileClick = () => {
                 <div className="py-1">
                   {/* Return to Home - Only show for Customer role */}
                   {userRole === 'Customer' && (
-                    <button
-                      onClick={() => {
-                        setIsUserMenuOpen(false);
-                        window.location.href = '/mainStore';
-                      }}
-                      className="w-full px-4 py-2.5 text-left text-body-regular text-charcoal-600 dark:text-cream-50 hover:bg-cream-100 dark:hover:bg-charcoal-400 transition-colors flex items-center gap-2"
-                    >
-                      <span className="text-charcoal-500 dark:text-charcoal-300">🏠</span>
-                      <span>Return to Home</span>
-                    </button>
-                  )}
+                  <button
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      window.location.href = '/mainStore';
+                    }}
+                    className="w-full px-4 py-2.5 text-left text-body-regular text-charcoal-600 dark:text-cream-50 hover:bg-cream-100 dark:hover:bg-charcoal-400 transition-colors flex items-center gap-3"
+                  >
+                    <House size={20} weight="regular" className="text-charcoal-500 dark:text-charcoal-300" />
+                    <span style={{ fontFamily: 'Inter, sans-serif' }}>Return to Home</span>
+                  </button>
+                )}
                   
                   <button
                     onClick={handleProfileClick}
-                    className="w-full px-4 py-2.5 text-left text-body-regular text-charcoal-600 dark:text-cream-50 hover:bg-cream-100 dark:hover:bg-charcoal-400 transition-colors flex items-center gap-2"
+                    className="w-full px-4 py-2.5 text-left text-body-regular text-charcoal-600 dark:text-cream-50 hover:bg-cream-100 dark:hover:bg-charcoal-400 transition-colors flex items-center gap-3"
                   >
-                    <User size={18} className="text-charcoal-500 dark:text-charcoal-300" />
-                    <span>View Profile</span>
+                    <User size={20} weight="regular" className="text-charcoal-500 dark:text-charcoal-300" />
+                    <span style={{ fontFamily: 'Inter, sans-serif' }}>View Profile</span>
                   </button>
                   <button
                     onClick={handleSettingsClick}
-                    className="w-full px-4 py-2.5 text-left text-body-regular text-charcoal-600 dark:text-cream-50 hover:bg-cream-100 dark:hover:bg-charcoal-400 transition-colors flex items-center gap-2"
+                    className="w-full px-4 py-2.5 text-left text-body-regular text-charcoal-600 dark:text-cream-50 hover:bg-cream-100 dark:hover:bg-charcoal-400 transition-colors flex items-center gap-3"
                   >
-                    <span className="text-charcoal-500 dark:text-charcoal-300">⚙️</span>
-                    <span>Settings</span>
+                    <Gear size={20} weight="regular" className="text-charcoal-500 dark:text-charcoal-300" />
+                    <span style={{ fontFamily: 'Inter, sans-serif' }}>Settings</span>
                   </button>
                 </div>
 
@@ -239,10 +239,10 @@ const handleProfileClick = () => {
                 <div className="border-t border-grey-stroke dark:border-charcoal-400">
                   <button
                     onClick={handleLogout}
-                    className="w-full px-4 py-2.5 text-left text-body-regular text-error-text dark:text-red-400 hover:bg-error-bg dark:hover:bg-red-900/20 transition-colors flex items-center gap-2"
+                    className="w-full px-4 py-2.5 text-left text-body-regular text-error-text dark:text-red-400 hover:bg-error-bg dark:hover:bg-red-900/20 transition-colors flex items-center gap-3"
                   >
-                    <span>🚪</span>
-                    <span>Logout</span>
+                    <SignOut size={20} weight="regular" className="text-error-text dark:text-red-400" />
+                    <span style={{ fontFamily: 'Inter, sans-serif' }}>Logout</span>
                   </button>
                 </div>
               </div>

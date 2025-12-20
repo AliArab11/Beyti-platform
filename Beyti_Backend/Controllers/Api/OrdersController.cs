@@ -150,6 +150,8 @@ namespace Beyti_Backend.Controllers.Api
                     productId = oi.ProductVariant.Product.Id,
                     productName = oi.ProductVariant.Product.Name,
                     productPrice = oi.ProductVariant.Product.BasePrice,
+                    productImage = oi.ProductVariant.Product.ImageUrl, 
+                    imageUrl = oi.ProductVariant.Product.ImageUrl,
                     variantSKU = oi.ProductVariant.SKU,
                     oi.Qty,
                     oi.UnitPrice,
