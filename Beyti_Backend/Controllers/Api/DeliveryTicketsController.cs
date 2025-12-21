@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using BeytiDB.Data;
+using Microsoft.AspNetCore.SignalR;
 
 namespace Beyti_Backend.Controllers.Api
 {
@@ -19,9 +20,12 @@ namespace Beyti_Backend.Controllers.Api
         private static readonly Dictionary<int, HashSet<int>> _ticketOfferedDrivers = new();
 
 
-        public DeliveryTicketsController(BeytiContext context)
+        private readonly IHubContext<Beyti_Backend.Hubs.OrderHub> _hubContext;
+
+        public DeliveryTicketsController(BeytiContext context, IHubContext<Beyti_Backend.Hubs.OrderHub> hubContext)
         {
             _context = context;
+            _hubContext = hubContext;
         }
 
         public class UpdateDeliveryTicketDto
@@ -182,8 +186,61 @@ namespace Beyti_Backend.Controllers.Api
 
                 await _context.SaveChangesAsync();
 
+                // 🔔 BROADCAST TO DRIVER VIA SIGNALR
+                await _hubContext.Clients.Group($"Driver_{nextDriver.Driver.Id}")
+                    .SendAsync("NewDeliveryOffer", new
+                    {
+                        id = ticket.Id,
+                        orderId = ticket.OrderId,
+                        status = ticket.Status,
+                        currentOfferedDriverId = ticket.CurrentOfferedDriverId,
+                        offerExpiresAt = ticket.OfferExpiresAt,
+                        deliveryNote = ticket.DeliveryNote,
+                        createdAt = ticket.CreatedAt,
+                        updatedAt = ticket.UpdatedAt,
+                        order = new
+                        {
+                            id = ticket.Order.Id,
+                            totalAmount = ticket.Order.TotalAmount,
+                            subtotalAmount = ticket.Order.SubtotalAmount,
+                            deliveryFee = ticket.Order.DeliveryFee,
+                            paymentMethod = ticket.Order.PaymentMethod,
+                            customerName = ticket.Order.Customer?.UserProfile?.DisplayName,
+                            customerPhone = ticket.Order.Customer?.Phone,
+                            sellerName = ticket.Order.Seller?.UserProfile?.DisplayName,
+                            sellerPhone = ticket.Order.Seller?.Phone,
+                            orderNote = ticket.Order.OrderNote
+                        },
+                        pickupAddress = ticket.PickupAddress != null ? new
+                        {
+                            ticket.PickupAddress.Street,
+                            ticket.PickupAddress.City,
+                            ticket.PickupAddress.Region,
+                            ticket.PickupAddress.Country,
+                            ticket.PickupAddress.Latitude,
+                            ticket.PickupAddress.Longitude
+                        } : (ticket.Order.Seller.SellerAddresses.FirstOrDefault() != null ? new
+                        {
+                            Street = ticket.Order.Seller.SellerAddresses.FirstOrDefault().Address.Street,
+                            City = ticket.Order.Seller.SellerAddresses.FirstOrDefault().Address.City,
+                            Region = ticket.Order.Seller.SellerAddresses.FirstOrDefault().Address.Region,
+                            Country = ticket.Order.Seller.SellerAddresses.FirstOrDefault().Address.Country,
+                            Latitude = ticket.Order.Seller.SellerAddresses.FirstOrDefault().Address.Latitude,
+                            Longitude = ticket.Order.Seller.SellerAddresses.FirstOrDefault().Address.Longitude
+                        } : null),
+                        deliveryAddress = ticket.DeliveryAddress != null ? new
+                        {
+                            ticket.DeliveryAddress.Street,
+                            ticket.DeliveryAddress.City,
+                            ticket.DeliveryAddress.Region,
+                            ticket.DeliveryAddress.Country,
+                            ticket.DeliveryAddress.Latitude,
+                            ticket.DeliveryAddress.Longitude
+                        } : null
+                    });
+
                 Console.WriteLine($"✅ Offered ticket {ticketId} to driver {nextDriver.Driver.Id} " +
-                                 $"(distance: {nextDriver.Distance:F2} km)");
+                                 $"(distance: {nextDriver.Distance:F2} km) and broadcasted via SignalR");
 
                 return true;
             }
@@ -284,7 +341,7 @@ namespace Beyti_Backend.Controllers.Api
             }
 
             var query = _context.DeliveryTickets
-                        .Include(dt => dt.Order)
+                .Include(dt => dt.Order)
                     .ThenInclude(o => o.Customer)
                         .ThenInclude(c => c.UserProfile)
                 .Include(dt => dt.Order)
@@ -294,7 +351,8 @@ namespace Beyti_Backend.Controllers.Api
                     .ThenInclude(o => o.Seller)
                         .ThenInclude(s => s.SellerAddresses)
                             .ThenInclude(sa => sa.Address)
-                .Include(dt => dt.DeliveryAddress)
+                .Include(dt => dt.PickupAddress)  // CRITICAL - this was missing
+                .Include(dt => dt.DeliveryAddress) // CRITICAL - this was missing
                 .Include(dt => dt.Driver)
                     .ThenInclude(d => d.UserProfile)
                 .AsQueryable();
@@ -369,6 +427,30 @@ namespace Beyti_Backend.Controllers.Api
                 .ToListAsync();
 
             return Ok(tickets);
+        }
+
+        // POST: api/DeliveryTickets/5/trigger-offer
+        [HttpPost("{id}/trigger-offer")]
+        public async Task<IActionResult> TriggerDriverOffer(int id)
+        {
+            try
+            {
+                var success = await OfferToNextClosestDriver(id);
+
+                if (success)
+                {
+                    return Ok(new { message = "Driver offering started", ticketId = id });
+                }
+                else
+                {
+                    return BadRequest(new { message = "No available drivers or ticket not found" });
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error triggering offer: {ex.Message}");
+                return StatusCode(500, new { message = "Error triggering driver offer", error = ex.Message });
+            }
         }
 
         // GET: api/DeliveryTickets/5

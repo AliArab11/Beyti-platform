@@ -48,6 +48,14 @@ const OrderDetails = ({ order, onClose }) => {
     try {
       const response = await fetch(`https://localhost:7062/api/Orders/${order.id}/tracking`);
       const data = await response.json();
+      // ADD THESE DEBUG LINES
+      console.log('🔍 TRACKING DEBUG:', {
+        orderId: order.id,
+        orderStatus: order.status,
+        trackingShowMap: data.showMap,
+        hasDriverLocation: !!data.driverLocation,
+        driverLocation: data.driverLocation
+      });
       setTracking(data);
       
       // Stop polling if order is delivered or cancelled
@@ -62,26 +70,20 @@ const OrderDetails = ({ order, onClose }) => {
     }
   };
 
-  useEffect(() => {
-    if (order) {
-      console.log('📦 OrderDetails useEffect - order:', order);
-      
-      // Start tracking if delivery order
-      if (order.fulfillmentType === 'Delivery') {
-        fetchTracking(); // Initial fetch
-        
-        // Poll every 10 seconds
-        trackingIntervalRef.current = setInterval(fetchTracking, 10000);
-      }
-    }
+useEffect(() => {
+  if (order && order.fulfillmentType === 'Delivery' && order.status === 'Picked Up') {
+    fetchTracking(); // Initial fetch
     
-    // Cleanup on unmount
-    return () => {
-      if (trackingIntervalRef.current) {
-        clearInterval(trackingIntervalRef.current);
-      }
-    };
-  }, [order]);
+    // Poll every 10 seconds
+    trackingIntervalRef.current = setInterval(fetchTracking, 10000);
+  }
+  
+  return () => {
+    if (trackingIntervalRef.current) {
+      clearInterval(trackingIntervalRef.current);
+    }
+  };
+}, [order?.id, order?.status]);
 
   if (!order) {
     console.log('⚠️ No order provided to OrderDetails');

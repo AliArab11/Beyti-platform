@@ -29,4 +29,17 @@ public class OrderHub : Hub
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"Customer_{customerId}");
         Console.WriteLine($"👋 Connection {Context.ConnectionId} left Customer_{customerId}");
     }
+
+    // Driver group methods
+    public async Task JoinDriverGroup(int driverId)
+    {
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"Driver_{driverId}");
+        Console.WriteLine($"✅ Connection {Context.ConnectionId} joined Driver_{driverId}");
+    }
+
+    public async Task LeaveDriverGroup(int driverId)
+    {
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"Driver_{driverId}");
+        Console.WriteLine($"👋 Connection {Context.ConnectionId} left Driver_{driverId}");
+    }
 }

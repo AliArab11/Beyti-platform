@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo } from "react";
 import * as Icon from "@phosphor-icons/react";
-
+import * as signalR from '@microsoft/signalr';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from 'leaflet'
+
+import Snackbar from "../../components/Snackbar";
 
 import { useNavigate, useLocation } from "react-router-dom";
 import PageHeader from "../../components/PageHeader";
@@ -295,6 +297,8 @@ const DriverDashboard = () => {
   const [driverList, setDriverList] = useState([]);
   const [selectModalOpen, setSelectModalOpen] = useState(true);
 
+  const [snackbar, setSnackbar] = useState({ show: false, message: '', type: 'error' });
+
   // data
   const [tickets, setTickets] = useState([]);
   const [loading] = useState(false); // keeping for future if you want loader
@@ -494,12 +498,118 @@ const fetchTickets = async () => {
   }
 };
 
-  // Load tickets once when a driver is selected
-  useEffect(() => {
-    if (!driverId) return;
-    fetchTickets();
-    // DO NOT ADD ANYTHING ELSE
-  }, [driverId]);
+useEffect(() => {
+  if (!driverId) return;
+  
+  // Setup SignalR connection for real-time delivery offers
+  const connection = new signalR.HubConnectionBuilder()
+    .withUrl("https://localhost:7062/orderHub")
+    .withAutomaticReconnect()
+    .build();
+
+  // ⭐ SETUP LISTENER BEFORE CONNECTION STARTS
+  connection.on("NewDeliveryOffer", (newTicket) => {
+    console.log('🔔 New delivery offer received via SignalR:', newTicket);
+    
+    // Format the ticket to match your existing structure
+    const formattedTicket = {
+      id: newTicket.id,
+      orderId: newTicket.orderId,
+      status: newTicket.status,
+      currentOfferedDriverId: newTicket.currentOfferedDriverId,
+      offerExpiresAt: newTicket.offerExpiresAt,
+      deliveryNote: newTicket.deliveryNote,
+      createdAt: newTicket.createdAt,
+      updatedAt: newTicket.updatedAt,
+      order: newTicket.order,
+      pickupAddress: newTicket.pickupAddress,
+      deliveryAddress: newTicket.deliveryAddress
+    };
+    
+// Add or update the ticket
+setTickets(prev => {
+  const existingIndex = prev.findIndex(t => t.id === formattedTicket.id);
+  
+  if (existingIndex !== -1) {
+    const existingTicket = prev[existingIndex];
+    
+    // Check if this is a RE-OFFER to THIS driver
+    const isReOffer = formattedTicket.status === "Offered" && 
+                      formattedTicket.currentOfferedDriverId === driverId &&
+                      formattedTicket.offerExpiresAt &&
+                      (existingTicket.currentOfferedDriverId !== driverId || 
+                       existingTicket.offerExpiresAt !== formattedTicket.offerExpiresAt);
+    
+    if (isReOffer) {
+      console.log('🔄 RE-OFFER: Ticket was offered to another driver, now offered to me!');
+      // Move to top and update
+      const updated = prev.filter(t => t.id !== formattedTicket.id);
+      return [formattedTicket, ...updated];
+    }
+    
+    // Check if this is just a status update
+    if (existingTicket.status !== formattedTicket.status ||
+        existingTicket.currentOfferedDriverId !== formattedTicket.currentOfferedDriverId) {
+      console.log('🔄 Updating existing ticket status/offer');
+      const updated = [...prev];
+      updated[existingIndex] = formattedTicket;
+      return updated;
+    }
+    
+    console.log('⚠️ Ticket unchanged, skipping');
+    return prev;
+  }
+  
+  // Completely new ticket - add at the beginning
+  console.log('✅ Adding NEW delivery offer to list');
+  return [formattedTicket, ...prev];
+});
+
+    // Show browser notification if supported
+    if (isOnline && Notification.permission === "granted") {
+      new Notification("🚨 New Delivery Request!", {
+        body: `Order #${newTicket.orderId} from ${newTicket.order?.sellerName}. Earn BHD ${(newTicket.order?.deliveryFee || 0).toFixed(3)}`,
+        icon: "/delivery-icon.png"
+      });
+    }
+
+    // Show snackbar notification (if you have that implemented)
+    setSnackbar({
+      show: true,
+      message: `New delivery offer for Order #${newTicket.orderId}!`,
+      type: 'success'
+    });
+  });
+
+  // ⭐ NOW START CONNECTION AND JOIN GROUP
+  connection.start()
+    .then(() => {
+      console.log('✅ SignalR Connected to OrderHub (Driver)');
+      
+      // Join driver-specific group and wait for confirmation
+      return connection.invoke("JoinDriverGroup", driverId);
+    })
+    .then(() => {
+      console.log(`✅ Joined Driver_${driverId} group - Ready to receive offers`);
+      
+      // ⭐ ONLY FETCH TICKETS AFTER CONNECTION IS FULLY READY
+      fetchTickets();
+    })
+    .catch(err => console.error('❌ SignalR Connection Error:', err));
+
+  // Cleanup on unmount or driver change
+  return () => {
+    if (connection.state === signalR.HubConnectionState.Connected) {
+      connection.invoke("LeaveDriverGroup", driverId)
+        .then(() => {
+          console.log(`✅ Left Driver_${driverId} group`);
+          return connection.stop();
+        })
+        .then(() => console.log('✅ SignalR Disconnected'))
+        .catch(err => console.error('❌ Error disconnecting:', err));
+    }
+  };
+}, [driverId, isOnline]);
 
 const { metrics, availableJobs, currentJobs, historyJobs } = useMemo(() => {
 if (!tickets || tickets.length === 0) {
@@ -1347,8 +1457,13 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
               const selected = driverList.find((d) => d.id === id);
               setDriverName(selected?.fullName || "My Profile");
               setDriverId(id);
-              setUserProfileId(selected?.userProfileId); // ✅ ADD THIS LINE
+              setUserProfileId(selected?.userProfileId);
               setSelectModalOpen(false);
+              
+              // Request notification permission
+              if (Notification.permission === "default") {
+                Notification.requestPermission();
+              }
             }}
           >
             <option value="">-- Select Driver --</option>
@@ -1720,6 +1835,15 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
   // Render
   // -------------------------------------------------------------------
   return (
+     <>
+    {/* Snackbar - Rendered outside main layout for proper z-index */}
+    {snackbar.show && (
+      <Snackbar
+        message={snackbar.message}
+        type={snackbar.type}
+        onClose={() => setSnackbar({ ...snackbar, show: false })}
+      />
+    )}
     <div className="flex min-h-screen bg-cream-50">
       <DriverSelectModal />
 
@@ -2703,6 +2827,7 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
         </main>
       </div>
     </div>
+    </>
   );
 };
 
