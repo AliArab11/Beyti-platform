@@ -11,13 +11,14 @@ import {
   CheckCircle,
   Clock,
   Eye,
-  EyeSlash,
   Plus,
   MagnifyingGlass,
   CalendarBlank,
   Users
 } from '@phosphor-icons/react';
 import CRUDButton from '../../../components/CRUDButton';
+import Snackbar from '../../../components/Snackbar';
+import ConfirmModal from '../../../components/ConfirmModal';
 
 const AnnouncementManagement = ({
   onNavigate,
@@ -30,6 +31,20 @@ const AnnouncementManagement = ({
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all'); // all, active, expired
+
+  // Snackbar state
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    type: 'success'
+  });
+
+  // Confirm modal state
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    announcementId: null,
+    title: ''
+  });
 
   // Fetch announcements on mount
   useEffect(() => {
@@ -50,8 +65,69 @@ const AnnouncementManagement = ({
       setAnnouncements(sortedData);
     } catch (error) {
       console.error('Error fetching announcements:', error);
+      showSnackbar('Failed to fetch announcements', 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Show snackbar helper
+  const showSnackbar = (message, type = 'success') => {
+    setSnackbar({ open: true, message, type });
+    setTimeout(() => {
+      setSnackbar({ open: false, message: '', type: 'success' });
+    }, 3000);
+  };
+
+  // Open confirm modal for inactivating
+  const handleInactivateClick = (announcement) => {
+    setConfirmModal({
+      isOpen: true,
+      announcementId: announcement.Id || announcement.id,
+      title: announcement.Title || announcement.title
+    });
+  };
+
+  // Close confirm modal
+  const handleCloseConfirmModal = () => {
+    setConfirmModal({
+      isOpen: false,
+      announcementId: null,
+      title: ''
+    });
+  };
+
+  // Inactivate announcement
+  const handleInactivateAnnouncement = async () => {
+    try {
+      const response = await fetch(
+        `https://localhost:7062/api/Announcements/${confirmModal.announcementId}/deactivate`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to inactivate announcement');
+      }
+
+      // Update local state
+      setAnnouncements(prevAnnouncements =>
+        prevAnnouncements.map(a =>
+          (a.Id || a.id) === confirmModal.announcementId
+            ? { ...a, IsActive: false, isActive: false }
+            : a
+        )
+      );
+
+      showSnackbar('Announcement inactivated successfully', 'success');
+      handleCloseConfirmModal();
+    } catch (error) {
+      console.error('Error inactivating announcement:', error);
+      showSnackbar('Failed to inactivate announcement', 'error');
     }
   };
 
@@ -296,6 +372,18 @@ const AnnouncementManagement = ({
                           </span>
                         </div>
                       </div>
+
+                      {/* Action Button */}
+                      {(announcement.IsActive || announcement.isActive) && !isExpired(announcement) && (
+                        <div className="mt-4">
+                          <CRUDButton
+                            variant="danger"
+                            onClick={() => handleInactivateClick(announcement)}
+                          >
+                            Inactivate
+                          </CRUDButton>
+                        </div>
+                      )}
                     </div>
 
                     {/* Icon */}
@@ -325,7 +413,31 @@ const AnnouncementManagement = ({
   );
 
   if (renderContentOnly) {
-    return renderContent();
+    return (
+      <>
+        {renderContent()}
+
+        {/* Snackbar */}
+        <Snackbar
+          open={snackbar.open}
+          message={snackbar.message}
+          type={snackbar.type}
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+        />
+
+        {/* Confirm Modal */}
+        <ConfirmModal
+          isOpen={confirmModal.isOpen}
+          onClose={handleCloseConfirmModal}
+          onConfirm={handleInactivateAnnouncement}
+          title="Inactivate Announcement"
+          message={`Are you sure you want to inactivate "${confirmModal.title}"? This announcement will no longer be visible to users.`}
+          confirmText="Inactivate"
+          cancelText="Cancel"
+          variant="danger"
+        />
+      </>
+    );
   }
 
   return (
@@ -333,6 +445,26 @@ const AnnouncementManagement = ({
       <div className="max-w-7xl mx-auto p-8">
         {renderContent()}
       </div>
+
+      {/* Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        message={snackbar.message}
+        type={snackbar.type}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+      />
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={handleCloseConfirmModal}
+        onConfirm={handleInactivateAnnouncement}
+        title="Inactivate Announcement"
+        message={`Are you sure you want to inactivate "${confirmModal.title}"? This announcement will no longer be visible to users.`}
+        confirmText="Inactivate"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 };

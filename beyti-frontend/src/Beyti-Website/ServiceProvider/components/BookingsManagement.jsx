@@ -5,6 +5,8 @@ import StatusChip from '../../../components/StatusChip';
 import BookingTimer from '../../../components/BookingTimer';
 import { logProviderActivity } from '../../../utils/providerActivityLogger';
 import { Calendar } from '@phosphor-icons/react';
+import Snackbar from '../../../components/Snackbar';
+import ConfirmModal from '../../../components/ConfirmModal';
 
 export default function BookingsManagement({ serviceProviderId, initialFilter = null, initialViewMode = null }) {
   const [bookings, setBookings] = useState([]);
@@ -23,6 +25,55 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
   ); // 'upcoming' or 'all'
   const [currentWeekStart, setCurrentWeekStart] = useState(getWeekStart(new Date()));
   const [timeSlots, setTimeSlots] = useState([]);
+
+  // Snackbar state
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    type: 'success'
+  });
+
+  // Confirm modal state
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    variant: 'danger'
+  });
+
+  // Helper functions for snackbar
+  const showSnackbar = (message, type = 'success') => {
+    setSnackbar({ open: true, message, type });
+    setTimeout(() => {
+      setSnackbar(prev => ({ ...prev, open: false }));
+    }, 3000);
+  };
+
+  const closeSnackbar = () => {
+    setSnackbar(prev => ({ ...prev, open: false }));
+  };
+
+  // Helper functions for confirm modal
+  const showConfirmModal = (title, message, onConfirm, variant = 'danger') => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      onConfirm,
+      variant
+    });
+  };
+
+  const closeConfirmModal = () => {
+    setConfirmModal({
+      isOpen: false,
+      title: '',
+      message: '',
+      onConfirm: null,
+      variant: 'danger'
+    });
+  };
 
   // Helper function to get the start of the week (Monday)
   function getWeekStart(date) {
@@ -143,7 +194,7 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
 
   const handleSendQuote = async () => {
     if (!quotePrice || parseFloat(quotePrice) <= 0) {
-      alert('Please enter a valid quote price');
+      showSnackbar('Please enter a valid quote price', 'error');
       return;
     }
 
@@ -161,14 +212,14 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
         `Customer: ${selectedBooking.customerName || 'N/A'} - ${parseFloat(quotePrice).toFixed(2)} BHD`
       );
 
-      alert('Quote sent successfully!');
+      showSnackbar('Quote sent successfully!', 'success');
       setShowQuoteModal(false);
       setSelectedBooking(null);
       setQuotePrice('');
       fetchBookings();
     } catch (err) {
       console.error('Error sending quote:', err);
-      alert('Error sending quote');
+      showSnackbar('Error sending quote', 'error');
     }
   };
 
@@ -194,19 +245,29 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
 
       // Refresh bookings to show updated status immediately on calendar
       await fetchBookings();
+
+      // Show success message
+      const successMessages = {
+        'Confirmed': 'Booking confirmed successfully!',
+        'InProgress': 'Service started successfully!',
+        'Completed': 'Service completed successfully!',
+        'Canceled': 'Booking canceled successfully!',
+        'Rejected': 'Booking rejected successfully!'
+      };
+      showSnackbar(successMessages[newStatus] || 'Booking status updated successfully!', 'success');
     } catch (err) {
       console.error('Error updating status:', err);
-      alert('Error updating booking status');
+      showSnackbar('Error updating booking status', 'error');
     }
   };
 
   const handleCompleteService = async () => {
     if (!finalPrice || parseFloat(finalPrice) <= 0) {
-      alert('Please enter a valid final price');
+      showSnackbar('Please enter a valid final price', 'error');
       return;
     }
     if (!paymentType) {
-      alert('Please select a payment type');
+      showSnackbar('Please select a payment type', 'error');
       return;
     }
 
@@ -224,14 +285,13 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
         `Customer: ${selectedBooking.customerName || 'N/A'} - Final Price: ${parseFloat(finalPrice).toFixed(2)} BHD (${paymentType})`
       );
 
-      alert('Service completed successfully!');
       setShowCompleteModal(false);
       setSelectedBooking(null);
       setFinalPrice('');
       setPaymentType('');
     } catch (err) {
       console.error('Error completing service:', err);
-      alert('Error completing service');
+      showSnackbar('Error completing service', 'error');
     }
   };
 
@@ -461,9 +521,15 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
                             <CRUDButton
                               variant="success"
                               onClick={() => {
-                                if (confirm('Confirm this booking?')) {
-                                  handleStatusChange(booking.id, 'Confirmed');
-                                }
+                                showConfirmModal(
+                                  'Confirm Booking',
+                                  `Are you sure you want to confirm this booking for ${booking.customerName}?`,
+                                  () => {
+                                    closeConfirmModal();
+                                    handleStatusChange(booking.id, 'Confirmed');
+                                  },
+                                  'success'
+                                );
                               }}
                             >
                               Accept
@@ -471,9 +537,15 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
                             <CRUDButton
                               variant="error"
                               onClick={() => {
-                                if (confirm('Reject this booking?')) {
-                                  handleStatusChange(booking.id, 'Rejected');
-                                }
+                                showConfirmModal(
+                                  'Reject Booking',
+                                  `Are you sure you want to reject this booking for ${booking.customerName}?`,
+                                  () => {
+                                    closeConfirmModal();
+                                    handleStatusChange(booking.id, 'Rejected');
+                                  },
+                                  'danger'
+                                );
                               }}
                             >
                               Reject
@@ -950,9 +1022,15 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
                               <CRUDButton
                                 variant="success"
                                 onClick={() => {
-                                  if (confirm('Confirm this booking?')) {
-                                    handleStatusChange(booking.id, 'Confirmed');
-                                  }
+                                  showConfirmModal(
+                                    'Confirm Booking',
+                                    `Are you sure you want to confirm this booking for ${booking.customerName}?`,
+                                    () => {
+                                      closeConfirmModal();
+                                      handleStatusChange(booking.id, 'Confirmed');
+                                    },
+                                    'success'
+                                  );
                                 }}
                                 className="w-full text-center"
                               >
@@ -961,9 +1039,15 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
                               <CRUDButton
                                 variant="error"
                                 onClick={() => {
-                                  if (confirm('Are you sure you want to reject this booking?')) {
-                                    handleStatusChange(booking.id, 'Rejected');
-                                  }
+                                  showConfirmModal(
+                                    'Reject Booking',
+                                    `Are you sure you want to reject this booking for ${booking.customerName}?`,
+                                    () => {
+                                      closeConfirmModal();
+                                      handleStatusChange(booking.id, 'Rejected');
+                                    },
+                                    'danger'
+                                  );
                                 }}
                                 className="w-full text-center"
                               >
@@ -977,9 +1061,15 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
                             <CRUDButton
                               variant="success"
                               onClick={() => {
-                                if (confirm('Start the service now?')) {
-                                  handleStatusChange(booking.id, 'InProgress');
-                                }
+                                showConfirmModal(
+                                  'Start Service',
+                                  `Are you sure you want to start the service for ${booking.customerName}?`,
+                                  () => {
+                                    closeConfirmModal();
+                                    handleStatusChange(booking.id, 'InProgress');
+                                  },
+                                  'success'
+                                );
                               }}
                               className="w-full text-center"
                             >
@@ -1186,10 +1276,16 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
                     <CRUDButton
                       variant="success"
                       onClick={() => {
-                        if (confirm('Confirm this booking?')) {
-                          handleStatusChange(selectedBooking.id, 'Confirmed');
-                          setSelectedBooking(null);
-                        }
+                        showConfirmModal(
+                          'Confirm Booking',
+                          `Are you sure you want to confirm this booking for ${selectedBooking.customerName}?`,
+                          () => {
+                            closeConfirmModal();
+                            handleStatusChange(selectedBooking.id, 'Confirmed');
+                            setSelectedBooking(null);
+                          },
+                          'success'
+                        );
                       }}
                       className="flex-1"
                     >
@@ -1198,10 +1294,16 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
                     <CRUDButton
                       variant="error"
                       onClick={() => {
-                        if (confirm('Are you sure you want to reject this booking?')) {
-                          handleStatusChange(selectedBooking.id, 'Rejected');
-                          setSelectedBooking(null);
-                        }
+                        showConfirmModal(
+                          'Reject Booking',
+                          `Are you sure you want to reject this booking for ${selectedBooking.customerName}?`,
+                          () => {
+                            closeConfirmModal();
+                            handleStatusChange(selectedBooking.id, 'Rejected');
+                            setSelectedBooking(null);
+                          },
+                          'danger'
+                        );
                       }}
                       className="flex-1"
                     >
@@ -1215,10 +1317,16 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
                   <CRUDButton
                     variant="success"
                     onClick={() => {
-                      if (confirm('Start the service now?')) {
-                        handleStatusChange(selectedBooking.id, 'InProgress');
-                        setSelectedBooking(null);
-                      }
+                      showConfirmModal(
+                        'Start Service',
+                        `Are you sure you want to start the service for ${selectedBooking.customerName}?`,
+                        () => {
+                          closeConfirmModal();
+                          handleStatusChange(selectedBooking.id, 'InProgress');
+                          setSelectedBooking(null);
+                        },
+                        'success'
+                      );
                     }}
                     className="flex-1"
                   >
@@ -1435,6 +1543,26 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
           </div>
         </div>
       )}
+
+      {/* Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        message={snackbar.message}
+        type={snackbar.type}
+        onClose={closeSnackbar}
+      />
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={closeConfirmModal}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+        confirmText="Confirm"
+        cancelText="Cancel"
+      />
     </div>
   );
 }
