@@ -334,6 +334,8 @@ const [userProfile, setUserProfile] = useState(null);
 const [activeOrderCount, setActiveOrderCount] = useState(0);
 const [showOrderBanner, setShowOrderBanner] = useState(false);
 
+const [orders, setOrders] = useState([]);
+
 const [cart, setCart] = useState([]);
 
 // User IDs
@@ -385,26 +387,51 @@ useEffect(() => {
   fetchUserProfile();
 }, [userProfileId]);
 
-// Check for active orders
 useEffect(() => {
-  if (customerId) {
-    const activeOrderKey = `beyti_activeOrder_${customerId}`;
-    const bannerDismissedKey = `beyti_bannerDismissed_${customerId}`;
-    
-    const activeOrder = localStorage.getItem(activeOrderKey);
-    const bannerDismissed = localStorage.getItem(bannerDismissedKey);
-    
-    if (activeOrder && !bannerDismissed) {
-      try {
-        const orderData = JSON.parse(activeOrder);
-        setActiveOrderCount(1);
-        setShowOrderBanner(true);
-      } catch (err) {
-        console.error('Error parsing active order:', err);
-      }
-    }
+  if (!customerId) {
+    setOrders([]);
+    return;
   }
+
+  const fetchOrders = async () => {
+    try {
+      const response = await fetch(`https://localhost:7062/api/Orders?customerId=${customerId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setOrders(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Error fetching orders:', err);
+      setOrders([]);
+    }
+  };
+
+  fetchOrders();
+  
+  // Poll every 30 seconds
+  const interval = setInterval(fetchOrders, 30000);
+  
+  return () => clearInterval(interval);
 }, [customerId]);
+
+// Calculate active order count and show banner
+useEffect(() => {
+  if (!customerId) {
+    setActiveOrderCount(0);
+    setShowOrderBanner(false);
+    return;
+  }
+
+  const bannerDismissedKey = `beyti_bannerDismissed_${customerId}`;
+  const bannerDismissed = localStorage.getItem(bannerDismissedKey);
+  
+  const activeCount = orders.filter(o => 
+    !['completed', 'cancelled', 'delivered'].includes(o.status?.toLowerCase())
+  ).length;
+  
+  setActiveOrderCount(activeCount);
+  setShowOrderBanner(activeCount > 0 && !bannerDismissed);
+}, [orders, customerId]);
 
 // Load cart from localStorage
 useEffect(() => {

@@ -754,6 +754,26 @@ const handlePlaceOrder = async () => {
       throw new Error('Order created but failed to add items. Please contact support.');
     }
 
+    // Step 6.5: Finalize order and broadcast to seller via SignalR
+    try {
+      const finalizeResponse = await fetch(
+        `https://localhost:7062/api/Orders/${createdOrder.id}/finalize`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+      
+      if (!finalizeResponse.ok) {
+        console.error('⚠️ Failed to broadcast order to seller, but order was created');
+      } else {
+        console.log('✅ Order finalized and broadcasted to seller');
+      }
+    } catch (finalizeError) {
+      console.error('⚠️ Finalize error:', finalizeError);
+      // Don't throw - order was still created successfully
+    }
+
     // Step 7: Prepare complete order object
     const completeOrder = {
       id: createdOrder.id,

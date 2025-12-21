@@ -909,8 +909,7 @@ const openImageModal = (product) => {
                   <img 
                     src={`https://localhost:7062${p.imageUrl}`}
                     alt={p.name}
-                    className="w-full h-full object-cover"
-                    style={{ aspectRatio: '1 / 1' }}
+                    className="w-full h-full object-contain"
                   />
                 ) : (
                   <svg

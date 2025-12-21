@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using BeytiDB.Data;
 using Beyti_Backend.Services;
+using Microsoft.AspNetCore.SignalR;
 
 namespace Beyti_Backend.Controllers.Api
 {
@@ -16,11 +17,13 @@ namespace Beyti_Backend.Controllers.Api
     {
         private readonly BeytiContext _context;
         private readonly INotificationService _notificationService;
+        private readonly IHubContext<Beyti_Backend.Hubs.OrderHub> _hubContext;
 
-        public OrdersController(BeytiContext context, INotificationService notificationService)
+        public OrdersController(BeytiContext context, INotificationService notificationService, IHubContext<Beyti_Backend.Hubs.OrderHub> hubContext)
         {
             _context = context;
             _notificationService = notificationService;
+            _hubContext = hubContext;
         }
 
         // DTO for creating orders 
@@ -394,6 +397,97 @@ namespace Beyti_Backend.Controllers.Api
             return CreatedAtAction("GetOrder", new { id = order.Id }, order);
         }
 
+        [HttpPost("{orderId}/finalize")]
+        public async Task<IActionResult> FinalizeOrder(int orderId)
+        {
+            try
+            {
+                // ⭐ CRITICAL: Add a small delay to ensure order items are committed
+                await Task.Delay(500);
+
+                // Fetch the complete order with all items - MUST include Product navigation
+                var order = await _context.Orders
+                    .Include(o => o.Customer)
+                        .ThenInclude(c => c.UserProfile)
+                    .Include(o => o.Seller)
+                        .ThenInclude(s => s.UserProfile)
+                    .Include(o => o.OrderItems)
+                        .ThenInclude(oi => oi.ProductVariant)
+                            .ThenInclude(pv => pv.Product)
+                    .Include(o => o.PickupAddress)
+                    .Include(o => o.DeliveryAddress)
+                    .FirstOrDefaultAsync(o => o.Id == orderId);
+
+                if (order == null)
+                    return NotFound();
+
+                // ⭐ CRITICAL: Verify order items exist before broadcasting
+                if (order.OrderItems == null || !order.OrderItems.Any())
+                {
+                    return BadRequest(new
+                    {
+                        success = false,
+                        message = "Order has no items yet. Please create order items first."
+                    });
+                }
+
+                // Log for debugging
+                Console.WriteLine($"📦 Finalizing order {orderId} with {order.OrderItems.Count} items");
+                foreach (var item in order.OrderItems)
+                {
+                    Console.WriteLine($"   - Item {item.Id}: Product={item.ProductVariant?.Product?.Name}, Qty={item.Qty}");
+                }
+
+                // Broadcast the complete order to seller via SignalR
+                await _hubContext.Clients.Group($"Seller_{order.SellerId}")
+                    .SendAsync("NewOrder", new
+                    {
+                        id = order.Id,
+                        customerId = order.CustomerId,
+                        sellerId = order.SellerId,
+                        deliveryAddressId = order.DeliveryAddressId,
+                        pickupAddressId = order.PickupAddressId,
+                        paymentMethod = order.PaymentMethod,
+                        paymentStatus = order.PaymentStatus,
+                        fulfillmentType = order.FulfillmentType,
+                        status = order.Status,
+                        subtotalAmount = order.SubtotalAmount,
+                        deliveryFee = order.DeliveryFee,
+                        totalAmount = order.TotalAmount,
+                        createdAt = order.CreatedAt,
+                        updatedAt = order.UpdatedAt,
+                        orderNote = order.OrderNote,
+                        customerName = order.Customer?.UserProfile?.DisplayName ?? "Customer",
+                        sellerName = order.Seller?.UserProfile?.DisplayName ?? "Seller",
+                        sellerPhone = order.Seller?.Phone,
+                        orderItems = order.OrderItems.Select(oi => new
+                        {
+                            id = oi.Id,
+                            orderId = oi.OrderId,
+                            productVariantId = oi.ProductVariantId,
+                            productId = oi.ProductVariant?.Product?.Id,
+                            productName = oi.ProductVariant?.Product?.Name ?? "Unknown Product",
+                            productPrice = oi.ProductVariant?.Product?.BasePrice,
+                            productImage = oi.ProductVariant?.Product?.ImageUrl,
+                            imageUrl = oi.ProductVariant?.Product?.ImageUrl,
+                            variantSKU = oi.ProductVariant?.SKU,
+                            qty = oi.Qty,
+                            unitPrice = oi.UnitPrice,
+                            lineTotal = oi.LineTotal
+                        }).ToList()
+                    });
+
+                Console.WriteLine($"✅ Order {orderId} finalized and broadcasted to Seller_{order.SellerId}");
+
+                return Ok(new { success = true, message = "Order finalized and broadcasted" });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error finalizing order {orderId}: {ex.Message}");
+                return StatusCode(500, new { success = false, message = "Error finalizing order", error = ex.Message });
+            }
+        }
+
         // POST: api/Orders/validate-stock
         [HttpPost("validate-stock")]
         public async Task<ActionResult<object>> ValidateStock([FromBody] List<StockValidationItem> items)
@@ -625,10 +719,15 @@ namespace Beyti_Backend.Controllers.Api
             {
                 var order = await _context.Orders
                     .Include(o => o.DeliveryTicket)
+                    .Include(o => o.PickupAddress)
+                    .Include(o => o.DeliveryAddress)
                     .Include(o => o.Customer)
                         .ThenInclude(c => c.UserProfile)
                     .Include(o => o.Seller)
                         .ThenInclude(s => s.UserProfile)
+                    .Include(o => o.OrderItems)
+                        .ThenInclude(oi => oi.ProductVariant)
+                            .ThenInclude(pv => pv.Product)
                     .FirstOrDefaultAsync(o => o.Id == id);
 
                 if (order == null)
@@ -730,6 +829,73 @@ namespace Beyti_Backend.Controllers.Api
                         relatedEntityType: "Order",
                         relatedEntityId: id
                     );
+                }
+
+                // Broadcast order status change to customer via SignalR
+                if (order.CustomerId > 0)
+                {
+                    var groupName = $"Customer_{order.CustomerId}";
+
+                    Console.WriteLine($"🔔 Broadcasting OrderStatusChanged to group: {groupName}");
+                    Console.WriteLine($"🔔 Order ID: {order.Id}, Status: {order.Status}");
+                    Console.WriteLine($"🔔 Customer ID: {order.CustomerId}");
+
+                    var statusUpdate = new
+                    {
+                        Id = order.Id,
+                        Status = order.Status,
+                        PaymentStatus = order.PaymentStatus,
+                        UpdatedAt = order.UpdatedAt,
+                        CustomerName = order.Customer?.UserProfile?.DisplayName,
+                        SellerName = order.Seller?.UserProfile?.DisplayName,
+                        SellerPhone = order.Seller?.Phone,
+                        FulfillmentType = order.FulfillmentType,
+                        TotalAmount = order.TotalAmount,
+                        DeliveryFee = order.DeliveryFee,
+                        SubtotalAmount = order.SubtotalAmount,
+                        PickupAddress = order.PickupAddress != null ? new
+                        {
+                            order.PickupAddress.Id,
+                            order.PickupAddress.Street,
+                            order.PickupAddress.City,
+                            order.PickupAddress.Region,
+                            order.PickupAddress.Country,
+                            order.PickupAddress.Latitude,
+                            order.PickupAddress.Longitude
+                        } : null,
+                        DeliveryAddress = order.DeliveryAddress != null ? new
+                        {
+                            order.DeliveryAddress.Id,
+                            order.DeliveryAddress.Street,
+                            order.DeliveryAddress.City,
+                            order.DeliveryAddress.Region,
+                            order.DeliveryAddress.Country,
+                            order.DeliveryAddress.Latitude,
+                            order.DeliveryAddress.Longitude
+                        } : null,
+                        orderItems = order.OrderItems.Select(oi => new
+                        {
+                            oi.Id,
+                            oi.OrderId,
+                            oi.ProductVariantId,
+                            ProductId = oi.ProductVariant?.Product?.Id,
+                            ProductName = oi.ProductVariant?.Product?.Name,
+                            ProductPrice = oi.ProductVariant?.Product?.BasePrice,
+                            ProductImage = oi.ProductVariant?.Product?.ImageUrl,
+                            ImageUrl = oi.ProductVariant?.Product?.ImageUrl,
+                            VariantSKU = oi.ProductVariant?.SKU,
+                            oi.Qty,
+                            oi.UnitPrice,
+                            oi.LineTotal
+                        }).ToList()
+                    };
+
+                    Console.WriteLine($"🔔 Sending update with {statusUpdate.orderItems.Count} items");
+
+                    await _hubContext.Clients.Group(groupName)
+                        .SendAsync("OrderStatusChanged", statusUpdate);
+
+                    Console.WriteLine($"✅ Broadcast complete");
                 }
 
                 Console.WriteLine($"✅ Order {id} - Status updated: {currentStatus} → {newStatus}");

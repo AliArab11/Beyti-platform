@@ -7,6 +7,7 @@ using Beyti_Backend.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Beyti_Backend.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -114,5 +115,7 @@ app.MapControllers();
 
 // Map SignalR Hub
 app.MapHub<NotificationHub>("/notificationHub");
+
+app.MapHub<OrderHub>("/orderHub");
 
 app.Run();

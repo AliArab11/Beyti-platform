@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import * as signalR from '@microsoft/signalr';
 import PageHeader from "../../components/PageHeader";
 import SidebarProfile from "../../components/SidebarProfile";
 import NavigationButton from "../../components/NavigationButton";
@@ -685,7 +686,7 @@ useEffect(() => {
 }, []);
 
 
-// Load seller orders and products after selecting sellerId
+// Load seller orders and products + setup SignalR
 useEffect(() => {
   if (!sellerId) return;
 
@@ -734,7 +735,103 @@ useEffect(() => {
   };
 
   loadData();
-}, [sellerId]);
+
+  // Setup SignalR connection for real-time order updates
+  const connection = new signalR.HubConnectionBuilder()
+    .withUrl("https://localhost:7062/orderHub")
+    .withAutomaticReconnect()
+    .build();
+
+  connection.start()
+    .then(() => {
+      console.log('✅ SignalR Connected to OrderHub');
+      
+      // Join seller-specific group
+      connection.invoke("JoinSellerGroup", sellerId)
+        .then(() => console.log(`✅ Joined Seller_${sellerId} group`))
+        .catch(err => console.error('❌ Error joining group:', err));
+
+      // Listen for new orders
+      connection.on("NewOrder", (newOrder) => {
+        console.log('🔔 New order received via SignalR:', newOrder);
+        console.log('🔍 Order Items from SignalR:', newOrder.orderItems);
+        console.log('🔍 Order Items length:', newOrder.orderItems?.length);
+        if (newOrder.orderItems && newOrder.orderItems.length > 0) {
+          console.log('🔍 First item structure:', newOrder.orderItems[0]);
+        }
+        
+        // Format the order to match your existing structure
+const formattedOrder = {
+  id: newOrder.id,
+  customerId: newOrder.customerId,
+  sellerId: newOrder.sellerId,
+  deliveryAddressId: newOrder.deliveryAddressId,
+  pickupAddressId: newOrder.pickupAddressId,
+  paymentMethod: newOrder.paymentMethod,
+  paymentStatus: newOrder.paymentStatus,
+  fulfillmentType: newOrder.fulfillmentType,
+  status: newOrder.status,
+  subtotalAmount: newOrder.subtotalAmount,
+  deliveryFee: newOrder.deliveryFee,
+  totalAmount: newOrder.totalAmount,
+  createdAt: newOrder.createdAt,
+  updatedAt: newOrder.updatedAt,
+  orderNote: newOrder.orderNote,
+  customerName: newOrder.customerName,
+  sellerName: newOrder.sellerName,
+  sellerPhone: newOrder.sellerPhone,
+  // Normalize orderItems to camelCase to match API format
+  orderItems: (newOrder.orderItems || []).map(item => ({
+    id: item.Id || item.id,
+    orderId: item.OrderId || item.orderId,
+    productVariantId: item.ProductVariantId || item.productVariantId,
+    productId: item.ProductId || item.productId,
+    productName: item.ProductName || item.productName,
+    productPrice: item.ProductPrice || item.productPrice,
+    productImage: item.ProductImage || item.productImage,
+    imageUrl: item.ImageUrl || item.imageUrl,
+    variantSKU: item.VariantSKU || item.variantSKU,
+    qty: item.Qty || item.qty,
+    unitPrice: item.UnitPrice || item.unitPrice,
+    lineTotal: item.LineTotal || item.lineTotal
+  }))
+};
+        
+        // Add the new order to the list
+        setOrders(prev => {
+          // Check if order already exists to prevent duplicates
+          if (prev.some(o => o.id === formattedOrder.id)) {
+            console.log('⚠️ Order already exists, skipping duplicate');
+            return prev;
+          }
+          // Add new order at the beginning
+          console.log('✅ Adding new order to list');
+          return [formattedOrder, ...prev];
+        });
+
+        // Show snackbar notification
+        setSnackbar({
+          show: true,
+          message: `New order #${newOrder.id} from ${newOrder.customerName}! Please respond within 10 minutes.`,
+          type: 'success'
+        });
+      });
+    })
+    .catch(err => console.error('❌ SignalR Connection Error:', err));
+
+  // Cleanup on unmount or seller change
+  return () => {
+    if (connection.state === signalR.HubConnectionState.Connected) {
+      connection.invoke("LeaveSellerGroup", sellerId)
+        .then(() => {
+          console.log(`✅ Left Seller_${sellerId} group`);
+          return connection.stop();
+        })
+        .then(() => console.log('✅ SignalR Disconnected'))
+        .catch(err => console.error('❌ Error disconnecting:', err));
+    }
+  };
+}, [sellerId, sellerList]);
 
 // Add this new useEffect AFTER the existing ones
 useEffect(() => {
