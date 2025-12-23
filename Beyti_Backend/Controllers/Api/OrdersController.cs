@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using BeytiDB.Data;
 using Beyti_Backend.Services;
+using Beyti_SignalR;
 
 namespace Beyti_Backend.Controllers.Api
 {
@@ -16,11 +17,13 @@ namespace Beyti_Backend.Controllers.Api
     {
         private readonly BeytiContext _context;
         private readonly INotificationService _notificationService;
+        private readonly ISignalRService _signalRService;
 
-        public OrdersController(BeytiContext context, INotificationService notificationService)
+        public OrdersController(BeytiContext context, INotificationService notificationService, ISignalRService signalRService)
         {
             _context = context;
             _notificationService = notificationService;
+            _signalRService = signalRService;
         }
 
         // DTO for creating orders 
@@ -274,11 +277,19 @@ namespace Beyti_Backend.Controllers.Api
         {
             try
             {
-                var order = await _context.Orders.FindAsync(id);
+                var order = await _context.Orders
+                    .Include(o => o.Customer)
+                        .ThenInclude(c => c.UserProfile)
+                    .Include(o => o.Seller)
+                        .ThenInclude(s => s.UserProfile)
+                    .FirstOrDefaultAsync(o => o.Id == id);
+
                 if (order == null)
                 {
                     return NotFound();
                 }
+
+                var oldStatus = order.Status;
 
                 // Update only the fields that are provided
                 if (!string.IsNullOrEmpty(dto.Status))
@@ -295,6 +306,97 @@ namespace Beyti_Backend.Controllers.Api
 
                 order.UpdatedAt = DateTime.Now;
                 await _context.SaveChangesAsync();
+
+                // Send real-time update if status changed
+                if (!string.IsNullOrEmpty(dto.Status) && dto.Status != oldStatus && order.Customer?.UserProfile != null)
+                {
+                    Console.WriteLine($"[OrdersController] Sending order status change - OrderId: {order.Id}, NewStatus: {dto.Status}");
+
+                    // Fetch the complete updated order with all related data to send to clients
+                    // This structure MUST match the GET endpoint to ensure UI consistency
+                    var updatedOrder = await _context.Orders
+                        .Include(o => o.Customer)
+                            .ThenInclude(c => c.UserProfile)
+                        .Include(o => o.Seller)
+                            .ThenInclude(s => s.UserProfile)
+                        .Include(o => o.PickupAddress)
+                        .Include(o => o.DeliveryAddress)
+                        .Include(o => o.Seller)
+                            .ThenInclude(s => s.SellerAddresses)
+                                .ThenInclude(sa => sa.Address)
+                        .Include(o => o.OrderItems)
+                            .ThenInclude(oi => oi.ProductVariant)
+                                .ThenInclude(pv => pv.Product)
+                        .Where(o => o.Id == order.Id)
+                        .Select(o => new
+                        {
+                            o.Id,
+                            o.CustomerId,
+                            o.SellerId,
+                            o.DeliveryAddressId,
+                            o.PickupAddressId,
+                            o.PaymentMethod,
+                            o.PaymentStatus,
+                            o.FulfillmentType,
+                            o.Status,
+                            o.SubtotalAmount,
+                            o.DeliveryFee,
+                            o.TotalAmount,
+                            o.CreatedAt,
+                            o.UpdatedAt,
+                            o.OrderNote,
+                            customerName = o.Customer.UserProfile.DisplayName,
+                            sellerName = o.Seller.UserProfile.DisplayName,
+                            sellerPhone = o.Seller.Phone,
+                            pickupAddress = o.PickupAddress != null ? new
+                            {
+                                o.PickupAddress.Id,
+                                o.PickupAddress.Street,
+                                o.PickupAddress.City,
+                                o.PickupAddress.Region,
+                                o.PickupAddress.Country,
+                                o.PickupAddress.Latitude,
+                                o.PickupAddress.Longitude,
+                            } : null,
+                            deliveryAddress = o.DeliveryAddress != null ? new
+                            {
+                                o.DeliveryAddress.Id,
+                                o.DeliveryAddress.Street,
+                                o.DeliveryAddress.City,
+                                o.DeliveryAddress.Region,
+                                o.DeliveryAddress.Country,
+                                o.DeliveryAddress.Latitude,
+                                o.DeliveryAddress.Longitude,
+                            } : null,
+                            orderItems = o.OrderItems.Select(oi => new
+                            {
+                                oi.Id,
+                                oi.OrderId,
+                                oi.ProductVariantId,
+                                productId = oi.ProductVariant.Product.Id,
+                                productName = oi.ProductVariant.Product.Name,
+                                productPrice = oi.ProductVariant.Product.BasePrice,
+                                productImage = oi.ProductVariant.Product.ImageUrl,
+                                imageUrl = oi.ProductVariant.Product.ImageUrl,
+                                variantSKU = oi.ProductVariant.SKU,
+                                oi.Qty,
+                                oi.UnitPrice,
+                                oi.LineTotal
+                            }).ToList()
+                        })
+                        .FirstOrDefaultAsync();
+
+                    await _signalRService.SendOrderStatusChangedAsync(
+                        customerId: order.Customer.UserProfile.Id,
+                        sellerId: order.Seller?.UserProfile?.Id,
+                        driverId: null,
+                        orderId: order.Id,
+                        newStatus: dto.Status,
+                        orderData: updatedOrder
+                    );
+
+                    Console.WriteLine($"[OrdersController] Order status change sent successfully");
+                }
 
                 return NoContent();
             }
@@ -372,6 +474,97 @@ namespace Beyti_Backend.Controllers.Api
                     relatedEntityType: "Order",
                     relatedEntityId: order.Id
                 );
+
+                // Send real-time order update via SignalR with complete order data
+                Console.WriteLine($"[OrdersController] 📤 Sending order created - OrderId: {order.Id}, CustomerId: {customer.UserProfile.Id}, SellerId: {seller.UserProfile.Id}");
+                Console.WriteLine($"[OrdersController] 🎯 Sending to seller group: user_{seller.UserProfile.Id}");
+
+                // Fetch the complete order with all related data to send to clients
+                // This structure MUST match the GET endpoint to ensure UI consistency
+                var completeOrder = await _context.Orders
+                    .Include(o => o.Customer)
+                        .ThenInclude(c => c.UserProfile)
+                    .Include(o => o.Seller)
+                        .ThenInclude(s => s.UserProfile)
+                    .Include(o => o.PickupAddress)
+                    .Include(o => o.DeliveryAddress)
+                    .Include(o => o.OrderItems)
+                        .ThenInclude(oi => oi.ProductVariant)
+                            .ThenInclude(pv => pv.Product)
+                    .Where(o => o.Id == order.Id)
+                    .Select(o => new
+                    {
+                        o.Id,
+                        o.CustomerId,
+                        o.SellerId,
+                        o.DeliveryAddressId,
+                        o.PickupAddressId,
+                        o.PaymentMethod,
+                        o.PaymentStatus,
+                        o.FulfillmentType,
+                        o.Status,
+                        o.SubtotalAmount,
+                        o.DeliveryFee,
+                        o.TotalAmount,
+                        o.CreatedAt,
+                        o.UpdatedAt,
+                        o.OrderNote,
+                        customerName = o.Customer.UserProfile.DisplayName,
+                        sellerName = o.Seller.UserProfile.DisplayName,
+                        sellerPhone = o.Seller.Phone,
+                        pickupAddress = o.PickupAddress != null ? new
+                        {
+                            o.PickupAddress.Id,
+                            o.PickupAddress.Street,
+                            o.PickupAddress.City,
+                            o.PickupAddress.Region,
+                            o.PickupAddress.Country,
+                            o.PickupAddress.Latitude,
+                            o.PickupAddress.Longitude,
+                        } : null,
+                        deliveryAddress = o.DeliveryAddress != null ? new
+                        {
+                            o.DeliveryAddress.Id,
+                            o.DeliveryAddress.Street,
+                            o.DeliveryAddress.City,
+                            o.DeliveryAddress.Region,
+                            o.DeliveryAddress.Country,
+                            o.DeliveryAddress.Latitude,
+                            o.DeliveryAddress.Longitude,
+                        } : null,
+                        orderItems = o.OrderItems.Select(oi => new
+                        {
+                            oi.Id,
+                            oi.OrderId,
+                            oi.ProductVariantId,
+                            productId = oi.ProductVariant.Product.Id,
+                            productName = oi.ProductVariant.Product.Name,
+                            productPrice = oi.ProductVariant.Product.BasePrice,
+                            productImage = oi.ProductVariant.Product.ImageUrl,
+                            imageUrl = oi.ProductVariant.Product.ImageUrl,
+                            variantSKU = oi.ProductVariant.SKU,
+                            oi.Qty,
+                            oi.UnitPrice,
+                            oi.LineTotal
+                        }).ToList()
+                    })
+                    .FirstOrDefaultAsync();
+
+                // Check if someone is currently managing this seller
+                var managerUserId = NotificationHub.GetSellerManager(seller.Id);
+
+                // Send to the manager if one is registered, otherwise send to the seller's UserProfile
+                var targetSellerId = managerUserId ?? seller.UserProfile.Id;
+
+                Console.WriteLine($"[OrdersController] 🎯 Seller {seller.Id} manager: {(managerUserId.HasValue ? "User " + managerUserId.Value : "Not registered, using seller UserProfile " + seller.UserProfile.Id)}");
+
+                await _signalRService.SendOrderCreatedAsync(
+                customerId: customer.UserProfile.Id,
+                sellerId: targetSellerId,
+                orderData: completeOrder
+            );
+
+                Console.WriteLine($"[OrdersController] ✅ Order created event sent successfully - Order #{order.Id}");
             }
 
             // Create delivery ticket immediately if delivery order
@@ -607,6 +800,89 @@ namespace Beyti_Backend.Controllers.Api
                         relatedEntityType: "Order",
                         relatedEntityId: id
                     );
+
+                    // Send real-time order status change via SignalR with complete order data
+                    Console.WriteLine($"[OrdersController] Sending order status change (seller-response) - OrderId: {order.Id}, NewStatus: {dto.Status}");
+
+                    var updatedOrder = await _context.Orders
+                        .Include(o => o.Customer)
+                            .ThenInclude(c => c.UserProfile)
+                        .Include(o => o.Seller)
+                            .ThenInclude(s => s.UserProfile)
+                        .Include(o => o.PickupAddress)
+                        .Include(o => o.DeliveryAddress)
+                        .Include(o => o.OrderItems)
+                            .ThenInclude(oi => oi.ProductVariant)
+                                .ThenInclude(pv => pv.Product)
+                        .Where(o => o.Id == order.Id)
+                        .Select(o => new
+                        {
+                            o.Id,
+                            o.CustomerId,
+                            o.SellerId,
+                            o.DeliveryAddressId,
+                            o.PickupAddressId,
+                            o.PaymentMethod,
+                            o.PaymentStatus,
+                            o.FulfillmentType,
+                            o.Status,
+                            o.SubtotalAmount,
+                            o.DeliveryFee,
+                            o.TotalAmount,
+                            o.CreatedAt,
+                            o.UpdatedAt,
+                            o.OrderNote,
+                            customerName = o.Customer.UserProfile.DisplayName,
+                            sellerName = o.Seller.UserProfile.DisplayName,
+                            sellerPhone = o.Seller.Phone,
+                            pickupAddress = o.PickupAddress != null ? new
+                            {
+                                o.PickupAddress.Id,
+                                o.PickupAddress.Street,
+                                o.PickupAddress.City,
+                                o.PickupAddress.Region,
+                                o.PickupAddress.Country,
+                                o.PickupAddress.Latitude,
+                                o.PickupAddress.Longitude,
+                            } : null,
+                            deliveryAddress = o.DeliveryAddress != null ? new
+                            {
+                                o.DeliveryAddress.Id,
+                                o.DeliveryAddress.Street,
+                                o.DeliveryAddress.City,
+                                o.DeliveryAddress.Region,
+                                o.DeliveryAddress.Country,
+                                o.DeliveryAddress.Latitude,
+                                o.DeliveryAddress.Longitude,
+                            } : null,
+                            orderItems = o.OrderItems.Select(oi => new
+                            {
+                                oi.Id,
+                                oi.OrderId,
+                                oi.ProductVariantId,
+                                productId = oi.ProductVariant.Product.Id,
+                                productName = oi.ProductVariant.Product.Name,
+                                productPrice = oi.ProductVariant.Product.BasePrice,
+                                productImage = oi.ProductVariant.Product.ImageUrl,
+                                imageUrl = oi.ProductVariant.Product.ImageUrl,
+                                variantSKU = oi.ProductVariant.SKU,
+                                oi.Qty,
+                                oi.UnitPrice,
+                                oi.LineTotal
+                            }).ToList()
+                        })
+                        .FirstOrDefaultAsync();
+
+                    await _signalRService.SendOrderStatusChangedAsync(
+                        customerId: order.Customer.UserProfile.Id,
+                        sellerId: order.Seller?.UserProfileId,
+                        driverId: null,
+                        orderId: order.Id,
+                        newStatus: dto.Status,
+                        orderData: updatedOrder
+                    );
+
+                    Console.WriteLine($"[OrdersController] Order status change sent successfully (seller-response)");
                 }
 
                 return NoContent();
@@ -730,6 +1006,89 @@ namespace Beyti_Backend.Controllers.Api
                         relatedEntityType: "Order",
                         relatedEntityId: id
                     );
+
+                    // Send real-time order status change via SignalR with complete order data
+                    Console.WriteLine($"[OrdersController] Sending order status change (update-seller-status) - OrderId: {order.Id}, NewStatus: {dto.Status}");
+
+                    var updatedOrder = await _context.Orders
+                        .Include(o => o.Customer)
+                            .ThenInclude(c => c.UserProfile)
+                        .Include(o => o.Seller)
+                            .ThenInclude(s => s.UserProfile)
+                        .Include(o => o.PickupAddress)
+                        .Include(o => o.DeliveryAddress)
+                        .Include(o => o.OrderItems)
+                            .ThenInclude(oi => oi.ProductVariant)
+                                .ThenInclude(pv => pv.Product)
+                        .Where(o => o.Id == order.Id)
+                        .Select(o => new
+                        {
+                            o.Id,
+                            o.CustomerId,
+                            o.SellerId,
+                            o.DeliveryAddressId,
+                            o.PickupAddressId,
+                            o.PaymentMethod,
+                            o.PaymentStatus,
+                            o.FulfillmentType,
+                            o.Status,
+                            o.SubtotalAmount,
+                            o.DeliveryFee,
+                            o.TotalAmount,
+                            o.CreatedAt,
+                            o.UpdatedAt,
+                            o.OrderNote,
+                            customerName = o.Customer.UserProfile.DisplayName,
+                            sellerName = o.Seller.UserProfile.DisplayName,
+                            sellerPhone = o.Seller.Phone,
+                            pickupAddress = o.PickupAddress != null ? new
+                            {
+                                o.PickupAddress.Id,
+                                o.PickupAddress.Street,
+                                o.PickupAddress.City,
+                                o.PickupAddress.Region,
+                                o.PickupAddress.Country,
+                                o.PickupAddress.Latitude,
+                                o.PickupAddress.Longitude,
+                            } : null,
+                            deliveryAddress = o.DeliveryAddress != null ? new
+                            {
+                                o.DeliveryAddress.Id,
+                                o.DeliveryAddress.Street,
+                                o.DeliveryAddress.City,
+                                o.DeliveryAddress.Region,
+                                o.DeliveryAddress.Country,
+                                o.DeliveryAddress.Latitude,
+                                o.DeliveryAddress.Longitude,
+                            } : null,
+                            orderItems = o.OrderItems.Select(oi => new
+                            {
+                                oi.Id,
+                                oi.OrderId,
+                                oi.ProductVariantId,
+                                productId = oi.ProductVariant.Product.Id,
+                                productName = oi.ProductVariant.Product.Name,
+                                productPrice = oi.ProductVariant.Product.BasePrice,
+                                productImage = oi.ProductVariant.Product.ImageUrl,
+                                imageUrl = oi.ProductVariant.Product.ImageUrl,
+                                variantSKU = oi.ProductVariant.SKU,
+                                oi.Qty,
+                                oi.UnitPrice,
+                                oi.LineTotal
+                            }).ToList()
+                        })
+                        .FirstOrDefaultAsync();
+
+                    await _signalRService.SendOrderStatusChangedAsync(
+                        customerId: order.Customer.UserProfile.Id,
+                        sellerId: order.Seller?.UserProfileId,
+                        driverId: null,
+                        orderId: order.Id,
+                        newStatus: dto.Status,
+                        orderData: updatedOrder
+                    );
+
+                    Console.WriteLine($"[OrdersController] Order status change sent successfully (update-seller-status)");
                 }
 
                 Console.WriteLine($"✅ Order {id} - Status updated: {currentStatus} → {newStatus}");

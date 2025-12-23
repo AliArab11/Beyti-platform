@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using BeytiDB.Data;
+using Beyti_Backend.Services;
 
 namespace Beyti_Backend.Controllers.Api
 {
@@ -14,10 +15,12 @@ namespace Beyti_Backend.Controllers.Api
     public class ProductsController : ControllerBase
     {
         private readonly BeytiContext _context;
+        private readonly ISignalRService _signalRService;
 
-        public ProductsController(BeytiContext context)
+        public ProductsController(BeytiContext context, ISignalRService signalRService)
         {
             _context = context;
+            _signalRService = signalRService;
         }
 
         // Add this at the top with your other using statements
@@ -180,6 +183,32 @@ namespace Beyti_Backend.Controllers.Api
             product.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
+
+            // Get seller's user profile for SignalR notification
+            var seller = await _context.Sellers
+                .Include(s => s.UserProfile)
+                .FirstOrDefaultAsync(s => s.Id == product.SellerId);
+
+            // Send real-time product updated update via SignalR
+            if (seller?.UserProfile != null)
+            {
+                await _signalRService.SendProductUpdatedAsync(
+                    sellerId: seller.UserProfile.Id,
+                    productData: new
+                    {
+                        id = product.Id,
+                        name = product.Name,
+                        description = product.Description,
+                        basePrice = product.BasePrice,
+                        imageUrl = product.ImageUrl,
+                        isActive = product.IsActive,
+                        sellerId = product.SellerId,
+                        subCategoryId = product.SubCategoryId,
+                        updatedAt = product.UpdatedAt
+                    }
+                );
+            }
+
             return NoContent();
         }
 
@@ -220,7 +249,29 @@ namespace Beyti_Backend.Controllers.Api
             // Reload product to get all navigation properties
             var createdProduct = await _context.Products
                 .Include(p => p.SubCategory)
+                .Include(p => p.Seller)
+                    .ThenInclude(s => s.UserProfile)
                 .FirstOrDefaultAsync(p => p.Id == product.Id);
+
+            // Send real-time product created update via SignalR
+            if (createdProduct?.Seller?.UserProfile != null)
+            {
+                await _signalRService.SendProductCreatedAsync(
+                    sellerId: createdProduct.Seller.UserProfile.Id,
+                    productData: new
+                    {
+                        id = createdProduct.Id,
+                        name = createdProduct.Name,
+                        description = createdProduct.Description,
+                        basePrice = createdProduct.BasePrice,
+                        imageUrl = createdProduct.ImageUrl,
+                        isActive = createdProduct.IsActive,
+                        sellerId = createdProduct.SellerId,
+                        subCategoryId = createdProduct.SubCategoryId,
+                        createdAt = createdProduct.CreatedAt
+                    }
+                );
+            }
 
             return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, new
             {
@@ -237,7 +288,11 @@ namespace Beyti_Backend.Controllers.Api
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteProduct(int id)
         {
-            var product = await _context.Products.FindAsync(id);
+            var product = await _context.Products
+                .Include(p => p.Seller)
+                    .ThenInclude(s => s.UserProfile)
+                .FirstOrDefaultAsync(p => p.Id == id);
+
             if (product == null)
             {
                 return NotFound();
@@ -248,6 +303,23 @@ namespace Beyti_Backend.Controllers.Api
             product.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
+
+            // Send real-time product status change via SignalR
+            if (product.Seller?.UserProfile != null)
+            {
+                await _signalRService.SendProductStatusChangedAsync(
+                    sellerId: product.Seller.UserProfile.Id,
+                    productId: product.Id,
+                    newStatus: product.IsActive ? "Active" : "Inactive",
+                    productData: new
+                    {
+                        id = product.Id,
+                        name = product.Name,
+                        isActive = product.IsActive,
+                        updatedAt = product.UpdatedAt
+                    }
+                );
+            }
 
             return NoContent();
         }

@@ -7,8 +7,9 @@ import { logProviderActivity } from '../../../utils/providerActivityLogger';
 import { Calendar } from '@phosphor-icons/react';
 import Snackbar from '../../../components/Snackbar';
 import ConfirmModal from '../../../components/ConfirmModal';
+import { useSignalRNotifications } from '../../../hooks/useSignalRNotifications';
 
-export default function BookingsManagement({ serviceProviderId, initialFilter = null, initialViewMode = null }) {
+export default function BookingsManagement({ serviceProviderId, initialFilter = null, initialViewMode = null, refreshTrigger = 0 }) {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState(initialFilter || '');
@@ -185,6 +186,60 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
     fetchTimeSlots();
   }, [serviceProviderId, filterStatus]);
 
+  // Watch for external refresh triggers from parent component
+  useEffect(() => {
+    if (refreshTrigger > 0) {
+      console.log('[BookingsManagement] External refresh triggered:', refreshTrigger);
+      fetchBookings();
+    }
+  }, [refreshTrigger]);
+
+  // Set up real-time booking updates via SignalR
+  // IMPORTANT: This provides instant updates when other users make changes
+  // - Customer creates/cancels booking → Provider sees it immediately
+  // - Provider changes status → Updates all connected clients (including this provider)
+  useSignalRNotifications({
+    onBookingUpdate: (data) => {
+      console.log('[BookingsManagement] Received booking update:', data);
+
+      if (data.type === 'BookingReceived') {
+        // New booking received from customer - refresh list
+        // Note: Snackbar notification is handled by parent ServiceProviderDashboard
+        // to avoid duplicate notifications
+        fetchBookings();
+      } else if (data.type === 'BookingCreated') {
+        // Booking created by customer - refresh list
+        fetchBookings();
+      }
+    },
+    onBookingStatusChange: (data) => {
+      console.log('[BookingsManagement] Received booking status change:', data);
+      console.log('[BookingsManagement] Booking data from SignalR:', data.booking);
+
+      // Update the booking in the list immediately (authoritative update from backend)
+      // This handles BOTH cases:
+      // 1. This provider changed the status (confirms optimistic update)
+      // 2. Another user changed it (customer canceled, etc.)
+      setBookings(prev => prev.map(booking => {
+        if (booking.id === data.bookingId) {
+          // Use the complete booking data from backend, ensuring we preserve the id
+          const updatedBooking = {
+            ...data.booking,
+            id: data.bookingId,
+            status: data.newStatus
+          };
+          console.log('[BookingsManagement] Updating booking from:', booking, 'to:', updatedBooking);
+          return updatedBooking;
+        }
+        return booking;
+      }));
+
+      // NOTE: Notification removed - provider's own actions show immediate success message
+      // External status changes (customer cancels) don't need notification here since
+      // the parent ServiceProviderDashboard handles them
+    }
+  });
+
   useEffect(() => {
     if (initialFilter) {
       setFilterStatus(initialFilter);
@@ -199,9 +254,17 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
     }
 
     try {
+      // OPTIMISTIC UPDATE: Update local state immediately
+      const quotedPriceValue = parseFloat(quotePrice);
+      setBookings(prev => prev.map(b =>
+        b.id === selectedBooking.id
+          ? { ...b, status: 'DepositPending', quotedPrice: quotedPriceValue }
+          : b
+      ));
+
       await updateBookingStatus(selectedBooking.id, {
         status: 'DepositPending',
-        quotedPrice: parseFloat(quotePrice)
+        quotedPrice: quotedPriceValue
       });
 
       // Log activity
@@ -209,23 +272,36 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
         serviceProviderId,
         'booking',
         'Sent Quote',
-        `Customer: ${selectedBooking.customerName || 'N/A'} - ${parseFloat(quotePrice).toFixed(2)} BHD`
+        `Customer: ${selectedBooking.customerName || 'N/A'} - ${quotedPriceValue.toFixed(2)} BHD`
       );
 
       showSnackbar('Quote sent successfully!', 'success');
       setShowQuoteModal(false);
       setSelectedBooking(null);
       setQuotePrice('');
-      fetchBookings();
+
+      // NOTE: SignalR will send authoritative update, no need for fetchBookings()
     } catch (err) {
       console.error('Error sending quote:', err);
       showSnackbar('Error sending quote', 'error');
+
+      // ROLLBACK: Revert optimistic update on error
+      await fetchBookings();
     }
   };
 
   const handleStatusChange = async (bookingId, newStatus, additionalData = {}) => {
     try {
       const booking = bookings.find(b => b.id === bookingId);
+
+      // OPTIMISTIC UPDATE: Update local state immediately for instant UI feedback
+      setBookings(prev => prev.map(b =>
+        b.id === bookingId
+          ? { ...b, status: newStatus, ...additionalData }
+          : b
+      ));
+
+      // Make API call to update backend
       await updateBookingStatus(bookingId, { status: newStatus, ...additionalData });
 
       // Log activity
@@ -243,10 +319,7 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
         `Customer: ${booking?.customerName || 'N/A'}`
       );
 
-      // Refresh bookings to show updated status immediately on calendar
-      await fetchBookings();
-
-      // Show success message
+      // Show success message for provider's own action
       const successMessages = {
         'Confirmed': 'Booking confirmed successfully!',
         'InProgress': 'Service started successfully!',
@@ -255,9 +328,16 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
         'Rejected': 'Booking rejected successfully!'
       };
       showSnackbar(successMessages[newStatus] || 'Booking status updated successfully!', 'success');
+
+      // NOTE: SignalR will send us a ReceiveBookingStatusChange event with the authoritative update
+      // We ignore that event to avoid duplicate notifications (see useSignalRNotifications below)
+
     } catch (err) {
       console.error('Error updating status:', err);
       showSnackbar('Error updating booking status', 'error');
+
+      // ROLLBACK: If API call fails, revert the optimistic update
+      await fetchBookings();
     }
   };
 

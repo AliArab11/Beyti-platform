@@ -26,6 +26,8 @@ import {
   getCustomerServiceReviews,
   cancelServiceBooking,
 } from "../../services/api";
+import { useSignalRNotifications } from '../../hooks/useSignalRNotifications';
+import { useSignalR } from '../../contexts/SignalRContext';
 
 // API helpers
 const BASE_URL = "https://localhost:7062/api";
@@ -87,6 +89,14 @@ const getStatusVariant = (status) => {
 const OrderDetailsModal = ({ order, onClose, onReorder, openReviewModal, onDeleteReview }) => {
   if (!order) return null;
 
+  // Log when order prop changes (indicates SignalR update)
+  React.useEffect(() => {
+    console.log('[OrderDetailsModal] Received order update:', {
+      id: order.id,
+      status: order.status,
+      fullOrder: order
+    });
+  }, [order]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm modal-backdrop-enter">
@@ -255,7 +265,7 @@ const CustomerDashboard = () => {
     return sessionStorage.getItem('beyti_customerName') || "My Account";
   });
   const [userProfileId, setUserProfileId] = useState(() => {
-    return parseInt(sessionStorage.getItem('beyti_userProfileId')) || null;
+    return parseInt(sessionStorage.getItem('beyti_userProfileId')) || 1; // Hardcoded fallback for testing
   });
 
   const [customerList, setCustomerList] = useState([]);
@@ -275,10 +285,10 @@ const CustomerDashboard = () => {
 
   const [snackbar, setSnackbar] = useState({ open: false, message: '', type: 'success' });
 
-  const showSnackbar = (message, type = 'success') => {
+  const showSnackbar = useCallback((message, type = 'success') => {
     setSnackbar({ open: true, message, type });
     setTimeout(() => setSnackbar({ open: false, message: '', type: 'success' }), 5000);
-  };
+  }, []);
 
   const [showReorderModal, setShowReorderModal] = useState(false);
   const [pendingReorderItems, setPendingReorderItems] = useState(null);
@@ -324,6 +334,39 @@ const [reviewModal, setReviewModal] = useState({
 
   // Notifications state
   const [notificationSearchQuery, setNotificationSearchQuery] = useState('');
+
+  // SignalR connection
+  const { startConnection, isConnected, on, off } = useSignalR();
+
+  // Initialize SignalR connection when userProfileId is available
+  useEffect(() => {
+    console.log('[CustomerDashboard] SignalR connection check - userProfileId:', userProfileId, 'isConnected:', isConnected);
+    if (userProfileId && !isConnected) {
+      console.log('[CustomerDashboard] Starting SignalR connection for user:', userProfileId);
+      startConnection(userProfileId);
+    } else if (!userProfileId) {
+      console.warn('[CustomerDashboard] Cannot start SignalR - no userProfileId!');
+    } else if (isConnected) {
+      console.log('[CustomerDashboard] SignalR already connected for userProfileId:', userProfileId);
+    }
+  }, [userProfileId, isConnected, startConnection]);
+
+  // DEBUG: Direct listener to test if event is received at all
+  useEffect(() => {
+    if (!isConnected) return;
+
+    const debugHandler = (data) => {
+      console.log('🔥🔥🔥 [CustomerDashboard] DIRECT receivebookingstatuschange event received:', data);
+    };
+
+    on('receivebookingstatuschange', debugHandler);
+    console.log('🔍 [CustomerDashboard] Direct debug handler registered for receivebookingstatuschange');
+
+    return () => {
+      off('receivebookingstatuschange', debugHandler);
+      console.log('🔍 [CustomerDashboard] Direct debug handler unregistered');
+    };
+  }, [isConnected, on, off]);
 
   // Cart state - load from localStorage
 const [cart, setCart] = useState(() => {
@@ -407,14 +450,10 @@ useEffect(() => {
     loadCustomers();
   }, []);
 
- // Load orders with reviews - only on mount or when customerId changes
-useEffect(() => {
+// Fetch orders with reviews
+const fetchOrders = useCallback(async () => {
   if (!customerId) return;
 
-  // Only load if we don't have orders yet
-  if (orders.length > 0) return;
-
-  const loadOrders = async () => {
   try {
     setLoading(true);
     setError(null);
@@ -450,9 +489,17 @@ useEffect(() => {
   } finally {
     setLoading(false);
   }
-};
-  loadOrders();
-}, [customerId]); // Removed orders from dependency to prevent infinite loops
+}, [customerId]);
+
+ // Load orders with reviews - only on mount or when customerId changes
+useEffect(() => {
+  if (!customerId) return;
+
+  // Only load if we don't have orders yet
+  if (orders.length > 0) return;
+
+  fetchOrders();
+}, [customerId, fetchOrders]); // Added fetchOrders to dependencies
 
 // Fetch history data (services and reviews)
 const fetchHistory = useCallback(async () => {
@@ -500,6 +547,106 @@ useEffect(() => {
     fetchHistory();
   }
 }, [customerId, fetchHistory]);
+
+// Stabilize SignalR event handlers with useCallback to prevent re-registration
+const handleBookingUpdate = useCallback((data) => {
+  console.log('[CustomerDashboard] Received booking update:', data);
+
+  if (data.type === 'BookingCreated') {
+    // Customer's own booking created - refresh list
+    fetchHistory();
+    showSnackbar('Booking request submitted successfully!', 'success');
+  }
+}, [fetchHistory, showSnackbar]);
+
+const handleBookingStatusChange = useCallback((data) => {
+  console.log('[CustomerDashboard] Received booking status change:', data);
+  console.log('[CustomerDashboard] Booking data from SignalR:', data.booking);
+
+  // Update the booking in the list with complete booking data from backend
+  setServiceBookings(prev => {
+    const updated = prev.map(booking => {
+      if (booking.id === data.bookingId) {
+        // Use the complete booking data from backend, ensuring we preserve the id
+        const updatedBooking = {
+          ...data.booking,
+          id: data.bookingId,
+          status: data.newStatus
+        };
+        console.log('[CustomerDashboard] Updating booking from:', booking, 'to:', updatedBooking);
+        return updatedBooking;
+      }
+      return booking;
+    });
+    console.log('[CustomerDashboard] Updated serviceBookings:', updated);
+    return updated;
+  });
+
+  // Show notification about status change
+  const statusMessages = {
+    'Confirmed': 'Your booking has been confirmed!',
+    'InProgress': 'Your service is now in progress',
+    'Completed': 'Your service has been completed!',
+    'Canceled': 'Your booking has been canceled',
+    'Cancelled': 'Your booking has been cancelled',
+    'Rejected': 'Your booking request was rejected'
+  };
+
+  const message = statusMessages[data.newStatus] || 'Booking status updated';
+  const type = ['Rejected', 'Canceled', 'Cancelled'].includes(data.newStatus) ? 'error' : 'success';
+  showSnackbar(message, type);
+}, [showSnackbar]);
+
+const handleOrderUpdate = useCallback((data) => {
+  console.log('[CustomerDashboard] Received order update:', data);
+
+  if (data.type === 'OrderCreated') {
+    // Customer's own order created - refresh orders
+    fetchOrders();
+    showSnackbar('Order placed successfully!', 'success');
+  }
+}, [fetchOrders, showSnackbar]);
+
+const handleOrderStatusChange = useCallback((data) => {
+  console.log('[CustomerDashboard] Received order status change:', data);
+  console.log('[CustomerDashboard] Order data from SignalR:', data.order);
+
+  // Update the order in the list with complete order data from backend
+  setOrders(prev => prev.map(order => {
+    if (order.id === data.orderId) {
+      // Use the complete order data from backend, ensuring we preserve the id
+      const updatedOrder = {
+        ...data.order,
+        id: data.orderId,
+        status: data.newStatus
+      };
+      console.log('[CustomerDashboard] Updating order from:', order, 'to:', updatedOrder);
+      return updatedOrder;
+    }
+    return order;
+  }));
+
+  // Show notification about order status change
+  const orderStatusMessages = {
+    'Accepted': 'Your order has been accepted!',
+    'Preparing': 'Your order is being prepared',
+    'Ready for Pickup': 'Your order is ready for pickup!',
+    'Completed': 'Your order has been completed!',
+    'Cancelled': 'Your order has been cancelled'
+  };
+
+  const message = orderStatusMessages[data.newStatus] || 'Order status updated';
+  const type = data.newStatus === 'Cancelled' ? 'error' : 'success';
+  showSnackbar(message, type);
+}, [showSnackbar]);
+
+// Set up real-time booking and order updates via SignalR
+useSignalRNotifications({
+  onBookingUpdate: handleBookingUpdate,
+  onBookingStatusChange: handleBookingStatusChange,
+  onOrderUpdate: handleOrderUpdate,
+  onOrderStatusChange: handleOrderStatusChange
+});
 
 // Sync historyViewMode with mainTab
 useEffect(() => {
