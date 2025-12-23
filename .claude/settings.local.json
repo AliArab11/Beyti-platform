@@ -11,7 +11,15 @@
       "Bash(taskkill:*)",
       "Bash(cmd /c \"taskkill /F /PID 24248\")",
       "Bash(npm run dev:*)",
-      "Bash(tasklist:*)"
+      "Bash(tasklist:*)",
+      "Bash(dotnet build:*)",
+      "Bash(npm install:*)",
+      "Bash(grep:*)",
+      "Bash(cat:*)",
+      "Bash(dotnet ef migrations:*)",
+      "Bash(dotnet tool list:*)",
+      "Bash(dotnet tool install:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []

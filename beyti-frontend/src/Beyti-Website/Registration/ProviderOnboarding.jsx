@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
 import Select from '../../components/Select';
 import MembershipSelection from './components/MembershipSelection';
 import { validateRequired, validatePhone, validateNumber, validatePriceRange } from '../../utils/validation';
+import { getServiceCategories, createUserMembership } from '../../services/api';
 
 /**
  * Service Provider Onboarding Wizard
@@ -24,7 +25,7 @@ export default function ProviderOnboarding() {
   const [formData, setFormData] = useState({
     // Step 1: Identity
     businessName: '',
-    serviceType: '',
+    serviceCategoryId: '',
     phone: '',
     // Step 2: Services
     serviceDescription: '',
@@ -44,23 +45,27 @@ export default function ProviderOnboarding() {
 
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [serviceCategories, setServiceCategories] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
 
-  // Service type options
-  const serviceTypes = [
-    { value: 'plumbing', label: 'Plumbing' },
-    { value: 'electrical', label: 'Electrical' },
-    { value: 'carpentry', label: 'Carpentry' },
-    { value: 'painting', label: 'Painting' },
-    { value: 'cleaning', label: 'Cleaning' },
-    { value: 'tutoring', label: 'Tutoring' },
-    { value: 'photography', label: 'Photography' },
-    { value: 'catering', label: 'Catering' },
-    { value: 'landscaping', label: 'Landscaping' },
-    { value: 'hvac', label: 'HVAC' },
-    { value: 'pest-control', label: 'Pest Control' },
-    { value: 'moving', label: 'Moving Services' },
-    { value: 'other', label: 'Other' }
-  ];
+  // Fetch service categories from backend
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const categories = await getServiceCategories();
+        setServiceCategories(categories.map(cat => ({
+          value: cat.id,
+          label: cat.name
+        })));
+      } catch (error) {
+        console.error('Failed to load service categories:', error);
+        setErrors(prev => ({ ...prev, form: 'Failed to load service categories. Please refresh the page.' }));
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   /**
    * Update form field
@@ -84,8 +89,8 @@ export default function ProviderOnboarding() {
       if (!validateRequired(formData.businessName)) {
         newErrors.businessName = 'Business name is required';
       }
-      if (!validateRequired(formData.serviceType)) {
-        newErrors.serviceType = 'Please select a service type';
+      if (!validateRequired(formData.serviceCategoryId)) {
+        newErrors.serviceCategoryId = 'Please select a service category';
       }
       if (!validateRequired(formData.phone)) {
         newErrors.phone = 'Phone number is required';
@@ -122,11 +127,8 @@ export default function ProviderOnboarding() {
       if (!formData.isVerified) {
         newErrors.verification = 'Please complete the verification step';
       }
-    } else if (step === 5) {
-      if (!formData.selectedPlan) {
-        newErrors.membership = 'Please select a membership plan';
-      }
     }
+    // Step 5: Membership is now optional - no validation needed
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -172,9 +174,7 @@ export default function ProviderOnboarding() {
    * Submit provider registration
    */
   const handleSubmit = async () => {
-    if (!validateStep(5)) {
-      return;
-    }
+    // No validation needed for step 5 since membership is optional
 
     setIsLoading(true);
 
@@ -245,6 +245,7 @@ export default function ProviderOnboarding() {
         },
         body: JSON.stringify({
           businessName: formData.businessName,
+          serviceCategoryId: parseInt(formData.serviceCategoryId),
           phone: formData.phone,
           minServicePrice: parseFloat(formData.minPrice),
           maxServicePrice: parseFloat(formData.maxPrice),
@@ -285,6 +286,20 @@ export default function ProviderOnboarding() {
         const errorText = await providerAddressResponse.text();
         console.error('ServiceProviderAddress creation failed:', errorText);
         throw new Error(`Step 3: Failed to link address to service provider - ${errorText || 'Bad Request'}`);
+      }
+
+      // Step 4: Create membership if selected
+      if (formData.selectedPlan) {
+        try {
+          await createUserMembership({
+            userProfileId: parseInt(userId),
+            membershipPlanId: formData.selectedPlan,
+            autoRenew: false
+          });
+        } catch (error) {
+          console.error('Failed to assign membership, continuing...', error);
+          // Don't block registration if membership fails
+        }
       }
 
       // Update role in localStorage
@@ -369,14 +384,15 @@ export default function ProviderOnboarding() {
 
               <Select
                 label="SERVICE TYPE"
-                name="serviceType"
-                id="serviceType"
-                value={formData.serviceType}
-                onChange={handleChange('serviceType')}
-                options={serviceTypes}
-                placeholder="Select your service type"
+                name="serviceCategoryId"
+                id="serviceCategoryId"
+                value={formData.serviceCategoryId}
+                onChange={handleChange('serviceCategoryId')}
+                options={serviceCategories}
+                placeholder={loadingCategories ? "Loading..." : "Select your service type"}
                 required
-                error={errors.serviceType}
+                disabled={loadingCategories}
+                error={errors.serviceCategoryId}
               />
 
               <Input

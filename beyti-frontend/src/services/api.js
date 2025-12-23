@@ -238,6 +238,38 @@ export const toggleMembershipPlanStatus = async (id) => {
   });
 };
 
+/**
+ * Create a user membership assignment
+ * Assigns a membership plan to a user profile
+ *
+ * @param {object} data - Membership data { userProfileId, membershipPlanId, autoRenew }
+ * @returns {Promise<object>} - Created membership object
+ *
+ * @example
+ * ```javascript
+ * import { createUserMembership } from './services/api';
+ *
+ * const membershipData = {
+ *   userProfileId: 1,
+ *   membershipPlanId: 2,
+ *   autoRenew: false
+ * };
+ *
+ * try {
+ *   const membership = await createUserMembership(membershipData);
+ *   console.log('Membership created:', membership);
+ * } catch (error) {
+ *   console.error('Failed to create membership:', error.message);
+ * }
+ * ```
+ */
+export const createUserMembership = async (data) => {
+  return await fetchAPI('/UserMemberships', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
 // --- Admin APIs ---
 export const getAdmins = async () => {
   return await fetchAPI('/AdminProfiles');
@@ -1575,7 +1607,7 @@ export const updateProviderAddress = async (serviceProviderId, data) => {
 
 // Categories & Services
 export const getServiceCategories = async () => {
-  return await fetchAPI('/ServiceProviderDashboard/Categories');
+  return await fetchAPI('/ServiceCategories');
 };
 
 export const getProviderCategories = async (serviceProviderId) => {

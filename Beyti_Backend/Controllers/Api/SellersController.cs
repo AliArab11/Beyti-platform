@@ -9,6 +9,7 @@ namespace Beyti_Backend.Controllers.Api
         public string StoreName { get; set; }
         public string Phone { get; set; }
         public string? UserId { get; set; }  // For onboarding flow
+        public int CategoryId { get; set; }  // Required for seller category
     }
     public class UpdateStoreImageDto
     {
@@ -531,6 +532,16 @@ namespace Beyti_Backend.Controllers.Api
                 if (string.IsNullOrEmpty(dto.Phone))
                     return BadRequest(new { error = "Phone is required" });
 
+                if (dto.CategoryId == 0)
+                    return BadRequest(new { error = "categoryId is required" });
+
+                // Validate Category exists
+                var categoryExists = await _context.Categories
+                    .AnyAsync(c => c.Id == dto.CategoryId && c.IsActive);
+
+                if (!categoryExists)
+                    return BadRequest(new { error = "Invalid category" });
+
                 UserProfile profile;
 
                 // Check if onboarding (userId provided) or admin creation
@@ -576,6 +587,8 @@ namespace Beyti_Backend.Controllers.Api
                 var seller = new Seller
                 {
                     UserProfileId = profile.Id,
+                    StoreName = dto.StoreName,
+                    CategoryId = dto.CategoryId,
                     Phone = dto.Phone,
                     CreatedAt = DateTime.Now,
                     UpdatedAt = DateTime.Now

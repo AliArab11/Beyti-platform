@@ -16,7 +16,7 @@ public partial class ServiceCatalog
     public int ServiceCategoryId { get; set; }
 
     [Required]
-    [StringLength(100)]
+    [StringLength(120)]
     public string Name { get; set; } = null!;
 
     [StringLength(255)]

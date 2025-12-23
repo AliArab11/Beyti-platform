@@ -75,12 +75,54 @@ namespace Beyti_Backend.Controllers.Api
         // POST: api/UserMemberships
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<UserMembership>> PostUserMembership(UserMembership userMembership)
+        public async Task<ActionResult<UserMembership>> PostUserMembership(CreateMembershipDto dto)
         {
-            _context.UserMemberships.Add(userMembership);
+            // Validate UserProfileId exists
+            var userProfile = await _context.UserProfiles.FindAsync(dto.UserProfileId);
+            if (userProfile == null)
+            {
+                return NotFound(new { error = "User profile not found" });
+            }
+
+            // Validate MembershipPlanId exists
+            var plan = await _context.MembershipPlans.FindAsync(dto.MembershipPlanId);
+            if (plan == null)
+            {
+                return NotFound(new { error = "Membership plan not found" });
+            }
+
+            // Check if user already has active membership
+            var existing = await _context.UserMemberships
+                .FirstOrDefaultAsync(um => um.UserProfileId == dto.UserProfileId && um.Status == "Active");
+
+            if (existing != null)
+            {
+                return BadRequest(new { error = "User already has an active membership" });
+            }
+
+            var membership = new UserMembership
+            {
+                UserProfileId = dto.UserProfileId,
+                MembershipPlanId = dto.MembershipPlanId,
+                StartDate = DateOnly.FromDateTime(DateTime.UtcNow),
+                EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(plan.DurationDays ?? 30)),
+                Status = "Active",
+                AutoRenew = dto.AutoRenew ?? false,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.UserMemberships.Add(membership);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetUserMembership", new { id = userMembership.Id }, userMembership);
+            return CreatedAtAction("GetUserMembership", new { id = membership.Id }, membership);
+        }
+
+        // DTO class for membership creation
+        public class CreateMembershipDto
+        {
+            public int UserProfileId { get; set; }
+            public int MembershipPlanId { get; set; }
+            public bool? AutoRenew { get; set; }
         }
 
         // DELETE: api/UserMemberships/5

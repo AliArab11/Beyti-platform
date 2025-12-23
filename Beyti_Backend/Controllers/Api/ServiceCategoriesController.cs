@@ -22,11 +22,15 @@ namespace Beyti_Backend.Controllers.Api
 
         // GET: api/ServiceCategories
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<ServiceCategory>>> GetServiceCategories()
+        public async Task<ActionResult<IEnumerable<object>>> GetServiceCategories()
         {
-            return await _context.ServiceCategories
-                .Include(sc => sc.ServiceCatalogs)
+            var categories = await _context.ServiceCategories
+                .Where(sc => sc.IsActive)
+                .OrderBy(sc => sc.Name)
+                .Select(sc => new { sc.Id, sc.Name, sc.Description })
                 .ToListAsync();
+
+            return Ok(categories);
         }
 
         // GET: api/ServiceCategories/5

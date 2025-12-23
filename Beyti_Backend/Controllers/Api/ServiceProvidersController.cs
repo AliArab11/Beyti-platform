@@ -194,6 +194,19 @@ namespace Beyti_Backend.Controllers.Api
             if (body.TryGetProperty("userId", out var userIdProp))
                 userId = userIdProp.GetString();
 
+            // Extract serviceCategoryId (required)
+            if (!body.TryGetProperty("serviceCategoryId", out var serviceCategoryIdProp))
+                return BadRequest(new { error = "serviceCategoryId is required" });
+
+            int serviceCategoryId = serviceCategoryIdProp.GetInt32();
+
+            // Validate ServiceCategory exists
+            var categoryExists = await _context.ServiceCategories
+                .AnyAsync(sc => sc.Id == serviceCategoryId && sc.IsActive);
+
+            if (!categoryExists)
+                return BadRequest(new { error = "Invalid service category" });
+
             var now = DateTime.Now;
             UserProfile profile;
 
@@ -243,6 +256,7 @@ namespace Beyti_Backend.Controllers.Api
             var provider = new BeytiDB.Data.ServiceProvider
             {
                 UserProfileId = profile.Id,
+                ServiceCategoryId = serviceCategoryId,
                 BusinessName = businessName,
                 Phone = phone,
                 MinServicePrice = minServicePrice,
