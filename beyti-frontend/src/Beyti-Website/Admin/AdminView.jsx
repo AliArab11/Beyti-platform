@@ -94,7 +94,7 @@ const AdminView = () => {
   // ADMIN CREDENTIALS - CONFIGURED HERE
   // ========================================
   // Set the admin credentials directly
-  const userProfileId = 3;  // Admin UserProfileId
+  const userProfileId = 4;  // Admin UserProfileId
   const adminProfileId = 1;  // Admin Id
   const userRole = 'Admin';  // User role type
 
@@ -258,9 +258,23 @@ const AdminView = () => {
 
   // Helper function to format time ago
   const formatTimeAgo = (timestamp) => {
-    const now = new Date();
+    if (!timestamp) return '';
+
+    // Parse the timestamp - backend sends local timestamps using DateTime.Now
+    // JavaScript's new Date() will treat timestamps without timezone as local time
     const past = new Date(timestamp);
+
+    // Validate the date
+    if (isNaN(past.getTime())) {
+      console.error('Invalid timestamp:', timestamp);
+      return '';
+    }
+
+    const now = new Date();
     const diffInSeconds = Math.floor((now - past) / 1000);
+
+    // Handle negative differences (clock skew or future timestamps)
+    if (diffInSeconds < 0) return 'Just now';
 
     if (diffInSeconds < 60) return 'Just now';
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;

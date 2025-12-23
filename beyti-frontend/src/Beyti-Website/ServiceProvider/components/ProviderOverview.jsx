@@ -6,6 +6,7 @@ import StatusChip from '../../../components/StatusChip';
 import CRUDButton from '../../../components/CRUDButton';
 import QuickAddServiceModal from './QuickAddServiceModal';
 import QuickAddScheduleModal from './QuickAddScheduleModal';
+import { useSignalR } from '../../../contexts/SignalRContext';
 import {
   CalendarCheck,
   Plus,
@@ -19,6 +20,8 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
   const [todayBookings, setTodayBookings] = useState([]);
   const [recentReviews, setRecentReviews] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { on, off, isConnected } = useSignalR();
+  const [newRequestAnimation, setNewRequestAnimation] = useState(false);
 
   // Modal States
   const [showServiceModal, setShowServiceModal] = useState(false);
@@ -27,16 +30,86 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
   useEffect(() => {
     if (serviceProviderId) {
       fetchDashboardData();
-
-      // Set up automatic refresh every 10 seconds to update pending requests count
-      // This ensures the count updates when timers expire and bookings are auto-cancelled
-      const refreshInterval = setInterval(() => {
-        fetchDashboardData(false); // Don't show loading spinner on automatic refreshes
-      }, 10000); // Refresh every 10 seconds
-
-      return () => clearInterval(refreshInterval);
     }
   }, [serviceProviderId]);
+
+  // Set up SignalR real-time listeners for new bookings
+  useEffect(() => {
+    if (!isConnected) return;
+
+    console.log('[ProviderOverview] Setting up SignalR listeners');
+
+    // Handler for new booking received
+    const handleBookingUpdate = (message) => {
+      console.log('[ProviderOverview] Received booking update:', message);
+
+      if (message.type === 'BookingReceived') {
+        console.log('[ProviderOverview] New booking received - updating stats immediately');
+
+        // Trigger animation for new request
+        setNewRequestAnimation(true);
+        setTimeout(() => setNewRequestAnimation(false), 3000);
+
+        // Immediately increment pending requests count for instant feedback
+        setStats(prevStats => {
+          if (prevStats) {
+            return {
+              ...prevStats,
+              pendingRequests: prevStats.pendingRequests + 1,
+              totalBookings: prevStats.totalBookings + 1
+            };
+          }
+          return prevStats;
+        });
+
+        // Also refresh full dashboard data in background to sync everything
+        fetchDashboardData(false); // Don't show loading spinner
+      }
+    };
+
+    // Handler for booking status changes
+    const handleBookingStatusChange = (data) => {
+      console.log('[ProviderOverview] Booking status changed:', data);
+      console.log('[ProviderOverview] Status change details:', {
+        bookingId: data.bookingId,
+        newStatus: data.newStatus,
+        booking: data.booking
+      });
+
+      // Update stats based on status change
+      setStats(prevStats => {
+        if (!prevStats) return prevStats;
+
+        const updatedStats = { ...prevStats };
+
+        // If status changed FROM Pending to something else, decrement pending
+        if (data.newStatus !== 'Pending') {
+          updatedStats.pendingRequests = Math.max(0, prevStats.pendingRequests - 1);
+        }
+
+        // If status changed TO Completed, increment completed bookings and update earnings
+        if (data.newStatus === 'Completed' && data.booking?.quotedPrice) {
+          updatedStats.completedBookings = prevStats.completedBookings + 1;
+          updatedStats.totalEarnings = prevStats.totalEarnings + (data.booking.quotedPrice || 0);
+        }
+
+        return updatedStats;
+      });
+
+      // Refresh full dashboard to sync and update today's bookings
+      fetchDashboardData(false);
+    };
+
+    // Register SignalR event listeners
+    on('ReceiveBookingUpdate', handleBookingUpdate);
+    on('ReceiveBookingStatusChange', handleBookingStatusChange);
+
+    return () => {
+      console.log('[ProviderOverview] Cleaning up SignalR listeners');
+      off('ReceiveBookingUpdate', handleBookingUpdate);
+      off('ReceiveBookingStatusChange', handleBookingStatusChange);
+    };
+  }, [isConnected, on, off]);
 
   const fetchDashboardData = async (showLoadingSpinner = true) => {
     try {
@@ -215,17 +288,24 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
       {stats && stats.pendingRequests > 0 && (
         <div
           onClick={() => onNavigateToBookings && onNavigateToBookings('Pending')}
-          className="bg-warning-bg border-2 border-warning-stroke rounded-lg p-4 cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.01]"
+          className={`bg-warning-bg border-2 border-warning-stroke rounded-lg p-4 cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.01] ${
+            newRequestAnimation ? 'animate-[pulse_1s_ease-in-out_3] ring-4 ring-warning-text ring-opacity-50' : ''
+          }`}
         >
           <div className="flex items-center gap-4">
             <div className="flex-shrink-0">
-              <div className="w-12 h-12 bg-warning-text rounded-full flex items-center justify-center animate-pulse">
+              <div className={`w-12 h-12 bg-warning-text rounded-full flex items-center justify-center ${
+                newRequestAnimation ? 'animate-[bounce_0.5s_ease-in-out_3]' : 'animate-pulse'
+              }`}>
                 <CalendarCheck size={24} className="text-white" weight="fill" />
               </div>
             </div>
             <div className="flex-1">
               <h3 className="text-card-h3 text-charcoal-600 dark:text-white font-semibold">
                 {stats.pendingRequests} Pending Booking Request{stats.pendingRequests > 1 ? 's' : ''}
+                {newRequestAnimation && (
+                  <span className="ml-2 text-warning-text animate-pulse">● NEW</span>
+                )}
               </h3>
               <p className="text-body-regular text-charcoal-400 dark:text-gray-400 mt-1">
                 Click here to review and respond to pending booking requests
@@ -264,10 +344,19 @@ export default function ProviderOverview({ serviceProviderId, onNavigateToBookin
 
         <div
           onClick={() => stats.pendingRequests > 0 && onNavigateToBookings && onNavigateToBookings('Pending')}
-          className={stats.pendingRequests > 0 ? 'cursor-pointer transition-transform hover:scale-105' : ''}
+          className={`${stats.pendingRequests > 0 ? 'cursor-pointer transition-transform hover:scale-105' : ''} ${
+            newRequestAnimation ? 'animate-[pulse_0.5s_ease-in-out_3]' : ''
+          }`}
         >
           <AnalyticsCard
-            title="Pending Requests"
+            title={
+              <div className="flex items-center gap-2">
+                Pending Requests
+                {newRequestAnimation && stats.pendingRequests > 0 && (
+                  <span className="w-2 h-2 bg-warning-text rounded-full animate-pulse"></span>
+                )}
+              </div>
+            }
             metrics={[
               {
                 value: loading ? '...' : stats.pendingRequests.toString(),

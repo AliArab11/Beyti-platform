@@ -494,9 +494,9 @@ const ServiceProviderStoresView = () => {
   //   }
   // }, [navigate]);
 
-  // Get user ID from localStorage (Customer: UserProfileId = 2, CustomerId = 1)
-  const userProfileId = parseInt(getUserId()) || 4;
-  const customerId = 1; // TODO: Get from API based on userProfileId
+  
+  const userProfileId = parseInt(getUserId()) || 1002;
+  const customerId = 2; // TODO: Get from API based on userProfileId
 
   // Fetch user profile details
   const fetchUserProfile = async () => {

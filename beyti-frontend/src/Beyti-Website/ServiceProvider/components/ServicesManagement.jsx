@@ -11,6 +11,8 @@ import CRUDButton from '../../../components/CRUDButton';
 import StatusChip from '../../../components/StatusChip';
 import { Table, TableHeader, TableBody, TableRow } from '../../../components/Table';
 import { logProviderActivity } from '../../../utils/providerActivityLogger';
+import Snackbar from '../../../components/Snackbar';
+import ConfirmModal from '../../../components/ConfirmModal';
 
 export default function ServicesManagement({ serviceProviderId, searchTerm = '' }) {
   const [services, setServices] = useState([]);
@@ -34,6 +36,55 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
   const [flaggedKeywords, setFlaggedKeywords] = useState([]);
   const [showWarning, setShowWarning] = useState(false);
   const [priceError, setPriceError] = useState('');
+
+  // Snackbar state
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    type: 'success'
+  });
+
+  // Confirm modal state
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    variant: 'danger'
+  });
+
+  // Helper functions for snackbar
+  const showSnackbar = (message, type = 'success') => {
+    setSnackbar({ open: true, message, type });
+    setTimeout(() => {
+      setSnackbar(prev => ({ ...prev, open: false }));
+    }, 3000);
+  };
+
+  const closeSnackbar = () => {
+    setSnackbar(prev => ({ ...prev, open: false }));
+  };
+
+  // Helper functions for confirm modal
+  const showConfirmModal = (title, message, onConfirm, variant = 'danger') => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      onConfirm,
+      variant
+    });
+  };
+
+  const closeConfirmModal = () => {
+    setConfirmModal({
+      isOpen: false,
+      title: '',
+      message: '',
+      onConfirm: null,
+      variant: 'danger'
+    });
+  };
 
   const fetchServices = async () => {
     try {
@@ -65,7 +116,7 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
       console.error('Error fetching categories:', err);
       // If provider is not enrolled in any category, show error
       if (err.status === 404) {
-        alert('You are not enrolled in any service category. Please contact support.');
+        showSnackbar('You are not enrolled in any service category. Please contact support.', 'error');
       }
     }
   };
@@ -115,29 +166,39 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
 
     if (minPrice !== null && maxPrice !== null && minPrice > maxPrice) {
       setPriceError('Minimum price must be less than or equal to maximum price');
-      alert('Error: Minimum price must be less than or equal to maximum price');
+      showSnackbar('Error: Minimum price must be less than or equal to maximum price', 'error');
       return;
     }
 
     // Clear price error if validation passes
     setPriceError('');
 
+    // Warn user if flagged keywords detected
+    if (flaggedKeywords.length > 0) {
+      showConfirmModal(
+        'Prohibited Keywords Detected',
+        `Warning: Your service contains prohibited keywords (${flaggedKeywords.join(', ')}). This may result in your service being flagged or suspended. Do you want to proceed anyway?`,
+        () => {
+          closeConfirmModal();
+          submitService();
+        },
+        'warning'
+      );
+      return;
+    }
+
+    submitService();
+  };
+
+  const submitService = async () => {
     // Calculate total duration in minutes from hours and minutes
     const hours = formData.durationHours ? parseInt(formData.durationHours) : 0;
     const minutes = formData.durationMinutes ? parseInt(formData.durationMinutes) : 0;
     const totalMinutes = (hours * 60) + minutes;
 
-    // Warn user if flagged keywords detected
-    if (flaggedKeywords.length > 0) {
-      const confirmSubmit = window.confirm(
-        `Warning: Your service contains prohibited keywords (${flaggedKeywords.join(', ')}). ` +
-        `This may result in your service being flagged or suspended. ` +
-        `Do you want to proceed anyway?`
-      );
-      if (!confirmSubmit) {
-        return;
-      }
-    }
+    // Get price values
+    const minPrice = formData.minPrice ? parseFloat(formData.minPrice) : null;
+    const maxPrice = formData.maxPrice ? parseFloat(formData.maxPrice) : null;
 
     try {
       if (editingService) {
@@ -159,7 +220,7 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
           `Service: ${formData.name}`
         );
 
-        alert('Service updated successfully!');
+        showSnackbar('Service updated successfully!', 'success');
       } else {
         const addData = {
           serviceProviderId,
@@ -180,7 +241,7 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
           `Service: ${formData.name}`
         );
 
-        alert('Service added successfully!');
+        showSnackbar('Service added successfully!', 'success');
       }
 
       setFormData({
@@ -204,9 +265,9 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
 
       // Show specific error message if it's a category authorization error
       if (err.error === 'Unauthorized category' || err.message?.includes('category')) {
-        alert(err.message || 'You can only add services from your enrolled category.');
+        showSnackbar(err.message || 'You can only add services from your enrolled category.', 'error');
       } else {
-        alert('Error saving service. Check console for details.');
+        showSnackbar('Error saving service. Check console for details.', 'error');
       }
     }
   };
@@ -233,9 +294,24 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
     setShowForm(true);
   };
 
-  const handleToggle = async (serviceId) => {
+  const handleToggle = (serviceId) => {
+    const service = services.find(s => s.serviceId === serviceId);
+    const action = service?.isActive ? 'deactivate' : 'activate';
+    const actionTitle = service?.isActive ? 'Deactivate Service' : 'Activate Service';
+
+    showConfirmModal(
+      actionTitle,
+      `Are you sure you want to ${action} "${service?.name}"?`,
+      () => {
+        closeConfirmModal();
+        performToggle(serviceId, service);
+      },
+      service?.isActive ? 'warning' : 'success'
+    );
+  };
+
+  const performToggle = async (serviceId, service) => {
     try {
-      const service = services.find(s => s.serviceId === serviceId);
       await toggleServiceStatus(serviceId);
 
       // Log activity
@@ -247,9 +323,15 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
       );
 
       fetchServices();
+
+      // Show success message
+      const successMessage = service?.isActive
+        ? `Service "${service?.name}" has been deactivated successfully!`
+        : `Service "${service?.name}" has been activated successfully!`;
+      showSnackbar(successMessage, 'success');
     } catch (err) {
       console.error('Error toggling service:', err);
-      alert('Error toggling service status');
+      showSnackbar('Error toggling service status', 'error');
     }
   };
 
@@ -711,6 +793,26 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
           </TableBody>
         </Table>
       </div>
+
+      {/* Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        message={snackbar.message}
+        type={snackbar.type}
+        onClose={closeSnackbar}
+      />
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={closeConfirmModal}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+        confirmText="Proceed"
+        cancelText="Cancel"
+      />
     </div>
   );
 }

@@ -14,6 +14,8 @@ import {
   markAllNotificationsRead,
   deleteNotification
 } from '../services/api';
+import { useSignalR } from '../contexts/SignalRContext';
+import { useSignalRNotifications } from '../hooks/useSignalRNotifications';
 
 const NotificationDropdown = ({ userId, className = '' }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -21,6 +23,7 @@ const NotificationDropdown = ({ userId, className = '' }) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef(null);
+  const { startConnection, isConnected } = useSignalR();
 
   // Fetch notifications and unread count
   const fetchNotifications = async () => {
@@ -39,7 +42,12 @@ const NotificationDropdown = ({ userId, className = '' }) => {
       ]);
       console.log('🔔 NotificationDropdown: Fetched notifications:', notifs);
       console.log('🔔 NotificationDropdown: Unread count:', count);
-      setNotifications(notifs);
+      // Debug: Check timestamp format
+      if (notifs.length > 0) {
+        console.log('🔔 Sample notification timestamp:', notifs[0].createdAt, 'Type:', typeof notifs[0].createdAt);
+      }
+      // Keep only the latest 5 notifications
+      setNotifications(notifs.slice(0, 5));
       setUnreadCount(count);
     } catch (error) {
       console.error('🔔 NotificationDropdown: Failed to fetch notifications:', error);
@@ -47,6 +55,27 @@ const NotificationDropdown = ({ userId, className = '' }) => {
       setLoading(false);
     }
   };
+
+  // Start SignalR connection when userId is available
+  useEffect(() => {
+    if (userId && !isConnected) {
+      console.log('[NotificationDropdown] Starting SignalR connection for user:', userId);
+      startConnection(userId);
+    }
+  }, [userId, isConnected, startConnection]);
+
+  // Set up real-time notification handlers
+  useSignalRNotifications({
+    onNotification: (notification) => {
+      console.log('[NotificationDropdown] Received real-time notification:', notification);
+      // Add new notification to the beginning of the list and keep only latest 5
+      setNotifications(prev => [notification, ...prev].slice(0, 5));
+    },
+    onUnreadCountUpdate: (count) => {
+      console.log('[NotificationDropdown] Unread count updated:', count);
+      setUnreadCount(count);
+    }
+  });
 
   // Fetch notifications on mount and when dropdown opens
   useEffect(() => {
@@ -111,12 +140,13 @@ const NotificationDropdown = ({ userId, className = '' }) => {
     e.stopPropagation();
     try {
       await deleteNotification(notificationId);
-      setNotifications(prev => prev.filter(n => n.id !== notificationId));
       // Update unread count if deleted notification was unread
       const deletedNotif = notifications.find(n => n.id === notificationId);
       if (deletedNotif && !deletedNotif.isRead) {
         setUnreadCount(prev => Math.max(0, prev - 1));
       }
+      // Fetch fresh notifications to get the next one and maintain showing 5
+      await fetchNotifications();
     } catch (error) {
       console.error('Failed to delete notification:', error);
     }
@@ -124,13 +154,26 @@ const NotificationDropdown = ({ userId, className = '' }) => {
 
   // Format timestamp
   const formatTime = (timestamp) => {
-    // Ensure timestamp is treated as UTC if it doesn't have timezone info
-    const date = new Date(timestamp + (timestamp.endsWith('Z') ? '' : 'Z'));
+    if (!timestamp) return '';
+
+    // Parse the timestamp - backend sends local timestamps using DateTime.Now
+    // JavaScript's new Date() will treat timestamps without timezone as local time
+    const date = new Date(timestamp);
+
+    // Validate the date
+    if (isNaN(date.getTime())) {
+      console.error('Invalid timestamp:', timestamp);
+      return '';
+    }
+
     const now = new Date();
     const diffMs = now - date;
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
+
+    // Handle negative differences (clock skew or future timestamps)
+    if (diffMs < 0) return 'Just now';
 
     if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins}m ago`;
