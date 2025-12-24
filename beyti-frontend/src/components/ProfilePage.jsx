@@ -9,10 +9,11 @@ import { useState, useEffect, useRef } from 'react';
 import { User, Envelope, Phone, MapPin, Calendar, IdentificationCard, CheckCircle, XCircle, Buildings, Tag, X, Camera, Upload, Trash, Palette  } from '@phosphor-icons/react';
 import { StoreBanner, BannerThemeModal } from './StoreBanner';
 
-import ConfirmModal from './ConfirmModal'; 
+import ConfirmModal from './ConfirmModal';
 import { formatTime } from '../Beyti-Website/Seller/Components/storeStatus';
 import Cropper from 'react-easy-crop';
 import Snackbar from './Snackbar';
+import { updateUserProfile } from '../services/api';
 
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -332,6 +333,14 @@ const loadSubCategories = async (categoryId) => {
     // Add business name for Service Providers
     if (userRole === 'ServiceProvider' && formData.businessName) {
       updates.businessName = formData.businessName;
+    }
+
+    // Get userId from userProfile or localStorage
+    const userId = userProfile?.userProfileId || parseInt(localStorage.getItem('userProfileId'));
+
+    // Update basic profile fields (displayName, phone, businessName) for all roles
+    if (userId && Object.keys(updates).length > 0) {
+      await updateUserProfile(userId, userRole, updates);
     }
 
     // Handle address for sellers

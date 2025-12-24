@@ -26,7 +26,7 @@ export default function ProviderOnboarding() {
     // Step 1: Identity
     businessName: '',
     serviceCategoryId: '',
-    phone: '',
+    phone: localStorage.getItem('userPhone') || '',
     // Step 2: Services
     serviceDescription: '',
     minPrice: '',
@@ -181,12 +181,15 @@ export default function ProviderOnboarding() {
     try {
       // Get stored user data from registration
       const userId = localStorage.getItem('userId');
+      const userProfileId = localStorage.getItem('userProfileId');
       const userEmail = localStorage.getItem('userEmail');
       const userPhone = localStorage.getItem('userPhone');
 
       console.log('[ProviderOnboarding] userId from localStorage:', userId);
+      console.log('[ProviderOnboarding] userProfileId from localStorage:', userProfileId);
       console.log('[ProviderOnboarding] All localStorage:', {
         userId,
+        userProfileId,
         userEmail,
         userPhone,
         authToken: localStorage.getItem('authToken')
@@ -288,22 +291,24 @@ export default function ProviderOnboarding() {
         throw new Error(`Step 3: Failed to link address to service provider - ${errorText || 'Bad Request'}`);
       }
 
+      // Update role in localStorage BEFORE membership assignment
+      // This ensures the user's role is set correctly before any subsequent API calls
+      localStorage.setItem('userRole', 'ServiceProvider');
+
       // Step 4: Create membership if selected
       if (formData.selectedPlan) {
         try {
           await createUserMembership({
-            userProfileId: parseInt(userId),
+            userProfileId: parseInt(userProfileId),
             membershipPlanId: formData.selectedPlan,
             autoRenew: false
           });
+          console.log('[ProviderOnboarding] Membership created successfully');
         } catch (error) {
           console.error('Failed to assign membership, continuing...', error);
           // Don't block registration if membership fails
         }
       }
-
-      // Update role in localStorage
-      localStorage.setItem('userRole', 'ServiceProvider');
 
       // Navigate to dashboard
       navigate('/dashboard');
@@ -395,17 +400,24 @@ export default function ProviderOnboarding() {
                 error={errors.serviceCategoryId}
               />
 
-              <Input
-                label="PHONE NUMBER"
-                type="tel"
-                name="phone"
-                id="phone"
-                value={formData.phone}
-                onChange={handleChange('phone')}
-                placeholder="+973 12345678"
-                required
-                error={errors.phone}
-              />
+              <div>
+                <Input
+                  label="BUSINESS PHONE NUMBER"
+                  type="tel"
+                  name="phone"
+                  id="phone"
+                  value={formData.phone}
+                  onChange={handleChange('phone')}
+                  placeholder="+973 12345678"
+                  required
+                  error={errors.phone}
+                />
+                {localStorage.getItem('userPhone') && (
+                  <p className="text-xs text-charcoal-400 mt-1">
+                    Using your registered number. You can change it if needed.
+                  </p>
+                )}
+              </div>
             </div>
           )}
 
@@ -625,6 +637,7 @@ export default function ProviderOnboarding() {
               <MembershipSelection
                 onSelect={handleMembershipSelect}
                 selectedPlan={formData.selectedPlan}
+                onSubmit={handleSubmit}
               />
 
               {errors.membership && (

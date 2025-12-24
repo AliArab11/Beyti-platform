@@ -248,14 +248,35 @@ const CustomerDashboard = () => {
   const location = useLocation();
 
   // Get customer info from session storage (set by MainStoreView/StoreView)
+  // Or fallback to localStorage for newly registered customers
   const [customerId, setCustomerId] = useState(() => {
     return parseInt(sessionStorage.getItem('beyti_customerId')) || null;
   });
   const [customerName, setCustomerName] = useState(() => {
-    return sessionStorage.getItem('beyti_customerName') || "My Account";
+    const sessionName = sessionStorage.getItem('beyti_customerName');
+    if (sessionName) return sessionName;
+
+    // Fallback to localStorage for newly registered users
+    const userName = localStorage.getItem('userName');
+    if (userName) {
+      sessionStorage.setItem('beyti_customerName', userName);
+      return userName;
+    }
+
+    return "My Account";
   });
   const [userProfileId, setUserProfileId] = useState(() => {
-    return parseInt(sessionStorage.getItem('beyti_userProfileId')) || null;
+    const sessionId = parseInt(sessionStorage.getItem('beyti_userProfileId'));
+    if (sessionId) return sessionId;
+
+    // Fallback to localStorage for newly registered users
+    const localId = parseInt(localStorage.getItem('userProfileId'));
+    if (localId) {
+      sessionStorage.setItem('beyti_userProfileId', localId.toString());
+      return localId;
+    }
+
+    return null;
   });
 
   const [customerList, setCustomerList] = useState([]);

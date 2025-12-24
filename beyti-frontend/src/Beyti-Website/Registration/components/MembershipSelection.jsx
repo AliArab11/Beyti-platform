@@ -11,8 +11,9 @@ import { getMembershipPlans } from '../../../services/api';
  * @param {object} props
  * @param {function} props.onSelect - Callback when plan is selected, receives planId
  * @param {number} props.selectedPlan - Currently selected plan ID
+ * @param {function} props.onSubmit - Optional callback to submit/complete registration (for auto-submit on skip)
  */
-export default function MembershipSelection({ onSelect, selectedPlan = null }) {
+export default function MembershipSelection({ onSelect, selectedPlan = null, onSubmit = null }) {
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -131,7 +132,7 @@ export default function MembershipSelection({ onSelect, selectedPlan = null }) {
         </p>
       )}
 
-      {/* Skip button - assigns free plan (ID 1) */}
+      {/* Skip button - assigns free plan and auto-completes registration */}
       <div className="text-center mt-6">
         <Button
           variant="ghost"
@@ -139,10 +140,14 @@ export default function MembershipSelection({ onSelect, selectedPlan = null }) {
             const freePlan = plans.find(p => p.priceValue === 0);
             if (freePlan) {
               onSelect(freePlan.id);
+              // Auto-submit if callback provided
+              if (onSubmit) {
+                setTimeout(() => onSubmit(), 100); // Small delay to ensure state updates
+              }
             }
           }}
         >
-          Skip - Use Free Plan
+          Continue with Free Plan
         </Button>
       </div>
     </div>

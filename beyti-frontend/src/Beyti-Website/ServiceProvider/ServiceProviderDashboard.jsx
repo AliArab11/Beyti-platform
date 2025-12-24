@@ -50,8 +50,7 @@ export default function ServiceProviderDashboard() {
   // }, [navigate]);
 
   // Get user ID from localStorage (will be replaced with context in future)
-  // const userProfileId = parseInt(getUserId()) || 1;
-  const userProfileId = 1; // Hardcoded for testing
+  const userProfileId = parseInt(localStorage.getItem('userProfileId')) || null;
 
   // Auto-close snackbar after 5 seconds
   useEffect(() => {
@@ -77,65 +76,92 @@ export default function ServiceProviderDashboard() {
       const profile = await getProviderProfile(userProfileId);
 
       console.log('[fetchUserProfile] Received provider profile:', profile);
+
+      // Check if profile is null or undefined
+      if (!profile) {
+        console.error('[fetchUserProfile] Profile not found for userProfileId:', userProfileId);
+        setSnackbar({
+          open: true,
+          message: 'Profile not found. Please complete your registration.',
+          type: 'error'
+        });
+        // Redirect to provider onboarding to complete registration
+        setTimeout(() => {
+          navigate('/provider-onboarding');
+        }, 2000);
+        return;
+      }
+
       console.log('[fetchUserProfile] Profile keys:', Object.keys(profile));
 
-      if (profile) {
-        // 3. Map the Backend data to Frontend (check if PascalCase or camelCase)
-        const normalizedProfile = {
-          id: profile.id || profile.Id,
-          userProfileId: profile.userProfileId || profile.UserProfileId,
-          displayName: profile.displayName || profile.DisplayName,
-          roleType: profile.roleType || profile.RoleType,
-          status: profile.status || profile.Status, // This is ServiceProvider.Status from the API
-          accountStatus: profile.accountStatus || profile.AccountStatus, // UserProfile.Status (Active/Suspended)
-          phone: profile.phone || profile.Phone,
-          businessName: profile.businessName || profile.BusinessName,
-          // Address fields from the new controller
-          street: profile.street || profile.Street,
-          city: profile.city || profile.City,
-          region: profile.region || profile.Region,
-          postalCode: profile.postalCode || profile.PostalCode,
-          country: profile.country || profile.Country,
-          address: profile.address || profile.Address, // Formatted string
-          createdAt: profile.createdAt || profile.CreatedAt,
-          updatedAt: profile.updatedAt || profile.UpdatedAt,
-        };
+      // 3. Map the Backend data to Frontend (check if PascalCase or camelCase)
+      const normalizedProfile = {
+        id: profile.id || profile.Id,
+        userProfileId: profile.userProfileId || profile.UserProfileId,
+        displayName: profile.displayName || profile.DisplayName,
+        roleType: profile.roleType || profile.RoleType,
+        status: profile.status || profile.Status, // This is ServiceProvider.Status from the API
+        accountStatus: profile.accountStatus || profile.AccountStatus, // UserProfile.Status (Active/Suspended)
+        phone: profile.phone || profile.Phone,
+        businessName: profile.businessName || profile.BusinessName,
+        // Address fields from the new controller
+        street: profile.street || profile.Street,
+        city: profile.city || profile.City,
+        region: profile.region || profile.Region,
+        postalCode: profile.postalCode || profile.PostalCode,
+        country: profile.country || profile.Country,
+        address: profile.address || profile.Address, // Formatted string
+        createdAt: profile.createdAt || profile.CreatedAt,
+        updatedAt: profile.updatedAt || profile.UpdatedAt,
+      };
 
-        console.log('[fetchUserProfile] Normalized profile status:', normalizedProfile.status);
-        console.log('[fetchUserProfile] Account status:', normalizedProfile.accountStatus);
+      console.log('[fetchUserProfile] Normalized profile status:', normalizedProfile.status);
+      console.log('[fetchUserProfile] Account status:', normalizedProfile.accountStatus);
 
-        // Check if account is suspended
-        if (normalizedProfile.accountStatus === 'Suspended') {
-          navigate('/account-suspended');
-          return;
-        }
+      // Check if account is suspended
+      if (normalizedProfile.accountStatus === 'Suspended') {
+        navigate('/account-suspended');
+        return;
+      }
 
-        setUserProfile(normalizedProfile);
-        
-        // CRITICAL: Save the ServiceProviderId to state so other widgets can use it
-        // (Make sure you have [serviceProviderId, setServiceProviderId] = useState(null) defined above)
-        setServiceProviderId(normalizedProfile.id); 
+      setUserProfile(normalizedProfile);
 
-        if (normalizedProfile.displayName) {
-          setDisplayName(normalizedProfile.displayName);
-        }
+      // CRITICAL: Save the ServiceProviderId to state so other widgets can use it
+      // (Make sure you have [serviceProviderId, setServiceProviderId] = useState(null) defined above)
+      setServiceProviderId(normalizedProfile.id);
 
-        // Set provider status (Available/Busy/Unavailable)
-        if (normalizedProfile.status) {
-          setProviderStatus(normalizedProfile.status);
-        }
+      if (normalizedProfile.displayName) {
+        setDisplayName(normalizedProfile.displayName);
+      }
+
+      // Set provider status (Available/Busy/Unavailable)
+      if (normalizedProfile.status) {
+        setProviderStatus(normalizedProfile.status);
       }
     } catch (error) {
       console.error('Error fetching user profile:', error);
       // Check if error is due to suspension
       if (!handleSuspensionError(error, navigate)) {
-        // Handle other errors
-        console.error('Failed to load profile');
-        setSnackbar({
-          open: true,
-          message: 'Error loading profile. Please try again.',
-          type: 'error'
-        });
+        // Check if it's a 404 error (profile not found)
+        if (error.message && error.message.includes('Service provider not found')) {
+          setSnackbar({
+            open: true,
+            message: 'Profile not found. Please complete your registration.',
+            type: 'error'
+          });
+          // Redirect to provider onboarding
+          setTimeout(() => {
+            navigate('/provider-onboarding');
+          }, 2000);
+        } else {
+          // Handle other errors
+          console.error('Failed to load profile');
+          setSnackbar({
+            open: true,
+            message: 'Error loading profile. Please try again.',
+            type: 'error'
+          });
+        }
       }
     }
   };

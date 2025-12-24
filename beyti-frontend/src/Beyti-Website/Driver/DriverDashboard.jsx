@@ -293,7 +293,7 @@ const DriverDashboard = () => {
   const [userProfileId, setUserProfileId] = useState(null);
   const [driverName, setDriverName] = useState("My Profile");
   const [driverList, setDriverList] = useState([]);
-  const [selectModalOpen, setSelectModalOpen] = useState(true);
+  const [selectModalOpen, setSelectModalOpen] = useState(false); // Changed to false - will open only if multiple drivers exist
 
   // data
   const [tickets, setTickets] = useState([]);
@@ -353,7 +353,18 @@ const handleProfileUpdate = async (updates) => {
     const loadDrivers = async () => {
       try {
         const data = await getDrivers();
-        setDriverList(Array.isArray(data) ? data : []);
+        const drivers = Array.isArray(data) ? data : [];
+        setDriverList(drivers);
+
+        // Auto-select if only one driver exists (e.g., just registered)
+        if (drivers.length === 1 && !driverId) {
+          const driver = drivers[0];
+          handleDriverSelect(driver);
+          setSelectModalOpen(false); // Don't show modal
+        } else if (drivers.length > 1 && !driverId) {
+          // Show selection modal only if multiple drivers exist
+          setSelectModalOpen(true);
+        }
       } catch (err) {
         console.error("Failed to load drivers", err);
       }

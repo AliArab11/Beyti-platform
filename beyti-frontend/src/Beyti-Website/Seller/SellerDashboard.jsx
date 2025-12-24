@@ -543,7 +543,7 @@ const getPageTitle = () => {
   const loggedInUserId = sellerUserProfileId || getUserId();
 
   const [sellerList, setSellerList] = useState([]);
-  const [selectModalOpen, setSelectModalOpen] = useState(true);
+  const [selectModalOpen, setSelectModalOpen] = useState(false); // Changed to false - will open only if multiple sellers exist
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -675,7 +675,18 @@ useEffect(() => {
     try {
       const data = await getSellers();
       console.log('📦 Loaded sellers:', data);
-      setSellerList(Array.isArray(data) ? data : []);
+      const sellers = Array.isArray(data) ? data : [];
+      setSellerList(sellers);
+
+      // Auto-select if only one seller exists (e.g., just registered)
+      if (sellers.length === 1 && !sellerId) {
+        const seller = sellers[0];
+        handleSellerSelect(seller);
+        setSelectModalOpen(false); // Don't show modal
+      } else if (sellers.length > 1 && !sellerId) {
+        // Show selection modal only if multiple sellers exist
+        setSelectModalOpen(true);
+      }
     } catch (err) {
       console.error("Failed to load sellers", err);
     }

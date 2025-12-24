@@ -25,7 +25,7 @@ export default function SellerOnboarding() {
     // Step 1: Identity
     storeName: '',
     categoryId: '',
-    phone: '',
+    phone: localStorage.getItem('userPhone') || '',
     // Step 2: Location
     city: '',
     block: '',
@@ -369,17 +369,24 @@ export default function SellerOnboarding() {
                 error={errors.categoryId}
               />
 
-              <Input
-                label="PHONE NUMBER"
-                type="tel"
-                name="phone"
-                id="phone"
-                value={formData.phone}
-                onChange={handleChange('phone')}
-                placeholder="+973 12345678"
-                required
-                error={errors.phone}
-              />
+              <div>
+                <Input
+                  label="STORE PHONE NUMBER"
+                  type="tel"
+                  name="phone"
+                  id="phone"
+                  value={formData.phone}
+                  onChange={handleChange('phone')}
+                  placeholder="+973 12345678"
+                  required
+                  error={errors.phone}
+                />
+                {localStorage.getItem('userPhone') && (
+                  <p className="text-xs text-charcoal-400 mt-1">
+                    Using your registered number. You can change it if needed.
+                  </p>
+                )}
+              </div>
             </div>
           )}
 
@@ -523,6 +530,7 @@ export default function SellerOnboarding() {
               <MembershipSelection
                 onSelect={handleMembershipSelect}
                 selectedPlan={formData.selectedPlan}
+                onSubmit={handleSubmit}
               />
 
               {errors.membership && (

@@ -134,6 +134,7 @@ export default function Register() {
       // Step 3: Store auth data (backend returns camelCase fields)
       localStorage.setItem('authToken', loginResponse.token);
       localStorage.setItem('userId', loginResponse.userId);
+      localStorage.setItem('userProfileId', loginResponse.userProfileId);
       localStorage.setItem('userRole', loginResponse.role);
       localStorage.setItem('userEmail', formData.email);
       localStorage.setItem('userPhone', formData.phoneNumber);
@@ -144,11 +145,14 @@ export default function Register() {
 
     } catch (error) {
       let errorMessage = error.message;
+      let emailError = null;
 
       // Map common errors to user-friendly messages
       if (errorMessage.toLowerCase().includes('duplicate') ||
-          errorMessage.toLowerCase().includes('already exists')) {
-        errorMessage = 'This email is already registered. Try logging in instead.';
+          errorMessage.toLowerCase().includes('already exists') ||
+          errorMessage.toLowerCase().includes('already registered')) {
+        errorMessage = 'This email is already registered. Please login or use a different email.';
+        emailError = 'This email is already registered';
       } else if (errorMessage.toLowerCase().includes('network') ||
                  errorMessage.toLowerCase().includes('failed to fetch')) {
         errorMessage = 'Unable to connect to server. Please check your connection.';
@@ -156,7 +160,10 @@ export default function Register() {
         errorMessage = 'An error occurred during registration. Please try again.';
       }
 
-      setErrors({ form: errorMessage });
+      setErrors({
+        form: errorMessage,
+        email: emailError
+      });
       setIsLoading(false);
     }
   };

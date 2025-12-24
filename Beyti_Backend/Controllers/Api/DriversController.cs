@@ -6,7 +6,7 @@ namespace Beyti_Backend.Controllers.Api
 {
     public class CreateDriverDto
     {
-        public int? UserId { get; set; }
+        public string? UserId { get; set; }  // Changed from int? to string? to accept GUID
         public string? FullName { get; set; }
         public string? VehicleType { get; set; }
         public string? LicenseNumber { get; set; }
@@ -126,26 +126,37 @@ namespace Beyti_Backend.Controllers.Api
                 // Check if UserId is provided (for onboarding flow)
                 UserProfile profile;
 
-                if (dto.UserId.HasValue)
+                if (!string.IsNullOrEmpty(dto.UserId))
                 {
-                    // Find existing UserProfile by IdentityUserId
+                    // ONBOARDING FLOW: Find existing UserProfile by IdentityUserId (GUID string)
                     profile = await _context.UserProfiles
-                        .FirstOrDefaultAsync(up => up.IdentityUserId == dto.UserId.Value.ToString());
+                        .FirstOrDefaultAsync(up => up.IdentityUserId == dto.UserId);
 
                     if (profile == null)
                     {
-                        return BadRequest(new { error = "User profile not found" });
+                        return BadRequest(new { error = "User profile not found for userId: " + dto.UserId });
                     }
 
                     // Update profile to Driver role
                     profile.RoleType = "Driver";
                     profile.UpdatedAt = DateTime.Now;
+
+                    // Delete orphaned Customer record if exists
+                    var existingCustomer = await _context.Customers
+                        .FirstOrDefaultAsync(c => c.UserProfileId == profile.Id);
+                    if (existingCustomer != null)
+                    {
+                        _context.Customers.Remove(existingCustomer);
+                    }
+
+                    await _context.SaveChangesAsync();
                 }
                 else
                 {
-                    // Create new UserProfile (for admin creating drivers)
+                    // ADMIN CREATION FLOW: Create new UserProfile
                     profile = new UserProfile
                     {
+                        IdentityUserId = Guid.NewGuid().ToString(),
                         DisplayName = dto.FullName ?? dto.Email ?? "Driver",
                         RoleType = "Driver",
                         Status = dto.Status,

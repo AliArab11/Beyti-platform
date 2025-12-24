@@ -281,6 +281,22 @@ Verify driver registration works (no membership required).
 - ✅ localStorage contains:
   - `userRole` = "Driver"
 
+### Bug Fix Notes
+**Issue**: POST /api/Drivers returned 400 Bad Request when user with Pending status tried to complete driver onboarding.
+
+**Root Cause**:
+- DriverOnboarding.jsx was sending `UserId: parseInt(userId)` where userId is a GUID string like `'3e15deab-e2f7-472f-821d-a193b110f78f'`
+- `parseInt(userId)` returned `NaN`, causing backend validation to fail
+- Backend DriversController expected `UserId` as `int?` instead of `string?` (GUID)
+
+**Fix Applied**:
+1. Frontend ([DriverOnboarding.jsx:103](beyti-frontend/src/Beyti-Website/Registration/DriverOnboarding.jsx#L103)): Changed to send `UserId: userId` (GUID string) instead of `parseInt(userId)`
+2. Backend ([DriversController.cs:9](Beyti_Backend/Controllers/Api/DriversController.cs#L9)): Changed `CreateDriverDto.UserId` from `int?` to `string?` to accept GUID
+3. Backend ([DriversController.cs:129-133](Beyti_Backend/Controllers/Api/DriversController.cs#L129-L133)): Updated logic to handle GUID string lookup against `UserProfile.IdentityUserId`
+4. Added orphaned Customer record cleanup (lines 144-150) to match ServiceProvider flow
+
+**Testing**: Retest with a user in "Pending" status to ensure 400 error is resolved.
+
 ---
 
 ## Test Case 7: Foreign Key Constraint Validation (Critical)

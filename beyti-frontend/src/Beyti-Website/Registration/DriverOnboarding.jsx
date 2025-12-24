@@ -87,6 +87,12 @@ export default function DriverOnboarding() {
       const userId = localStorage.getItem('userId');
       const userEmail = localStorage.getItem('userEmail');
 
+      console.log('[DriverOnboarding] userId from localStorage:', userId);
+
+      if (!userId) {
+        throw new Error('User ID not found. Please register or login first before completing onboarding.');
+      }
+
       // Create Driver
       const driverResponse = await fetch('https://localhost:7062/api/Drivers', {
         method: 'POST',
@@ -94,7 +100,7 @@ export default function DriverOnboarding() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          UserId: parseInt(userId),
+          UserId: userId,  // Pass userId (GUID string) for onboarding - links to existing UserProfile
           VehicleType: formData.vehicleType,
           LicenseNumber: formData.licenseNumber,
           PhoneNumber: formData.phone,
