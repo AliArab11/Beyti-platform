@@ -348,28 +348,43 @@ const handleProfileUpdate = async (updates) => {
     };
   }, [selectModalOpen, jobModalOpen]);
 
-  // Load drivers once
+  // Load driver for current user
   useEffect(() => {
-    const loadDrivers = async () => {
+    const loadDriver = async () => {
       try {
-        const data = await getDrivers();
-        const drivers = Array.isArray(data) ? data : [];
-        setDriverList(drivers);
+        // Get userProfileId from localStorage
+        const currentUserProfileId = parseInt(localStorage.getItem('userProfileId'));
+        if (!currentUserProfileId) {
+          console.error('No userProfileId found in localStorage');
+          return;
+        }
 
-        // Auto-select if only one driver exists (e.g., just registered)
-        if (drivers.length === 1 && !driverId) {
-          const driver = drivers[0];
-          handleDriverSelect(driver);
-          setSelectModalOpen(false); // Don't show modal
-        } else if (drivers.length > 1 && !driverId) {
-          // Show selection modal only if multiple drivers exist
-          setSelectModalOpen(true);
+        console.log('📦 Loading driver for userProfileId:', currentUserProfileId);
+        const { getDriverByUserProfileId } = await import('../../services/api');
+        const driverData = await getDriverByUserProfileId(currentUserProfileId);
+        console.log('📦 Loaded driver:', driverData);
+
+        if (driverData) {
+          // Auto-select the driver for this user
+          const driverId = driverData.driverId || driverData.id;
+          const fullName = driverData.fullName || driverData.name || "My Profile";
+          const userProfileId = driverData.userProfileId || driverData.UserProfileId;
+
+          setDriverName(fullName);
+          setDriverId(driverId);
+          setUserProfileId(userProfileId);
+          setDriverList([driverData]); // Store in list for potential future use
+          setSelectModalOpen(false); // Never show modal for single user
+
+          console.log('📦 Auto-selected driver:', { driverId, fullName, userProfileId });
+        } else {
+          console.warn('No driver profile found for current user');
         }
       } catch (err) {
-        console.error("Failed to load drivers", err);
+        console.error("Failed to load driver", err);
       }
     };
-    loadDrivers();
+    loadDriver();
   }, []);
 
 

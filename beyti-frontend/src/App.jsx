@@ -48,6 +48,7 @@ import DriverDashboardPlaceholder from './Beyti-Website/Driver/DriverDashboardPl
 import AccountSuspended from './Beyti-Website/Auth/AccountSuspended';
 
 import ProfilePage from './components/ProfilePage'
+import ProtectedRoute from './components/ProtectedRoute';
 
 // Placeholder components for pages that don't exist yet
 const PlaceholderPage = ({ pageName }) => (
@@ -101,7 +102,7 @@ export default function App() {
     // { path: '/addplan', label: 'Add Plan' },
     // { path: '/seller', label: 'Seller' },
     { path: '/seller-dashboard', label: 'Seller Dashboard' },
-    { path: '/stores', label: 'Home Page' },
+    { path: '/stores', label: 'Home' },
     { path: '/mainStore', label: 'Seller Stores' },
     { path: '/serviceProviders', label: 'Service Providers' },
     // { path: '/product', label: 'Product' },
@@ -197,7 +198,7 @@ export default function App() {
         {/* Page Content */}
         <main>
           <Routes>
-            <Route path="/" element={<RegistrationPage />} />
+            <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/role-selection" element={<RoleSelect />} />
@@ -208,7 +209,11 @@ export default function App() {
             <Route path="/addplan" element={<AddPlanPage />} />
             <Route path="/seller" element={<SellerPage />} />
 
-            <Route path="/seller-dashboard" element={<SellerDashboardLayout />}>
+            <Route path="/seller-dashboard" element={
+              <ProtectedRoute requiredRole="Seller">
+                <SellerDashboardLayout />
+              </ProtectedRoute>
+            }>
               <Route index element={<SellerAnalyticsPage />} />
               <Route path="dashboard" element={<SellerAnalyticsPage />} />
               <Route path="orders" element={<SellerOrdersPage />} />
@@ -219,7 +224,11 @@ export default function App() {
               <Route path="profile" element={<div />} />
             </Route>
 
-            <Route path="/customer-dashboard" element={<CustomerDashboardPage />}>
+            <Route path="/customer-dashboard" element={
+              <ProtectedRoute requiredRole="Customer">
+                <CustomerDashboardPage />
+              </ProtectedRoute>
+            }>
               <Route index element={<div />} />
               <Route path="bookings" element={<div />} />
               <Route path="history" element={<div />} />
@@ -227,7 +236,11 @@ export default function App() {
               <Route path="profile" element={<div />} />
             </Route>
 
-            <Route path="/checkout" element={<Checkout />} />
+            <Route path="/checkout" element={
+              <ProtectedRoute requiredRole="Customer">
+                <Checkout />
+              </ProtectedRoute>
+            } />
 
 
             <Route path="/stores" element={<HomePage />} />
@@ -242,7 +255,11 @@ export default function App() {
             <Route path="/customer" element={<CustomerPage />} />
 
             <Route path="/driver" element={<DriverPage />} />
-            <Route path="/driver-dashboard" element={<DriverDashboardPage />}>
+            <Route path="/driver-dashboard" element={
+              <ProtectedRoute requiredRole="Driver">
+                <DriverDashboardPage />
+              </ProtectedRoute>
+            }>
               <Route index element={<div />} />
               <Route path="dashboard" element={<div />} />
               <Route path="orders" element={<div />} />
@@ -253,16 +270,28 @@ export default function App() {
 
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/serviceprovider" element={<ServiceProviderPage />} />
-            <Route path="/serviceprovider-dashboard" element={<ServiceProviderDashboard />} />
+            <Route path="/serviceprovider-dashboard" element={
+              <ProtectedRoute requiredRole="ServiceProvider">
+                <ServiceProviderDashboard />
+              </ProtectedRoute>
+            } />
             <Route path="/account-suspended" element={<AccountSuspended />} />
-            <Route path="/admin-view" element={<AdminView />} />
+            <Route path="/admin-view" element={
+              <ProtectedRoute requiredRole="Admin">
+                <AdminView />
+              </ProtectedRoute>
+            } />
             <Route path="/admindashboard" element={<AdminUsersPage />} />
             <Route path="/servicerequest" element={<ServiceProviderRequests />} />
             <Route path="/notification" element={<PlaceholderPage pageName="Notification" />} />
             <Route path="/design-demo" element={<DesignSystemDemo />} />
             <Route path="/dashboard-template" element={<DashboardTemplate />} />
             <Route path="/user-management" element={<AdminUserManagementNew />} />
-            <Route path="/dashboard" element={<DashboardRouter />} />
+            <Route path="/dashboard" element={
+              <ProtectedRoute>
+                <DashboardRouter />
+              </ProtectedRoute>
+            } />
             <Route path="/driver-placeholder" element={<DriverDashboardPlaceholder />} />
             <Route path="/profile" element={<ProfilePageWrapper />} />
           </Routes>

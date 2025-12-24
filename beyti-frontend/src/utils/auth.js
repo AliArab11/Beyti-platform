@@ -13,6 +13,7 @@ export const logout = () => {
   // Clear all authentication and user data
   localStorage.removeItem('authToken');
   localStorage.removeItem('userId');
+  localStorage.removeItem('userProfileId');
   localStorage.removeItem('userRole');
   localStorage.removeItem('userName');
   localStorage.removeItem('userEmail');
@@ -39,11 +40,20 @@ export const getUserRole = () => {
 };
 
 /**
- * Get current user's ID
+ * Get current user's ID (ASP.NET Identity GUID)
  * @returns {string|null} - User ID or null if not logged in
  */
 export const getUserId = () => {
   return localStorage.getItem('userId');
+};
+
+/**
+ * Get current user's Profile ID (integer used for database relationships)
+ * @returns {number|null} - User Profile ID or null if not logged in
+ */
+export const getUserProfileId = () => {
+  const profileId = localStorage.getItem('userProfileId');
+  return profileId ? parseInt(profileId) : null;
 };
 
 /**

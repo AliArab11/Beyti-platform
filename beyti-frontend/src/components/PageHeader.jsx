@@ -187,7 +187,9 @@ const handleProfileClick = () => {
                         <div className="flex items-start gap-2">
                           <span className="text-label-small text-charcoal-400 dark:text-charcoal-300 min-w-[60px]">Address:</span>
                           <span className="text-label-small text-charcoal-600 dark:text-cream-50 break-words">
-                            {userProfile.address}
+                            {typeof userProfile.address === 'string'
+                              ? userProfile.address
+                              : `${userProfile.address.street || ''}, ${userProfile.address.city || ''}, ${userProfile.address.region || ''} ${userProfile.address.postalCode || ''}, ${userProfile.address.country || ''}`.replace(/,\s*,/g, ',').replace(/^,\s*/, '').replace(/,\s*$/, '')}
                           </span>
                         </div>
                       )}

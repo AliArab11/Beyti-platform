@@ -23,11 +23,20 @@ export const getUserRole = () => {
 };
 
 /**
- * Get current user's ID
+ * Get current user's ID (ASP.NET Identity GUID)
  * @returns {string|null} User ID or null if not authenticated
  */
 export const getUserId = () => {
   return localStorage.getItem('userId');
+};
+
+/**
+ * Get current user's Profile ID (integer used for database relationships)
+ * @returns {number|null} User Profile ID or null if not authenticated
+ */
+export const getUserProfileId = () => {
+  const profileId = localStorage.getItem('userProfileId');
+  return profileId ? parseInt(profileId) : null;
 };
 
 /**
@@ -54,6 +63,7 @@ export const hasRole = (requiredRole) => {
 export const logout = () => {
   localStorage.removeItem('authToken');
   localStorage.removeItem('userId');
+  localStorage.removeItem('userProfileId');
   localStorage.removeItem('userRole');
 };
 

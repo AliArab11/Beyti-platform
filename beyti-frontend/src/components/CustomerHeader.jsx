@@ -311,7 +311,7 @@ const CustomerHeader = ({
             </div>
           ) : (
             <button
-              onClick={onCustomerClick}
+              onClick={() => navigate('/login')}
               className="flex items-center gap-2 pl-4 border-l border-grey-stroke dark:border-charcoal-400 bg-sage-500 hover:bg-sage-600 text-white px-4 py-2 rounded-lg transition-all"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

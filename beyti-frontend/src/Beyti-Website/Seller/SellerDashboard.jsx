@@ -26,7 +26,7 @@ import { Outlet, useNavigate } from "react-router-dom";
 import { useLocation } from "react-router-dom";
 
 import * as Icon from "@phosphor-icons/react";
-import { getUserId } from "../../utils/auth";
+import { getUserProfileId } from "../../utils/auth";
 
 
 
@@ -540,7 +540,7 @@ const getPageTitle = () => {
 
   // Get logged-in user ID for notifications (NOT the seller entity ID)
   // This will be overridden by the seller's UserProfileId when a seller is selected
-  const loggedInUserId = sellerUserProfileId || getUserId();
+  const loggedInUserId = sellerUserProfileId || getUserProfileId();
 
   const [sellerList, setSellerList] = useState([]);
   const [selectModalOpen, setSelectModalOpen] = useState(false); // Changed to false - will open only if multiple sellers exist
@@ -669,30 +669,43 @@ useEffect(() => {
     );
   };
 
-  // Load sellers for modal
+  // Load seller for current user
 useEffect(() => {
-  const loadSellers = async () => {
+  const loadSeller = async () => {
     try {
-      const data = await getSellers();
-      console.log('📦 Loaded sellers:', data);
-      const sellers = Array.isArray(data) ? data : [];
-      setSellerList(sellers);
+      const currentUserProfileId = getUserProfileId();
+      if (!currentUserProfileId) {
+        console.error('No userProfileId found in localStorage');
+        return;
+      }
 
-      // Auto-select if only one seller exists (e.g., just registered)
-      if (sellers.length === 1 && !sellerId) {
-        const seller = sellers[0];
-        handleSellerSelect(seller);
-        setSelectModalOpen(false); // Don't show modal
-      } else if (sellers.length > 1 && !sellerId) {
-        // Show selection modal only if multiple sellers exist
-        setSelectModalOpen(true);
+      console.log('📦 Loading seller for userProfileId:', currentUserProfileId);
+      const { getSellerByUserProfileId } = await import('../../services/api');
+      const sellerData = await getSellerByUserProfileId(currentUserProfileId);
+      console.log('📦 Loaded seller:', sellerData);
+
+      if (sellerData) {
+        // Auto-select the seller for this user
+        const sellerId = sellerData.sellerId || sellerData.id;
+        const storeName = sellerData.storeName || sellerData.name || "My Store";
+        const userProfileId = sellerData.userProfileId || sellerData.UserProfileId;
+
+        setSellerName(storeName);
+        setSellerId(sellerId);
+        setSellerUserProfileId(userProfileId);
+        setSellerList([sellerData]); // Store in list for potential future use
+        setSelectModalOpen(false); // Never show modal for single user
+
+        console.log('📦 Auto-selected seller:', { sellerId, storeName, userProfileId });
+      } else {
+        console.warn('No seller profile found for current user');
       }
     } catch (err) {
-      console.error("Failed to load sellers", err);
+      console.error("Failed to load seller", err);
     }
   };
 
-  loadSellers();
+  loadSeller();
 }, []);
 
 

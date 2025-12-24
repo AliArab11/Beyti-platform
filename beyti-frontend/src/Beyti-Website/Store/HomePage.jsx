@@ -4,66 +4,7 @@ import { ArrowRight, Storefront, Star } from '@phosphor-icons/react';
 import CustomerHeader from '../../components/CustomerHeader';
 import ActiveOrderBanner from './Components/ActiveOrderBanner';
 import { isStoreOpen } from '../Seller/Components/storeStatus';
-
-// Customer Select Modal
-const CustomerSelectModal = ({ isOpen, customers, onSelect, onClose }) => {
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [isOpen]);
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-cream-50 rounded-2xl shadow-2xl w-full max-w-md p-6 border border-grey-stroke transform transition-all">
-        <h2 className="text-2xl font-semibold text-charcoal-700 mb-2" style={{ fontFamily: 'Merriweather, serif' }}>
-          Select Customer Account
-        </h2>
-
-        <p className="text-sm text-charcoal-400 mb-4" style={{ fontFamily: 'Inter, sans-serif' }}>
-          Choose which customer account you want to shop as.
-        </p>
-
-        <select
-          className="w-full border border-grey-stroke rounded-lg p-3 mb-6 bg-white focus:outline-none focus:ring-2 focus:ring-sage-400 text-charcoal-600"
-          style={{ fontFamily: 'Inter, sans-serif' }}
-          defaultValue=""
-          onChange={(e) => {
-            const id = e.target.value;
-            if (id) {
-              const numericId = parseInt(id, 10);
-              const selected = customers.find((c) => c.id === numericId);
-              onSelect(selected);
-            }
-          }}
-        >
-          <option value="">-- Select Customer --</option>
-          {customers.map((customer) => (
-            <option key={customer.id} value={customer.id}>
-              {customer.fullName || customer.name || `Customer #${customer.id}`}
-            </option>
-          ))}
-        </select>
-
-        <button
-          type="button"
-          onClick={onClose}
-          className="w-full bg-grey-300 hover:bg-grey-400 text-charcoal-700 py-2.5 rounded-lg font-semibold transition-colors"
-          style={{ fontFamily: 'Inter, sans-serif' }}
-        >
-          Close
-        </button>
-      </div>
-    </div>
-  );
-};
+import { getUserProfileId, getUserRole, isLoggedIn, logout } from '../../utils/auth';
 
 const HomePage = () => {
   const navigate = useNavigate();
@@ -72,28 +13,38 @@ const HomePage = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
   
   // Customer state
-  const [customers, setCustomers] = useState([]);
   const [customerId, setCustomerId] = useState(null);
   const [customerName, setCustomerName] = useState(null);
-  const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [cart, setCart] = useState([]);
   const [orders, setOrders] = useState([]);
   const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [showBrowseOnlyBanner, setShowBrowseOnlyBanner] = useState(false);
 
   useEffect(() => {
-    // Load customer session
-    const savedId = sessionStorage.getItem('beyti_customerId');
-    const savedName = sessionStorage.getItem('beyti_customerName');
-    if (savedId && savedName) {
-      setCustomerId(parseInt(savedId));
-      setCustomerName(savedName);
-    }
+    // Load logged-in user's data automatically
+    const userProfileId = getUserProfileId();
+    const userName = localStorage.getItem('userName') || 'User';
+    const userRole = getUserRole();
+    const authenticated = isLoggedIn();
 
-    // Fetch customers
-    fetch('https://localhost:7062/api/Customers')
-      .then(res => res.json())
-      .then(data => setCustomers(Array.isArray(data) ? data : []))
-      .catch(err => console.error('Failed to load customers:', err));
+    console.log('[HomePage] User auth status:', { authenticated, userProfileId, userName, userRole });
+
+    if (authenticated && userProfileId) {
+      // Use logged user's profile as customer
+      setCustomerId(userProfileId);
+      setCustomerName(userName);
+
+      // Save to sessionStorage for compatibility with other components
+      sessionStorage.setItem('beyti_customerId', userProfileId.toString());
+      sessionStorage.setItem('beyti_customerName', userName);
+      sessionStorage.setItem('beyti_userProfileId', userProfileId.toString());
+
+      // Show browse-only banner for non-Customer roles
+      if (userRole && userRole !== 'Customer') {
+        setShowBrowseOnlyBanner(true);
+        console.log(`[HomePage] User is ${userRole}, showing browse-only mode`);
+      }
+    }
 
     // Fetch categories
     fetch('https://localhost:7062/api/Categories')
@@ -184,30 +135,27 @@ const HomePage = () => {
     return () => clearInterval(interval);
   }, [featuredStores.length]);
 
-  const handleCustomerSelect = (customer) => {
-    const name = customer.fullName || customer.name || `Customer #${customer.id}`;
-    setCustomerId(customer.id);
-    setCustomerName(name);
-    setCustomerModalOpen(false);
-    
-    sessionStorage.setItem('beyti_customerId', customer.id.toString());
-    sessionStorage.setItem('beyti_customerName', name);
-  };
-
   const handleCustomerLogout = () => {
+    // Clear sessionStorage
     sessionStorage.removeItem('beyti_customerId');
     sessionStorage.removeItem('beyti_customerName');
-    setCustomerId(null);
-    setCustomerName(null);
-    
+    sessionStorage.removeItem('beyti_userProfileId');
+
+    // Clear customer-specific localStorage data
     if (customerId) {
       localStorage.removeItem(`beyti_activeOrder_${customerId}`);
       localStorage.removeItem(`beyti_bannerDismissed_${customerId}`);
     }
-  };
 
-  const handleCustomerClick = () => {
-    setCustomerModalOpen(true);
+    // Clear all auth data from localStorage
+    logout();
+
+    // Reset state
+    setCustomerId(null);
+    setCustomerName(null);
+
+    // Redirect to login
+    navigate('/login');
   };
 
   const handleNavigateToStores = () => {
@@ -244,24 +192,41 @@ const HomePage = () => {
 
   return (
     <div className="min-h-screen bg-cream-50">
-      <CustomerSelectModal
-        isOpen={customerModalOpen}
-        customers={customers}
-        onSelect={handleCustomerSelect}
-        onClose={() => setCustomerModalOpen(false)}
-      />
-
       <CustomerHeader
         customerName={customerName}
         customerId={customerId}
         cart={cart}
         stores={featuredStores}
         customerAddresses={[]}
-        onCustomerClick={handleCustomerClick}
         onLogout={handleCustomerLogout}
         variant="store"
         showSearch={false}
       />
+
+      {/* Browse-Only Banner for non-Customer roles */}
+      {showBrowseOnlyBanner && (
+        <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 mx-6 mt-4 rounded-md shadow-sm">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3 flex-1">
+              <p className="text-sm text-yellow-700" style={{ fontFamily: 'Inter, sans-serif' }}>
+                <strong>Browse-Only Mode:</strong> You are viewing the store as <strong>{getUserRole()}</strong>. Only Customer accounts can place orders.
+                {' '}
+                <button
+                  onClick={() => navigate('/role-selection')}
+                  className="underline hover:text-yellow-900 font-semibold"
+                >
+                  Create Customer Profile
+                </button>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Active Order Banner */}
       {(() => {

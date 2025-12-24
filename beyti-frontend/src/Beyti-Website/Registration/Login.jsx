@@ -68,7 +68,8 @@ export default function Login() {
 
       // Handle both camelCase and PascalCase response formats
       const token = response.token || response.Token;
-      const userId = response.userId || response.UserId || response.userProfileId || response.UserProfileId;
+      const userId = response.userId || response.UserId;
+      const userProfileId = response.userProfileId || response.UserProfileId;
       const apiRole = response.role || response.Role;
 
       // Check if this is a different user (userId changed)
@@ -82,6 +83,7 @@ export default function Login() {
         localStorage.removeItem('userName');
         localStorage.removeItem('userEmail');
         localStorage.removeItem('userPhone');
+        localStorage.removeItem('userProfileId');
       }
 
       // Check if user already has a partner role set (from previous onboarding of SAME user)
@@ -92,6 +94,7 @@ export default function Login() {
       // Store authentication data in localStorage
       localStorage.setItem('authToken', token);
       localStorage.setItem('userId', userId);
+      localStorage.setItem('userProfileId', userProfileId);
 
       // Only preserve role if it's the same user with a partner role
       if (!isDifferentUser && hasPartnerRole) {
@@ -103,7 +106,7 @@ export default function Login() {
 
       // Fetch user profile to get additional details (name, email, phone)
       try {
-        const userProfile = await getUserProfile(userId);
+        const userProfile = await getUserProfile(userProfileId);
         console.log('[Login] User Profile Response:', userProfile);
 
         // Store user profile data in localStorage
@@ -148,7 +151,7 @@ export default function Login() {
 
                 // Check ServiceProvider
                 try {
-                  const providerProfile = await getProviderProfile(userId);
+                  const providerProfile = await getProviderProfile(userProfileId);
                   console.log('[Login] ServiceProvider check result:', providerProfile);
                   if (providerProfile && (providerProfile.Id || providerProfile.ServiceProviderId || providerProfile.id || providerProfile.serviceProviderId)) {
                     console.log('[Login] ✅ Service Provider profile found! Updating role to ServiceProvider');
@@ -164,7 +167,7 @@ export default function Login() {
 
                 // Check Seller
                 try {
-                  const sellerProfile = await getSellerByUserProfileId(userId);
+                  const sellerProfile = await getSellerByUserProfileId(userProfileId);
                   console.log('[Login] Seller check result:', sellerProfile);
                   if (sellerProfile && (sellerProfile.Id || sellerProfile.SellerId || sellerProfile.id || sellerProfile.sellerId)) {
                     console.log('[Login] ✅ Seller profile found! Updating role to Seller');
@@ -180,7 +183,7 @@ export default function Login() {
 
                 // Check Driver
                 try {
-                  const driverProfile = await getDriverByUserProfileId(userId);
+                  const driverProfile = await getDriverByUserProfileId(userProfileId);
                   console.log('[Login] Driver check result:', driverProfile);
                   if (driverProfile && (driverProfile.Id || driverProfile.DriverId || driverProfile.id || driverProfile.driverId)) {
                     console.log('[Login] ✅ Driver profile found! Updating role to Driver');

@@ -160,18 +160,20 @@ export default function SellerOnboarding() {
     try {
       // Get stored user data from registration
       const userId = localStorage.getItem('userId');
+      const userProfileId = localStorage.getItem('userProfileId');
       const userEmail = localStorage.getItem('userEmail');
       const userPhone = localStorage.getItem('userPhone');
 
       console.log('[SellerOnboarding] userId from localStorage:', userId);
       console.log('[SellerOnboarding] All localStorage:', {
         userId,
+        userProfileId,
         userEmail,
         userPhone,
         authToken: localStorage.getItem('authToken')
       });
 
-      if (!userId) {
+      if (!userId || !userProfileId) {
         throw new Error('User ID not found. Please register or login first before completing onboarding.');
       }
 
@@ -267,7 +269,7 @@ export default function SellerOnboarding() {
       if (formData.selectedPlan) {
         try {
           await createUserMembership({
-            userProfileId: parseInt(userId),
+            userProfileId: parseInt(userProfileId),
             membershipPlanId: formData.selectedPlan,
             autoRenew: false
           });

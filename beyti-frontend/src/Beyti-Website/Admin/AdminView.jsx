@@ -24,6 +24,7 @@ import {
   createAnnouncement,
   getAuditLogs,
 } from '../../services/api';
+import { getUserProfileId, getUserRole } from '../../utils/auth';
 
 // Import design system components
 import AnalyticsCard from '../../components/AnalyticsCard';
@@ -91,16 +92,14 @@ const AdminView = () => {
   const [announcementSuccess, setAnnouncementSuccess] = useState(false);
 
   // ========================================
-  // ADMIN CREDENTIALS - CONFIGURED HERE
+  // ADMIN CREDENTIALS - LOADED FROM AUTH
   // ========================================
-  // Set the admin credentials directly
-  const userProfileId = 3;  // Admin UserProfileId
-  const adminProfileId = 1;  // Admin Id
-  const userRole = 'Admin';  // User role type
+  // Get admin credentials from localStorage (set during login)
+  const userProfileId = getUserProfileId();
+  const userRole = getUserRole();
 
   console.log('Admin View Initialized with:', {
     userProfileId,
-    adminProfileId,
     userRole
   });
   // ========================================

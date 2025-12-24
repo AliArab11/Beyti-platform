@@ -8,6 +8,7 @@ import CustomerHeader from './../../../components/CustomerHeader';
 import PageHeader from './../../../components/PageHeader'
 import ConfirmModal from './../../../components/ConfirmModal';
 import { isStoreOpen } from '../../Seller/Components/storeStatus';
+import { getUserRole } from '../../../utils/auth';
 
 
 import { 
@@ -64,6 +65,20 @@ const Checkout = () => {
     setActiveOrder,
     storeId
     } = location.state || {};
+
+  // Verify user is a Customer (additional check beyond ProtectedRoute)
+  useEffect(() => {
+    const userRole = getUserRole();
+    if (userRole !== 'Customer') {
+      console.warn('[Checkout] Access denied: User is not a Customer');
+      // Redirect to store with message
+      navigate('/mainStore', {
+        state: {
+          message: 'Only Customer accounts can place orders. Please create a Customer profile to continue.'
+        }
+      });
+    }
+  }, [navigate]);
 
     
 
@@ -723,13 +738,10 @@ const handlePlaceOrder = async () => {
       console.log('✅ Order created:', createdOrder);
     } catch (orderError) {
       console.error('❌ Order creation failed, restoring stock:', orderError);
-      // Restore stock if order creation fails
-      try {
-        await restoreStock(stockValidationItems);
-        console.log('♻️ Stock restored after order creation failure');
-      } catch (restoreError) {
-        console.error('⚠️ Failed to restore stock:', restoreError);
-      }
+      // Note: Since order creation failed, we don't have an orderId to restore stock with
+      // The stock reservation will expire automatically on the backend
+      // Or we can implement a separate endpoint to restore stock by items
+      console.warn('⚠️ Stock was reserved but order creation failed. Stock reservation will expire automatically.');
       throw new Error('Failed to create order. Please try again.');
     }
 

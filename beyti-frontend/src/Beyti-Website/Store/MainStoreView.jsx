@@ -8,30 +8,10 @@ import Snackbar from './../../components/Snackbar';
 import CustomerHeader from '../../components/CustomerHeader';
 import { isStoreOpen } from '../Seller/Components/storeStatus';
 import { StoreBanner } from '../../components/StoreBanner';
+import { getUserProfileId, getUserRole, isLoggedIn, logout } from '../../utils/auth';
 
 
-// Get customers function
-const getCustomers = async () => {
-  try {
-    const response = await fetch('https://localhost:7062/api/Customers');
-
-    if (!response.ok) {
-      throw new Error('Failed to load customers');
-    }
-
-    const data = await response.json();
-    console.log("🔔 MainStoreView: Fetched customers from API:", data);
-    if (data.length > 0) {
-      console.log("🔔 MainStoreView: First customer structure:", data[0]);
-      console.log("🔔 MainStoreView: First customer userProfileId:", data[0].userProfileId);
-    }
-    return Array.isArray(data) ? data : [];
-  } catch (error) {
-    console.error('Error fetching customers:', error);
-    alert("Failed to load customers: " + error.message);
-    return [];
-  }
-};
+// Removed getCustomers function - now using logged-in user data automatically
 
 // Get categories function
 const getCategories = async () => {
@@ -578,79 +558,7 @@ const StoreCard = ({ store, subcategories = [], isFavorited = false, onToggleFav
   );
 };
 
-const CustomerSelectModal = ({ isOpen, customers, onSelect, onClose }) => {
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [isOpen]);
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-cream-50 rounded-2xl shadow-2xl w-full max-w-md p-6 border border-grey-stroke transform transition-all">
-        <h2 className="text-2xl font-semibold text-charcoal-700 mb-2" style={{ fontFamily: 'Merriweather, serif' }}>
-          Select Customer Account
-        </h2>
-
-        <p className="text-sm text-charcoal-400 mb-4" style={{ fontFamily: 'Inter, sans-serif' }}>
-          Choose which customer account you want to shop as.
-        </p>
-
-        <select
-          className="w-full border border-grey-stroke rounded-lg p-3 mb-6 bg-white focus:outline-none focus:ring-2 focus:ring-sage-400 text-charcoal-600"
-          style={{ fontFamily: 'Inter, sans-serif' }}
-          defaultValue=""
-          onChange={(e) => {
-            const id = e.target.value;
-            if (id) {
-              const numericId = parseInt(id, 10);
-              console.log("🔔 CustomerSelectModal: Selected ID from dropdown:", numericId);
-              console.log("🔔 CustomerSelectModal: Available customers:", customers);
-              const selected = customers.find((c) => {
-                const customerId = c.id || c.Id; // Handle both camelCase and PascalCase
-                console.log("🔔 CustomerSelectModal: Comparing", customerId, "with", numericId);
-                return customerId === numericId;
-              });
-              console.log("🔔 CustomerSelectModal: Found customer:", selected);
-              if (selected) {
-                onSelect(selected);
-              } else {
-                console.error("🔔 CustomerSelectModal: Customer not found!");
-              }
-            }
-          }}
-        >
-          <option value="">-- Select Customer --</option>
-          {customers.map((customer) => {
-            const customerId = customer.id || customer.Id;
-            const customerName = customer.fullName || customer.name || `Customer #${customerId}`;
-            return (
-              <option key={customerId} value={customerId}>
-                {customerName}
-              </option>
-            );
-          })}
-        </select>
-
-        <button
-          type="button"
-          onClick={onClose}
-          className="w-full bg-grey-300 hover:bg-grey-400 text-charcoal-700 py-2.5 rounded-lg font-semibold transition-colors"
-          style={{ fontFamily: 'Inter, sans-serif' }}
-        >
-          Close
-        </button>
-      </div>
-    </div>
-  );
-};
+// Removed CustomerSelectModal component - now using logged-in user data automatically
 
 // Main Component
 const MainStoreView = () => {
@@ -724,13 +632,12 @@ useEffect(() => {
     availability: null, // null, 'open', 'closed'
   });
 
- // Customer state
-  const [customers, setCustomers] = useState([]);
+ // Customer state - Now using logged-in user data
   const [customerId, setCustomerId] = useState(null);
   const [customerName, setCustomerName] = useState(null);
   const [userProfileId, setUserProfileId] = useState(null); // Add userProfileId for notifications
-  const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [customerAddresses, setCustomerAddresses] = useState([]);
+  const [showBrowseOnlyBanner, setShowBrowseOnlyBanner] = useState(false);
 
   const [favoriteStores, setFavoriteStores] = useState([]);
   const [loadingFavorites, setLoadingFavorites] = useState(false);
@@ -936,35 +843,56 @@ useEffect(() => {
   fetchAllSubcategories();
 }, []);
 
-// Load customers on mount
-  useEffect(() => {
-    const loadCustomers = async () => {
+// Load logged-in user data automatically on mount
+useEffect(() => {
+  const authUserProfileId = getUserProfileId();
+  const userName = localStorage.getItem('userName') || 'User';
+  const userRole = getUserRole();
+  const authenticated = isLoggedIn();
+
+  console.log('[MainStoreView] User auth status:', { authenticated, authUserProfileId, userName, userRole });
+
+  if (authenticated && authUserProfileId) {
+    // Fetch the actual Customer entity using userProfileId
+    const fetchCustomerByUserProfileId = async () => {
       try {
-        const data = await getCustomers();
-        setCustomers(data); // data is already an array from getCustomers
+        const response = await fetch('https://localhost:7062/api/Customers');
+        if (response.ok) {
+          const customers = await response.json();
+          // Find customer with matching userProfileId
+          const customer = customers.find(c => c.userProfileId === authUserProfileId);
+
+          if (customer) {
+            console.log('[MainStoreView] Found customer:', customer);
+            // Use the actual Customer ID, not the UserProfile ID
+            setCustomerId(customer.id);
+            setCustomerName(customer.fullName || userName);
+            setUserProfileId(authUserProfileId);
+
+            // Save to sessionStorage for compatibility with other components
+            sessionStorage.setItem('beyti_customerId', customer.id.toString());
+            sessionStorage.setItem('beyti_customerName', customer.fullName || userName);
+            sessionStorage.setItem('beyti_userProfileId', authUserProfileId.toString());
+          } else {
+            console.warn('[MainStoreView] No Customer entity found for userProfileId:', authUserProfileId);
+            // Still set the userProfileId for display purposes
+            setUserProfileId(authUserProfileId);
+            setCustomerName(userName);
+          }
+        }
       } catch (error) {
-        console.error("Failed to load customers:", error);
-        setCustomers([]); // Ensure empty array on error
+        console.error('[MainStoreView] Error fetching customer:', error);
       }
     };
-    loadCustomers();
-  }, []);
 
-// Load saved customer from sessionStorage on mount
-useEffect(() => {
-  const savedCustomerId = sessionStorage.getItem('beyti_customerId');
-  const savedCustomerName = sessionStorage.getItem('beyti_customerName');
-  const savedUserProfileId = sessionStorage.getItem('beyti_userProfileId');
+    fetchCustomerByUserProfileId();
 
-  if (savedCustomerId && savedCustomerName) {
-    setCustomerId(parseInt(savedCustomerId, 10));
-    setCustomerName(savedCustomerName);
-    if (savedUserProfileId) {
-      setUserProfileId(parseInt(savedUserProfileId, 10));
+    // Show browse-only banner for non-Customer roles
+    if (userRole && userRole !== 'Customer') {
+      setShowBrowseOnlyBanner(true);
+      console.log(`[MainStoreView] User is ${userRole}, showing browse-only mode`);
     }
-    console.log("Restored customer session:", savedCustomerName);
   }
-  // Removed auto-opening modal - let user browse as guest
 }, []);
 
 
@@ -1065,45 +993,32 @@ const scrollSubcategories = (direction) => {
   });
 };
 
-const handleCustomerSelect = (customer) => {
-  // Handle both camelCase and PascalCase from API
-  const customerId = customer.id || customer.Id;
-  const userProfileId = customer.userProfileId || customer.UserProfileId;
-  const name = customer.fullName || customer.name || `Customer #${customerId}`;
-
-  console.log("🔔 MainStoreView: Selected customer:", customer);
-  console.log("🔔 MainStoreView: customer.userProfileId:", userProfileId);
-  console.log("🔔 MainStoreView: customer.id:", customerId);
-
-  setCustomerId(customerId);
-  setCustomerName(name);
-  setUserProfileId(userProfileId); // Store userProfileId for notifications
-  setCustomerModalOpen(false);
-
-  // Save to sessionStorage
-  sessionStorage.setItem('beyti_customerId', customerId.toString());
-  sessionStorage.setItem('beyti_customerName', name);
-  sessionStorage.setItem('beyti_userProfileId', userProfileId?.toString() || '');
-
-  console.log("🔔 MainStoreView: Saved to sessionStorage - userProfileId:", userProfileId);
-};
+// Removed handleCustomerSelect - now using logged-in user data automatically
 
 const handleCustomerLogout = () => {
-  // Clear customer session
+  // Clear sessionStorage
   sessionStorage.removeItem('beyti_customerId');
   sessionStorage.removeItem('beyti_customerName');
   sessionStorage.removeItem('beyti_userProfileId');
+
+  // Clear customer-specific localStorage data
+  if (customerId) {
+    localStorage.removeItem(`beyti_activeOrder_${customerId}`);
+  }
+
+  // Clear all auth data from localStorage
+  logout();
+
+  // Reset state
   setCustomerId(null);
   setCustomerName(null);
   setUserProfileId(null);
   setActiveOrder(null);
 
-  // Clear any active order from localStorage
-  if (customerId) {
-    localStorage.removeItem(`beyti_activeOrder_${customerId}`);
-  }
+  console.log("[MainStoreView] User logged out, redirecting to login");
 
-  console.log("Customer logged out");
+  // Redirect to login
+  navigate('/login');
 };
 
 const handleDismissBanner = () => {
@@ -1114,10 +1029,6 @@ const handleDismissBanner = () => {
 const handleTrackOrder = () => {
   navigate('/customer-dashboard');
 };
-
-  const handleCustomerClick = () => {
-    setCustomerModalOpen(true);
-  };
 
   const fetchStores = async () => {
     try {
@@ -1317,13 +1228,6 @@ const filteredStores = stores
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#FAF7F2' }}>
-      <CustomerSelectModal
-        isOpen={customerModalOpen}
-        customers={customers}
-        onSelect={handleCustomerSelect}
-        onClose={() => setCustomerModalOpen(false)}
-      />
-      
       <CustomerHeader
         pageTitle="Stores"
         customerName={customerName}
@@ -1332,13 +1236,39 @@ const filteredStores = stores
         cart={cart}
         stores={stores}
         customerAddresses={customerAddresses}
-        onCustomerClick={handleCustomerClick}
         onLogout={handleCustomerLogout}
         variant="store"
         showSearch={false}
         showContextSwitch={true}
         currentContext="stores"
       />
+
+      {/* Browse-Only Banner for non-Customer roles */}
+      {showBrowseOnlyBanner && (
+        <div className="max-w-[1600px] mx-auto px-8 pt-4">
+          <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-md shadow-sm">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3 flex-1">
+                <p className="text-sm text-yellow-700" style={{ fontFamily: 'Inter, sans-serif' }}>
+                  <strong>Browse-Only Mode:</strong> You are viewing stores as <strong>{getUserRole()}</strong>. Only Customer accounts can place orders.
+                  {' '}
+                  <button
+                    onClick={() => navigate('/role-selection')}
+                    className="underline hover:text-yellow-900 font-semibold"
+                  >
+                    Create Customer Profile
+                  </button>
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     {/* Active Order Banner */}
       {(() => {
