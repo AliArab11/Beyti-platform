@@ -546,6 +546,36 @@ namespace Beyti_Backend.Controllers.Api
                 _context.Services.Add(service);
                 await _context.SaveChangesAsync();
 
+                // Send real-time notification for service creation
+                Console.WriteLine($"[ServiceProviderDashboard] Service created - ServiceId: {service.Id}, ProviderId: {serviceProviderId}");
+
+                // Get the complete service data with all related information
+                var serviceData = await _context.Services
+                    .Include(s => s.ServiceCatalog)
+                        .ThenInclude(sc => sc.ServiceCategory)
+                    .Where(s => s.Id == service.Id)
+                    .Select(s => new
+                    {
+                        ServiceId = s.Id,
+                        s.ServiceProviderId,
+                        s.Name,
+                        s.Description,
+                        s.MinPrice,
+                        s.MaxPrice,
+                        s.EstimatedDuration,
+                        s.IsActive,
+                        Category = s.ServiceCatalog.ServiceCategory.Name,
+                        SubCategory = s.ServiceCatalog.Name,
+                        CategoryId = s.ServiceCatalog.ServiceCategoryId,
+                        ServiceCatalogId = s.ServiceCatalogId,
+                        s.CreatedAt
+                    })
+                    .FirstOrDefaultAsync();
+
+                // Send SignalR notification with serviceProviderId
+                await _signalRService.SendServiceCreatedAsync(serviceProviderId, serviceData);
+                Console.WriteLine($"[ServiceProviderDashboard] Service creation notification sent for ServiceProviderId: {serviceProviderId}");
+
                 return Ok(new
                 {
                     message = "Service added successfully",
@@ -698,6 +728,36 @@ namespace Beyti_Backend.Controllers.Api
 
                 await _context.SaveChangesAsync();
 
+                // Send real-time notification for service update
+                Console.WriteLine($"[ServiceProviderDashboard] Service updated - ServiceId: {serviceId}");
+
+                // Get the complete updated service data with all related information
+                var updatedServiceData = await _context.Services
+                    .Include(s => s.ServiceCatalog)
+                        .ThenInclude(sc => sc.ServiceCategory)
+                    .Where(s => s.Id == serviceId)
+                    .Select(s => new
+                    {
+                        ServiceId = s.Id,
+                        s.ServiceProviderId,
+                        s.Name,
+                        s.Description,
+                        s.MinPrice,
+                        s.MaxPrice,
+                        s.EstimatedDuration,
+                        s.IsActive,
+                        Category = s.ServiceCatalog.ServiceCategory.Name,
+                        SubCategory = s.ServiceCatalog.Name,
+                        CategoryId = s.ServiceCatalog.ServiceCategoryId,
+                        ServiceCatalogId = s.ServiceCatalogId,
+                        s.CreatedAt
+                    })
+                    .FirstOrDefaultAsync();
+
+                // Send SignalR notification with serviceProviderId
+                await _signalRService.SendServiceUpdatedAsync(service.ServiceProviderId, updatedServiceData);
+                Console.WriteLine($"[ServiceProviderDashboard] Service update notification sent for ServiceProviderId: {service.ServiceProviderId}");
+
                 return Ok(new { message = "Service updated successfully" });
             }
             catch (Exception ex)
@@ -712,12 +772,41 @@ namespace Beyti_Backend.Controllers.Api
         {
             try
             {
-                var service = await _context.Services.FindAsync(serviceId);
+                var service = await _context.Services
+                    .Include(s => s.ServiceCatalog)
+                        .ThenInclude(sc => sc.ServiceCategory)
+                    .FirstOrDefaultAsync(s => s.Id == serviceId);
+
                 if (service == null)
                     return NotFound("Service not found");
 
                 service.IsActive = !service.IsActive;
                 await _context.SaveChangesAsync();
+
+                // Send real-time notification for service toggle
+                Console.WriteLine($"[ServiceProviderDashboard] Service toggled - ServiceId: {serviceId}, IsActive: {service.IsActive}");
+
+                // Get the complete service data
+                var serviceData = new
+                {
+                    ServiceId = service.Id,
+                    ServiceProviderId = service.ServiceProviderId,
+                    service.Name,
+                    service.Description,
+                    service.MinPrice,
+                    service.MaxPrice,
+                    service.EstimatedDuration,
+                    service.IsActive,
+                    Category = service.ServiceCatalog.ServiceCategory.Name,
+                    SubCategory = service.ServiceCatalog.Name,
+                    CategoryId = service.ServiceCatalog.ServiceCategoryId,
+                    ServiceCatalogId = service.ServiceCatalogId,
+                    service.CreatedAt
+                };
+
+                // Send SignalR notification
+                await _signalRService.SendServiceUpdatedAsync(service.ServiceProviderId, serviceData);
+                Console.WriteLine($"[ServiceProviderDashboard] Service toggle notification sent for ServiceProviderId: {service.ServiceProviderId}");
 
                 return Ok(new
                 {

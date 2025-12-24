@@ -7,6 +7,7 @@ import CustomerHeader from "../../components/CustomerHeader";
 import ActiveOrderBanner from "./Components/ActiveOrderBanner";
 import ServiceDetailsSheet from "./Components/ServiceDetailsSheet";
 import ServiceCheckout from "./Components/ServiceCheckout";
+import { useSignalR } from "../../contexts/SignalRContext";
 
 
 // Service Provider Info Section
@@ -308,6 +309,7 @@ const ServiceCard = ({ service, onClick }) => {
 const ServiceProviderDetailView = () => {
   const { providerId } = useParams();
   const navigate = useNavigate();
+  const { on, off } = useSignalR();
   const [provider, setProvider] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -588,6 +590,82 @@ const handleCartClick = () => {
     }
   }, [providerId]);
 
+  // SignalR listener for real-time service updates
+  useEffect(() => {
+    const handleServiceUpdate = async (data) => {
+      console.log('[ServiceProviderDetailView] Received service update:', data);
+
+      // Only update if this update is for the provider we're currently viewing
+      if ((data.type === 'ServiceCreated' || data.type === 'ServiceUpdated') &&
+          data.serviceProviderId &&
+          data.serviceProviderId.toString() === providerId.toString()) {
+        try {
+          console.log('[ServiceProviderDetailView] This update is for the current provider, refreshing...');
+
+          // Refresh services for this provider
+          const servicesData = await getServiceProviderServices(providerId);
+          console.log('[ServiceProviderDetailView] Refreshed services data:', servicesData);
+
+          // Fetch bookings to calculate reviews per service
+          const bookingsData = bookings.length > 0 ? bookings : await getServiceBookings(providerId);
+
+          // Fetch reviews
+          const reviewsData = allReviews.length > 0 ? allReviews : await getProviderServiceReviews(providerId);
+
+          // Create a map of reviews by serviceId using bookings
+          const reviewsByServiceId = {};
+          (Array.isArray(reviewsData) ? reviewsData : []).forEach(review => {
+            const booking = (Array.isArray(bookingsData) ? bookingsData : []).find(
+              b => b.id === review.serviceBookingId
+            );
+
+            if (booking && booking.serviceId) {
+              if (!reviewsByServiceId[booking.serviceId]) {
+                reviewsByServiceId[booking.serviceId] = [];
+              }
+              reviewsByServiceId[booking.serviceId].push(review);
+            }
+          });
+
+          // Calculate average rating for each service
+          const servicesWithRatings = (Array.isArray(servicesData) ? servicesData : []).map(service => {
+            const allServiceReviews = reviewsByServiceId[service.id] || [];
+            const visibleServiceReviews = allServiceReviews.filter(review => !review.isHidden);
+
+            let averageRating = 0;
+            if (allServiceReviews.length > 0) {
+              const sum = allServiceReviews.reduce((acc, review) => acc + (review.overallRating || 0), 0);
+              averageRating = sum / allServiceReviews.length;
+            }
+
+            return {
+              ...service,
+              averageRating,
+              reviewCount: visibleServiceReviews.length
+            };
+          });
+
+          setServices(servicesWithRatings);
+          console.log('[ServiceProviderDetailView] Services updated with new data');
+        } catch (err) {
+          console.error('[ServiceProviderDetailView] Error refreshing services:', err);
+        }
+      }
+    };
+
+    // Subscribe to service updates
+    if (on) {
+      on('ReceiveServiceUpdate', handleServiceUpdate);
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (off) {
+        off('ReceiveServiceUpdate', handleServiceUpdate);
+      }
+    };
+  }, [on, off, providerId, bookings, allReviews]);
+
   // Get catalog title
   const getCatalogTitle = (catalogId) => {
     const catalog = catalogs.find(c => c.id === catalogId);
@@ -618,18 +696,22 @@ const handleCartClick = () => {
     setBookingData(null);
   };
 
-  // Filter services by selected catalog and search query
+  // Filter services by selected catalog, search query, and active status
   const filteredServices = services.filter(service => {
+    // Only show active services to customers
+    const isActive = service.isActive !== false;
+    if (!isActive) return false;
+
     // Filter by catalog
-    const matchesCatalog = selectedCatalog 
-      ? service.serviceCatalogId === selectedCatalog 
+    const matchesCatalog = selectedCatalog
+      ? service.serviceCatalogId === selectedCatalog
       : true;
-    
+
     // Filter by search query
-    const matchesSearch = searchQuery.trim() === '' 
-      ? true 
+    const matchesSearch = searchQuery.trim() === ''
+      ? true
       : service.name?.toLowerCase().includes(searchQuery.toLowerCase());
-    
+
     return matchesCatalog && matchesSearch;
   });
 

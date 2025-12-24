@@ -13,8 +13,10 @@ import { Table, TableHeader, TableBody, TableRow } from '../../../components/Tab
 import { logProviderActivity } from '../../../utils/providerActivityLogger';
 import Snackbar from '../../../components/Snackbar';
 import ConfirmModal from '../../../components/ConfirmModal';
+import { useSignalR } from '../../../contexts/SignalRContext';
 
 export default function ServicesManagement({ serviceProviderId, searchTerm = '' }) {
+  const { on, off } = useSignalR();
   const [services, setServices] = useState([]);
   const [providerCategory, setProviderCategory] = useState(null);
   const [serviceCatalogs, setServiceCatalogs] = useState([]);
@@ -126,6 +128,48 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
     fetchCategories();
   }, [serviceProviderId]);
 
+  // SignalR listener for real-time service updates
+  useEffect(() => {
+    const handleServiceUpdate = (data) => {
+      console.log('[ServicesManagement] Received service update:', data);
+
+      // Check if this update is for the current service provider
+      const isForCurrentProvider = data.serviceProviderId &&
+                                    data.serviceProviderId.toString() === serviceProviderId.toString();
+
+      // Also check if the update data contains this provider's ID
+      const isProviderMatch = data.data?.ServiceProviderId &&
+                              data.data.ServiceProviderId.toString() === serviceProviderId.toString();
+
+      if ((data.type === 'ServiceCreated' || data.type === 'ServiceUpdated') &&
+          (isForCurrentProvider || isProviderMatch)) {
+        console.log('[ServicesManagement] Update is for this provider, refreshing services...');
+
+        // Refresh services list to get the latest data
+        fetchServices();
+
+        // Show notification to user
+        if (data.type === 'ServiceCreated') {
+          showSnackbar('New service added successfully!', 'success');
+        } else {
+          showSnackbar('Service updated successfully!', 'success');
+        }
+      }
+    };
+
+    // Subscribe to service updates
+    if (on) {
+      on('ReceiveServiceUpdate', handleServiceUpdate);
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (off) {
+        off('ReceiveServiceUpdate', handleServiceUpdate);
+      }
+    };
+  }, [on, off, serviceProviderId]);
+
   // Check for flagged keywords whenever name or description changes
   useEffect(() => {
     const checkKeywords = async () => {
@@ -160,13 +204,61 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validate price range
-    const minPrice = formData.minPrice ? parseFloat(formData.minPrice) : null;
-    const maxPrice = formData.maxPrice ? parseFloat(formData.maxPrice) : null;
+    // Validate service name
+    if (!formData.name || !formData.name.trim()) {
+      showSnackbar('Error: Service name is required', 'error');
+      return;
+    }
 
-    if (minPrice !== null && maxPrice !== null && minPrice > maxPrice) {
+    // Validate price - both minimum and maximum prices are required
+    const minPriceStr = formData.minPrice?.toString().trim();
+    const maxPriceStr = formData.maxPrice?.toString().trim();
+
+    const minPrice = minPriceStr && minPriceStr !== '' ? parseFloat(minPriceStr) : null;
+    const maxPrice = maxPriceStr && maxPriceStr !== '' ? parseFloat(maxPriceStr) : null;
+
+    // Both prices must be provided
+    if (minPrice === null || maxPrice === null) {
+      setPriceError('Both minimum and maximum prices are required');
+      showSnackbar('Error: Please provide both minimum and maximum prices', 'error');
+      return;
+    }
+
+    // Validate that prices are valid numbers
+    if (isNaN(minPrice) || minPrice < 0) {
+      setPriceError('Minimum price must be a valid positive number');
+      showSnackbar('Error: Minimum price must be a valid positive number', 'error');
+      return;
+    }
+
+    if (isNaN(maxPrice) || maxPrice < 0) {
+      setPriceError('Maximum price must be a valid positive number');
+      showSnackbar('Error: Maximum price must be a valid positive number', 'error');
+      return;
+    }
+
+    // Validate price range
+    if (minPrice > maxPrice) {
       setPriceError('Minimum price must be less than or equal to maximum price');
       showSnackbar('Error: Minimum price must be less than or equal to maximum price', 'error');
+      return;
+    }
+
+    // Validate duration - at least one of hours or minutes must be provided
+    const hoursStr = formData.durationHours?.toString().trim();
+    const minutesStr = formData.durationMinutes?.toString().trim();
+
+    const hours = hoursStr && hoursStr !== '' ? parseInt(hoursStr) : 0;
+    const minutes = minutesStr && minutesStr !== '' ? parseInt(minutesStr) : 0;
+    const totalMinutes = (hours * 60) + minutes;
+
+    if (totalMinutes === 0 || isNaN(totalMinutes)) {
+      showSnackbar('Error: Please provide an estimated duration (hours and/or minutes)', 'error');
+      return;
+    }
+
+    if (hours < 0 || minutes < 0) {
+      showSnackbar('Error: Duration cannot be negative', 'error');
       return;
     }
 
@@ -603,47 +695,56 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">Min Price (BHD)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.minPrice}
-                  onChange={(e) => {
-                    setFormData({ ...formData, minPrice: e.target.value });
-                    setPriceError('');
-                  }}
-                  className={`w-full border ${priceError ? 'border-red-500' : 'border-grey-stroke'} rounded-lg px-4 py-2 text-body-regular focus:ring-2 focus:ring-sage-500 focus:border-sage-500 bg-white dark:bg-[#1F1F1F] dark:text-white`}
-                />
-              </div>
+            <div>
+              <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">
+                Price Range (BHD) *
+                <span className="text-label-medium text-charcoal-400 dark:text-gray-400 ml-2">
+                  (Both prices required)
+                </span>
+              </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-label-medium text-charcoal-400 dark:text-gray-400 mb-2">Min Price *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.minPrice}
+                    onChange={(e) => {
+                      setFormData({ ...formData, minPrice: e.target.value });
+                      setPriceError('');
+                    }}
+                    className={`w-full border ${priceError ? 'border-red-500' : 'border-grey-stroke'} rounded-lg px-4 py-2 text-body-regular focus:ring-2 focus:ring-sage-500 focus:border-sage-500 bg-white dark:bg-[#1F1F1F] dark:text-white`}
+                    placeholder="Enter minimum price"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">Max Price (BHD)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.maxPrice}
-                  onChange={(e) => {
-                    setFormData({ ...formData, maxPrice: e.target.value });
-                    setPriceError('');
-                  }}
-                  className={`w-full border ${priceError ? 'border-red-500' : 'border-grey-stroke'} rounded-lg px-4 py-2 text-body-regular focus:ring-2 focus:ring-sage-500 focus:border-sage-500 bg-white dark:bg-[#1F1F1F] dark:text-white`}
-                />
+                <div>
+                  <label className="block text-label-medium text-charcoal-400 dark:text-gray-400 mb-2">Max Price *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.maxPrice}
+                    onChange={(e) => {
+                      setFormData({ ...formData, maxPrice: e.target.value });
+                      setPriceError('');
+                    }}
+                    className={`w-full border ${priceError ? 'border-red-500' : 'border-grey-stroke'} rounded-lg px-4 py-2 text-body-regular focus:ring-2 focus:ring-sage-500 focus:border-sage-500 bg-white dark:bg-[#1F1F1F] dark:text-white`}
+                    placeholder="Enter maximum price"
+                  />
+                </div>
               </div>
+              {priceError && (
+                <p className="text-label-medium text-red-600 dark:text-red-400 mt-2">
+                  {priceError}
+                </p>
+              )}
             </div>
-
-            {priceError && (
-              <p className="text-label-medium text-red-600 dark:text-red-400 mt-2">
-                {priceError}
-              </p>
-            )}
 
             <div>
               <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">
-                Estimated Duration
+                Estimated Duration *
               </label>
               <div className="grid grid-cols-2 gap-4">
                 <div>

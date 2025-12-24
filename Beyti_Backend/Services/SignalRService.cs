@@ -161,34 +161,52 @@ namespace Beyti_Backend.Services
 
         public async Task SendProductCreatedAsync(int sellerId, object productData)
         {
-            await _hubContext.Clients.Group($"user_{sellerId}")
+            Console.WriteLine($"[SignalRService] 📡 SendProductCreatedAsync - SellerId: {sellerId}");
+
+            // Broadcast to all clients so customers viewing the store can see updates
+            await _hubContext.Clients.All
                 .SendAsync("ReceiveProductUpdate", new
                 {
                     type = "ProductCreated",
+                    sellerId = sellerId,
                     data = productData
                 });
+
+            Console.WriteLine($"[SignalRService] ✅ Product creation notification broadcasted to all clients");
         }
 
         public async Task SendProductUpdatedAsync(int sellerId, object productData)
         {
-            await _hubContext.Clients.Group($"user_{sellerId}")
+            Console.WriteLine($"[SignalRService] 📡 SendProductUpdatedAsync - SellerId: {sellerId}");
+
+            // Broadcast to all clients so customers viewing the store can see updates
+            await _hubContext.Clients.All
                 .SendAsync("ReceiveProductUpdate", new
                 {
                     type = "ProductUpdated",
+                    sellerId = sellerId,
                     data = productData
                 });
+
+            Console.WriteLine($"[SignalRService] ✅ Product update notification broadcasted to all clients");
         }
 
         public async Task SendProductStatusChangedAsync(int sellerId, int productId, string newStatus, object productData)
         {
-            await _hubContext.Clients.Group($"user_{sellerId}")
+            Console.WriteLine($"[SignalRService] 📡 SendProductStatusChangedAsync - SellerId: {sellerId}, ProductId: {productId}, NewStatus: {newStatus}");
+
+            // Broadcast to all clients so customers viewing the store can see updates
+            await _hubContext.Clients.All
                 .SendAsync("ReceiveProductUpdate", new
                 {
                     type = "ProductStatusChanged",
+                    sellerId = sellerId,
                     productId,
                     newStatus,
                     data = productData
                 });
+
+            Console.WriteLine($"[SignalRService] ✅ Product status change notification broadcasted to all clients");
         }
 
         // ==================== CATEGORY METHODS ====================
@@ -208,22 +226,34 @@ namespace Beyti_Backend.Services
 
         public async Task SendServiceCreatedAsync(int serviceProviderId, object serviceData)
         {
-            await _hubContext.Clients.Group($"user_{serviceProviderId}")
+            Console.WriteLine($"[SignalRService] 📡 SendServiceCreatedAsync - ServiceProviderId: {serviceProviderId}");
+
+            // Broadcast to all clients so customers viewing the provider's page can see updates
+            await _hubContext.Clients.All
                 .SendAsync("ReceiveServiceUpdate", new
                 {
                     type = "ServiceCreated",
+                    serviceProviderId = serviceProviderId,
                     data = serviceData
                 });
+
+            Console.WriteLine($"[SignalRService] ✅ Service creation notification broadcasted to all clients");
         }
 
         public async Task SendServiceUpdatedAsync(int serviceProviderId, object serviceData)
         {
-            await _hubContext.Clients.Group($"user_{serviceProviderId}")
+            Console.WriteLine($"[SignalRService] 📡 SendServiceUpdatedAsync - ServiceProviderId: {serviceProviderId}");
+
+            // Broadcast to all clients so customers viewing the provider's page can see updates
+            await _hubContext.Clients.All
                 .SendAsync("ReceiveServiceUpdate", new
                 {
                     type = "ServiceUpdated",
+                    serviceProviderId = serviceProviderId,
                     data = serviceData
                 });
+
+            Console.WriteLine($"[SignalRService] ✅ Service update notification broadcasted to all clients");
         }
     }
 }
