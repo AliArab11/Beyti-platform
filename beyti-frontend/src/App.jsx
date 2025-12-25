@@ -46,6 +46,7 @@ import AdminView from './Beyti-Website/Admin/AdminView.jsx';
 import DashboardRouter from './components/DashboardRouter';
 import DriverDashboardPlaceholder from './Beyti-Website/Driver/DriverDashboardPlaceholder';
 import AccountSuspended from './Beyti-Website/Auth/AccountSuspended';
+import PendingApproval from './components/PendingApproval';
 
 import ProfilePage from './components/ProfilePage'
 import ProtectedRoute from './components/ProtectedRoute';
@@ -290,6 +291,11 @@ export default function App() {
             <Route path="/dashboard" element={
               <ProtectedRoute>
                 <DashboardRouter />
+              </ProtectedRoute>
+            } />
+            <Route path="/pending-approval" element={
+              <ProtectedRoute>
+                <PendingApproval />
               </ProtectedRoute>
             } />
             <Route path="/driver-placeholder" element={<DriverDashboardPlaceholder />} />

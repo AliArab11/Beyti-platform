@@ -59,6 +59,11 @@ export default function DashboardRouter() {
         navigate('/customer-dashboard', { replace: true });
         break;
 
+      case 'Pending':
+        console.log('[DashboardRouter] Pending role detected, redirecting to pending approval page');
+        navigate('/pending-approval', { replace: true });
+        break;
+
       default:
         console.warn('[DashboardRouter] Invalid or missing role, redirecting to login');
         navigate('/login', { replace: true });

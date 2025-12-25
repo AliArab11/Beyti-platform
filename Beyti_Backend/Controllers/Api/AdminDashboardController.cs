@@ -584,7 +584,7 @@ namespace Beyti_Backend.Controllers.Api
 
         // PATCH: api/AdminDashboard/ServiceProviderRequests/5/reject
         [HttpPatch("ServiceProviderRequests/{id}/reject")]
-        public async Task<IActionResult> RejectServiceProviderRequest(int id, [FromQuery] int? adminUserProfileId)
+        public async Task<IActionResult> RejectServiceProviderRequest(int id, [FromQuery] int? adminUserProfileId, [FromBody] JsonElement body)
         {
             try
             {
@@ -595,16 +595,21 @@ namespace Beyti_Backend.Controllers.Api
 
                 if (request == null) return NotFound();
 
-                // Update application status
+                // Extract rejection reason from body
+                string? rejectionReason = null;
+                if (body.TryGetProperty("rejectionReason", out var reasonProp))
+                    rejectionReason = reasonProp.GetString();
+
+                // Update application status and store rejection reason in Notes
                 request.Status = "Rejected";
+                request.Notes = rejectionReason ?? request.Notes;
                 request.UpdatedAt = DateTime.Now;
 
-                // Optionally set service provider as unavailable
+                // Set service provider as unavailable
                 request.ServiceProvider.Status = "Unavailable";
                 request.ServiceProvider.UpdatedAt = DateTime.Now;
 
-                // Optionally deactivate user profile
-                request.ServiceProvider.UserProfile.Status = "Inactive";
+                // Keep user profile Active (allow resubmission and login)
                 request.ServiceProvider.UserProfile.UpdatedAt = DateTime.Now;
 
                 await _context.SaveChangesAsync();
@@ -620,13 +625,17 @@ namespace Beyti_Backend.Controllers.Api
                     }
                 }
 
-                // Send notification to the service provider
+                // Send notification with rejection reason
+                string notificationBody = rejectionReason != null
+                    ? $"Your service provider application has been rejected. Reason: {rejectionReason}. You may resubmit your application after addressing the issues."
+                    : "Your service provider application has been rejected. Please contact support for details. You may resubmit your application.";
+
                 await _notificationService.SendNotificationAsync(
                     recipientUserId: request.ServiceProvider.UserProfileId,
                     senderUserId: adminUserProfileId,
                     type: "application_rejected",
                     title: "Application Rejected",
-                    body: $"Your service provider application has been reviewed{adminInfo} and unfortunately was not approved at this time. Please contact support for more information.",
+                    body: notificationBody,
                     relatedEntityType: "ProviderApplication",
                     relatedEntityId: request.Id
                 );
@@ -635,7 +644,8 @@ namespace Beyti_Backend.Controllers.Api
                 {
                     message = "Request rejected successfully",
                     applicationId = request.Id,
-                    serviceProviderId = request.ServiceProviderId
+                    serviceProviderId = request.ServiceProviderId,
+                    rejectionReason
                 });
             }
             catch (Exception ex)

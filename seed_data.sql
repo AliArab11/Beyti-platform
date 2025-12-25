@@ -5,7 +5,7 @@
 -- ServiceCategory, Category, and MembershipPlan tables
 -- ============================================
 
-USE [BeytiDB]
+USE [Beyti-V1]
 GO
 
 -- ============================================
@@ -40,18 +40,18 @@ GO
 SET IDENTITY_INSERT [dbo].[Category] ON;
 GO
 
-INSERT INTO [dbo].[Category] ([Id], [Name], [Description], [IsActive], [CreatedAt])
+INSERT INTO [dbo].[Category] ([Id], [Name], [IsActive], [CreatedAt])
 VALUES
-    (1, 'Electronics', 'Electronic devices and accessories', 1, '2025-12-23 00:00:00'),
-    (2, 'Fashion & Clothing', 'Apparel and fashion items', 1, '2025-12-23 00:00:00'),
-    (3, 'Home & Garden', 'Home improvement and garden supplies', 1, '2025-12-23 00:00:00'),
-    (4, 'Sports & Outdoors', 'Sports equipment and outdoor gear', 1, '2025-12-23 00:00:00'),
-    (5, 'Books & Media', 'Books, music, movies, and media', 1, '2025-12-23 00:00:00'),
-    (6, 'Food & Beverages', 'Food products and beverages', 1, '2025-12-23 00:00:00'),
-    (7, 'Beauty & Personal Care', 'Beauty products and personal care items', 1, '2025-12-23 00:00:00'),
-    (8, 'Toys & Games', 'Toys, games, and entertainment', 1, '2025-12-23 00:00:00'),
-    (9, 'Automotive', 'Auto parts and accessories', 1, '2025-12-23 00:00:00'),
-    (10, 'Other', 'Other products', 1, '2025-12-23 00:00:00');
+    (1, 'Electronics', 1, '2025-12-23 00:00:00'),
+    (2, 'Fashion & Clothing', 1, '2025-12-23 00:00:00'),
+    (3, 'Home & Garden', 1, '2025-12-23 00:00:00'),
+    (4, 'Sports & Outdoors', 1, '2025-12-23 00:00:00'),
+    (5, 'Books & Media', 1, '2025-12-23 00:00:00'),
+    (6, 'Food & Beverages', 1, '2025-12-23 00:00:00'),
+    (7, 'Beauty & Personal Care', 1, '2025-12-23 00:00:00'),
+    (8, 'Toys & Games', 1, '2025-12-23 00:00:00'),
+    (9, 'Automotive', 1, '2025-12-23 00:00:00'),
+    (10, 'Other', 1, '2025-12-23 00:00:00');
 GO
 
 SET IDENTITY_INSERT [dbo].[Category] OFF;
