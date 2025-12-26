@@ -718,10 +718,21 @@ const handleOrderUpdate = React.useCallback((data) => {
   }
 }, [sellerId]);
 
+// Handle real-time announcements
+const handleAnnouncement = React.useCallback((data) => {
+  console.log('[SellerDashboard] Received announcement:', data);
+  setSnackbar({
+    show: true,
+    message: `📢 ${data.title}: ${data.message}`,
+    type: 'success'
+  });
+}, []);
+
 // Set up real-time order updates via SignalR
 useSignalRNotifications({
   onOrderUpdate: handleOrderUpdate,
-  onOrderStatusChange: handleOrderStatusChange
+  onOrderStatusChange: handleOrderStatusChange,
+  onAnnouncement: handleAnnouncement
 });
 
 const handleToggleStoreStatus = async () => {
