@@ -43,6 +43,7 @@ import AuditLogs from './components/AuditLogs';
 import AdminSidebar from './components/AdminSidebar';
 import ProfilePage from '../../components/ProfilePage';
 import AnnouncementManagement from './components/AnnouncementManagement';
+import MembershipManagement from './components/MembershipManagement';
 
 const AdminView = () => {
   // View state for navigation
@@ -399,6 +400,7 @@ const AdminView = () => {
       '/admin/product-moderation': 'product-moderation',
       '/admin/service-moderation': 'service-moderation',
       '/admin/category-moderation': 'category-moderation',
+      '/admin/membership': 'membership',
       '/admin/announcements': 'announcements',
       '/admin/notifications': 'notifications',
       '/admin/audit-logs': 'audit-logs',
@@ -418,6 +420,7 @@ const AdminView = () => {
       'product-moderation': 'Product Moderation',
       'service-moderation': 'Service Moderation',
       'category-moderation': 'Category Moderation',
+      'membership': 'Membership Plans',
       'announcements': 'Announcements',
       'notifications': 'Notifications',
       'audit-logs': 'Audit Logs',
@@ -434,6 +437,7 @@ const AdminView = () => {
       'product-moderation': 'Search products, sellers, categories...',
       'service-moderation': 'Search services, categories...',
       'category-moderation': 'Search categories or subcategories...',
+      'membership': 'Search plans by name or description...',
       'announcements': 'Search announcements by title or message...',
       'notifications': 'Search notifications by title, content, or type...',
       'audit-logs': 'Search by event type, description, or table...',
@@ -443,7 +447,7 @@ const AdminView = () => {
 
   // Check if current view should have search
   const hasSearch = () => {
-    return ['users', 'approvals', 'product-moderation', 'service-moderation', 'category-moderation', 'announcements', 'notifications', 'audit-logs'].includes(currentView);
+    return ['users', 'approvals', 'product-moderation', 'service-moderation', 'category-moderation', 'membership', 'announcements', 'notifications', 'audit-logs'].includes(currentView);
   };
 
   // Render the content for each view (without sidebar and header)
@@ -461,6 +465,8 @@ const AdminView = () => {
         return <ServiceModeration onNavigate={handleNavigate} adminUserProfileId={userProfileId} renderContentOnly={true} />;
       case 'category-moderation':
         return <CategoryModeration onNavigate={handleNavigate} adminUserProfileId={userProfileId} renderContentOnly={true} />;
+      case 'membership':
+        return <MembershipManagement renderContentOnly={true} />;
       case 'announcements':
         return <AnnouncementManagement onNavigate={handleNavigate} adminUserProfileId={userProfileId} renderContentOnly={true} onOpenAnnouncementModal={handleOpenAnnouncementModal} />;
       case 'notifications':

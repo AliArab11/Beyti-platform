@@ -33,8 +33,8 @@ export default function Register() {
   // Redirect if already logged in
   useEffect(() => {
     if (isLoggedIn()) {
-      console.log('[Register] User already logged in, redirecting to dashboard');
-      navigate('/dashboard');
+      console.log('[Register] User already logged in, redirecting to home');
+      navigate('/');
     }
   }, [navigate]);
   const [isLoading, setIsLoading] = useState(false);

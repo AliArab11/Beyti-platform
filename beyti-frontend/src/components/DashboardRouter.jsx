@@ -55,8 +55,8 @@ export default function DashboardRouter() {
         break;
 
       case 'Customer':
-        console.log('[DashboardRouter] Customer role detected, redirecting to customer dashboard');
-        navigate('/customer-dashboard', { replace: true });
+        console.log('[DashboardRouter] Customer role detected, redirecting to home');
+        navigate('/', { replace: true });
         break;
 
       case 'Pending':

@@ -599,7 +599,7 @@ const HomePage = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
             {/* Feature 1 */}
             <div className="bg-gradient-to-br from-white to-cream-50 rounded-3xl p-12 text-center shadow-[0_8px_30px_rgba(0,0,0,0.08)] hover:shadow-[0_12px_40px_rgba(85,107,92,0.15)] transition-all duration-300 hover:scale-105 group border border-grey-stroke/50">
-              <div className="w-24 h-24 bg-gradient-to-br from-sage-400 to-sage-600 rounded-2xl flex items-center justify-center mx-auto mb-8 group-hover:scale-110 transition-transform shadow-lg">
+              <div className="w-24 h-24 bg-gradient-to-br from-sage-700 to-sage-900 rounded-2xl flex items-center justify-center mx-auto mb-8 group-hover:scale-110 transition-transform shadow-lg">
                 <Storefront size={48} className="text-white" weight="bold" />
               </div>
               <h3 className="text-3xl font-bold text-charcoal-600 mb-5" style={{ fontFamily: 'Merriweather, serif' }}>
@@ -612,7 +612,7 @@ const HomePage = () => {
 
             {/* Feature 2 */}
             <div className="bg-gradient-to-br from-white to-cream-50 rounded-3xl p-12 text-center shadow-[0_8px_30px_rgba(0,0,0,0.08)] hover:shadow-[0_12px_40px_rgba(85,107,92,0.15)] transition-all duration-300 hover:scale-105 group border border-grey-stroke/50">
-              <div className="w-24 h-24 bg-gradient-to-br from-sage-400 to-sage-600 rounded-2xl flex items-center justify-center mx-auto mb-8 group-hover:scale-110 transition-transform shadow-lg">
+              <div className="w-24 h-24 bg-gradient-to-br from-sage-700 to-sage-900 rounded-2xl flex items-center justify-center mx-auto mb-8 group-hover:scale-110 transition-transform shadow-lg">
                 <Star size={48} className="text-white" weight="fill" />
               </div>
               <h3 className="text-3xl font-bold text-charcoal-600 mb-5" style={{ fontFamily: 'Merriweather, serif' }}>
@@ -625,7 +625,7 @@ const HomePage = () => {
 
             {/* Feature 3 */}
             <div className="bg-gradient-to-br from-white to-cream-50 rounded-3xl p-12 text-center shadow-[0_8px_30px_rgba(0,0,0,0.08)] hover:shadow-[0_12px_40px_rgba(85,107,92,0.15)] transition-all duration-300 hover:scale-105 group border border-grey-stroke/50">
-              <div className="w-24 h-24 bg-gradient-to-br from-sage-400 to-sage-600 rounded-2xl flex items-center justify-center mx-auto mb-8 group-hover:scale-110 transition-transform shadow-lg">
+              <div className="w-24 h-24 bg-gradient-to-br from-sage-700 to-sage-900 rounded-2xl flex items-center justify-center mx-auto mb-8 group-hover:scale-110 transition-transform shadow-lg">
                 <ArrowRight size={48} className="text-white" weight="bold" />
               </div>
               <h3 className="text-3xl font-bold text-charcoal-600 mb-5" style={{ fontFamily: 'Merriweather, serif' }}>
@@ -640,7 +640,7 @@ const HomePage = () => {
       </section>
 
       {/* Footer */}
-<footer className="w-full px-8 py-12 bg-charcoal-700">
+<footer className="w-full px-8 py-12 bg-charcoal-600">
   <div className="max-w-[1400px] mx-auto">
     <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
       <div>

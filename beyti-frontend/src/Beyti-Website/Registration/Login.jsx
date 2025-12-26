@@ -31,8 +31,8 @@ export default function Login() {
   // Redirect if already logged in
   useEffect(() => {
     if (isLoggedIn()) {
-      console.log('[Login] User already logged in, redirecting to dashboard');
-      navigate('/dashboard');
+      console.log('[Login] User already logged in, redirecting to home');
+      navigate('/');
     }
   }, [navigate]);
 
@@ -211,10 +211,10 @@ export default function Login() {
         localStorage.setItem('userEmail', email);
       }
 
-      // Log success and redirect to dashboard router
+      // Log success and redirect to home
       const finalRole = localStorage.getItem('userRole');
-      console.log('[Login] Login successful, redirecting to dashboard. Role:', finalRole);
-      navigate('/dashboard');
+      console.log('[Login] Login successful, redirecting to home. Role:', finalRole);
+      navigate('/');
     } catch (err) {
       console.error('[Login] Login failed:', err);
       // Map error messages to user-friendly text

@@ -5,39 +5,26 @@
 -- Follow the instructions in ADMIN-SETUP-INSTRUCTIONS.md
 -- ===================================================================
 
--- Step 1: SET YOUR ADMIN EMAIL
--- Replace 'admin@beyti.com' with the email you used during registration
-DECLARE @AdminEmail NVARCHAR(256) = 'admin@beyti.com';
+-- IMPORTANT: Make sure you're connected to the Beyti-V1 database
+USE [Beyti-V1];
+GO
+
+-- Step 1: SET YOUR IDENTITY USER ID
+-- Your IdentityUserId: 6bbb4590-4ea1-44c8-8967-9ef8d43ba2aa
 DECLARE @UserProfileId INT;
-DECLARE @IdentityUserId NVARCHAR(450);
+DECLARE @IdentityUserId NVARCHAR(450) = '6bbb4590-4ea1-44c8-8967-9ef8d43ba2aa';
 
 PRINT '========================================';
 PRINT 'BEYTI ADMIN USER SETUP';
 PRINT '========================================';
-PRINT 'Admin Email: ' + @AdminEmail;
+PRINT 'IdentityUserId: ' + @IdentityUserId;
 PRINT '';
 
 -- ===================================================================
--- Step 2: Find the IdentityUserId from AspNetUsers
--- ===================================================================
-SELECT @IdentityUserId = Id
-FROM AspNetUsers
-WHERE Email = @AdminEmail;
-
-IF @IdentityUserId IS NULL
-BEGIN
-    PRINT 'ERROR: User not found with email: ' + @AdminEmail;
-    PRINT 'Please register via /register first, then run this script.';
-    RETURN;
-END
-
-PRINT '✓ Found AspNetUsers Id: ' + @IdentityUserId;
-
--- ===================================================================
--- Step 3: Get the UserProfile ID
+-- Step 2: Get the UserProfile ID
 -- ===================================================================
 SELECT @UserProfileId = Id
-FROM UserProfile
+FROM [dbo].[UserProfile]
 WHERE IdentityUserId = @IdentityUserId;
 
 IF @UserProfileId IS NULL
@@ -51,9 +38,9 @@ PRINT '✓ Found UserProfile Id: ' + CAST(@UserProfileId AS NVARCHAR(10));
 PRINT '';
 
 -- ===================================================================
--- Step 4: Update UserProfile to Admin role
+-- Step 3: Update UserProfile to Admin role
 -- ===================================================================
-UPDATE UserProfile
+UPDATE [dbo].[UserProfile]
 SET RoleType = 'Admin',
     Status = 'Active',
     DisplayName = 'System Administrator',
@@ -63,9 +50,9 @@ WHERE Id = @UserProfileId;
 PRINT '✓ Updated UserProfile.RoleType to Admin';
 
 -- ===================================================================
--- Step 5: Delete orphaned Customer record (if exists)
+-- Step 4: Delete orphaned Customer record (if exists)
 -- ===================================================================
-DELETE FROM Customer
+DELETE FROM [dbo].[Customer]
 WHERE UserProfileId = @UserProfileId;
 
 IF @@ROWCOUNT > 0
@@ -74,57 +61,16 @@ ELSE
     PRINT '  (No Customer record to remove)';
 
 -- ===================================================================
--- Step 6: Get or Create Admin role
+-- Step 5: Create AdminProfile record (if table exists)
 -- ===================================================================
-DECLARE @AdminRoleId NVARCHAR(450);
-
-SELECT @AdminRoleId = Id
-FROM AspNetRoles
-WHERE Name = 'Admin';
-
-IF @AdminRoleId IS NULL
-BEGIN
-    -- Create Admin role if it doesn't exist
-    SET @AdminRoleId = NEWID();
-    INSERT INTO AspNetRoles (Id, Name, NormalizedName, ConcurrencyStamp)
-    VALUES (@AdminRoleId, 'Admin', 'ADMIN', NEWID());
-
-    PRINT '✓ Created Admin role in AspNetRoles';
-END
-ELSE
-BEGIN
-    PRINT '✓ Admin role already exists';
-END
-
--- ===================================================================
--- Step 7: Assign Admin role in AspNetUserRoles
--- ===================================================================
-IF NOT EXISTS (
-    SELECT 1 FROM AspNetUserRoles
-    WHERE UserId = @IdentityUserId AND RoleId = @AdminRoleId
-)
-BEGIN
-    INSERT INTO AspNetUserRoles (UserId, RoleId)
-    VALUES (@IdentityUserId, @AdminRoleId);
-
-    PRINT '✓ Assigned Admin role to user';
-END
-ELSE
-BEGIN
-    PRINT '  (User already has Admin role)';
-END
-
--- ===================================================================
--- Step 8: Create AdminProfile record (if table exists)
--- ===================================================================
-IF OBJECT_ID('AdminProfile', 'U') IS NOT NULL
+IF OBJECT_ID('[dbo].[AdminProfile]', 'U') IS NOT NULL
 BEGIN
     IF NOT EXISTS (
-        SELECT 1 FROM AdminProfile
+        SELECT 1 FROM [dbo].[AdminProfile]
         WHERE UserProfileId = @UserProfileId
     )
     BEGIN
-        INSERT INTO AdminProfile (UserProfileId, Title, Permissions, CreatedAt)
+        INSERT INTO [dbo].[AdminProfile] (UserProfileId, Title, Permissions, CreatedAt)
         VALUES (
             @UserProfileId,
             'Super Admin',
@@ -151,30 +97,26 @@ PRINT '========================================';
 PRINT '';
 
 -- ===================================================================
--- Step 9: Verify results
+-- Step 6: Verify results
 -- ===================================================================
 PRINT 'Verification:';
 PRINT '';
 
 SELECT
-    up.Id AS UserProfileId,
-    up.IdentityUserId,
-    up.DisplayName,
-    up.RoleType,
-    up.Status,
-    au.Email,
-    au.EmailConfirmed,
-    r.Name AS AssignedRole
-FROM UserProfile up
-INNER JOIN AspNetUsers au ON up.IdentityUserId = au.Id
-LEFT JOIN AspNetUserRoles aur ON au.Id = aur.UserId
-LEFT JOIN AspNetRoles r ON aur.RoleId = r.Id
-WHERE up.Id = @UserProfileId;
+    Id AS UserProfileId,
+    IdentityUserId,
+    DisplayName,
+    RoleType,
+    Status,
+    CreatedAt,
+    UpdatedAt
+FROM [dbo].[UserProfile]
+WHERE Id = @UserProfileId;
 
 PRINT '';
 PRINT 'Next Steps:';
 PRINT '1. Logout from the application';
-PRINT '2. Login with your admin credentials: ' + @AdminEmail;
+PRINT '2. Login with your admin credentials';
 PRINT '3. Navigate to /admin to access the admin dashboard';
 PRINT '4. Verify you can approve/reject ServiceProvider requests';
 PRINT '';

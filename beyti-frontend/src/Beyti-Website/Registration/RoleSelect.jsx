@@ -53,8 +53,8 @@ export default function RoleSelect() {
       // Update localStorage
       localStorage.setItem('userRole', 'Customer');
 
-      // Navigate to customer dashboard
-      navigate('/customer-dashboard');
+      // Navigate to home page
+      navigate('/');
     } catch (error) {
       console.error('[RoleSelect] Error creating customer profile:', error);
       alert(`Failed to complete customer registration: ${error.message}`);
