@@ -33,7 +33,7 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
 
   // Initialize SignalR connection when component mounts
   useEffect(() => {
-    const userProfileId = 1002; // TODO: Get from auth context
+    const userProfileId = 4; // TODO: Get from auth context
     if (userProfileId && !isConnected) {
       startConnection(userProfileId);
     }
@@ -324,7 +324,7 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
 
         // Link address to customer
         // Hardcoded customerId - will be replaced with context/API in future
-        const customerId = 2; // TODO: Get from API based on userProfileId
+        const customerId = 4; // TODO: Get from API based on userProfileId
 
         if (customerId) {
           await fetch('https://localhost:7062/api/CustomerAddresses', {
@@ -376,7 +376,7 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
   const handlePlaceBooking = async () => {
     try {
       // Hardcoded customerId - will be replaced with context/API in future
-      const customerId = 2; // TODO: Get from API based on userProfileId
+      const customerId = 4; // TODO: Get from API based on userProfileId
 
       if (!customerId) {
         alert('Please log in to book a service');

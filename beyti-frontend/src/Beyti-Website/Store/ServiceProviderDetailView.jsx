@@ -339,8 +339,8 @@ const [showOrderBanner, setShowOrderBanner] = useState(false);
 const [cart, setCart] = useState([]);
 
 // User IDs
-const userProfileId = parseInt(getUserId()) || 1002;
-const customerId = 2; // TODO: Get from API based on userProfileId
+const userProfileId = parseInt(getUserId()) || 4;
+const customerId = 4; // TODO: Get from API based on userProfileId
 
 
 

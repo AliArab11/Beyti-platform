@@ -1443,7 +1443,7 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
 
       {/* Quote Modal */}
       {showQuoteModal && selectedBooking && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-xl max-w-md w-full transition-colors">
             <div className="p-6 border-b border-grey-stroke dark:border-charcoal-500">
               <h3 className="text-card-h2 text-charcoal-600 dark:text-white">Send Quote</h3>
@@ -1526,7 +1526,7 @@ export default function BookingsManagement({ serviceProviderId, initialFilter = 
 
       {/* Complete Service Modal */}
       {showCompleteModal && selectedBooking && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg shadow-xl max-w-md w-full transition-colors">
             <div className="p-6 border-b border-grey-stroke dark:border-charcoal-500">
               <h3 className="text-card-h2 text-charcoal-600 dark:text-white">Complete Service</h3>
