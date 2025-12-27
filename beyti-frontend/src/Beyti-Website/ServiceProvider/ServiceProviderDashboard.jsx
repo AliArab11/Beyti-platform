@@ -57,7 +57,7 @@ export default function ServiceProviderDashboard() {
 
   // Get user ID from localStorage (will be replaced with context in future)
   // const userProfileId = parseInt(getUserId()) || 1;
-  const userProfileId = 1; // Hardcoded for testing
+  const userProfileId = 15; // Hardcoded for testing
 
   // Auto-close snackbar after 5 seconds
   useEffect(() => {
@@ -228,6 +228,14 @@ export default function ServiceProviderDashboard() {
 
       // Refresh activity log
       setActivityRefreshKey(prev => prev + 1);
+    },
+    onAnnouncement: (data) => {
+      console.log('[ServiceProviderDashboard] Received announcement:', data);
+      setSnackbar({
+        open: true,
+        message: `📢 ${data.title}: ${data.message}`,
+        type: 'success'
+      });
     }
   });
 

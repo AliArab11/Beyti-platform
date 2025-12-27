@@ -192,6 +192,8 @@ namespace Beyti_Backend.Controllers.Api
             // Send real-time product updated update via SignalR
             if (seller?.UserProfile != null)
             {
+                Console.WriteLine($"[ProductsController] Product updated - ProductId: {product.Id}, SellerId: {product.SellerId}");
+
                 await _signalRService.SendProductUpdatedAsync(
                     sellerId: seller.UserProfile.Id,
                     productData: new
@@ -200,13 +202,17 @@ namespace Beyti_Backend.Controllers.Api
                         name = product.Name,
                         description = product.Description,
                         basePrice = product.BasePrice,
+                        discountPercentage = product.DiscountPercentage,
                         imageUrl = product.ImageUrl,
                         isActive = product.IsActive,
                         sellerId = product.SellerId,
                         subCategoryId = product.SubCategoryId,
+                        storeSectionId = product.StoreSectionId,
                         updatedAt = product.UpdatedAt
                     }
                 );
+
+                Console.WriteLine($"[ProductsController] Product update notification sent for SellerId: {product.SellerId}");
             }
 
             return NoContent();
@@ -256,6 +262,8 @@ namespace Beyti_Backend.Controllers.Api
             // Send real-time product created update via SignalR
             if (createdProduct?.Seller?.UserProfile != null)
             {
+                Console.WriteLine($"[ProductsController] Product created - ProductId: {createdProduct.Id}, SellerId: {createdProduct.SellerId}");
+
                 await _signalRService.SendProductCreatedAsync(
                     sellerId: createdProduct.Seller.UserProfile.Id,
                     productData: new
@@ -264,13 +272,18 @@ namespace Beyti_Backend.Controllers.Api
                         name = createdProduct.Name,
                         description = createdProduct.Description,
                         basePrice = createdProduct.BasePrice,
+                        discountPercentage = createdProduct.DiscountPercentage,
                         imageUrl = createdProduct.ImageUrl,
                         isActive = createdProduct.IsActive,
                         sellerId = createdProduct.SellerId,
                         subCategoryId = createdProduct.SubCategoryId,
-                        createdAt = createdProduct.CreatedAt
+                        storeSectionId = createdProduct.StoreSectionId,
+                        createdAt = createdProduct.CreatedAt,
+                        updatedAt = createdProduct.UpdatedAt
                     }
                 );
+
+                Console.WriteLine($"[ProductsController] Product creation notification sent for SellerId: {createdProduct.SellerId}");
             }
 
             return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, new
@@ -307,6 +320,8 @@ namespace Beyti_Backend.Controllers.Api
             // Send real-time product status change via SignalR
             if (product.Seller?.UserProfile != null)
             {
+                Console.WriteLine($"[ProductsController] Product status toggled - ProductId: {product.Id}, IsActive: {product.IsActive}, SellerId: {product.SellerId}");
+
                 await _signalRService.SendProductStatusChangedAsync(
                     sellerId: product.Seller.UserProfile.Id,
                     productId: product.Id,
@@ -315,10 +330,19 @@ namespace Beyti_Backend.Controllers.Api
                     {
                         id = product.Id,
                         name = product.Name,
+                        description = product.Description,
+                        basePrice = product.BasePrice,
+                        discountPercentage = product.DiscountPercentage,
+                        imageUrl = product.ImageUrl,
                         isActive = product.IsActive,
+                        sellerId = product.SellerId,
+                        subCategoryId = product.SubCategoryId,
+                        storeSectionId = product.StoreSectionId,
                         updatedAt = product.UpdatedAt
                     }
                 );
+
+                Console.WriteLine($"[ProductsController] Product status change notification sent for SellerId: {product.SellerId}");
             }
 
             return NoContent();

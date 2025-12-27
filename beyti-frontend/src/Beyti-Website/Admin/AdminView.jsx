@@ -35,8 +35,6 @@ import UsersFlagged from './components/UsersFlagged';
 import UserManagement from './components/UserManagement';
 import RequestApprovals from './components/RequestApprovals';
 import CategoryModeration from './components/CategoryModeration';
-import ProductModeration from './components/ProductModeration';
-import ServiceModeration from './components/ServiceModeration';
 import NotificationsPage from '../ServiceProvider/components/NotificationsPage';
 import AuditLogs from './components/AuditLogs';
 import AdminSidebar from './components/AdminSidebar';
@@ -94,7 +92,7 @@ const AdminView = () => {
   // ADMIN CREDENTIALS - CONFIGURED HERE
   // ========================================
   // Set the admin credentials directly
-  const userProfileId = 4;  // Admin UserProfileId
+  const userProfileId = 21;  // Admin UserProfileId
   const adminProfileId = 1;  // Admin Id
   const userRole = 'Admin';  // User role type
 
@@ -411,8 +409,6 @@ const AdminView = () => {
       '/admin/users': 'users',
       '/admin/approvals': 'approvals',
       '/admin/flagged-users': 'flagged-users',
-      '/admin/product-moderation': 'product-moderation',
-      '/admin/service-moderation': 'service-moderation',
       '/admin/category-moderation': 'category-moderation',
       '/admin/announcements': 'announcements',
       '/admin/notifications': 'notifications',
@@ -430,8 +426,6 @@ const AdminView = () => {
       'users': 'User Management',
       'approvals': 'Request Approvals',
       'flagged-users': 'User Moderation',
-      'product-moderation': 'Product Moderation',
-      'service-moderation': 'Service Moderation',
       'category-moderation': 'Category Moderation',
       'announcements': 'Announcements',
       'notifications': 'Notifications',
@@ -446,8 +440,6 @@ const AdminView = () => {
     const placeholders = {
       'users': 'Search by name or role...',
       'approvals': 'Search by business name or provider...',
-      'product-moderation': 'Search products, sellers, categories...',
-      'service-moderation': 'Search services, categories...',
       'category-moderation': 'Search categories or subcategories...',
       'announcements': 'Search announcements by title or message...',
       'notifications': 'Search notifications by title, content, or type...',
@@ -458,7 +450,7 @@ const AdminView = () => {
 
   // Check if current view should have search
   const hasSearch = () => {
-    return ['users', 'approvals', 'product-moderation', 'service-moderation', 'category-moderation', 'announcements', 'notifications', 'audit-logs'].includes(currentView);
+    return ['users', 'approvals','category-moderation', 'announcements', 'notifications', 'audit-logs'].includes(currentView);
   };
 
   // Render the content for each view (without sidebar and header)
@@ -470,10 +462,6 @@ const AdminView = () => {
         return <RequestApprovals onNavigate={handleNavigate} adminUserProfileId={userProfileId} renderContentOnly={true} />;
       case 'flagged-users':
         return <UsersFlagged onNavigate={handleNavigate} adminUserProfileId={userProfileId} renderContentOnly={true} />;
-      case 'product-moderation':
-        return <ProductModeration onNavigate={handleNavigate} adminUserProfileId={userProfileId} renderContentOnly={true} />;
-      case 'service-moderation':
-        return <ServiceModeration onNavigate={handleNavigate} adminUserProfileId={userProfileId} renderContentOnly={true} />;
       case 'category-moderation':
         return <CategoryModeration onNavigate={handleNavigate} adminUserProfileId={userProfileId} renderContentOnly={true} />;
       case 'announcements':

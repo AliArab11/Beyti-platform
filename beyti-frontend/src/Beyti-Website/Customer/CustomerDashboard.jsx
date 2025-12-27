@@ -640,12 +640,19 @@ const handleOrderStatusChange = useCallback((data) => {
   showSnackbar(message, type);
 }, [showSnackbar]);
 
+// Handle real-time announcements
+const handleAnnouncement = useCallback((data) => {
+  console.log('[CustomerDashboard] Received announcement:', data);
+  showSnackbar(`📢 ${data.title}: ${data.message}`, 'success');
+}, [showSnackbar]);
+
 // Set up real-time booking and order updates via SignalR
 useSignalRNotifications({
   onBookingUpdate: handleBookingUpdate,
   onBookingStatusChange: handleBookingStatusChange,
   onOrderUpdate: handleOrderUpdate,
-  onOrderStatusChange: handleOrderStatusChange
+  onOrderStatusChange: handleOrderStatusChange,
+  onAnnouncement: handleAnnouncement
 });
 
 // Sync historyViewMode with mainTab

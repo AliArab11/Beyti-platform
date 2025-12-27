@@ -8,6 +8,7 @@ import Snackbar from './../../components/Snackbar';
 import CustomerHeader from '../../components/CustomerHeader';
 import { isStoreOpen } from '../Seller/Components/storeStatus';
 import { StoreBanner } from '../../components/StoreBanner';
+import { useSignalR } from '../../contexts/SignalRContext';
 
 
 // Get customers function
@@ -656,6 +657,7 @@ const CustomerSelectModal = ({ isOpen, customers, onSelect, onClose }) => {
 const MainStoreView = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { on, off } = useSignalR();
 
   const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1053,6 +1055,29 @@ useEffect(() => {
   document.addEventListener('mousedown', handleClickOutside);
   return () => document.removeEventListener('mousedown', handleClickOutside);
 }, [showFilterDropdown]);
+
+// SignalR listener for real-time product updates
+useEffect(() => {
+  const handleProductUpdate = (data) => {
+    console.log('[MainStoreView] Received product update:', data);
+
+    // Refresh stores list when any product is created, updated, or status changed
+    if (data.type === 'ProductCreated' || data.type === 'ProductUpdated' || data.type === 'ProductStatusChanged') {
+      console.log('[MainStoreView] Refreshing stores due to product update');
+      fetchStores();
+    }
+  };
+
+  if (on) {
+    on('ReceiveProductUpdate', handleProductUpdate);
+  }
+
+  return () => {
+    if (off) {
+      off('ReceiveProductUpdate', handleProductUpdate);
+    }
+  };
+}, [on, off]);
 
 const scrollSubcategories = (direction) => {
   const container = subcategoryScrollRef.current;

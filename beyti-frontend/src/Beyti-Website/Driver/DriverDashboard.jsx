@@ -12,6 +12,9 @@ import ProfilePage from '../../components/ProfilePage';
 import DriverOrdersPage from "./Components/DriverOrders";
 import DriverAnalytics from "./Components/DriverAnalytics";
 import NotificationsPage from '../ServiceProvider/components/NotificationsPage';
+import Snackbar from '../../components/Snackbar';
+import { useSignalR } from '../../contexts/SignalRContext';
+import { useSignalRNotifications } from '../../hooks/useSignalRNotifications';
 
 import '../Seller/Components/modalAnimations.css';
 
@@ -317,7 +320,31 @@ const [viewMapModal, setViewMapModal] = useState({
 // Notification search state
 const [notificationSearchQuery, setNotificationSearchQuery] = useState('');
 
+// Snackbar state
+const [snackbar, setSnackbar] = useState({ show: false, message: '', type: 'success' });
 
+// SignalR connection
+const { startConnection, isConnected } = useSignalR();
+
+// Start SignalR connection when userProfileId is available
+useEffect(() => {
+  if (userProfileId && !isConnected) {
+    console.log('[DriverDashboard] Starting SignalR connection for user:', userProfileId);
+    startConnection(userProfileId);
+  }
+}, [userProfileId, isConnected, startConnection]);
+
+// Set up real-time announcement listener
+useSignalRNotifications({
+  onAnnouncement: (data) => {
+    console.log('[DriverDashboard] Received announcement:', data);
+    setSnackbar({
+      show: true,
+      message: `📢 ${data.title}: ${data.message}`,
+      type: 'success'
+    });
+  }
+});
 
 const handleProfileUpdate = async (updates) => {
   try {
@@ -2702,6 +2729,15 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
           </div>
         </main>
       </div>
+
+      {/* Snackbar for announcements and notifications */}
+      {snackbar.show && (
+        <Snackbar
+          message={snackbar.message}
+          type={snackbar.type}
+          onClose={() => setSnackbar({ ...snackbar, show: false })}
+        />
+      )}
     </div>
   );
 };

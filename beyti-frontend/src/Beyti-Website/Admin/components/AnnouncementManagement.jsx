@@ -10,9 +10,7 @@ import {
   Megaphone,
   CheckCircle,
   Clock,
-  Eye,
   Plus,
-  MagnifyingGlass,
   CalendarBlank,
   Users
 } from '@phosphor-icons/react';
@@ -29,7 +27,6 @@ const AnnouncementManagement = ({
   // State management
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all'); // all, active, expired
 
   // Snackbar state
@@ -131,17 +128,8 @@ const AnnouncementManagement = ({
     }
   };
 
-  // Filter and search announcements
+  // Filter announcements
   const filteredAnnouncements = announcements.filter(announcement => {
-    // Search filter
-    const matchesSearch =
-      announcement.Title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      announcement.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      announcement.Message?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      announcement.message?.toLowerCase().includes(searchTerm.toLowerCase());
-
-    if (!matchesSearch) return false;
-
     // Status filter
     const expiresAt = announcement.ExpiresAt || announcement.expiresAt;
     const isExpired = expiresAt && new Date(expiresAt) < new Date();
@@ -212,38 +200,25 @@ const AnnouncementManagement = ({
     <>
       {/* Header Actions */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
-        {/* Search Bar */}
-        <div className="relative flex-1 max-w-md">
-          <MagnifyingGlass size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-charcoal-400" />
-          <input
-            type="text"
-            placeholder="Search announcements by title or message..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-grey-stroke bg-white dark:bg-[#2A2A2A] dark:border-gray-600 text-charcoal-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-sage-400"
-          />
-        </div>
+        {/* Filter Dropdown */}
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          className="px-4 py-2.5 rounded-lg border border-grey-stroke bg-white dark:bg-[#2A2A2A] dark:border-gray-600 text-charcoal-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-sage-400"
+        >
+          <option value="all">All Announcements</option>
+          <option value="active">Active Only</option>
+          <option value="expired">Expired/Inactive</option>
+        </select>
 
-        {/* Filter and Create Button */}
-        <div className="flex items-center gap-3">
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-4 py-2.5 rounded-lg border border-grey-stroke bg-white dark:bg-[#2A2A2A] dark:border-gray-600 text-charcoal-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-sage-400"
-          >
-            <option value="all">All Announcements</option>
-            <option value="active">Active Only</option>
-            <option value="expired">Expired/Inactive</option>
-          </select>
-
-          <CRUDButton
-            variant="success"
-            onClick={onOpenAnnouncementModal}
-          >
-            <Plus size={18} weight="bold" />
-            Send Announcement
-          </CRUDButton>
-        </div>
+        {/* Create Button */}
+        <CRUDButton
+          variant="success"
+          onClick={onOpenAnnouncementModal}
+        >
+          
+          Send
+        </CRUDButton>
       </div>
 
       {/* Statistics Cards */}
@@ -317,7 +292,7 @@ const AnnouncementManagement = ({
             <div className="text-center py-12">
               <Megaphone size={48} className="text-charcoal-300 dark:text-gray-500 mx-auto mb-3" weight="light" />
               <p className="text-body-regular text-charcoal-400 dark:text-gray-400">
-                {searchTerm ? 'No announcements found matching your search' : 'No announcements sent yet'}
+                No announcements found
               </p>
               <p className="text-label-medium text-charcoal-300 dark:text-gray-500 mt-1">
                 Click "Send Announcement" to create your first announcement

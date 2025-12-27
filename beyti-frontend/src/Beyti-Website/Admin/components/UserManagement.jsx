@@ -474,16 +474,7 @@ const UserManagement = ({ onNavigate, adminUserProfileId, renderContentOnly = fa
               </button>
             </div>
 
-            {/* Add User Button */}
-            <div className="px-6 py-2">
-              <CRUDButton
-                variant="success"
-                onClick={() => setShowAddModal(true)}
-              >
-                <Plus size={16} className="inline mr-1" />
-                Add New User
-              </CRUDButton>
-            </div>
+           
           </div>
 
           {/* Tab Content */}
