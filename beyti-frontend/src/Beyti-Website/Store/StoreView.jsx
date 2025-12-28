@@ -17,6 +17,7 @@ import { createOrder, createOrderItem, getProductVariants, getOrder, getOrders }
 
 
 
+// Load store details and products
 const getStoreDetails = async (storeId) => {
   try {
     const response = await fetch(
@@ -131,7 +132,7 @@ const StoreInfo = ({ store, isFavorited, onToggleFavorite, customerId }) => (
                 <div className="flex items-center gap-2.5">
                   {(() => {
                     const reviewCount = store?.products?.reduce((count, product) => 
-                      count + (product.reviews?.filter(r => !r.isCommentHiddenBySeller)?.length || 0), 0
+                      count + (product.reviews?.length || 0), 0
                     ) || 0;
                     
                     const rating = store?.averageRating || 0;

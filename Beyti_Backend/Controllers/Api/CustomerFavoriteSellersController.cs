@@ -97,7 +97,7 @@ namespace Beyti_Backend.Controllers.Api
                 {
                     CustomerId = dto.CustomerId,
                     SellerId = dto.SellerId,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.Now
                 };
 
                 _context.Set<CustomerFavoriteSeller>().Add(favorite);

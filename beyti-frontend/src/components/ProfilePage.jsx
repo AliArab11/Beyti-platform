@@ -334,6 +334,75 @@ const loadSubCategories = async (categoryId) => {
       updates.businessName = formData.businessName;
     }
 
+    // ✅ UPDATE BASIC PROFILE INFO (NAME, PHONE, BUSINESS NAME)
+    if (entityId) {
+      let updateEndpoint = '';
+      let updatePayload = {};
+
+      // Determine endpoint based on user role
+      switch (userRole) {
+        case 'Seller':
+          updateEndpoint = `https://localhost:7062/api/Sellers/${entityId}`;
+          updatePayload = {
+            StoreName: formData.displayName,
+            Phone: formData.phone
+          };
+          break;
+
+        case 'ServiceProvider':
+          updateEndpoint = `https://localhost:7062/api/ServiceProviders/${entityId}`;
+          updatePayload = {
+            BusinessName: formData.businessName,
+            Phone: formData.phone
+          };
+          break;
+
+        case 'Customer':
+          updateEndpoint = `https://localhost:7062/api/Customers/${entityId}`;
+          updatePayload = {
+            Phone: formData.phone
+          };
+          break;
+
+        case 'Driver':
+          updateEndpoint = `https://localhost:7062/api/Drivers/${entityId}`;
+          updatePayload = {
+            Phone: formData.phone
+          };
+          break;
+
+        default:
+          // For Admin or other roles, update UserProfile directly
+          if (userProfile?.userProfileId) {
+            updateEndpoint = `https://localhost:7062/api/UserProfiles/${userProfile.userProfileId}`;
+            updatePayload = {
+              Id: userProfile.userProfileId,
+              DisplayName: formData.displayName,
+              RoleType: userProfile.roleType || userRole,
+              Status: userProfile.status || 'Active',
+              IdentityUserId: userProfile.identityUserId,
+              CreatedAt: userProfile.createdAt,
+              UpdatedAt: new Date().toISOString()
+            };
+          }
+          break;
+      }
+
+      // Send the update request
+      if (updateEndpoint) {
+        const response = await fetch(updateEndpoint, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatePayload)
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to update profile: ${errorText}`);
+        }
+      }
+    }
+
     // Handle address for sellers
 if (userRole === 'Seller' && entityId) {
   // Validate address fields

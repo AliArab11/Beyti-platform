@@ -58,15 +58,22 @@ namespace Beyti_Backend.Controllers.Api
             {
                 // Calculate average rating from all reviews of seller's products
                 var allReviews = await _context.Reviews
-                    .Where(r => r.Product.SellerId == seller.Id && !r.IsCommentHiddenBySeller)
-                    .ToListAsync();
+                .Where(r => r.Product.SellerId == seller.Id)
+                .ToListAsync();
 
                 decimal? averageRating = null;
-                if (allReviews.Any())
+                if (allReviews.Count >= 5)
                 {
                     averageRating = Math.Round((decimal)allReviews.Average(r => r.Rating), 1);
                 }
 
+                // Calculate completed orders in past 7 days
+                var sevenDaysAgo = DateTime.Now.AddDays(-7);
+                var recentCompletedOrders = await _context.Orders
+                    .Where(o => o.SellerId == seller.Id &&
+                                o.CreatedAt >= sevenDaysAgo &&
+                                (o.Status == "completed" || o.Status == "delivered"))
+                    .CountAsync();
 
                 result.Add(new
                 {
@@ -76,6 +83,7 @@ namespace Beyti_Backend.Controllers.Api
                     seller.Phone,
                     seller.CreatedAt,
                     averageRating,
+                    recentCompletedOrders = recentCompletedOrders,
                     categoryId = seller.CategoryId,
                     categoryName = seller.Category?.Name,
                     isOpen = seller.IsOpen,
@@ -199,8 +207,8 @@ namespace Beyti_Backend.Controllers.Api
                         .ThenInclude(sc => sc.Category)
                 .Include(s => s.Products)
                     .ThenInclude(p => p.Reviews)
-                .Include(s => s.SellerSubCategories)  // ← ADD THIS LINE
-                    .ThenInclude(ssc => ssc.SubCategory)  // ← ADD THIS LINE
+                .Include(s => s.SellerSubCategories) 
+                    .ThenInclude(ssc => ssc.SubCategory)  
                 .FirstOrDefaultAsync(s => s.Id == id);
 
                 if (seller == null)
@@ -209,21 +217,21 @@ namespace Beyti_Backend.Controllers.Api
                 if (seller.UserProfile == null)
                     return StatusCode(500, new { message = "Seller profile data is missing" });
 
-                
 
-                // ← NEW: Calculate average rating
+
+                // Calculate average rating
                 var allReviews = await _context.Reviews
-                    .Where(r => r.Product.SellerId == id && !r.IsCommentHiddenBySeller)
-                    .ToListAsync();
+                .Where(r => r.Product.SellerId == id)
+                .ToListAsync();
 
                 decimal? averageRating = null;
-                if (allReviews.Any())
+                if (allReviews.Count >= 5)
                 {
                     averageRating = Math.Round((decimal)allReviews.Average(r => r.Rating), 1);
                 }
 
                 // Calculate system sections
-                var now = DateTime.UtcNow;
+                var now = DateTime.Now;
                 var thirtyDaysAgo = now.AddDays(-30);
 
                 // Get orders from last 30 days for this seller
@@ -266,7 +274,7 @@ namespace Beyti_Backend.Controllers.Api
                         var p = popularProducts.FirstOrDefault(x => x.Id == productId);
                         if (p != null)
                         {
-                            var productReviews = p.Reviews.Where(r => !r.IsCommentHiddenBySeller).ToList();
+                            var productReviews = p.Reviews.ToList();
                             decimal? productAverageRating = null;
 
                             if (productReviews.Count >= 5)
@@ -314,7 +322,7 @@ namespace Beyti_Backend.Controllers.Api
                 var discountedProducts = seller.Products
                     .Where(p => p.IsActive && p.DiscountPercentage.HasValue && p.DiscountPercentage > 0)
                     .Select(p => {
-                        var productReviews = p.Reviews.Where(r => !r.IsCommentHiddenBySeller).ToList();
+                        var productReviews = p.Reviews.ToList();
                         decimal? productAverageRating = null;
 
                         if (productReviews.Count >= 5)
@@ -419,7 +427,7 @@ namespace Beyti_Backend.Controllers.Api
                     products = seller.Products
                         .Where(p => p.IsActive)
                         .Select(p => {
-                            var productReviews = p.Reviews.Where(r => !r.IsCommentHiddenBySeller).ToList();
+                            var productReviews = p.Reviews.ToList();
                             decimal? productAverageRating = null;
 
                             if (productReviews.Count >= 5)
@@ -489,13 +497,13 @@ namespace Beyti_Backend.Controllers.Api
                 if (seller.UserProfile == null)
                     return StatusCode(500, new { message = "Seller profile data is missing" });
 
-                // ← NEW: Calculate average rating
+                // Calculate average rating
                 var allReviews = await _context.Reviews
-                    .Where(r => r.Product.SellerId == id && !r.IsCommentHiddenBySeller)
+                    .Where(r => r.Product.SellerId == id)
                     .ToListAsync();
 
                 decimal? averageRating = null;
-                if (allReviews.Any())
+                if (allReviews.Count >= 5)
                 {
                     averageRating = Math.Round((decimal)allReviews.Average(r => r.Rating), 1);
                 }
@@ -797,7 +805,7 @@ namespace Beyti_Backend.Controllers.Api
                 }
 
                 seller.StoreImageUrl = imagePath;
-                seller.UpdatedAt = DateTime.UtcNow;
+                seller.UpdatedAt = DateTime.Now;
 
                 _context.Entry(seller).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
@@ -863,7 +871,7 @@ namespace Beyti_Backend.Controllers.Api
                     return NotFound(new { message = "Seller not found" });
 
                 seller.StoreDescription = dto.Description;
-                seller.UpdatedAt = DateTime.UtcNow;
+                seller.UpdatedAt = DateTime.Now;
 
                 await _context.SaveChangesAsync();
 
@@ -895,7 +903,7 @@ namespace Beyti_Backend.Controllers.Api
 
                 seller.BannerThemeKey = dto.BannerThemeKey;
                 seller.BannerAccentColor = dto.BannerAccentColor;
-                seller.UpdatedAt = DateTime.UtcNow;
+                seller.UpdatedAt = DateTime.Now;
 
                 await _context.SaveChangesAsync();
 

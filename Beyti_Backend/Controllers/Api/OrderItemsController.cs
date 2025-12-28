@@ -21,7 +21,7 @@ namespace Beyti_Backend.Controllers.Api
         }
 
         // DTO for creating order items
-        public class CreateOrderItemDto
+        public class CreateOrderItemsDto
         {
             public int OrderId { get; set; }
             public int ProductVariantId { get; set; }
@@ -102,7 +102,7 @@ namespace Beyti_Backend.Controllers.Api
 
         // POST: api/OrderItems
         [HttpPost]
-        public async Task<ActionResult<OrderItem>> PostOrderItem([FromBody] CreateOrderItemDto dto)
+        public async Task<ActionResult<OrderItem>> PostOrderItem([FromBody] CreateOrderItemsDto dto)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);

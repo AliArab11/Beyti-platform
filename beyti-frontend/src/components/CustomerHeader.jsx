@@ -129,12 +129,13 @@ const CustomerHeader = ({
           <ArrowLeft className="w-6 h-6 text-charcoal-600 dark:text-cream-50" weight="bold" />
         </button>
       )}
-      <h1
-        className="text-[28px] font-bold text-sage-500 dark:text-sage-400"
-        style={{ fontFamily: 'Merriweather, serif' }}
+      <button
+        onClick={() => navigate('/stores')}
+        className="text-[36px] font-black text-sage-500 dark:text-sage-400 hover:text-sage-600 dark:hover:text-sage-300 transition-colors cursor-pointer"
+        style={{ fontFamily: 'Merriweather, serif', letterSpacing: '0.02em' }}
       >
         Beyti
-      </h1>
+      </button>
     </div>
 
     {/* Left Side: Context Switcher (after Beyti brand) */}
@@ -171,7 +172,7 @@ const CustomerHeader = ({
     {pageTitle && (
       <div className="absolute left-1/2 -translate-x-1/2">
         <h2 
-          className="text-[24px] font-bold text-charcoal-600 dark:text-cream-50 whitespace-nowrap"
+          className="text-[36px] font-bold text-charcoal-600 dark:text-cream-50 whitespace-nowrap"
           style={{ fontFamily: 'Merriweather, serif' }}
         >
           {pageTitle}

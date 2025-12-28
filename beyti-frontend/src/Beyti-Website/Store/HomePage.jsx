@@ -4,6 +4,7 @@ import { ArrowRight, Storefront, Star } from '@phosphor-icons/react';
 import CustomerHeader from '../../components/CustomerHeader';
 import ActiveOrderBanner from './Components/ActiveOrderBanner';
 import { isStoreOpen } from '../Seller/Components/storeStatus';
+import { StoreBanner } from '../../components/StoreBanner';
 
 // Customer Select Modal
 const CustomerSelectModal = ({ isOpen, customers, onSelect, onClose }) => {
@@ -70,6 +71,9 @@ const HomePage = () => {
   const [categories, setCategories] = useState([]);
   const [featuredStores, setFeaturedStores] = useState([]);
   const [currentSlide, setCurrentSlide] = useState(0);
+
+  const [subcategories, setSubcategories] = useState([]);
+  const [favoriteStores, setFavoriteStores] = useState([]);
   
   // Customer state
   const [customers, setCustomers] = useState([]);
@@ -102,10 +106,40 @@ const HomePage = () => {
       .catch(err => console.error('Failed to load categories:', err));
 
     // Fetch stores for carousel
-    fetch('https://localhost:7062/api/Sellers')
+    const fetchStores = async () => {
+      try {
+        const response = await fetch('https://localhost:7062/api/Sellers');
+        const sellers = await response.json();
+        
+        // Fetch products for each seller
+        const sellersWithProducts = await Promise.all(
+          sellers.map(async (seller) => {
+            try {
+              const productsRes = await fetch(`https://localhost:7062/api/Sellers/${seller.id}/products`);
+              if (productsRes.ok) {
+                const productsData = await productsRes.json();
+                return { ...seller, products: productsData.products || [] };
+              }
+              return { ...seller, products: [] };
+            } catch (err) {
+              return { ...seller, products: [] };
+            }
+          })
+        );
+        
+        setFeaturedStores(Array.isArray(sellersWithProducts) ? sellersWithProducts : []);
+      } catch (err) {
+        console.error('Failed to load stores:', err);
+      }
+    };
+    
+    fetchStores();
+    
+    // Fetch subcategories
+    fetch('https://localhost:7062/api/SubCategories')
       .then(res => res.json())
-      .then(data => setFeaturedStores(Array.isArray(data) ? data.slice(0, 8) : []))
-      .catch(err => console.error('Failed to load stores:', err));
+      .then(data => setSubcategories(Array.isArray(data) ? data.filter(sub => sub.isActive === true) : []))
+      .catch(err => console.error('Failed to load subcategories:', err));
   }, []);
 
   // Fetch customer orders
@@ -131,6 +165,31 @@ const HomePage = () => {
     fetchOrders();
     const interval = setInterval(fetchOrders, 30000);
     return () => clearInterval(interval);
+  }, [customerId]);
+
+  // Fetch favorites when customer changes
+  useEffect(() => {
+    const fetchFavorites = async () => {
+      if (!customerId) {
+        setFavoriteStores([]);
+        return;
+      }
+
+      try {
+        const response = await fetch(`https://localhost:7062/api/CustomerFavorites/${customerId}`);
+        if (response.ok) {
+          const data = await response.json();
+          setFavoriteStores(Array.isArray(data) ? data.map(f => f.sellerId) : []);
+        } else {
+          setFavoriteStores([]);
+        }
+      } catch (error) {
+        console.error("Failed to load favorites:", error);
+        setFavoriteStores([]);
+      }
+    };
+
+    fetchFavorites();
   }, [customerId]);
 
   // Load banner dismissed state
@@ -175,14 +234,30 @@ const HomePage = () => {
     return () => clearInterval(interval);
   }, [customerId]);
 
-  // Auto-scroll carousel
+  // Auto-scroll carousel - DISABLED to prevent scrolling past stores
   useEffect(() => {
     if (featuredStores.length === 0) return;
+    
+    // Calculate max slides based on filtered stores
+    const popularStores = featuredStores
+      .filter(store => {
+        const hasActiveProducts = store.products && 
+                                 store.products.length > 0 && 
+                                 store.products.some(p => p.isActive === true);
+        return hasActiveProducts;
+      })
+      .slice(0, 5);
+    
+    const maxSlide = Math.max(0, popularStores.length - 4);
+    
     const interval = setInterval(() => {
-      setCurrentSlide(prev => (prev + 1) % Math.max(1, featuredStores.length - 3));
+      setCurrentSlide(prev => {
+        const next = prev + 1;
+        return next > maxSlide ? 0 : next;
+      });
     }, 4000);
     return () => clearInterval(interval);
-  }, [featuredStores.length]);
+  }, [featuredStores]);
 
   const handleCustomerSelect = (customer) => {
     const name = customer.fullName || customer.name || `Customer #${customer.id}`;
@@ -235,6 +310,40 @@ const HomePage = () => {
     navigate('/customer-dashboard');
   };
 
+  const toggleFavorite = async (sellerId) => {
+    if (!customerId) {
+      alert('Please login to save favorites');
+      return;
+    }
+
+    const isFavorited = favoriteStores.includes(sellerId);
+
+    try {
+      if (isFavorited) {
+        const response = await fetch(
+          `https://localhost:7062/api/CustomerFavorites/${customerId}/${sellerId}`,
+          { method: 'DELETE' }
+        );
+
+        if (response.ok) {
+          setFavoriteStores(prev => prev.filter(id => id !== sellerId));
+        }
+      } else {
+        const response = await fetch('https://localhost:7062/api/CustomerFavorites', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ customerId, sellerId })
+        });
+
+        if (response.ok) {
+          setFavoriteStores(prev => [...prev, sellerId]);
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
+  };
+
   const getStoreInitials = (storeName) => {
     const words = storeName.split(' ').filter(w => w.length > 0);
     return words.length >= 2 
@@ -252,6 +361,7 @@ const HomePage = () => {
       />
 
       <CustomerHeader
+        pageTitle="Home" 
         customerName={customerName}
         customerId={customerId}
         cart={cart}
@@ -457,156 +567,230 @@ const HomePage = () => {
       </div>
 
       {/* Featured Stores Carousel */}
-      <section className="w-full px-8 py-24 bg-gradient-to-b from-white to-cream-50">
+      <section className="w-full px-8 py-16" style={{ backgroundColor: '#FAF7F2' }}>
         <div className="max-w-[1400px] mx-auto">
-          <div className="text-center mb-16">
-            <div className="inline-block mb-4">
-              <span className="px-5 py-2 bg-sage-100 text-sage-700 rounded-full text-sm font-bold" style={{ fontFamily: 'Inter, sans-serif' }}>
-                 FEATURED
+          <div className="text-center mb-10">
+            <div className="inline-block mb-3">
+              <span className="px-4 py-1.5 rounded-full text-xs font-bold" style={{ fontFamily: 'Inter, sans-serif', backgroundColor: '#E8F0EB', color: '#556B5C' }}>
+                ✨ FEATURED
               </span>
             </div>
             <h2 
-              className="text-[48px] font-bold text-charcoal-600 mb-4" 
+              className="text-4xl font-bold text-charcoal-600 mb-3" 
               style={{ fontFamily: 'Merriweather, serif' }}
             >
-              Popular Stores Near You
+              Featured Stores
             </h2>
             <p 
-              className="text-xl text-charcoal-400 max-w-2xl mx-auto" 
+              className="text-base text-charcoal-400 max-w-xl mx-auto" 
               style={{ fontFamily: 'Inter, sans-serif' }}
             >
               Discover the most loved local businesses in your community
             </p>
           </div>
 
-          {featuredStores.length > 0 && (
-            <>
-              <div className="relative">
-                <button
-                  onClick={() => setCurrentSlide(Math.max(0, currentSlide - 1))}
-                  disabled={currentSlide === 0}
-                  className="absolute -left-6 top-1/2 -translate-y-1/2 z-10 w-12 h-12 bg-sage-500 hover:bg-sage-600 rounded-full shadow-lg flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
+          {featuredStores.length > 0 && (() => {
+            // Filter and sort stores
+            const popularStores = featuredStores
+              .filter(store => {
+                const hasActiveProducts = store.products && 
+                                         store.products.length > 0 && 
+                                         store.products.some(p => p.isActive === true);
+                return hasActiveProducts;
+              })
+              .sort((a, b) => {
+                const aRecentOrders = (a.recentCompletedOrders || 0);
+                const bRecentOrders = (b.recentCompletedOrders || 0);
+                
+                if (aRecentOrders !== bRecentOrders) {
+                  return bRecentOrders - aRecentOrders;
+                }
+                
+                const ratingA = a.averageRating || 0;
+                const ratingB = b.averageRating || 0;
+                return ratingB - ratingA;
+              })
+              .slice(0, 5);
 
-                <div className="overflow-hidden">
-                  <div 
-                    className="flex gap-6 transition-transform duration-500"
-                    style={{ transform: `translateX(-${currentSlide * (100 / 4)}%)` }}
+            return (
+              <>
+                <div className="relative mb-4">
+                  <button
+                    onClick={() => setCurrentSlide(Math.max(0, currentSlide - 1))}
+                    disabled={currentSlide === 0 || popularStores.length <= 4}
+                    className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white rounded-full shadow-[0_2px_10px_rgba(0,0,0,0.12)] flex items-center justify-center hover:bg-cream-50 transition-all disabled:opacity-30"
                   >
-                    {featuredStores.map((store) => (
-                      <div
-                        key={store.id}
-                        onClick={() => handleStoreClick(store.id)}
-                        className="flex-shrink-0 w-[calc(25%-18px)] bg-white rounded-2xl overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.08)] hover:shadow-[0_12px_40px_rgba(0,0,0,0.15)] transition-all duration-300 cursor-pointer group"
-                      >
-                        <div className="relative h-48 bg-gradient-to-br from-cream-100 to-cream-200 overflow-hidden">
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent group-hover:from-black/20 transition-all"></div>
-                          <div className="absolute top-4 left-4 z-10">
-                            <div className={`px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2 backdrop-blur-sm ${
-                              isStoreOpen(store) ? 'bg-success-btn/90 text-white' : 'bg-error-btn/90 text-white'
-                            }`}>
-                              <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                              {isStoreOpen(store) ? 'OPEN NOW' : 'CLOSED'}
+                    <svg className="w-5 h-5 text-charcoal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+
+                  <div className="overflow-hidden px-12 py-3">
+                    <div className="flex gap-6 transition-transform duration-500" style={{ transform: `translateX(-${currentSlide * (100 / 4)}%)` }}>
+                      {popularStores.map((store) => (
+                        <div 
+                          key={store.id}
+                          onClick={() => handleStoreClick(store.id)}
+                          className="flex-shrink-0 w-[calc(25%-18px)] bg-white rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all cursor-pointer"
+                        >
+                          <div className="relative h-32">
+                            <div className="absolute inset-0 overflow-hidden z-0">
+                              <StoreBanner
+                                storeName={store.storeName}
+                                storeImageUrl={store.storeImageUrl ? `https://localhost:7062${store.storeImageUrl}` : null}
+                                bannerThemeKey={store.bannerThemeKey || 'modern-gradient'}
+                                bannerAccentColor={store.bannerAccentColor || '#F97316'}
+                                variant="card"
+                              />
+                            </div>
+                            
+                            <div className="absolute top-3 left-3">
+                              <div className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 ${
+                                isStoreOpen(store) ? 'bg-success-btn text-white' : 'bg-error-btn text-white'
+                              }`}>
+                                <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                                {isStoreOpen(store) ? 'OPEN' : 'CLOSED'}
+                              </div>
+                            </div>
+
+                            {customerId && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleFavorite(store.id);
+                                }}
+                                className="absolute top-3 right-3 w-9 h-9 bg-white hover:bg-cream-50 rounded-full flex items-center justify-center shadow-md transition-all z-10"
+                              >
+                                <Star 
+                                  size={20} 
+                                  weight={favoriteStores.includes(store.id) ? 'fill' : 'regular'} 
+                                  className={favoriteStores.includes(store.id) ? 'text-error-btn' : 'text-charcoal-400'}
+                                />
+                              </button>
+                            )}
+                            
+                            <div className="absolute -bottom-8 left-4 z-20">
+                              <div className="w-16 h-16 rounded-full border-4 border-white bg-white shadow-[0_4px_12px_rgba(0,0,0,0.15)] overflow-hidden">
+                                {store.storeImageUrl ? (
+                                  <img 
+                                    src={`https://localhost:7062${store.storeImageUrl}`}
+                                    alt={store.storeName}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-grey-200 to-grey-300">
+                                    <span className="text-lg font-black text-charcoal-600">
+                                      {getStoreInitials(store.storeName)}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                           
-                          <div className="absolute -bottom-10 left-5">
-                            <div className="w-20 h-20 rounded-2xl border-4 border-white flex items-center justify-center overflow-hidden bg-white shadow-xl group-hover:scale-110 transition-transform duration-300">
-                              {store.storeImageUrl ? (
-                                <img 
-                                  src={`https://localhost:7062${store.storeImageUrl}`}
-                                  alt={store.storeName}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-sage-100 to-sage-200">
-                                  <span className="text-lg font-black text-sage-700">
-                                    {getStoreInitials(store.storeName)}
+                          <div className="pt-10 p-4 bg-white">
+                            <h3 className="font-bold text-charcoal-600 text-base mb-2" style={{ fontFamily: 'Merriweather, serif' }}>{store.storeName}</h3>
+                            <div className="flex items-center gap-1 mb-3">
+                              {(() => {
+                                const rating = store.averageRating || 0;
+                                const hasEnoughReviews = store.averageRating !== null && store.averageRating !== undefined;
+                                
+                                if (!hasEnoughReviews) {
+                                  return (
+                                    <span className="px-3 py-1 bg-sage-500 text-white text-xs font-bold rounded-full" style={{ fontFamily: 'Inter, sans-serif' }}>
+                                      NEW
+                                    </span>
+                                  );
+                                }
+                                
+                                return (
+                                  <>
+                                    {[0,1,2,3,4].map(i => {
+                                      const fillPercentage = Math.max(0, Math.min(100, (rating - i) * 100));
+                                      return (
+                                        <div key={i} className="relative w-3.5 h-3.5">
+                                          <Star size={14} className="text-grey-stroke absolute" weight="fill" />
+                                          <div className="overflow-hidden absolute" style={{ width: `${fillPercentage}%` }}>
+                                            <Star size={14} className="text-sage-500" weight="fill" />
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                    <span className="text-xs font-semibold text-charcoal-600 ml-1" style={{ fontFamily: 'Inter, sans-serif' }}>
+                                      {rating.toFixed(1)}
+                                    </span>
+                                  </>
+                                );
+                              })()}
+                            </div>
+                            <div className="flex gap-2 flex-wrap">
+                              {(() => {
+                                const storeSubcategoryIds = store.subCategoryIds || [];
+                                const storeSubcategories = subcategories.filter(sub => storeSubcategoryIds.includes(sub.id));
+                                
+                                return storeSubcategories.length > 0 ? (
+                                  storeSubcategories.slice(0, 2).map(subcat => (
+                                    <span key={subcat.id} className="px-3 py-1 bg-cream-100 rounded-full text-xs font-medium text-charcoal-600" style={{ fontFamily: 'Inter, sans-serif' }}>
+                                      {subcat.name}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="px-3 py-1 bg-grey-200 rounded-full text-xs font-medium text-charcoal-400 italic" style={{ fontFamily: 'Inter, sans-serif' }}>
+                                    No categories
                                   </span>
-                                </div>
-                              )}
+                                );
+                              })()}
                             </div>
                           </div>
                         </div>
-                        
-                        <div className="pt-12 px-6 pb-6">
-                          <h3 className="font-bold text-charcoal-600 text-lg mb-3 truncate group-hover:text-sage-600 transition-colors" style={{ fontFamily: 'Merriweather, serif' }}>
-                            {store.storeName}
-                          </h3>
-                          <div className="flex items-center gap-1.5">
-                            {store.averageRating ? (
-                              <>
-                                {[0,1,2,3,4].map(i => {
-                                  const fillPercentage = Math.max(0, Math.min(100, (store.averageRating - i) * 100));
-                                  return (
-                                    <div key={i} className="relative w-4 h-4">
-                                      <Star size={16} className="text-grey-stroke absolute" weight="fill" />
-                                      <div className="overflow-hidden absolute" style={{ width: `${fillPercentage}%` }}>
-                                        <Star size={16} className="text-sage-500" weight="fill" />
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                                <span className="text-sm font-bold text-charcoal-600 ml-1">
-                                  {store.averageRating.toFixed(1)}
-                                </span>
-                              </>
-                            ) : (
-                              <span className="px-3 py-1.5 bg-sage-500 text-white text-xs font-bold rounded-full">
-                                NEW STORE
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setCurrentSlide(Math.min(Math.max(0, popularStores.length - 4), currentSlide + 1))}
+                    disabled={popularStores.length <= 4 || currentSlide >= Math.max(0, popularStores.length - 4)}
+                    className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white rounded-full shadow-[0_2px_10px_rgba(0,0,0,0.12)] flex items-center justify-center hover:bg-cream-50 transition-all disabled:opacity-30"
+                  >
+                    <svg className="w-5 h-5 text-charcoal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+
+                  <div className="flex justify-center gap-2 mt-6">
+                    {popularStores.length > 4 && Array.from({ length: Math.max(1, popularStores.length - 3) }).map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setCurrentSlide(idx)}
+                        className={`h-2 rounded-full transition-all ${
+                          currentSlide === idx ? 'w-8' : 'bg-grey-stroke w-2'
+                        }`}
+                        style={currentSlide === idx ? { backgroundColor: '#556B5C' } : {}}
+                      />
                     ))}
                   </div>
                 </div>
 
-                <button
-                  onClick={() => setCurrentSlide(Math.min(featuredStores.length - 4, currentSlide + 1))}
-                  disabled={currentSlide >= featuredStores.length - 4}
-                  className="absolute -right-6 top-1/2 -translate-y-1/2 z-10 w-12 h-12 bg-sage-500 hover:bg-sage-600 rounded-full shadow-lg flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-
-                <div className="flex justify-center gap-2 mt-8">
-                  {Array.from({ length: Math.max(1, featuredStores.length - 3) }).map((_, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setCurrentSlide(idx)}
-                      className={`h-2 rounded-full transition-all ${
-                        currentSlide === idx ? 'bg-sage-500 w-8' : 'bg-grey-stroke w-2'
-                      }`}
-                    />
-                  ))}
+                <div className="text-center mt-10">
+                  <button
+                    onClick={handleNavigateToStores}
+                    className="text-white px-10 py-4 rounded-xl font-bold text-base transition-all shadow-lg hover:scale-105 inline-flex items-center gap-3 group"
+                    style={{ fontFamily: 'Inter, sans-serif', backgroundColor: '#556B5C' }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#465A4D'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#556B5C'}
+                  >
+                    View All Stores
+                    <ArrowRight size={24} weight="bold" className="group-hover:translate-x-2 transition-transform" />
+                  </button>
                 </div>
-              </div>
-
-              <div className="text-center mt-16">
-                <button
-                  onClick={handleNavigateToStores}
-                  className="bg-sage-500 text-white px-14 py-5 rounded-xl font-bold text-lg hover:bg-sage-600 transition-all shadow-xl hover:scale-110 hover:shadow-sage-500/30 inline-flex items-center gap-3 group"
-                  style={{ fontFamily: 'Inter, sans-serif' }}
-                >
-                  View All Stores
-                  <ArrowRight size={24} weight="bold" className="group-hover:translate-x-2 transition-transform" />
-                </button>
-              </div>
-            </>
-          )}
+              </>
+            );
+          })()}
         </div>
       </section>
 
-      {/* Why Choose Beyti Section */}
-      <section className="w-full px-8 py-24 bg-white relative overflow-hidden">
+     {/* Why Choose Beyti Section */}
+      <section className="w-full px-8 py-24 relative overflow-hidden" style={{ backgroundColor: '#FAF7F2' }}>
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-sage-100/30 rounded-full blur-3xl"></div>
         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-cream-200/50 rounded-full blur-3xl"></div>
         
@@ -634,7 +818,7 @@ const HomePage = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
             {/* Feature 1 */}
             <div className="bg-gradient-to-br from-white to-cream-50 rounded-3xl p-12 text-center shadow-[0_8px_30px_rgba(0,0,0,0.08)] hover:shadow-[0_12px_40px_rgba(85,107,92,0.15)] transition-all duration-300 hover:scale-105 group border border-grey-stroke/50">
-              <div className="w-24 h-24 bg-gradient-to-br from-sage-400 to-sage-600 rounded-2xl flex items-center justify-center mx-auto mb-8 group-hover:scale-110 transition-transform shadow-lg">
+              <div className="w-24 h-24 rounded-2xl flex items-center justify-center mx-auto mb-8 group-hover:scale-110 transition-transform shadow-lg" style={{ background: 'linear-gradient(135deg, #6B8E7A 0%, #556B5C 100%)' }}>
                 <Storefront size={48} className="text-white" weight="bold" />
               </div>
               <h3 className="text-3xl font-bold text-charcoal-600 mb-5" style={{ fontFamily: 'Merriweather, serif' }}>
@@ -647,7 +831,7 @@ const HomePage = () => {
 
             {/* Feature 2 */}
             <div className="bg-gradient-to-br from-white to-cream-50 rounded-3xl p-12 text-center shadow-[0_8px_30px_rgba(0,0,0,0.08)] hover:shadow-[0_12px_40px_rgba(85,107,92,0.15)] transition-all duration-300 hover:scale-105 group border border-grey-stroke/50">
-              <div className="w-24 h-24 bg-gradient-to-br from-sage-400 to-sage-600 rounded-2xl flex items-center justify-center mx-auto mb-8 group-hover:scale-110 transition-transform shadow-lg">
+              <div className="w-24 h-24 rounded-2xl flex items-center justify-center mx-auto mb-8 group-hover:scale-110 transition-transform shadow-lg" style={{ background: 'linear-gradient(135deg, #6B8E7A 0%, #556B5C 100%)' }}>
                 <Star size={48} className="text-white" weight="fill" />
               </div>
               <h3 className="text-3xl font-bold text-charcoal-600 mb-5" style={{ fontFamily: 'Merriweather, serif' }}>
@@ -660,7 +844,7 @@ const HomePage = () => {
 
             {/* Feature 3 */}
             <div className="bg-gradient-to-br from-white to-cream-50 rounded-3xl p-12 text-center shadow-[0_8px_30px_rgba(0,0,0,0.08)] hover:shadow-[0_12px_40px_rgba(85,107,92,0.15)] transition-all duration-300 hover:scale-105 group border border-grey-stroke/50">
-              <div className="w-24 h-24 bg-gradient-to-br from-sage-400 to-sage-600 rounded-2xl flex items-center justify-center mx-auto mb-8 group-hover:scale-110 transition-transform shadow-lg">
+              <div className="w-24 h-24 rounded-2xl flex items-center justify-center mx-auto mb-8 group-hover:scale-110 transition-transform shadow-lg" style={{ background: 'linear-gradient(135deg, #6B8E7A 0%, #556B5C 100%)' }}>
                 <ArrowRight size={48} className="text-white" weight="bold" />
               </div>
               <h3 className="text-3xl font-bold text-charcoal-600 mb-5" style={{ fontFamily: 'Merriweather, serif' }}>
@@ -675,40 +859,40 @@ const HomePage = () => {
       </section>
 
       {/* Footer */}
-<footer className="w-full px-8 py-12 bg-charcoal-700">
+<footer className="w-full px-8 py-6" style={{ backgroundColor: '#2D2D2D' }}>
   <div className="max-w-[1400px] mx-auto">
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-4">
       <div>
-        <h3 className="text-xl font-bold text-white mb-4" style={{ fontFamily: 'Merriweather, serif' }}>Beyti</h3>
-        <p className="text-charcoal-300 text-sm" style={{ fontFamily: 'Inter, sans-serif' }}>
+        <h3 className="text-lg font-bold text-white mb-2" style={{ fontFamily: 'Merriweather, serif' }}>Beyti</h3>
+        <p className="text-xs" style={{ fontFamily: 'Inter, sans-serif', color: '#B0B0B0' }}>
           Your trusted local marketplace for stores and services.
         </p>
       </div>
       <div>
-        <h4 className="text-white font-semibold mb-3" style={{ fontFamily: 'Inter, sans-serif' }}>Quick Links</h4>
-        <ul className="space-y-2">
-          <li><button onClick={handleNavigateToStores} className="text-charcoal-300 hover:text-white text-sm transition-colors">Browse Stores</button></li>
-          <li><button onClick={handleNavigateToServices} className="text-charcoal-300 hover:text-white text-sm transition-colors">Browse Services</button></li>
+        <h4 className="text-white font-semibold mb-2 text-sm" style={{ fontFamily: 'Inter, sans-serif' }}>Quick Links</h4>
+        <ul className="space-y-1">
+          <li><button onClick={handleNavigateToStores} className="text-xs transition-colors" style={{ color: '#B0B0B0' }} onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'} onMouseLeave={(e) => e.currentTarget.style.color = '#B0B0B0'}>Browse Stores</button></li>
+          <li><button onClick={handleNavigateToServices} className="text-xs transition-colors" style={{ color: '#B0B0B0' }} onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'} onMouseLeave={(e) => e.currentTarget.style.color = '#B0B0B0'}>Browse Services</button></li>
         </ul>
       </div>
       <div>
-        <h4 className="text-white font-semibold mb-3" style={{ fontFamily: 'Inter, sans-serif' }}>Support</h4>
-        <ul className="space-y-2">
-          <li><a href="#" className="text-charcoal-300 hover:text-white text-sm transition-colors">Help Center</a></li>
-          <li><a href="#" className="text-charcoal-300 hover:text-white text-sm transition-colors">Contact Us</a></li>
+        <h4 className="text-white font-semibold mb-2 text-sm" style={{ fontFamily: 'Inter, sans-serif' }}>Support</h4>
+        <ul className="space-y-1">
+          <li><a href="#" className="text-xs transition-colors" style={{ color: '#B0B0B0' }} onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'} onMouseLeave={(e) => e.currentTarget.style.color = '#B0B0B0'}>Help Center</a></li>
+          <li><a href="#" className="text-xs transition-colors" style={{ color: '#B0B0B0' }} onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'} onMouseLeave={(e) => e.currentTarget.style.color = '#B0B0B0'}>Contact Us</a></li>
         </ul>
       </div>
       <div>
-        <h4 className="text-white font-semibold mb-3" style={{ fontFamily: 'Inter, sans-serif' }}>Legal</h4>
-        <ul className="space-y-2">
-          <li><a href="#" className="text-charcoal-300 hover:text-white text-sm transition-colors">Privacy Policy</a></li>
-          <li><a href="#" className="text-charcoal-300 hover:text-white text-sm transition-colors">Terms of Service</a></li>
+        <h4 className="text-white font-semibold mb-2 text-sm" style={{ fontFamily: 'Inter, sans-serif' }}>Legal</h4>
+        <ul className="space-y-1">
+          <li><a href="#" className="text-xs transition-colors" style={{ color: '#B0B0B0' }} onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'} onMouseLeave={(e) => e.currentTarget.style.color = '#B0B0B0'}>Privacy Policy</a></li>
+          <li><a href="#" className="text-xs transition-colors" style={{ color: '#B0B0B0' }} onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'} onMouseLeave={(e) => e.currentTarget.style.color = '#B0B0B0'}>Terms of Service</a></li>
         </ul>
       </div>
     </div>
-    <div className="border-t border-charcoal-600 pt-6 text-center">
-      <p className="text-charcoal-400 text-sm" style={{ fontFamily: 'Inter, sans-serif' }}>
-        © 2024 Beyti. All rights reserved.
+    <div className="pt-3 text-center" style={{ borderTop: '1px solid #4D4D4D' }}>
+      <p className="text-xs" style={{ fontFamily: 'Inter, sans-serif', color: '#B0B0B0' }}>
+        © 2025 Beyti. All rights reserved.
       </p>
     </div>
   </div>

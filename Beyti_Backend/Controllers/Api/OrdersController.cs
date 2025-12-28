@@ -42,6 +42,15 @@ namespace Beyti_Backend.Controllers.Api
             public decimal? TotalAmount { get; set; }
             public string? OrderNote { get; set; }
             public string? DeliveryNote { get; set; }
+
+            public List<CreateOrderItemDto>? OrderItems { get; set; }
+        }
+
+        public class CreateOrderItemDto
+        {
+            public int ProductVariantId { get; set; }
+            public int Qty { get; set; }
+            public decimal UnitPrice { get; set; }
         }
         public class UpdateOrderDto
         {
@@ -451,6 +460,24 @@ namespace Beyti_Backend.Controllers.Api
             _context.Orders.Add(order);
             await _context.SaveChangesAsync();
 
+            // Add order items if provided
+            if (dto.OrderItems != null && dto.OrderItems.Any())
+            {
+                foreach (var itemDto in dto.OrderItems)
+                {
+                    var orderItem = new OrderItem
+                    {
+                        OrderId = order.Id,
+                        ProductVariantId = itemDto.ProductVariantId,
+                        Qty = itemDto.Qty,
+                        UnitPrice = itemDto.UnitPrice,
+                        LineTotal = itemDto.UnitPrice * itemDto.Qty
+                    };
+                    _context.OrderItems.Add(orderItem);
+                }
+                await _context.SaveChangesAsync();
+            }
+
             // Send notification to seller about new order
             var customer = await _context.Customers
                 .Include(c => c.UserProfile)
@@ -577,8 +604,8 @@ namespace Beyti_Backend.Controllers.Api
                     DeliveryAddressId = order.DeliveryAddressId,
                     Status = "Pending",
                     DeliveryNote = dto.DeliveryNote,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.Now,
+                    UpdatedAt = DateTime.Now
                 };
                 _context.DeliveryTickets.Add(deliveryTicket);
                 await _context.SaveChangesAsync();
@@ -1130,102 +1157,158 @@ namespace Beyti_Backend.Controllers.Api
         [HttpGet("{orderId}/tracking")]
         public async Task<ActionResult<object>> GetOrderTracking(int orderId)
         {
-            var order = await _context.Orders
-                .Include(o => o.DeliveryTicket)
-                .Include(o => o.PickupAddress)
-                .Include(o => o.DeliveryAddress)
-                .FirstOrDefaultAsync(o => o.Id == orderId);
-
-            if (order == null)
-                return NotFound();
-
-            // Only show map when driver has picked up the order
-            if (order.Status != "Picked Up")
+            try
             {
+                var order = await _context.Orders
+                    .Include(o => o.DeliveryTicket)
+                        .ThenInclude(dt => dt.Driver) // ✅ ADD THIS LINE
+                    .Include(o => o.PickupAddress)
+                    .Include(o => o.DeliveryAddress)
+                    .FirstOrDefaultAsync(o => o.Id == orderId);
+
+                if (order == null)
+                {
+                    Console.WriteLine($"❌ Order {orderId} not found");
+                    return NotFound(new { message = "Order not found" });
+                }
+
+                Console.WriteLine($"📍 Tracking request for order {orderId} - Status: {order.Status}");
+
+                // Show map for both "Picked Up" and "Out for Delivery" statuses
+                var showMapStatuses = new[] { "Picked Up", "Out for Delivery" };
+                if (!showMapStatuses.Contains(order.Status))
+                {
+                    Console.WriteLine($"⚠️ Order {orderId} - Status '{order.Status}' not eligible for tracking");
+                    return Ok(new
+                    {
+                        showMap = false,
+                        status = order.Status
+                    });
+                }
+
+                var ticket = order.DeliveryTicket;
+                if (ticket == null)
+                {
+                    Console.WriteLine($"❌ Order {orderId} - No delivery ticket found");
+                    return Ok(new { showMap = false, status = order.Status });
+                }
+
+                if (ticket.Driver == null)
+                {
+                    Console.WriteLine($"❌ Ticket {ticket.Id} - No driver assigned yet");
+                    return Ok(new { showMap = false, status = order.Status });
+                }
+
+                if (order.PickupAddress == null || order.DeliveryAddress == null)
+                {
+                    Console.WriteLine($"❌ Order {orderId} - Missing addresses");
+                    return Ok(new { showMap = false, status = order.Status });
+                }
+
+                // Get driver's current location
+                var driverLat = (double)(ticket.Driver.CurrentLat ?? 0);
+                var driverLng = (double)(ticket.Driver.CurrentLng ?? 0);
+
+                if (driverLat == 0 || driverLng == 0)
+                {
+                    Console.WriteLine($"❌ Driver {ticket.Driver.Id} - No location data");
+                    return Ok(new { showMap = false, status = order.Status });
+                }
+
+                var pickupLat = (double)(order.PickupAddress.Latitude ?? 0);
+                var pickupLng = (double)(order.PickupAddress.Longitude ?? 0);
+                var deliveryLat = (double)(order.DeliveryAddress.Latitude ?? 0);
+                var deliveryLng = (double)(order.DeliveryAddress.Longitude ?? 0);
+
+                Console.WriteLine($"✅ Driver location: {driverLat}, {driverLng}");
+
+                // Check if we have route cached, if not fetch from OSRM
+                if (!_routeCache.ContainsKey(orderId))
+                {
+                    try
+                    {
+                        Console.WriteLine($"🗺️ Fetching route from OSRM for order {orderId}");
+                        var route = await FetchOSRMRoute(pickupLng, pickupLat, deliveryLng, deliveryLat);
+                        _routeCache[orderId] = new RouteData
+                        {
+                            RoutePoints = route.RoutePoints,
+                            TotalDuration = route.Duration,
+                            PickupTime = ticket.UpdatedAt
+                        };
+                        Console.WriteLine($"✅ Route cached for order {orderId} - Duration: {route.Duration}s");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"❌ OSRM Error: {ex.Message}");
+                        // Fallback to straight line if OSRM fails
+                        _routeCache[orderId] = new RouteData
+                        {
+                            RoutePoints = new List<double[]>
+                    {
+                        new[] { pickupLng, pickupLat },
+                        new[] { deliveryLng, deliveryLat }
+                    },
+                            TotalDuration = 900, // 15 min default
+                            PickupTime = ticket.UpdatedAt
+                        };
+                    }
+                }
+
+                var routeData = _routeCache[orderId];
+                var timeSincePickup = (DateTime.Now - routeData.PickupTime).TotalSeconds;
+                var progress = Math.Min(timeSincePickup / routeData.TotalDuration, 1.0);
+
+                // Find driver position along route
+                var totalPoints = routeData.RoutePoints.Count;
+
+                // ✅ FIX: Ensure we always have at least 1 point and valid index
+                if (totalPoints == 0)
+                {
+                    Console.WriteLine($"❌ No route points available for order {orderId}");
+                    return Ok(new { showMap = false, status = order.Status });
+                }
+
+                var targetIndex = (int)(progress * (totalPoints - 1));
+                targetIndex = Math.Max(0, Math.Min(targetIndex, totalPoints - 1)); // ✅ Ensure index is never negative
+
+                var driverPoint = routeData.RoutePoints[targetIndex];
+
+                Console.WriteLine($"📍 Driver position - Progress: {progress:P0}, Index: {targetIndex}/{totalPoints}, Point: [{driverPoint[1]}, {driverPoint[0]}]");
+
+                // Calculate remaining time
+                var remainingSeconds = Math.Max(0, routeData.TotalDuration - timeSincePickup);
+
+                Console.WriteLine($"✅ Tracking data ready for order {orderId} - ETA: {remainingSeconds / 60.0:F1} min");
+
                 return Ok(new
                 {
-                    showMap = false,
-                    status = order.Status
+                    showMap = true,
+                    status = order.Status,
+                    driverLocation = new
+                    {
+                        latitude = driverPoint[1],
+                        longitude = driverPoint[0]
+                    },
+                    pickupLocation = new
+                    {
+                        latitude = pickupLat,
+                        longitude = pickupLng
+                    },
+                    deliveryLocation = new
+                    {
+                        latitude = deliveryLat,
+                        longitude = deliveryLng
+                    },
+                    estimatedArrival = remainingSeconds / 60.0, // convert to minutes
+                    routePolyline = routeData.RoutePoints.Select(p => new[] { p[1], p[0] }).ToList() // [lat, lng] for frontend
                 });
             }
-
-            var ticket = order.DeliveryTicket;
-            if (ticket == null || order.PickupAddress == null || order.DeliveryAddress == null)
+            catch (Exception ex)
             {
-                return Ok(new { showMap = false, status = order.Status });
+                Console.WriteLine($"❌ CRITICAL ERROR in GetOrderTracking for order {orderId}: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                return StatusCode(500, new { message = "Error fetching tracking data", error = ex.Message });
             }
-
-            var pickupLat = (double)(order.PickupAddress.Latitude ?? 0);
-            var pickupLng = (double)(order.PickupAddress.Longitude ?? 0);
-            var deliveryLat = (double)(order.DeliveryAddress.Latitude ?? 0);
-            var deliveryLng = (double)(order.DeliveryAddress.Longitude ?? 0);
-
-            // Check if we have route cached, if not fetch from OSRM
-            if (!_routeCache.ContainsKey(orderId))
-            {
-                try
-                {
-                    var route = await FetchOSRMRoute(pickupLng, pickupLat, deliveryLng, deliveryLat);
-                    _routeCache[orderId] = new RouteData
-                    {
-                        RoutePoints = route.RoutePoints,
-                        TotalDuration = route.Duration,
-                        PickupTime = ticket.UpdatedAt
-                    };
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"❌ OSRM Error: {ex.Message}");
-                    // Fallback to straight line if OSRM fails
-                    _routeCache[orderId] = new RouteData
-                    {
-                        RoutePoints = new List<double[]>
-                {
-                    new[] { pickupLng, pickupLat },
-                    new[] { deliveryLng, deliveryLat }
-                },
-                        TotalDuration = 900, // 15 min default
-                        PickupTime = ticket.UpdatedAt
-                    };
-                }
-            }
-
-            var routeData = _routeCache[orderId];
-            var timeSincePickup = (DateTime.UtcNow - routeData.PickupTime).TotalSeconds;
-            var progress = Math.Min(timeSincePickup / routeData.TotalDuration, 1.0);
-
-            // Find driver position along route
-            var totalPoints = routeData.RoutePoints.Count;
-            var targetIndex = (int)(progress * (totalPoints - 1));
-            targetIndex = Math.Min(targetIndex, totalPoints - 1);
-
-            var driverPoint = routeData.RoutePoints[targetIndex];
-
-            // Calculate remaining time
-            var remainingSeconds = Math.Max(0, routeData.TotalDuration - timeSincePickup);
-
-            return Ok(new
-            {
-                showMap = true,
-                status = order.Status,
-                driverLocation = new
-                {
-                    latitude = driverPoint[1],
-                    longitude = driverPoint[0]
-                },
-                pickupLocation = new
-                {
-                    latitude = pickupLat,
-                    longitude = pickupLng
-                },
-                deliveryLocation = new
-                {
-                    latitude = deliveryLat,
-                    longitude = deliveryLng
-                },
-                estimatedArrival = remainingSeconds / 60.0, // convert to minutes
-                routePolyline = routeData.RoutePoints.Select(p => new[] { p[1], p[0] }).ToList() // [lat, lng] for frontend
-            });
         }
 
         private async Task<(List<double[]> RoutePoints, double Duration)> FetchOSRMRoute(
@@ -1314,7 +1397,7 @@ namespace Beyti_Backend.Controllers.Api
                 if (closest == null) return false;
 
                 ticket.CurrentOfferedDriverId = closest.Id;
-                ticket.OfferExpiresAt = DateTime.UtcNow.AddSeconds(45);
+                ticket.OfferExpiresAt = DateTime.Now.AddSeconds(45);
                 ticket.Status = "Offered";
 
                 await _context.SaveChangesAsync();

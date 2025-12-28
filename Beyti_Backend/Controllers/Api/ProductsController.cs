@@ -415,7 +415,7 @@ namespace Beyti_Backend.Controllers.Api
                 }
 
                 product.ImageUrl = imagePath;
-                product.UpdatedAt = DateTime.UtcNow;
+                product.UpdatedAt = DateTime.Now;
 
                 _context.Entry(product).State = EntityState.Modified;
                 await _context.SaveChangesAsync();

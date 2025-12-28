@@ -241,13 +241,57 @@ const showSnackbar = (message, type = 'success') => {
 
 
   const MapSelector = () => {
-    useMapEvents({
-      click(e) {
-        setMapLocation(e.latlng); // Just set the temporary marker
+  useMapEvents({
+    click: async (e) => {
+      const { lat, lng } = e.latlng;
+      setMapLocation(e.latlng);
+      setSavedLocation(e.latlng);
+
+      // Auto-fill address fields from coordinates
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
+        );
+        const data = await res.json();
+        const addr = data.address || {};
+
+        // Build new values
+        const newFormData = {};
+        
+        if (addr.road || addr.street || addr.pedestrian) {
+          newFormData.street = addr.road || addr.street || addr.pedestrian;
+        }
+        if (addr.city || addr.town || addr.village || addr.municipality) {
+          newFormData.city = addr.city || addr.town || addr.village || addr.municipality;
+        }
+        if (addr.country) {
+          newFormData.country = addr.country;
+        }
+        if (addr.state || addr.county || addr.region) {
+          newFormData.region = addr.state || addr.county || addr.region;
+        }
+        if (addr.postcode) {
+          newFormData.postalCode = addr.postcode;
+        }
+
+        // Only update if we got at least some data
+        if (Object.keys(newFormData).length > 0) {
+          setNewAddress(prev => ({
+            ...prev,
+            ...newFormData
+          }));
+          showSnackbar('Address auto-filled from map!', 'success');
+        } else {
+          showSnackbar('Location saved, but could not auto-fill address', 'warning');
+        }
+      } catch (err) {
+        console.error('Error fetching address:', err);
+        showSnackbar('Location saved, but could not auto-fill address', 'warning');
       }
-    });
-    return null;
-  };
+    }
+  });
+  return null;
+};
 
   useEffect(() => {
   console.log("🛒 Checkout received customerAddresses:", customerAddresses);
@@ -255,7 +299,7 @@ const showSnackbar = (message, type = 'success') => {
   
   if (customerAddresses && customerAddresses.length > 0) {
     const formattedAddresses = customerAddresses
-      .filter(ca => ca.address?.isActive !== false) // Filter out inactive addresses
+      .filter(ca => ca.address?.isActive !== false)
       .map((ca, index) => {
         console.log(`🏠 Processing address ${index + 1}:`, ca);
         const formatted = {
@@ -265,6 +309,8 @@ const showSnackbar = (message, type = 'success') => {
           region: ca.address?.region || '',
           country: ca.address?.country || 'Bahrain',
           postalCode: ca.address?.postalCode || '',
+          latitude: ca.address?.latitude || null,
+          longitude: ca.address?.longitude || null,
           isActive: ca.address?.isActive !== false
         };
         console.log(`✅ Formatted address ${index + 1}:`, formatted);
@@ -387,27 +433,33 @@ const showSnackbar = (message, type = 'success') => {
       return;
     }
 
-    // ✅ NEW: Require coordinates when updating addresses
-    if (!savedLocation || !savedLocation.lat || !savedLocation.lng) {
-      setAddressError('Please pick a location on the map to enable delivery tracking');
-      showSnackbar('📍 Map location required for delivery addresses', 'warning');
-      return;
-    }
-
     setAddingAddress(true);
     setAddressError(null);
 
     try {
+      // Get existing address with coordinates
+      const existingAddress = addresses.find(a => a.id === addressId);
+      
+      // Use new coordinates if provided, otherwise keep existing ones
+      const latitude = savedLocation?.lat ?? existingAddress?.latitude ?? null;
+      const longitude = savedLocation?.lng ?? existingAddress?.longitude ?? null;
+      
+      console.log('🔄 Updating address with coordinates:', { latitude, longitude });
+      
       const updatedAddress = await updateAddress(addressId, {
         Street: newAddress.street,
         City: newAddress.city,
         Country: newAddress.country,
         Region: newAddress.region || null,
         PostalCode: newAddress.postalCode || null,
-        Latitude: savedLocation?.lat || null,
-        Longitude: savedLocation?.lng || null,
+        Latitude: latitude,
+        Longitude: longitude,
       });
 
+      // Get the coordinates that were used in the update
+      const finalLatitude = savedLocation?.lat ?? existingAddress?.latitude ?? null;
+      const finalLongitude = savedLocation?.lng ?? existingAddress?.longitude ?? null;
+      
       setAddresses(addresses.map(addr => 
         addr.id === addressId ? {
           id: addressId,
@@ -415,7 +467,10 @@ const showSnackbar = (message, type = 'success') => {
           city: newAddress.city,
           region: newAddress.region,
           country: newAddress.country,
-          postalCode: newAddress.postalCode
+          postalCode: newAddress.postalCode,
+          latitude: finalLatitude,
+          longitude: finalLongitude,
+          isActive: addr.isActive
         } : addr
       ));
 
@@ -434,17 +489,31 @@ const showSnackbar = (message, type = 'success') => {
     }
   };
 
-  const handleEditAddress = (address) => {
-    setEditingAddress(address);
-    setNewAddress({
-      street: address.street,
-      city: address.city,
-      region: address.region || '',
-      country: address.country,
-      postalCode: address.postalCode || ''
-    });
-    setShowAddressModal(true);
-  };
+const handleEditAddress = (address) => {
+  setEditingAddress(address);
+  setNewAddress({
+    street: address.street,
+    city: address.city,
+    region: address.region || '',
+    country: address.country,
+    postalCode: address.postalCode || ''
+  });
+  
+  // Load existing coordinates if they exist
+  if (address.latitude && address.longitude) {
+    const location = {
+      lat: parseFloat(address.latitude),
+      lng: parseFloat(address.longitude)
+    };
+    setSavedLocation(location);
+    setMapLocation(location);
+  } else {
+    setSavedLocation(null);
+    setMapLocation(null);
+  }
+  
+  setShowMapModal(true);
+}; 
 
  const handleDeleteAddress = async (addressId) => {
   const address = addresses.find(a => a.id === addressId);
@@ -477,40 +546,7 @@ const showSnackbar = (message, type = 'success') => {
   }
 };
 
-  const handleMapSave = async () => {
-    if (!mapLocation) {
-      showSnackbar('Please pick a location on the map', 'warning');
-      return;
-    }
 
-    try {
-      const { lat, lng } = mapLocation;
-
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
-      );
-      const data = await res.json();
-      const addr = data.address || {};
-
-      setNewAddress({
-        street: addr.road || newAddress.street || '',
-        city: addr.city || addr.town || addr.village || newAddress.city || '',
-        country: addr.country || newAddress.country || 'Bahrain',
-        region: addr.state || newAddress.region || '',
-        postalCode: addr.postcode || newAddress.postalCode || ''
-      });
-
-      setSavedLocation({ lat, lng });
-      setShowMapModal(false);
-      
-      showSnackbar('Location saved! Form fields have been auto-filled.', 'success');
-    } catch (err) {
-      console.error('Error fetching address:', err);
-      showSnackbar('Failed to fetch location details, but coordinates are saved.', 'warning');
-      setSavedLocation({ lat: mapLocation.lat, lng: mapLocation.lng });
-      setShowMapModal(false);
-    }
-  };
 
   // --- FLOW: Continue / Place Order (logic unchanged) ---
   const handleContinue = () => {
@@ -697,23 +733,31 @@ const handlePlaceOrder = async () => {
     const deliveryFee = fulfillmentType === 'Delivery' ? DELIVERY_FEE : 0;
     const totalAmount = subtotalAmount + deliveryFee;
 
-    const orderData = {
-      CustomerId: customerId,
-      SellerId: sellerId,
-      DeliveryAddressId: fulfillmentType === 'Delivery' ? parseInt(selectedAddress.id) : null,
-      PickupAddressId: pickupAddressId,
-      PaymentMethod: paymentMethod,
-      PaymentStatus: 'Pending',
-      FulfillmentType: fulfillmentType,
-      Status: 'Placed',
-      SubtotalAmount: subtotalAmount,
-      DeliveryFee: deliveryFee,
-      TotalAmount: totalAmount,
-      OrderNote: orderComments || null,
-      DeliveryNote: fulfillmentType === 'Delivery' ? (deliveryComments || null) : null,
-      CreatedAt: Date.now(),
-      UpdatedAt: Date.now()
-    };
+    // Prepare order items for single transaction
+const orderItems = localCart.map((cartItem, index) => ({
+  ProductVariantId: stockValidationItems[index].VariantId,
+  Qty: cartItem.quantity,
+  UnitPrice: cartItem.basePrice
+}));
+
+  const orderData = {
+    CustomerId: customerId,
+    SellerId: sellerId,
+    DeliveryAddressId: fulfillmentType === 'Delivery' ? parseInt(selectedAddress.id) : null,
+    PickupAddressId: pickupAddressId,
+    PaymentMethod: paymentMethod,
+    PaymentStatus: 'Pending',
+    FulfillmentType: fulfillmentType,
+    Status: 'Placed',
+    SubtotalAmount: subtotalAmount,
+    DeliveryFee: deliveryFee,
+    TotalAmount: totalAmount,
+    OrderNote: orderComments || null,
+    DeliveryNote: fulfillmentType === 'Delivery' ? (deliveryComments || null) : null,
+    OrderItems: orderItems, 
+    CreatedAt: Date.now(),
+    UpdatedAt: Date.now()
+  };
 
     // Step 5: Create order
     console.log('📝 Creating order:', orderData);
@@ -733,26 +777,6 @@ const handlePlaceOrder = async () => {
       throw new Error('Failed to create order. Please try again.');
     }
 
-    // Step 6: Create order items
-    try {
-      for (let i = 0; i < localCart.length; i++) {
-        const cartItem = localCart[i];
-        const variantId = stockValidationItems[i].VariantId;
-
-        await createOrderItem({
-          OrderId: createdOrder.id,
-          ProductVariantId: variantId,
-          Qty: cartItem.quantity,
-          UnitPrice: cartItem.basePrice
-        });
-      }
-      console.log('✅ Order items created');
-    } catch (itemError) {
-      console.error('❌ Order item creation failed:', itemError);
-      // Note: At this point, order exists but items failed
-      // You might want to handle this case specially
-      throw new Error('Order created but failed to add items. Please contact support.');
-    }
 
     // Step 7: Prepare complete order object
     const completeOrder = {
@@ -1509,7 +1533,14 @@ const handlePlaceOrder = async () => {
 
               <button
                 type="button"
-                onClick={() => setShowMapModal(true)}
+                onClick={() => {
+                  setShowMapModal(true);
+                  if (!editingAddress) {
+                    // Reset for new address
+                    setMapLocation(null);
+                    setSavedLocation(null);
+                  }
+                }}
                 className={`w-full px-4 py-3 rounded-xl font-bold flex items-center justify-center gap-2 ${
                   savedLocation 
                     ? 'bg-success-btn hover:bg-success-text text-white' 
@@ -1517,7 +1548,7 @@ const handlePlaceOrder = async () => {
                 }`}
               >
                 <MapPin size={20} weight="fill" />
-                {savedLocation ? '✓ Location Set' : '📍 Pick Location from Map (Required)'}
+                {savedLocation ? `✓ Location Set (${savedLocation.lat.toFixed(4)}, ${savedLocation.lng.toFixed(4)})` : '📍 Pick Location from Map (Required)'}
               </button>
 
               {!savedLocation && (
@@ -1620,56 +1651,141 @@ const handlePlaceOrder = async () => {
         </div>
       )}
 
-      {/* MAP MODAL (unchanged) */}
       {showMapModal && (
-        <div className="fixed inset-0 bg-black/70 z-[70] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden">
-            <div className="p-5 border-b border-grey-stroke flex justify-between items-center">
-              <h3 className="text-xl font-bold text-charcoal-600">Pick Location on Map</h3>
-              <button
-                onClick={() => setShowMapModal(false)}
-                className="p-2 hover:bg-grey-100 rounded-full"
-              >
-                <X size={20} weight="bold" />
-              </button>
+  <div className="fixed inset-0 bg-black/70 z-[70] flex items-center justify-center p-4">
+    <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden">
+      <div className="p-5 border-b border-grey-stroke flex justify-between items-center">
+        <h3 className="text-xl font-bold text-charcoal-600">Pick Location on Map</h3>
+        <button
+          onClick={() => {
+            setShowMapModal(false);
+            setMapLocation(null);
+          }}
+          className="p-2 hover:bg-grey-100 rounded-full"
+        >
+          <X size={20} weight="bold" />
+        </button>
+      </div>
+      <div className="h-80">
+        <MapContainer
+          center={savedLocation ? [savedLocation.lat, savedLocation.lng] : [26.0667, 50.5577]}
+          zoom={12}
+          style={{ height: '100%', width: '100%' }}
+        >
+          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <MapSelector />
+          {mapLocation && <Marker position={[mapLocation.lat, mapLocation.lng]} />}
+        </MapContainer>
+      </div>
+      <div className="p-5 space-y-4">
+        {mapLocation && (
+          <p className="text-sm text-charcoal-600 text-center">
+            📍 Location: {mapLocation.lat.toFixed(4)}, {mapLocation.lng.toFixed(4)}
+          </p>
+        )}
+
+        {/* Address Form Fields */}
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-charcoal-600 mb-1">
+              Street <span className="text-error-text">*</span>
+            </label>
+            <input
+              value={newAddress.street}
+              onChange={e => setNewAddress({ ...newAddress, street: e.target.value })}
+              placeholder="Enter street address"
+              className="w-full border-2 border-grey-stroke rounded-lg p-2.5 text-sm focus:border-sage-500 focus:outline-none"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-charcoal-600 mb-1">
+                City <span className="text-error-text">*</span>
+              </label>
+              <input
+                value={newAddress.city}
+                onChange={e => setNewAddress({ ...newAddress, city: e.target.value })}
+                placeholder="City"
+                className="w-full border-2 border-grey-stroke rounded-lg p-2.5 text-sm focus:border-sage-500 focus:outline-none"
+                required
+              />
             </div>
-            <div className="h-80">
-              <MapContainer
-                center={[26.0667, 50.5577]}
-                zoom={12}
-                style={{ height: '100%', width: '100%' }}
-              >
-                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                <MapSelector />
-                {mapLocation && <Marker position={[mapLocation.lat, mapLocation.lng]} />}
-              </MapContainer>
-            </div>
-            <div className="p-5 space-y-2">
-              {mapLocation && (
-                <p className="text-sm text-charcoal-600 text-center">
-                  📍 Location: {mapLocation.lat.toFixed(4)}, {mapLocation.lng.toFixed(4)}
-                </p>
-              )}
-              <div className="flex gap-3">
-                <button
-                  onClick={handleMapSave}
-                  disabled={!mapLocation}
-                  className="flex-1 bg-sage-500 text-white font-bold py-2.5 rounded-xl hover:bg-sage-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Save Location & Auto-Fill
-                </button>
-                <button
-                  onClick={() => setShowMapModal(false)}
-                  className="flex-1 bg-grey-300 text-charcoal-600 font-bold py-2.5 rounded-xl hover:bg-grey-400"
-                >
-                  Cancel
-                </button>
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-charcoal-600 mb-1">
+                Country <span className="text-error-text">*</span>
+              </label>
+              <input
+                value={newAddress.country}
+                onChange={e => setNewAddress({ ...newAddress, country: e.target.value })}
+                placeholder="Country"
+                className="w-full border-2 border-grey-stroke rounded-lg p-2.5 text-sm focus:border-sage-500 focus:outline-none"
+                required
+              />
             </div>
           </div>
-                
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-charcoal-600 mb-1">
+                Region (Optional)
+              </label>
+              <input
+                value={newAddress.region}
+                onChange={e => setNewAddress({ ...newAddress, region: e.target.value })}
+                placeholder="Region"
+                className="w-full border-2 border-grey-stroke rounded-lg p-2.5 text-sm focus:border-sage-500 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-charcoal-600 mb-1">
+                Postal Code (Optional)
+              </label>
+              <input
+                value={newAddress.postalCode}
+                onChange={e => setNewAddress({ ...newAddress, postalCode: e.target.value })}
+                placeholder="Postal Code"
+                className="w-full border-2 border-grey-stroke rounded-lg p-2.5 text-sm focus:border-sage-500 focus:outline-none"
+              />
+            </div>
+          </div>
         </div>
-      )}
+        
+        <div className="flex gap-3">
+          <button
+            onClick={() => {
+              if (!mapLocation || !savedLocation) {
+                showSnackbar('Please pick a location on the map', 'warning');
+                return;
+              }
+              if (!newAddress.street || !newAddress.city || !newAddress.country) {
+                showSnackbar('Please fill in all required fields', 'error');
+                return;
+              }
+              setShowMapModal(false);
+              setShowAddressModal(true);
+              showSnackbar('Location confirmed! Review and save address.', 'success');
+            }}
+            disabled={!mapLocation || !newAddress.street || !newAddress.city || !newAddress.country}
+            className="flex-1 bg-sage-500 text-white font-bold py-2.5 rounded-xl hover:bg-sage-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Confirm Address
+          </button>
+          <button
+            onClick={() => {
+              setShowMapModal(false);
+              setMapLocation(null);
+            }}
+            className="flex-1 bg-grey-300 text-charcoal-600 font-bold py-2.5 rounded-xl hover:bg-grey-400"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* Confirmation Modal */}
       <ConfirmModal

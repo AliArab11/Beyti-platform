@@ -76,6 +76,12 @@ const fetchAPI = async (endpoint, options = {}) => {
   }
 };
 
+const updateDriverOnlineStatus = async (driverId, isOnline) =>
+  fetchAPI(`/Drivers/${driverId}/online-status`, {
+    method: "PUT",
+    body: JSON.stringify(isOnline),
+  });
+
 const getDriverProfile = async (userProfileId) => 
   fetchAPI(`/Drivers/Profile/${userProfileId}`);
 
@@ -210,36 +216,44 @@ const OfferTimer = ({ job, onExpire, onAccept, onDecline }) => {
   const [timeLeft, setTimeLeft] = useState(null);
 
   useEffect(() => {
-    if (!job.offerExpiresAt) return;
+  if (!job.offerExpiresAt) return;
 
-    const calculateTimeLeft = () => {
-      const now = new Date();
-      const expiresRaw = job.offerExpiresAt;
-      const expiresStr = expiresRaw.endsWith('Z') ? expiresRaw : expiresRaw + 'Z';
-      const expires = new Date(expiresStr);
-      const diff = expires - now;
-      
-      if (diff <= 0) {
-        if (onExpire) onExpire(job.id);
-        return 0;
+  const calculateTimeLeft = () => {
+    const now = new Date();
+    const expiresRaw = job.offerExpiresAt;
+    const expires = new Date(expiresRaw);
+    const diff = expires - now;
+    
+    if (diff <= 0) {
+      if (onExpire) {
+        console.log('⏰ Timer expired for job:', job.id);
+        onExpire(job.id);
       }
-      
-      return Math.floor(diff / 1000);
-    };
+      return 0;
+    }
+    
+    return Math.floor(diff / 1000);
+  };
 
-    setTimeLeft(calculateTimeLeft());
+  const initialTime = calculateTimeLeft();
+  setTimeLeft(initialTime);
+  
+  // If already expired, trigger immediately
+  if (initialTime <= 0) {
+    return;
+  }
 
-    const interval = setInterval(() => {
-      const remaining = calculateTimeLeft();
-      setTimeLeft(remaining);
-      
-      if (remaining <= 0) {
-        clearInterval(interval);
-      }
-    }, 1000);
+  const interval = setInterval(() => {
+    const remaining = calculateTimeLeft();
+    setTimeLeft(remaining);
+    
+    if (remaining <= 0) {
+      clearInterval(interval);
+    }
+  }, 1000);
 
-    return () => clearInterval(interval);
-  }, [job.offerExpiresAt, job.id, onExpire]);
+  return () => clearInterval(interval);
+}, [job.offerExpiresAt, job.id, onExpire]);
 
   if (timeLeft === null || timeLeft <= 0) return null;
 
@@ -296,7 +310,7 @@ const DriverDashboard = () => {
   const [userProfileId, setUserProfileId] = useState(null);
   const [driverName, setDriverName] = useState("My Profile");
   const [driverList, setDriverList] = useState([]);
-  const [selectModalOpen, setSelectModalOpen] = useState(true);
+  const [selectModalOpen, setSelectModalOpen] = useState(false);
 
   // data
   const [tickets, setTickets] = useState([]);
@@ -307,8 +321,21 @@ const DriverDashboard = () => {
   const [selectedJob, setSelectedJob] = useState(null);
   const [jobModalOpen, setJobModalOpen] = useState(false);
 
-  // Online/Offline state
+
 const [isOnline, setIsOnline] = useState(true);
+
+// Load online status from database when driver is loaded
+useEffect(() => {
+  if (driverId && driverList.length > 0) {
+    const driver = driverList.find(d => d.id === driverId);
+    if (driver) {
+      // Convert Status to boolean: "Active" = true, anything else = false
+      const onlineStatus = driver.status === "Active";
+      console.log(`🟢 Loading driver ${driverId} online status from DB:`, onlineStatus, `(Status: ${driver.status})`);
+      setIsOnline(onlineStatus);
+    }
+  }
+}, [driverId, driverList]);
 
 // Map modal state
 const [viewMapModal, setViewMapModal] = useState({
@@ -322,6 +349,8 @@ const [notificationSearchQuery, setNotificationSearchQuery] = useState('');
 
 // Snackbar state
 const [snackbar, setSnackbar] = useState({ show: false, message: '', type: 'success' });
+
+const [forceUpdate, setForceUpdate] = useState(0);
 
 // SignalR connection
 const { startConnection, isConnected } = useSignalR();
@@ -379,10 +408,36 @@ const handleProfileUpdate = async (updates) => {
   useEffect(() => {
     const loadDrivers = async () => {
       try {
+        console.log('🔄 Loading drivers...');
         const data = await getDrivers();
         setDriverList(Array.isArray(data) ? data : []);
+        
+        // Load saved session AFTER drivers are loaded
+        const savedDriverId = sessionStorage.getItem('beyti_driver_driverId');
+        const savedDriverName = sessionStorage.getItem('beyti_driver_driverName');
+        const savedUserProfileId = sessionStorage.getItem('beyti_driver_userProfileId');
+        
+        console.log('🔍 Session data:', { savedDriverId, savedDriverName, savedUserProfileId });
+        
+        if (savedDriverId && savedDriverName && data.length > 0) {
+          const numericId = parseInt(savedDriverId, 10);
+          const savedDriver = data.find(d => d.id === numericId);
+          
+          if (savedDriver) {
+            console.log('✅ Restoring driver session:', savedDriverName);
+            // Set states in the correct order
+            setDriverId(numericId);
+            setDriverName(savedDriverName);
+            setUserProfileId(savedUserProfileId ? parseInt(savedUserProfileId, 10) : null);
+            setSelectModalOpen(false);
+          } else {
+            console.warn('⚠️ Saved driver not found in list');
+          }
+        } else {
+          console.log('ℹ️ No saved session or empty driver list');
+        }
       } catch (err) {
-        console.error("Failed to load drivers", err);
+        console.error("❌ Failed to load drivers:", err);
       }
     };
     loadDrivers();
@@ -440,6 +495,14 @@ useEffect(() => {
   //   }
   // };
 
+// Fetch tickets on initial load if driver is already selected
+useEffect(() => {
+  if (driverId && tickets.length === 0 && driverList.length > 0) {
+    console.log('🔄 Initial fetch for existing driver session');
+    fetchTickets(true); // Force fetch, bypass cooldown on initial load
+  }
+}, [driverList.length]); // Trigger when driver list finishes loading
+
   const handleAcceptJob = async (job) => {
     if (!driverId) return;
     
@@ -488,23 +551,37 @@ const handleDeclineJob = async (job) => {
 };
 
 const handleJobExpired = async (jobId) => {
-  // Remove expired job from local state
-  setTickets((prev) => prev.filter((t) => t.id !== jobId));
+  console.log('⏰ Job expired:', jobId);
   
-  // Close modal if it's open for this job
+  // IMMEDIATELY remove from local state for instant UI update
+  setTickets((prev) => {
+    const filtered = prev.filter((t) => t.id !== jobId);
+    console.log('🔄 Removed expired job, remaining tickets:', filtered.length);
+    return filtered;
+  });
+  
+  // Force re-render to update useMemo immediately
+  setForceUpdate(prev => prev + 1);
+  
+  // Close modal if open
   if (selectedJob && selectedJob.id === jobId) {
     setJobModalOpen(false);
     setSelectedJob(null);
   }
+  
+  // Force a refresh after a brief delay to sync with backend
+  setTimeout(() => {
+    fetchTickets();
+  }, 1000);
 };
 
-  // Fetch tickets (all) - filtered by driver in frontend
-const fetchTickets = async () => {
+// Fetch tickets (all) - filtered by driver in frontend
+const fetchTickets = async (force = false) => {
   const now = Date.now();
   const timeSinceLastRefresh = now - lastRefresh;
   
-  // Prevent refreshing more than once per 2 seconds
-  if (timeSinceLastRefresh < 2000) {
+  // Prevent refreshing more than once per 2 seconds (unless forced)
+  if (!force && timeSinceLastRefresh < 2000) {
     console.log('⚠️ Refresh cooldown active, please wait...');
     return;
   }
@@ -512,7 +589,9 @@ const fetchTickets = async () => {
   setLastRefresh(now);
   
   try {
+    console.log('🔄 Fetching delivery tickets...');
     const data = await getDeliveryTickets();
+    console.log('✅ Tickets fetched:', data?.length || 0);
     setTickets(Array.isArray(data) ? data : []);
     setError(null);
   } catch (err) {
@@ -521,12 +600,46 @@ const fetchTickets = async () => {
   }
 };
 
-  // Load tickets once when a driver is selected
+// Load tickets once when a driver is selected OR on mount if driver exists
   useEffect(() => {
     if (!driverId) return;
-    fetchTickets();
-    // DO NOT ADD ANYTHING ELSE
-  }, [driverId]);
+    console.log('🔄 Fetching tickets for driver:', driverId);
+    fetchTickets(true); // Force fetch, bypass cooldown on driver selection
+  }, [driverId]); // This will trigger when driverId is set from sessionStorage
+
+  // Periodic cleanup of expired jobs
+useEffect(() => {
+  if (!driverId) return;
+  
+  const cleanupInterval = setInterval(() => {
+    const now = new Date();
+    
+    setTickets((prev) => {
+      const cleaned = prev.filter(ticket => {
+        // Remove if offered to this driver but expired
+        if (ticket.status === "Offered" && 
+            ticket.currentOfferedDriverId === driverId && 
+            ticket.offerExpiresAt) {
+          const expires = new Date(ticket.offerExpiresAt);
+          if (expires <= now) {
+            console.log(`🧹 Cleaning up expired ticket ${ticket.id}`);
+            return false;
+          }
+        }
+        return true;
+      });
+      
+      // Force re-render if we removed anything
+      if (cleaned.length !== prev.length) {
+        setForceUpdate(u => u + 1);
+      }
+      
+      return cleaned;
+    });
+  }, 1000); // Check every second
+  
+  return () => clearInterval(cleanupInterval);
+}, [driverId]);
 
 const { metrics, availableJobs, currentJobs, historyJobs } = useMemo(() => {
 if (!tickets || tickets.length === 0) {
@@ -551,16 +664,30 @@ if (!tickets || tickets.length === 0) {
     };
   }
 
-  const availableJobs = tickets.filter(
-    (t) => {
-      // Only show tickets offered specifically to this driver
-      if (t.status === "Offered" && t.currentOfferedDriverId === driverId) {
-        return true;
+  const now = new Date(); // Calculate once outside filter
+
+const availableJobs = tickets.filter(
+  (t) => {
+    // Only show tickets offered specifically to this driver
+    if (t.status === "Offered" && t.currentOfferedDriverId === driverId) {
+      // Check if offer has expired - be aggressive with expiration
+      if (t.offerExpiresAt) {
+        const expires = new Date(t.offerExpiresAt);
+        const timeLeft = expires - now;
+        
+        // Don't show if expired OR expiring within 1 second
+        if (timeLeft <= 1000) {
+          console.log(`⏰ Filtering out expired/expiring job ${t.id}`);
+          return false;
+        }
       }
-      // Don't show pending tickets - they're being offered to other drivers
-      return false;
+      return true;
     }
-  );
+    // Don't show pending tickets - they're being offered to other drivers
+    return false;
+  }
+);
+
   const currentJobs = tickets.filter(
     (t) =>
       t.driverId === driverId &&
@@ -650,7 +777,7 @@ return {
     currentJobs,
     historyJobs,
   };
-}, [tickets, driverId]);
+}, [tickets, driverId, forceUpdate]);
 
 
 // -------------------------------------------------------------------
@@ -1372,10 +1499,21 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
               const id = parseInt(e.target.value, 10);
               if (!id) return;
               const selected = driverList.find((d) => d.id === id);
+              const userProfId = selected?.userProfileId;
+              
               setDriverName(selected?.fullName || "My Profile");
               setDriverId(id);
-              setUserProfileId(selected?.userProfileId); // ✅ ADD THIS LINE
+              setUserProfileId(userProfId);
+              
+              // Save to sessionStorage
+              sessionStorage.setItem('beyti_driver_driverId', id.toString());
+              sessionStorage.setItem('beyti_driver_driverName', selected?.fullName || "My Profile");
+              if (userProfId) {
+                sessionStorage.setItem('beyti_driver_userProfileId', userProfId.toString());
+              }
+              
               setSelectModalOpen(false);
+              console.log('Driver session saved:', selected?.fullName);
             }}
           >
             <option value="">-- Select Driver --</option>
@@ -1845,23 +1983,6 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
             Profile
           </NavigationButton>
         </nav>
-
-        <div className="border-t border-sage-700 p-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 flex-1 min-w-0">
-              <div className="w-10 h-10 rounded-full bg-sage-700 flex items-center justify-center flex-shrink-0">
-                <Icon.User size={20} weight="fill" className="text-cream-200" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-body-regular text-cream-200 truncate">{driverName}</p>
-                <p className="text-label-medium text-cream-100 truncate">Driver</p>
-              </div>
-            </div>
-            <button className="flex-shrink-0 p-1 hover:bg-sage-700 rounded transition-colors">
-              <Icon.CaretDown size={16} className="text-cream-200" />
-            </button>
-          </div>
-        </div>
       </aside>
 
       {/* Main content */}
@@ -1869,9 +1990,9 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
         <PageHeader
           title={getPageTitle()}
           notificationCount={isOnline ? metrics.available : 0}
-          userName={driverName}
+          userName={driverId ? driverName : null}
           userRole="Driver"
-          userProfile={{
+          userProfile={driverId ? {
             userProfileId: driverId,
             displayName: driverName,
             roleType: 'Driver',
@@ -1880,11 +2001,26 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
             address: driverList.find(d => d.id === driverId)?.address || '',
             createdAt: driverList.find(d => d.id === driverId)?.createdAt,
             updatedAt: Date.now()
-          }}
+          } : null}
           entityId={driverId}
           userId={userProfileId}
           onProfileClick={() => navigate('profile')}
           onProfileUpdate={handleProfileUpdate}
+          onUserMenuClick={() => {
+            if (!driverId) {
+              setSelectModalOpen(true);
+            }
+          }}
+          onLogout={() => {
+            sessionStorage.removeItem('beyti_driver_driverId');
+            sessionStorage.removeItem('beyti_driver_driverName');
+            sessionStorage.removeItem('beyti_driver_userProfileId');
+            setDriverId(null);
+            setDriverName("My Profile");
+            setUserProfileId(null);
+            setIsOnline(true);
+            console.log('Driver logged out');
+          }}
         />
 
         <main className="flex-1 p-6 lg:p-8">
@@ -1900,12 +2036,28 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
                         </span>
                     </div>
                     <button
-                        onClick={() => {
-                            if (isOnline && metrics.activeDelivery) {
-                                alert('⚠️ You cannot go offline while you have an active delivery. Please complete or cancel your current delivery first.');
-                                return;
-                            }
-                            setIsOnline(!isOnline);
+                        onClick={async () => {
+                          if (isOnline && metrics.activeDelivery) {
+                            alert('⚠️ You cannot go offline while you have an active delivery. Please complete or cancel your current delivery first.');
+                            return;
+                          }
+                          
+                          const newStatus = !isOnline;
+                          
+                          try {
+                            // Save to database
+                            await updateDriverOnlineStatus(driverId, newStatus);
+                            setIsOnline(newStatus);
+                            console.log(`✅ Driver ${driverId} status updated to:`, newStatus ? 'Active' : 'Inactive');
+                            
+                            // Update local driverList so it persists during session
+                            setDriverList(prev => prev.map(d => 
+                              d.id === driverId ? { ...d, status: newStatus ? "Active" : "Inactive" } : d
+                            ));
+                          } catch (err) {
+                            console.error('Failed to update online status:', err);
+                            alert('Failed to update online status');
+                          }
                         }}
                         disabled={isOnline && metrics.activeDelivery}
                         className={`px-4 py-1.5 rounded-lg font-semibold text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
@@ -2175,7 +2327,18 @@ const DeliveryDetailsModal = ({ job, onClose, onJobUpdated, onDecline }) => {
                                         </div>
                                       ) : (
                                         <div className="space-y-4">
-                                          {availableJobs.slice(0, 5).map(job => {
+                                          {availableJobs
+                                            .filter(job => {
+                                              // Filter out expired offers
+                                              if (job.offerExpiresAt) {
+                                                const now = new Date();
+                                                const expires = new Date(job.offerExpiresAt);
+                                                return expires > now;
+                                              }
+                                              return true;
+                                            })
+                                            .slice(0, 5)
+                                            .map(job => {
                                             const isOffered = job.status === "Offered" && job.currentOfferedDriverId === driverId;
                                             
                                             return (

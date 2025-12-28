@@ -40,7 +40,9 @@ const getCategories = async () => {
     const response = await fetch('https://localhost:7062/api/Categories');
     if (!response.ok) throw new Error('Failed to fetch categories');
     const data = await response.json();
-    return Array.isArray(data) ? data : [];
+    // Filter to only include active categories
+    const activeCategories = Array.isArray(data) ? data.filter(cat => cat.isActive === true) : [];
+    return activeCategories;
   } catch (error) {
     console.error('Error fetching categories:', error);
     return [];
@@ -53,7 +55,8 @@ const getAllSubCategories = async () => {
     const response = await fetch('https://localhost:7062/api/SubCategories');
     if (!response.ok) throw new Error('Failed to fetch subcategories');
     const data = await response.json();
-    return Array.isArray(data) ? data : [];
+    const activeCategories = Array.isArray(data) ? data.filter(cat => cat.isActive === true) : [];
+    return activeCategories;
   } catch (error) {
     console.error('Error fetching subcategories:', error);
     return [];
@@ -241,7 +244,7 @@ const SearchBar = ({ value, onChange }) => (
 const FeaturedCarousel = ({ stores, onStoreClick, subcategories = [], selectedCategory, favoriteStores = [], onToggleFavorite }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   
-  // Filter stores by selected category only (ignore subcategory filter)
+  // Filter stores by selected category and sort by popularity (completed orders in past week)
   const categoryFilteredStores = stores.filter(store => {
     // Filter out stores with no active products
     const hasActiveProducts = store.products && 
@@ -253,9 +256,26 @@ const FeaturedCarousel = ({ stores, onStoreClick, subcategories = [], selectedCa
     
     if (!selectedCategory) return true;
     return store.categoryId === selectedCategory;
+  })
+  .sort((a, b) => {
+    // Sort by number of completed orders in past week
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    
+    const aRecentOrders = (a.recentCompletedOrders || 0);
+    const bRecentOrders = (b.recentCompletedOrders || 0);
+    
+    if (aRecentOrders !== bRecentOrders) {
+      return bRecentOrders - aRecentOrders; // Most orders first
+    }
+    
+    // If same orders, sort by rating
+    const ratingA = a.averageRating || 0;
+    const ratingB = b.averageRating || 0;
+    return ratingB - ratingA;
   });
   
-  const featured = categoryFilteredStores.slice(0, 6);
+  const featured = categoryFilteredStores.slice(0, 5); // Changed from 6 to 5
 
   useEffect(() => {
     if (featured.length === 0) return;

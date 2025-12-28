@@ -40,6 +40,7 @@ namespace Beyti_Backend.Controllers.Api
                     fullName = d.UserProfile.DisplayName,
                     d.Phone,
                     d.Status,
+                    isOnline = d.Status == "Active",
                     d.CreatedAt
                 })
                 .ToListAsync();
@@ -66,7 +67,7 @@ namespace Beyti_Backend.Controllers.Api
                     // Bahrain land bounds (tight - avoids sea)
                     driver.CurrentLat = (decimal)(26.05 + random.NextDouble() * 0.20); // 26.05 to 26.25
                     driver.CurrentLng = (decimal)(50.45 + random.NextDouble() * 0.15); // 50.45 to 50.60
-                    driver.UpdatedAt = DateTime.UtcNow;
+                    driver.UpdatedAt = DateTime.Now;
 
                     await _context.SaveChangesAsync();
                 }
@@ -79,6 +80,7 @@ namespace Beyti_Backend.Controllers.Api
                     FullName = driver.UserProfile.DisplayName,
                     Phone = driver.Phone,
                     Status = driver.Status,
+                    IsOnline = driver.Status == "Active",
                     CreatedAt = driver.CreatedAt,
                     DisplayName = driver.UserProfile.DisplayName,
                     RoleType = driver.UserProfile.RoleType,
@@ -228,6 +230,29 @@ namespace Beyti_Backend.Controllers.Api
             _context.Drivers.Remove(driver);
             await _context.SaveChangesAsync();
             return NoContent();
+        }
+
+        // PUT: api/Drivers/5/online-status
+        [HttpPut("{id}/online-status")]
+        public async Task<IActionResult> UpdateOnlineStatus(int id, [FromBody] bool isOnline)
+        {
+            var driver = await _context.Drivers.FindAsync(id);
+
+            if (driver == null)
+                return NotFound();
+
+            // Map boolean to Status string
+            driver.Status = isOnline ? "Active" : "Inactive";
+            driver.UpdatedAt = DateTime.Now;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                id = driver.Id,
+                status = driver.Status,
+                isOnline = driver.Status == "Active"
+            });
         }
     }
 }

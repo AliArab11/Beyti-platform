@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { CaretUp, CaretDown } from '@phosphor-icons/react';
 import { SignalRProvider } from './contexts/SignalRContext';
-import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, NavLink, useNavigate } from 'react-router-dom';
 import RegistrationPage from "./Pages/Registration";
 import MembershipPage from "./Pages/Membership";
 import AddPlanPage from "./Pages/Membership/AddPlan";
@@ -47,8 +48,177 @@ import AdminView from './Beyti-Website/Admin/AdminView.jsx';
 import DashboardRouter from './components/DashboardRouter';
 import DriverDashboardPlaceholder from './Beyti-Website/Driver/DriverDashboardPlaceholder';
 import AccountSuspended from './Beyti-Website/Auth/AccountSuspended';
-
 import ProfilePage from './components/ProfilePage'
+
+// Wrapper to use useNavigate hook
+const BrowseAsDropdownWrapper = () => {
+  return <BrowseAsDropdown />;
+};
+
+// Browse As Dropdown Component
+const BrowseAsDropdown = () => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [currentRole, setCurrentRole] = useState(() => {
+    return localStorage.getItem('beyti_browse_role') || 'Customer';
+  });
+  const navigate = useNavigate();
+
+  const roles = [
+    { name: 'Customer', path: '/stores', icon: '🛍️' },
+    { name: 'Seller', path: '/seller-dashboard', icon: '🏪' },
+    { name: 'Driver', path: '/driver-dashboard', icon: '🚗' },
+    { name: 'Service Provider', path: '/serviceprovider-dashboard', icon: '🔧' },
+    { name: 'Admin', path: '/admin-view', icon: '👨‍💼' }
+  ];
+
+  const handleRoleSelect = (role) => {
+    setCurrentRole(role.name);
+    localStorage.setItem('beyti_browse_role', role.name);
+    setIsOpen(false);
+    navigate(role.path);
+  };
+
+  const getCurrentIcon = () => {
+    return roles.find(r => r.name === currentRole)?.icon || '🛍️';
+  };
+
+  return (
+    <div className="relative">
+      {/* Current Role Display Button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-3 px-6 py-3 bg-cream-50 hover:bg-cream-100 rounded-xl border border-grey-stroke transition-all"
+      >
+        <span className="text-sm text-charcoal-500 font-medium" style={{ fontFamily: 'Inter, sans-serif' }}>
+          Browsing as:
+        </span>
+        <span className="text-base font-bold text-sage-600" style={{ fontFamily: 'Inter, sans-serif' }}>
+          {getCurrentIcon()} {currentRole}
+        </span>
+        <svg 
+          className={`w-5 h-5 text-charcoal-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} 
+          fill="none" 
+          viewBox="0 0 24 24" 
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {/* Dropdown Menu */}
+      {isOpen && (
+        <>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 z-40" 
+            onClick={() => setIsOpen(false)}
+          />
+          
+          {/* Dropdown Content */}
+          <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-grey-stroke z-50 overflow-hidden">
+            <div className="p-3">
+              <p className="text-xs font-semibold text-charcoal-400 uppercase tracking-wide mb-2 px-3" style={{ fontFamily: 'Inter, sans-serif' }}>
+                Select Role
+              </p>
+              {roles.map((role) => (
+                <button
+                  key={role.name}
+                  onClick={() => handleRoleSelect(role)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                    currentRole === role.name
+                      ? 'bg-sage-100 text-sage-700'
+                      : 'hover:bg-cream-50 text-charcoal-600'
+                  }`}
+                >
+                  <span className="text-2xl">{role.icon}</span>
+                  <div className="flex-1 text-left">
+                    <p className="font-semibold text-sm" style={{ fontFamily: 'Inter, sans-serif' }}>
+                      {role.name}
+                    </p>
+                    <p className="text-xs text-charcoal-400" style={{ fontFamily: 'Inter, sans-serif' }}>
+                      {role.name === 'Customer' && 'Browse stores & services'}
+                      {role.name === 'Seller' && 'Manage your store'}
+                      {role.name === 'Driver' && 'View delivery orders'}
+                      {role.name === 'Service Provider' && 'Manage services'}
+                      {role.name === 'Admin' && 'Platform administration'}
+                    </p>
+                  </div>
+                  {currentRole === role.name && (
+                    <svg className="w-5 h-5 text-sage-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+// Navbar with Show/Hide Toggle
+const NavbarWithToggle = () => {
+  const [isVisible, setIsVisible] = useState(() => {
+    const saved = localStorage.getItem('beyti_navbar_visible');
+    return saved === null ? true : saved === 'true';
+  });
+
+  const toggleNavbar = () => {
+    const newState = !isVisible;
+    setIsVisible(newState);
+    localStorage.setItem('beyti_navbar_visible', newState.toString());
+  };
+
+  return (
+    <>
+      {isVisible ? (
+       <nav className="sticky top-0 z-50 border-b" style={{ backgroundColor: '#FAF7F2', borderColor: '#D4D4D4' }}>
+          <div className="max-w-5xl mx-auto px-8 py-2">
+            <div className="flex items-center justify-between">
+              {/* Logo/Brand */}
+              <div className="flex-shrink-0">
+                <h1 className="text-2xl font-bold text-sage-600" style={{ fontFamily: 'Merriweather, serif' }}>
+                  Beyti Platform
+                </h1>
+              </div>
+
+              <div className="flex items-center gap-4">
+                {/* Browse As Dropdown */}
+                <BrowseAsDropdownWrapper />
+              </div>
+            </div>
+          </div>
+
+          {/* Arrow Toggle Button - 35% from left */}
+          <div className="flex justify-start">
+            <button
+              onClick={toggleNavbar}
+              className="relative -mb-3 bg-white hover:bg-cream-50 p-2 rounded-full shadow-md transition-all border"
+              style={{ borderColor: '#D4D4D4', marginLeft: '35%' }}
+              title="Hide navbar"
+            >
+              <CaretUp size={20} weight="bold" className="text-sage-600" />
+            </button>
+          </div>
+        </nav>
+      ) : (
+        // Show Button (when navbar is hidden) - 35% from left
+        <div className="fixed top-0 z-50" style={{ left: '35%', transform: 'translateX(-50%)' }}>
+          <button
+            onClick={toggleNavbar}
+            className="mt-2 bg-white hover:bg-cream-50 p-2 rounded-full shadow-lg transition-all border"
+            style={{ borderColor: '#D4D4D4' }}
+            title="Show navbar"
+          >
+            <CaretDown size={20} weight="bold" className="text-sage-600" />
+          </button>
+        </div>
+      )}
+    </>
+  );
+};
 
 // Placeholder components for pages that don't exist yet
 const PlaceholderPage = ({ pageName }) => (
@@ -94,107 +264,40 @@ const ProfilePageWrapper = () => {
 };
 
 export default function App() {
- const navItems = [
-    // { path: '/', label: 'Registration' },
-    { path: '/login', label: 'Login' },
-    { path: '/register', label: 'Sign Up' },
-    // { path: '/membership', label: 'Membership' },
-    // { path: '/addplan', label: 'Add Plan' },
-    // { path: '/seller', label: 'Seller' },
-    { path: '/seller-dashboard', label: 'Seller Dashboard' },
-    { path: '/stores', label: 'Home Page' },
-    { path: '/mainStore', label: 'Seller Stores' },
-    { path: '/serviceProviders', label: 'Service Providers' },
-    // { path: '/product', label: 'Product' },
-    // { path: '/category', label: 'Category' },
-    // { path: '/customer', label: 'Customer' },
-    // { path: '/driver', label: 'Driver' },
-    { path: '/driver-dashboard', label: 'Driver Dashboard' },
-    // { path: '/admin', label: 'Admin' },
-    // { path: '/serviceprovider', label: 'Service Provider' },
-    { path: '/serviceprovider-dashboard', label: 'SP Dashboard' },
-    { path: '/admin-view', label: 'Admin Dashboard' },
-    // { path: '/notification', label: 'Notification' },
-    // { path: '/admindashboard', label: 'Admin Dash (Old)'},
-    // { path: '/servicerequest', label: 'Service Request'},
-    // { path: '/design-demo', label: 'Design Demo'},
-    // { path: '/dashboard-template', label: 'Dashboard Template'},
-    // { path: '/user-management', label: 'User Management (New)'}
-  ];
+//  const navItems = [
+//     // { path: '/', label: 'Registration' },
+//     { path: '/login', label: 'Login' },
+//     { path: '/register', label: 'Sign Up' },
+//     // { path: '/membership', label: 'Membership' },
+//     // { path: '/addplan', label: 'Add Plan' },
+//     // { path: '/seller', label: 'Seller' },
+//     { path: '/seller-dashboard', label: 'Seller Dashboard' },
+//     { path: '/stores', label: 'Home Page' },
+//     { path: '/mainStore', label: 'Seller Stores' },
+//     { path: '/serviceProviders', label: 'Service Providers' },
+//     // { path: '/product', label: 'Product' },
+//     // { path: '/category', label: 'Category' },
+//     // { path: '/customer', label: 'Customer' },
+//     // { path: '/driver', label: 'Driver' },
+//     { path: '/driver-dashboard', label: 'Driver Dashboard' },
+//     // { path: '/admin', label: 'Admin' },
+//     // { path: '/serviceprovider', label: 'Service Provider' },
+//     { path: '/serviceprovider-dashboard', label: 'SP Dashboard' },
+//     { path: '/admin-view', label: 'Admin Dashboard' },
+//     // { path: '/notification', label: 'Notification' },
+//     // { path: '/admindashboard', label: 'Admin Dash (Old)'},
+//     // { path: '/servicerequest', label: 'Service Request'},
+//     // { path: '/design-demo', label: 'Design Demo'},
+//     // { path: '/dashboard-template', label: 'Dashboard Template'},
+//     // { path: '/user-management', label: 'User Management (New)'}
+//   ];
   return (
     <ThemeProvider>
       <SignalRProvider>
         <BrowserRouter>
           <div className="min-h-screen bg-gray-50">
-            {/* Navigation Bar */}
-            <nav className="bg-white shadow-md sticky top-0 z-50">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center justify-between h-16">
-                  {/* Logo/Brand */}
-                  <div className="flex-shrink-0">
-                    <h1 className="text-2xl font-bold text-blue-600">Beyti Platform</h1>
-                  </div>
-
-                  {/* Navigation Items */}
-                  <div className="hidden md:flex items-center space-x-1">
-                    {navItems.map((item) => (
-                      <NavLink
-                        key={item.path}
-                        to={item.path}
-                        className={({ isActive }) =>
-                          `px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                            isActive
-                              ? 'bg-blue-600 text-white shadow-md'
-                              : 'text-gray-700 hover:bg-gray-100 hover:text-blue-600'
-                          }`
-                        }
-                      >
-                        {item.label}
-                      </NavLink>
-                    ))}
-                  </div>
-
-                  {/* Mobile Menu Button */}
-                  <div className="md:hidden">
-                    <button
-                      onClick={() => {
-                        const menu = document.getElementById('mobile-menu');
-                        menu.classList.toggle('hidden');
-                      }}
-                      className="text-gray-700 hover:text-blue-600 focus:outline-none"
-                    >
-                      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Mobile Menu */}
-              <div id="mobile-menu" className="hidden md:hidden bg-white border-t border-gray-200">
-                <div className="px-2 pt-2 pb-3 space-y-1">
-                  {navItems.map((item) => (
-                    <NavLink
-                      key={item.path}
-                      to={item.path}
-                      onClick={() => {
-                        document.getElementById('mobile-menu').classList.add('hidden');
-                      }}
-                      className={({ isActive }) =>
-                        `block w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                          isActive
-                            ? 'bg-blue-600 text-white'
-                            : 'text-gray-700 hover:bg-gray-100 hover:text-blue-600'
-                        }`
-                      }
-                    >
-                      {item.label}
-                    </NavLink>
-                  ))}
-                </div>
-              </div>
-            </nav>
+           {/* Navigation Bar */}
+            <NavbarWithToggle />
 
             {/* Page Content */}
             <main>

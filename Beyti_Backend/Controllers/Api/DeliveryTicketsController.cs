@@ -127,7 +127,7 @@ namespace Beyti_Backend.Controllers.Api
                     ticket.Status = "Cancelled";
                     ticket.CurrentOfferedDriverId = null;
                     ticket.OfferExpiresAt = null;
-                    ticket.UpdatedAt = DateTime.UtcNow;
+                    ticket.UpdatedAt = DateTime.Now;
 
                     // Also update the associated order - DON'T RESTORE STOCK (already done by AutoCancelExpiredOrders)
                     var order = await _context.Orders
@@ -139,7 +139,7 @@ namespace Beyti_Backend.Controllers.Api
                         if (order.Status?.ToLower() != "cancelled")
                         {
                             order.Status = "Cancelled";
-                            order.UpdatedAt = DateTime.UtcNow;
+                            order.UpdatedAt = DateTime.Now;
 
                             // Only restore stock if this is a NEW cancellation (not already cancelled by auto-expire)
                             var orderItems = await _context.OrderItems
@@ -152,7 +152,7 @@ namespace Beyti_Backend.Controllers.Api
                                 if (item.ProductVariant != null)
                                 {
                                     item.ProductVariant.StockQty += item.Qty;
-                                    item.ProductVariant.UpdatedAt = DateTime.UtcNow;
+                                    item.ProductVariant.UpdatedAt = DateTime.Now;
                                     Console.WriteLine($"📦 Restored {item.Qty} units of product variant {item.ProductVariantId}");
                                 }
                             }
@@ -169,9 +169,9 @@ namespace Beyti_Backend.Controllers.Api
 
                 // Offer to next closest driver
                 ticket.CurrentOfferedDriverId = nextDriver.Driver.Id;
-                ticket.OfferExpiresAt = DateTime.UtcNow.AddSeconds(45);
+                ticket.OfferExpiresAt = DateTime.Now.AddSeconds(45);
                 ticket.Status = "Offered";
-                ticket.UpdatedAt = DateTime.UtcNow;
+                ticket.UpdatedAt = DateTime.Now;
 
                 // Track this driver in memory
                 if (!_ticketOfferedDrivers.ContainsKey(ticketId))
@@ -202,7 +202,7 @@ namespace Beyti_Backend.Controllers.Api
                         .ThenInclude(oi => oi.ProductVariant)
                 .Where(dt => dt.Status == "Offered"
                           && dt.OfferExpiresAt.HasValue
-                          && dt.OfferExpiresAt < DateTime.UtcNow)
+                          && dt.OfferExpiresAt < DateTime.Now)
                 .ToListAsync();
 
             foreach (var ticket in expiredTickets)
@@ -225,7 +225,7 @@ namespace Beyti_Backend.Controllers.Api
                 // Clear expired offer immediately
                 ticket.CurrentOfferedDriverId = null;
                 ticket.OfferExpiresAt = null;
-                ticket.UpdatedAt = DateTime.UtcNow;
+                ticket.UpdatedAt = DateTime.Now;
                 await _context.SaveChangesAsync();
 
                 // Try next driver
@@ -235,7 +235,7 @@ namespace Beyti_Backend.Controllers.Api
                 {
                     // No drivers left - cancel ticket
                     ticket.Status = "Cancelled";
-                    ticket.UpdatedAt = DateTime.UtcNow;
+                    ticket.UpdatedAt = DateTime.Now;
 
                     if (ticket.Order != null)
                     {
@@ -243,7 +243,7 @@ namespace Beyti_Backend.Controllers.Api
                         if (ticket.Order.Status?.ToLower() != "cancelled")
                         {
                             ticket.Order.Status = "Cancelled";
-                            ticket.Order.UpdatedAt = DateTime.UtcNow;
+                            ticket.Order.UpdatedAt = DateTime.Now;
 
                             // RESTORE STOCK only if this is a NEW cancellation
                             foreach (var item in ticket.Order.OrderItems)
@@ -251,7 +251,7 @@ namespace Beyti_Backend.Controllers.Api
                                 if (item.ProductVariant != null)
                                 {
                                     item.ProductVariant.StockQty += item.Qty;
-                                    item.ProductVariant.UpdatedAt = DateTime.UtcNow;
+                                    item.ProductVariant.UpdatedAt = DateTime.Now;
                                     Console.WriteLine($"📦 Restored {item.Qty} units of product variant {item.ProductVariantId}");
                                 }
                             }
@@ -481,7 +481,7 @@ namespace Beyti_Backend.Controllers.Api
                     return NotFound();
 
                 // Check if offer expired
-                if (ticket.OfferExpiresAt.HasValue && ticket.OfferExpiresAt < DateTime.UtcNow)
+                if (ticket.OfferExpiresAt.HasValue && ticket.OfferExpiresAt < DateTime.Now)
                 {
                     await OfferToNextClosestDriver(id);
                     return BadRequest("Offer has expired");
@@ -528,7 +528,7 @@ namespace Beyti_Backend.Controllers.Api
                     return NotFound();
 
                 // Check if offer already expired
-                if (ticket.OfferExpiresAt.HasValue && ticket.OfferExpiresAt < DateTime.UtcNow)
+                if (ticket.OfferExpiresAt.HasValue && ticket.OfferExpiresAt < DateTime.Now)
                 {
                     return BadRequest("Offer has already expired");
                 }
@@ -550,7 +550,7 @@ namespace Beyti_Backend.Controllers.Api
                 // Clear current offer immediately
                 ticket.CurrentOfferedDriverId = null;
                 ticket.OfferExpiresAt = null;
-                ticket.UpdatedAt = DateTime.UtcNow;
+                ticket.UpdatedAt = DateTime.Now;
 
                 // Save immediately to prevent re-offering to same driver
                 await _context.SaveChangesAsync();
@@ -562,7 +562,7 @@ namespace Beyti_Backend.Controllers.Api
                 {
                     // No more drivers available - cancel ticket AND order AND restore stock
                     ticket.Status = "Cancelled";
-                    ticket.UpdatedAt = DateTime.UtcNow;
+                    ticket.UpdatedAt = DateTime.Now;
 
                     // Update order status
                     if (ticket.Order != null)
@@ -571,7 +571,7 @@ namespace Beyti_Backend.Controllers.Api
                         if (ticket.Order.Status?.ToLower() != "cancelled")
                         {
                             ticket.Order.Status = "Cancelled";
-                            ticket.Order.UpdatedAt = DateTime.UtcNow;
+                            ticket.Order.UpdatedAt = DateTime.Now;
 
                             // RESTORE STOCK
                             foreach (var item in ticket.Order.OrderItems)
@@ -579,7 +579,7 @@ namespace Beyti_Backend.Controllers.Api
                                 if (item.ProductVariant != null)
                                 {
                                     item.ProductVariant.StockQty += item.Qty;
-                                    item.ProductVariant.UpdatedAt = DateTime.UtcNow;
+                                    item.ProductVariant.UpdatedAt = DateTime.Now;
                                     Console.WriteLine($"📦 Restored {item.Qty} units of product variant {item.ProductVariantId}");
                                 }
                             }

@@ -43,46 +43,56 @@ const OrderDetails = ({ order, onClose }) => {
 
   // Fetch tracking data
   const fetchTracking = async () => {
-    if (!order?.id) return;
+  if (!order?.id) {
+    console.log('⚠️ No order ID, skipping tracking fetch');
+    return;
+  }
+  
+  try {
+    console.log(`🔍 Fetching tracking for order ${order.id}...`);
+    const response = await fetch(`https://localhost:7062/api/Orders/${order.id}/tracking`);
+    const data = await response.json();
+    console.log('📡 Tracking data received:', data);
+    setTracking(data);
     
-    try {
-      const response = await fetch(`https://localhost:7062/api/Orders/${order.id}/tracking`);
-      const data = await response.json();
-      setTracking(data);
-      
-      // Stop polling if order is delivered or cancelled
-      if (data.status === 'Delivered' || data.status === 'Cancelled') {
-        if (trackingIntervalRef.current) {
-          clearInterval(trackingIntervalRef.current);
-          trackingIntervalRef.current = null;
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching tracking:', error);
-    }
-  };
-
-  useEffect(() => {
-    if (order) {
-      console.log('📦 OrderDetails useEffect - order:', order);
-      console.log('🔄 OrderDetails received updated order status:', order.status);
-
-      // Start tracking if delivery order
-      if (order.fulfillmentType === 'Delivery') {
-        fetchTracking(); // Initial fetch
-
-        // Poll every 10 seconds
-        trackingIntervalRef.current = setInterval(fetchTracking, 10000);
-      }
-    }
-
-    // Cleanup on unmount
-    return () => {
+    // Stop polling if order is delivered or cancelled
+    if (data.status === 'Delivered' || data.status === 'Cancelled') {
+      console.log('🛑 Order completed, stopping tracking');
       if (trackingIntervalRef.current) {
         clearInterval(trackingIntervalRef.current);
+        trackingIntervalRef.current = null;
       }
-    };
-  }, [order]);
+    }
+  } catch (error) {
+    console.error('❌ Error fetching tracking:', error);
+  }
+};
+
+useEffect(() => {
+  if (order) {
+    console.log('📦 OrderDetails useEffect - order:', order);
+    console.log('🔄 OrderDetails received updated order status:', order.status);
+
+    // Start tracking if delivery order AND status is "Picked Up" or "Out for Delivery"
+    const trackingStatuses = ['Picked Up', 'Out for Delivery'];
+    if (order.fulfillmentType === 'Delivery' && trackingStatuses.includes(order.status)) {
+      console.log('✅ Starting tracking polling for order', order.id);
+      fetchTracking(); // Initial fetch
+
+      // Poll every 10 seconds
+      trackingIntervalRef.current = setInterval(fetchTracking, 10000);
+    }
+  }
+
+  // Cleanup on unmount
+  return () => {
+    if (trackingIntervalRef.current) {
+      console.log('🛑 Cleaning up tracking interval');
+      clearInterval(trackingIntervalRef.current);
+      trackingIntervalRef.current = null;
+    }
+  };
+}, [order, order?.status]); // Add order.status as dependency
 
   if (!order) {
     console.log('⚠️ No order provided to OrderDetails');

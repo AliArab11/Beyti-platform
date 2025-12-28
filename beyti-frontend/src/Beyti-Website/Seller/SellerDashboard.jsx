@@ -546,7 +546,7 @@ const getPageTitle = () => {
   const loggedInUserId = sellerUserProfileId || getUserId();
 
   const [sellerList, setSellerList] = useState([]);
-  const [selectModalOpen, setSelectModalOpen] = useState(true);
+  const [selectModalOpen, setSelectModalOpen] = useState(false);
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -831,6 +831,24 @@ useEffect(() => {
       const data = await getSellers();
       console.log('📦 Loaded sellers:', data);
       setSellerList(Array.isArray(data) ? data : []);
+      
+      // Load saved session AFTER sellers are loaded
+      const savedSellerId = sessionStorage.getItem('beyti_seller_sellerId');
+      const savedSellerName = sessionStorage.getItem('beyti_seller_sellerName');
+      const savedUserProfileId = sessionStorage.getItem('beyti_seller_userProfileId');
+      
+      if (savedSellerId && savedSellerName && data.length > 0) {
+        const numericId = parseInt(savedSellerId, 10);
+        const savedSeller = data.find(s => s.id === numericId);
+        
+        if (savedSeller) {
+          setSellerId(numericId);
+          setSellerName(savedSellerName);
+          setSellerUserProfileId(savedUserProfileId ? parseInt(savedUserProfileId, 10) : null);
+          setSelectModalOpen(false);
+          console.log('Restored seller session:', savedSellerName);
+        }
+      }
     } catch (err) {
       console.error("Failed to load sellers", err);
     }
@@ -1071,13 +1089,24 @@ const productsArr = Array.from(productMap.values()).sort(
               if (id) {
                 const numericId = parseInt(id, 10);
                 const selected = sellerList.find((s) => s.id === numericId);
+                const userProfId = selected?.userProfileId || selected?.UserProfileId || null;
+                
                 console.log('🔍 Selected seller:', selected);
-                console.log('🔍 Selected seller UserProfileId:', selected?.userProfileId || selected?.UserProfileId);
+                console.log('🔍 Selected seller UserProfileId:', userProfId);
+                
                 setSellerName(selected?.storeName || "My Store");
                 setSellerId(numericId);
-                // Set the UserProfileId for notifications
-                setSellerUserProfileId(selected?.userProfileId || selected?.UserProfileId || null);
+                setSellerUserProfileId(userProfId);
+                
+                // Save to sessionStorage
+                sessionStorage.setItem('beyti_seller_sellerId', numericId.toString());
+                sessionStorage.setItem('beyti_seller_sellerName', selected?.storeName || "My Store");
+                if (userProfId) {
+                  sessionStorage.setItem('beyti_seller_userProfileId', userProfId.toString());
+                }
+                
                 setSelectModalOpen(false);
+                console.log('Seller session saved:', selected?.storeName);
               }
             }}
           >
@@ -1242,59 +1271,57 @@ const productsArr = Array.from(productMap.values()).sort(
             Profile
           </NavigationButton>
         </nav>
-
-        <div className="border-t border-sage-700 p-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 flex-1 min-w-0">
-              <div className="w-10 h-10 rounded-full bg-sage-700 flex items-center justify-center flex-shrink-0">
-                <Icon.User size={20} weight="fill" className="text-cream-200" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-body-regular text-cream-200 truncate">{sellerName}</p>
-                <p className="text-label-medium text-cream-100 truncate">Seller</p>
-              </div>
-            </div>
-            <button className="flex-shrink-0 p-1 hover:bg-sage-700 rounded transition-colors">
-              <Icon.CaretDown size={16} className="text-cream-200" />
-            </button>
-          </div>
-        </div>
       </aside>
 
       {/* Main content */}
       <div className="flex-1 ml-64 flex flex-col">
         <div className="border-b border-grey-stroke bg-grey-200">
          <PageHeader
-          title={getPageTitle()}
-          userName={sellerName}
-          userRole="Seller"
-          userProfile={{
-            userProfileId: sellerId,
-            displayName: sellerName,
-            roleType: 'Seller',
-            status: 'Active',
-            phone: sellerList.find(s => s.id === sellerId)?.phone || '',
-            address: sellerList.find(s => s.id === sellerId)?.address || '',
-            createdAt: sellerList.find(s => s.id === sellerId)?.createdAt,
-            updatedAt: new Date().toISOString()
-          }}
-          entityId={sellerId}
-          userId={loggedInUserId}
-          onProfileClick={() => navigate('profile')}
-          onProfileUpdate={async (updates) => {
-            try {
-              console.log('Profile updates:', updates);
-              const sellers = await getSellers();
-              const updatedSeller = sellers.find(s => s.id === sellerId);
-              if (updatedSeller) {
-                setSellerName(updatedSeller.storeName || sellerName);
+            title={getPageTitle()}
+            userName={sellerId ? sellerName : null}
+            userRole="Seller"
+            userProfile={sellerId ? {
+              userProfileId: sellerId,
+              displayName: sellerName,
+              roleType: 'Seller',
+              status: 'Active',
+              phone: sellerList.find(s => s.id === sellerId)?.phone || '',
+              address: sellerList.find(s => s.id === sellerId)?.address || '',
+              createdAt: sellerList.find(s => s.id === sellerId)?.createdAt,
+              updatedAt: new Date().toISOString()
+            } : null}
+            entityId={sellerId}
+            userId={loggedInUserId}
+            onProfileClick={() => navigate('profile')}
+            onProfileUpdate={async (updates) => {
+              try {
+                console.log('Profile updates:', updates);
+                const sellers = await getSellers();
+                const updatedSeller = sellers.find(s => s.id === sellerId);
+                if (updatedSeller) {
+                  setSellerName(updatedSeller.storeName || sellerName);
+                  sessionStorage.setItem('beyti_seller_sellerName', updatedSeller.storeName || sellerName);
+                }
+              } catch (error) {
+                console.error('Error updating profile:', error);
+                throw error;
               }
-            } catch (error) {
-              console.error('Error updating profile:', error);
-              throw error;
-            }
-          }}
-        />
+            }}
+            onUserMenuClick={() => {
+              if (!sellerId) {
+                setSelectModalOpen(true);
+              }
+            }}
+            onLogout={() => {
+              sessionStorage.removeItem('beyti_seller_sellerId');
+              sessionStorage.removeItem('beyti_seller_sellerName');
+              sessionStorage.removeItem('beyti_seller_userProfileId');
+              setSellerId(null);
+              setSellerName("My Store");
+              setSellerUserProfileId(null);
+              console.log('Seller logged out');
+            }}
+          />
         
         </div>
 
@@ -1411,13 +1438,7 @@ const productsArr = Array.from(productMap.values()).sort(
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={searchRecent}
-                          onChange={(e) => setSearchRecent(e.target.value)}
-                          placeholder="Search orders..."
-                          className="hidden md:block w-56 px-3 py-2 rounded-lg border border-grey-stroke bg-cream-50 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400"
-                        />
+                        
                         <button
                             type="button"
                             className="text-sm font-medium text-sage-600 hover:text-sage-700 underline cursor-pointer"
