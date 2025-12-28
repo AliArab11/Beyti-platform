@@ -524,7 +524,7 @@ export const BannerThemeModal = ({
           </div>
         </div>
 
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-10">
           {/* Live Preview */}
           <div>
             <h4 className="text-lg font-semibold text-charcoal-600 dark:text-white mb-3">Live Preview</h4>

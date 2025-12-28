@@ -70,16 +70,16 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Add NotificationService
+//  NotificationService
 builder.Services.AddScoped<INotificationService, NotificationService>();
 
-// Add AuditLogService
+// AuditLogService
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 
-// Add SignalRService
+//  SignalRService
 builder.Services.AddScoped<ISignalRService, SignalRService>();
 
-// Add SignalR
+//  SignalR
 builder.Services.AddSignalR();
 
 builder.Services.AddCors(options =>

@@ -60,9 +60,6 @@ const getAllSubCategories = async () => {
   }
 };
 
-// Mock getSellers function
-
-// Mock getSellers function
 const getSellers = async () => {
   try {
     const response = await fetch('https://localhost:7062/api/Sellers');
@@ -1183,7 +1180,7 @@ const handleTrackOrder = () => {
 
 const toggleFavorite = async (sellerId) => {
   if (!customerId) {
-    showSnackbar('Please select a customer account to save favorites', 'warning');
+    showSnackbar('Please login to save favorites', 'warning');
     return;
   }
 
@@ -1241,13 +1238,12 @@ const getActiveFilterCount = () => {
 };
 
   
-// Function to handle store navigation - ALWAYS allow browsing
+// Navigate from store list to individual store page
 const handleStoreNavigation = (targetStoreId) => {
-  // Always allow navigation to browse stores
   navigate(`/store/${targetStoreId}`, { 
     state: { customerId, customerName } 
   });
-};
+}
 
 
 const filteredStores = stores

@@ -2265,7 +2265,7 @@ const historyFilteredData = useMemo(() => {
           {showClearCartModal && pendingReorderItems && (
             <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-grey-stroke">
-                <h3 className="text-xl font-bold text-charcoal-600 mb-4">Different Store Detected</h3>
+                <h3 className="text-xl font-bold text-charcoal-600 mb-4">Re-Order</h3>
                 <p className="text-body-regular text-charcoal-500 mb-6">
                   {cart.length > 0 
                     ? "You have items in your cart. Would you like to clear your current cart and reorder these items instead?"
