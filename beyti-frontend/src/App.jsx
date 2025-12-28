@@ -302,7 +302,7 @@ export default function App() {
             {/* Page Content */}
             <main>
               <Routes>
-                <Route path="/" element={<RegistrationPage />} />
+                <Route path="/" element={<HomePage />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/role-selection" element={<RoleSelect />} />
