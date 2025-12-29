@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
 import Select from '../../components/Select';
 import MembershipSelection from './components/MembershipSelection';
 import { validateRequired, validatePhone } from '../../utils/validation';
+import { getCategories, createUserMembership } from '../../services/api';
 
 /**
  * Seller Onboarding Wizard
@@ -23,8 +24,8 @@ export default function SellerOnboarding() {
   const [formData, setFormData] = useState({
     // Step 1: Identity
     storeName: '',
-    category: '',
-    phone: '',
+    categoryId: '',
+    phone: localStorage.getItem('userPhone') || '',
     // Step 2: Location
     city: '',
     block: '',
@@ -39,20 +40,27 @@ export default function SellerOnboarding() {
 
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
 
-  // Category options for sellers
-  const categories = [
-    { value: 'electronics', label: 'Electronics' },
-    { value: 'fashion', label: 'Fashion & Clothing' },
-    { value: 'home', label: 'Home & Garden' },
-    { value: 'sports', label: 'Sports & Outdoors' },
-    { value: 'books', label: 'Books & Media' },
-    { value: 'food', label: 'Food & Beverages' },
-    { value: 'beauty', label: 'Beauty & Personal Care' },
-    { value: 'toys', label: 'Toys & Games' },
-    { value: 'automotive', label: 'Automotive' },
-    { value: 'other', label: 'Other' }
-  ];
+  // Fetch categories from backend
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const cats = await getCategories();
+        setCategories(cats.map(cat => ({
+          value: cat.id,
+          label: cat.name
+        })));
+      } catch (error) {
+        console.error('Failed to load categories:', error);
+        setErrors(prev => ({ ...prev, form: 'Failed to load categories. Please refresh the page.' }));
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   /**
    * Update form field
@@ -76,8 +84,8 @@ export default function SellerOnboarding() {
       if (!validateRequired(formData.storeName)) {
         newErrors.storeName = 'Store name is required';
       }
-      if (!validateRequired(formData.category)) {
-        newErrors.category = 'Please select a category';
+      if (!validateRequired(formData.categoryId)) {
+        newErrors.categoryId = 'Please select a category';
       }
       if (!validateRequired(formData.phone)) {
         newErrors.phone = 'Phone number is required';
@@ -98,11 +106,8 @@ export default function SellerOnboarding() {
       if (!formData.isVerified) {
         newErrors.verification = 'Please complete the verification step';
       }
-    } else if (step === 4) {
-      if (!formData.selectedPlan) {
-        newErrors.membership = 'Please select a membership plan';
-      }
     }
+    // Step 4: Membership is now optional - no validation needed
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -148,17 +153,29 @@ export default function SellerOnboarding() {
    * Submit seller registration
    */
   const handleSubmit = async () => {
-    if (!validateStep(4)) {
-      return;
-    }
+    // No validation needed for step 4 since membership is optional
 
     setIsLoading(true);
 
     try {
       // Get stored user data from registration
       const userId = localStorage.getItem('userId');
+      const userProfileId = localStorage.getItem('userProfileId');
       const userEmail = localStorage.getItem('userEmail');
       const userPhone = localStorage.getItem('userPhone');
+
+      console.log('[SellerOnboarding] userId from localStorage:', userId);
+      console.log('[SellerOnboarding] All localStorage:', {
+        userId,
+        userProfileId,
+        userEmail,
+        userPhone,
+        authToken: localStorage.getItem('authToken')
+      });
+
+      if (!userId || !userProfileId) {
+        throw new Error('User ID not found. Please register or login first before completing onboarding.');
+      }
 
       // Step 1: Create Address
       // Combine location fields into proper address format
@@ -209,7 +226,9 @@ export default function SellerOnboarding() {
         },
         body: JSON.stringify({
           StoreName: formData.storeName,
-          Phone: formData.phone
+          CategoryId: parseInt(formData.categoryId),
+          Phone: formData.phone,
+          UserId: userId  // Pass userId for onboarding - links to existing UserProfile
         })
       });
 
@@ -244,6 +263,20 @@ export default function SellerOnboarding() {
         const errorText = await sellerAddressResponse.text();
         console.error('SellerAddress creation failed:', errorText);
         throw new Error(`Step 3: Failed to link address to seller - ${errorText || 'Bad Request'}`);
+      }
+
+      // Step 4: Create membership if selected
+      if (formData.selectedPlan) {
+        try {
+          await createUserMembership({
+            userProfileId: parseInt(userProfileId),
+            membershipPlanId: formData.selectedPlan,
+            autoRenew: false
+          });
+        } catch (error) {
+          console.error('Failed to assign membership, continuing...', error);
+          // Don't block registration if membership fails
+        }
       }
 
       // Update role in localStorage
@@ -327,27 +360,35 @@ export default function SellerOnboarding() {
 
               <Select
                 label="CATEGORY"
-                name="category"
-                id="category"
-                value={formData.category}
-                onChange={handleChange('category')}
+                name="categoryId"
+                id="categoryId"
+                value={formData.categoryId}
+                onChange={handleChange('categoryId')}
                 options={categories}
-                placeholder="Select a category"
+                placeholder={loadingCategories ? "Loading..." : "Select a category"}
                 required
-                error={errors.category}
+                disabled={loadingCategories}
+                error={errors.categoryId}
               />
 
-              <Input
-                label="PHONE NUMBER"
-                type="tel"
-                name="phone"
-                id="phone"
-                value={formData.phone}
-                onChange={handleChange('phone')}
-                placeholder="+973 12345678"
-                required
-                error={errors.phone}
-              />
+              <div>
+                <Input
+                  label="STORE PHONE NUMBER"
+                  type="tel"
+                  name="phone"
+                  id="phone"
+                  value={formData.phone}
+                  onChange={handleChange('phone')}
+                  placeholder="+973 12345678"
+                  required
+                  error={errors.phone}
+                />
+                {localStorage.getItem('userPhone') && (
+                  <p className="text-xs text-charcoal-400 mt-1">
+                    Using your registered number. You can change it if needed.
+                  </p>
+                )}
+              </div>
             </div>
           )}
 
@@ -491,6 +532,7 @@ export default function SellerOnboarding() {
               <MembershipSelection
                 onSelect={handleMembershipSelect}
                 selectedPlan={formData.selectedPlan}
+                onSubmit={handleSubmit}
               />
 
               {errors.membership && (

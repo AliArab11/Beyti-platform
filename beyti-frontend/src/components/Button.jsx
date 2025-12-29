@@ -31,22 +31,22 @@ const Button = ({
   // Variant styles - mapping semantic status names to design tokens
   const variantStyles = {
     // Success (positive actions like "Approve", "Review")
-    success: 'bg-success-btn text-white hover:bg-success-text',
+    success: 'bg-success-btn text-white hover:bg-success-text dark:bg-success-btn dark:text-white dark:hover:bg-success-text',
 
     // Error (destructive actions like "Reject", "Delete")
-    error: 'bg-error-btn text-white hover:bg-error-text',
+    error: 'bg-error-btn text-white hover:bg-error-text dark:bg-error-btn dark:text-white dark:hover:bg-error-text',
 
     // Danger/Warning (caution actions like "Archive", "Suspend")
-    danger: 'bg-danger-btn text-danger-text hover:bg-danger-text hover:text-white',
+    danger: 'bg-danger-btn text-danger-text hover:bg-danger-text hover:text-white dark:bg-danger-btn dark:text-danger-text dark:hover:bg-danger-text dark:hover:text-white',
 
     // Primary (brand-colored primary actions)
-    primary: 'bg-sage-500 text-white hover:bg-sage-700',
+    primary: 'bg-sage-500 text-white hover:bg-sage-700 dark:bg-sage-500 dark:text-white dark:hover:bg-sage-700',
 
     // Secondary (neutral actions)
-    secondary: 'bg-grey-200 text-charcoal-600 border border-grey-stroke hover:bg-cream-100',
+    secondary: 'bg-grey-200 text-charcoal-600 border border-grey-stroke hover:bg-cream-100 dark:bg-charcoal-400 dark:text-cream-50 dark:border-charcoal-500 dark:hover:bg-charcoal-500',
 
     // Ghost (subtle actions)
-    ghost: 'bg-transparent text-charcoal-600 hover:bg-cream-100',
+    ghost: 'bg-transparent text-charcoal-600 hover:bg-cream-100 dark:text-cream-50 dark:hover:bg-charcoal-400',
   };
 
   // Size styles

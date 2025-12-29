@@ -24,13 +24,13 @@ namespace Beyti_Backend.Controllers.Api
         public class CreateAddressDto
         {
             public string? Label { get; set; }
-            public string Street { get; set; }
-            public string City { get; set; }
+            public required string Street { get; set; }
+            public required string City { get; set; }
             [Column("Governorate")]
             public string? Region { get; set; }        // Changed from Governorate
             [Column("Block")]
             public string? PostalCode { get; set; }    // Changed from Block
-            public string Country { get; set; }
+            public required string Country { get; set; }
             public decimal? Latitude { get; set; }
             public decimal? Longitude { get; set; }
             public bool IsDefault { get; set; }
@@ -77,7 +77,7 @@ namespace Beyti_Backend.Controllers.Api
             address.Country = dto.Country;
             address.Latitude = dto.Latitude;
             address.Longitude = dto.Longitude;
-            address.UpdatedAt = DateTime.UtcNow;
+            address.UpdatedAt = DateTime.Now;
 
             _context.Entry(address).State = EntityState.Modified;
 
@@ -117,8 +117,8 @@ namespace Beyti_Backend.Controllers.Api
                 Longitude = dto.Longitude,
                 IsDefault = dto.IsDefault,
                 IsActive = true,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now,
+                UpdatedAt = DateTime.Now
             };
 
             _context.Addresses.Add(address);
@@ -128,7 +128,7 @@ namespace Beyti_Backend.Controllers.Api
         }
 
 
-        // DELETE: api/Addresses/5
+        // DELETE: api/Addresses/5 - Now toggles IsActive instead of deleting
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteAddress(int id)
         {
@@ -138,7 +138,10 @@ namespace Beyti_Backend.Controllers.Api
                 return NotFound();
             }
 
-            _context.Addresses.Remove(address);
+            // Toggle active status instead of deleting
+            address.IsActive = !address.IsActive;
+            address.UpdatedAt = DateTime.Now;
+
             await _context.SaveChangesAsync();
 
             return NoContent();

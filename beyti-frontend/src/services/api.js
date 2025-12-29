@@ -17,9 +17,17 @@ const fetchAPI = async (endpoint, options = {}) => {
   try {
     const url = `${BASE_URL}${endpoint}`;
 
+    // Get auth token from localStorage
+    const authToken = localStorage.getItem('authToken');
+
     const defaultHeaders = {
       'Content-Type': 'application/json',
     };
+
+    // Add Authorization header if token exists
+    if (authToken) {
+      defaultHeaders['Authorization'] = `Bearer ${authToken}`;
+    }
 
     const config = {
       ...options,
@@ -35,11 +43,12 @@ const fetchAPI = async (endpoint, options = {}) => {
     if (!response.ok) {
       // Try to parse error response
       let errorMessage;
+      let errorData = {};
       const contentType = response.headers.get('content-type');
 
       if (contentType && contentType.includes('application/json')) {
         // JSON error response
-        const errorData = await response.json().catch(() => ({}));
+        errorData = await response.json().catch(() => ({}));
         errorMessage = errorData.message || errorData.Message || errorData.title;
       } else {
         // Plain text error response (common for auth endpoints)
@@ -51,7 +60,14 @@ const fetchAPI = async (endpoint, options = {}) => {
         errorMessage = `Request failed with status ${response.status}`;
       }
 
-      throw new Error(errorMessage);
+      // Create error object with status and additional data
+      const error = new Error(errorMessage);
+      error.status = response.status;
+      error.statusCode = response.status;
+      error.isSuspended = errorData.isSuspended || false;
+      error.error = errorData.error || errorMessage;
+
+      throw error;
     }
 
     // Handle 204 No Content responses
@@ -222,6 +238,38 @@ export const toggleMembershipPlanStatus = async (id) => {
   });
 };
 
+/**
+ * Create a user membership assignment
+ * Assigns a membership plan to a user profile
+ *
+ * @param {object} data - Membership data { userProfileId, membershipPlanId, autoRenew }
+ * @returns {Promise<object>} - Created membership object
+ *
+ * @example
+ * ```javascript
+ * import { createUserMembership } from './services/api';
+ *
+ * const membershipData = {
+ *   userProfileId: 1,
+ *   membershipPlanId: 2,
+ *   autoRenew: false
+ * };
+ *
+ * try {
+ *   const membership = await createUserMembership(membershipData);
+ *   console.log('Membership created:', membership);
+ * } catch (error) {
+ *   console.error('Failed to create membership:', error.message);
+ * }
+ * ```
+ */
+export const createUserMembership = async (data) => {
+  return await fetchAPI('/UserMemberships', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
 // --- Admin APIs ---
 export const getAdmins = async () => {
   return await fetchAPI('/AdminProfiles');
@@ -258,22 +306,32 @@ export const getUser = async (id) => {
   return await fetchAPI(`/AdminDashboard/Users/${id}`);
 };
 
-export const createUser = async (data) => {
-  return await fetchAPI('/AdminDashboard/Users', {
+export const createUser = async (data, adminUserProfileId = null) => {
+  const url = adminUserProfileId
+    ? `/AdminDashboard/Users?adminUserProfileId=${adminUserProfileId}`
+    : '/AdminDashboard/Users';
+
+  return await fetchAPI(url, {
     method: 'POST',
     body: JSON.stringify(data),
   });
 };
 
-export const updateUser = async (id, data) => {
-  return await fetchAPI(`/AdminDashboard/Users/${id}`, {
+export const updateUser = async (id, data, adminUserProfileId = null) => {
+  const url = adminUserProfileId
+    ? `/AdminDashboard/Users/${id}?adminUserProfileId=${adminUserProfileId}`
+    : `/AdminDashboard/Users/${id}`;
+  return await fetchAPI(url, {
     method: 'PUT',
     body: JSON.stringify(data),
   });
 };
 
-export const toggleUserStatus = async (id) => {
-  return await fetchAPI(`/AdminDashboard/Users/${id}/toggle`, {
+export const toggleUserStatus = async (id, adminUserProfileId = null) => {
+  const url = adminUserProfileId
+    ? `/AdminDashboard/Users/${id}/toggle?adminUserProfileId=${adminUserProfileId}`
+    : `/AdminDashboard/Users/${id}/toggle`;
+  return await fetchAPI(url, {
     method: 'PATCH',
   });
 };
@@ -287,14 +345,20 @@ export const getAllServiceProviderRequests = async () => {
   return await fetchAPI('/AdminDashboard/ServiceProviderRequests');
 };
 
-export const approveServiceProviderRequest = async (id) => {
-  return await fetchAPI(`/AdminDashboard/ServiceProviderRequests/${id}/approve`, {
+export const approveServiceProviderRequest = async (id, adminUserProfileId = null) => {
+  const url = adminUserProfileId
+    ? `/AdminDashboard/ServiceProviderRequests/${id}/approve?adminUserProfileId=${adminUserProfileId}`
+    : `/AdminDashboard/ServiceProviderRequests/${id}/approve`;
+  return await fetchAPI(url, {
     method: 'PATCH',
   });
 };
 
-export const rejectServiceProviderRequest = async (id) => {
-  return await fetchAPI(`/AdminDashboard/ServiceProviderRequests/${id}/reject`, {
+export const rejectServiceProviderRequest = async (id, adminUserProfileId = null) => {
+  const url = adminUserProfileId
+    ? `/AdminDashboard/ServiceProviderRequests/${id}/reject?adminUserProfileId=${adminUserProfileId}`
+    : `/AdminDashboard/ServiceProviderRequests/${id}/reject`;
+  return await fetchAPI(url, {
     method: 'PATCH',
   });
 };
@@ -313,21 +377,30 @@ export const getUserViolations = async (userId) => {
   return await fetchAPI(`/AdminDashboard/UserViolations/${userId}`);
 };
 
-export const suspendUser = async (userId, reason) => {
-  return await fetchAPI(`/AdminDashboard/SuspendUser/${userId}`, {
+export const suspendUser = async (userId, reason, adminUserProfileId = null) => {
+  const url = adminUserProfileId
+    ? `/AdminDashboard/SuspendUser/${userId}?adminUserProfileId=${adminUserProfileId}`
+    : `/AdminDashboard/SuspendUser/${userId}`;
+  return await fetchAPI(url, {
     method: 'PUT',
     body: JSON.stringify({ reason }),
   });
 };
 
-export const reactivateUser = async (userId) => {
-  return await fetchAPI(`/AdminDashboard/ReactivateUser/${userId}`, {
+export const reactivateUser = async (userId, adminUserProfileId = null) => {
+  const url = adminUserProfileId
+    ? `/AdminDashboard/ReactivateUser/${userId}?adminUserProfileId=${adminUserProfileId}`
+    : `/AdminDashboard/ReactivateUser/${userId}`;
+  return await fetchAPI(url, {
     method: 'PUT',
   });
 };
 
-export const warnUser = async (userId, message) => {
-  return await fetchAPI(`/AdminDashboard/WarnUser/${userId}`, {
+export const warnUser = async (userId, message, adminUserProfileId = null) => {
+  const url = adminUserProfileId
+    ? `/AdminDashboard/WarnUser/${userId}?adminUserProfileId=${adminUserProfileId}`
+    : `/AdminDashboard/WarnUser/${userId}`;
+  return await fetchAPI(url, {
     method: 'PUT',
     body: JSON.stringify({ message }),
   });
@@ -352,14 +425,20 @@ export const getProductDetails = async (id) => {
   return await fetchAPI(`/ProductModeration/Products/${id}`);
 };
 
-export const approveProduct = async (id) => {
-  return await fetchAPI(`/ProductModeration/Products/${id}/approve`, {
+export const approveProduct = async (id, adminUserProfileId = null) => {
+  const url = adminUserProfileId
+    ? `/ProductModeration/Products/${id}/approve?adminUserProfileId=${adminUserProfileId}`
+    : `/ProductModeration/Products/${id}/approve`;
+  return await fetchAPI(url, {
     method: 'PUT',
   });
 };
 
-export const suspendProduct = async (id, reason) => {
-  return await fetchAPI(`/ProductModeration/Products/${id}/suspend`, {
+export const suspendProduct = async (id, reason, adminUserProfileId = null) => {
+  const url = adminUserProfileId
+    ? `/ProductModeration/Products/${id}/suspend?adminUserProfileId=${adminUserProfileId}`
+    : `/ProductModeration/Products/${id}/suspend`;
+  return await fetchAPI(url, {
     method: 'PUT',
     body: JSON.stringify({ reason }),
   });
@@ -391,6 +470,63 @@ export const getSellers = async () => {
  */
 export const getSeller = async (id) => {
   return await fetchAPI(`/Sellers/${id}`);
+};
+
+
+ /**
+ * Get seller profile by UserProfileId
+ * @param {number} userProfileId - User Profile ID
+ * @returns {Promise<object|null>} - Seller object or null if not found
+ */
+export const getSellerByUserProfileId = async (userProfileId) => {
+  try {
+    // Use the new Profile endpoint we created
+    return await fetchAPI(`/Sellers/Profile/${userProfileId}`);
+  } catch (error) {
+    console.warn('[API] Error fetching seller profile:', error);
+    
+    // Fallback to fetching all sellers if the endpoint fails
+    try {
+      const sellers = await fetchAPI('/Sellers');
+
+      if (!sellers || !Array.isArray(sellers)) {
+        return null;
+      }
+
+      // Find seller with matching UserProfileId
+      const seller = sellers.find(s =>
+        s.userProfileId === userProfileId ||
+        s.UserProfileId === userProfileId ||
+        s.userProfileId === parseInt(userProfileId) ||
+        s.UserProfileId === parseInt(userProfileId)
+      );
+
+      return seller || null;
+    } catch (fallbackError) {
+      console.warn('[API] Fallback also failed:', fallbackError);
+      return null;
+    }
+  }
+};
+
+/**
+ * Get seller profile with full details including subcategories
+ * @param {number} sellerId - Seller ID
+ * @returns {Promise<object>} - Seller profile with subcategories
+ */
+export const getSellerProfile = async (sellerId, userProfileId) => {
+  if (userProfileId) {
+    return await fetchAPI(`/Sellers/Profile/${userProfileId}`);
+  }
+  // Fallback to regular sellers endpoint
+  const sellers = await fetchAPI('/Sellers');
+  return sellers.find(s => s.id === sellerId);
+};
+
+export const getSellerById = async (sellerId) => {
+  const response = await fetch(`https://localhost:7062/api/Sellers/${sellerId}`);
+  if (!response.ok) throw new Error("Failed to fetch seller");
+  return response.json();
 };
 
 /**
@@ -427,6 +563,42 @@ export const deleteSeller = async (id) => {
   return await fetchAPI(`/Sellers/${id}`, {
     method: 'DELETE',
   });
+};
+
+
+// Store Sections APIS
+
+export const getStoreSections = async (sellerId) => {
+  const res = await fetch(`${BASE_URL}/StoreSections/seller/${sellerId}`);
+  if (!res.ok) throw new Error("Failed to fetch store sections");
+  return res.json();
+};
+
+export const createStoreSection = async (sellerId, data) => {
+  const res = await fetch(`${BASE_URL}/StoreSections?sellerId=${sellerId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to create section");
+  return res.json();
+};
+
+export const updateStoreSection = async (id, data) => {
+  const res = await fetch(`${BASE_URL}/StoreSections/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to update section");
+  return res.json();
+};
+
+export const deleteStoreSection = async (id) => {
+  const res = await fetch(`${BASE_URL}/StoreSections/${id}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error("Failed to delete section");
 };
 
 // --- Product APIs ---
@@ -500,6 +672,18 @@ export const getServiceProviders = async () => {
 
 export const getServiceProvider = async (id) => {
   return await fetchAPI(`/ServiceProviders/${id}`);
+};
+
+// Alias for consistency with other API naming conventions
+export const getServiceProviderById = getServiceProvider;
+
+/**
+ * Get all services for a specific service provider
+ * @param {number} serviceProviderId - Service Provider ID
+ * @returns {Promise<Array>} - Array of service objects
+ */
+export const getServiceProviderServices = async (serviceProviderId) => {
+  return await fetchAPI(`/ServiceProviders/${serviceProviderId}/services`);
 };
 
 export const createServiceProvider = async (data) => {
@@ -730,6 +914,12 @@ export const getOrders = async (customerId = null, sellerId = null) => {
   return await fetchAPI(url);
 };
 
+export const getOrderWithDetails = async (id, customerId) => {
+  const res = await fetch(`https://localhost:7062/api/Orders?customerId=${customerId}`);
+  return (await res.json()).find(o => o.id === id);
+};
+
+
 /**
  * Get a single order by ID
  * @param {number} id - Order ID
@@ -793,6 +983,64 @@ export const deleteOrder = async (id) => {
     method: 'DELETE',
   });
 };
+
+/**
+ * Validate stock availability before placing order
+ * @param {Array} items - Array of {ProductId, VariantId, Quantity}
+ * @returns {Promise<object>} - Validation result
+ */
+export const validateStock = async (items) => {
+  return await fetchAPI('/Orders/validate-stock', {
+    method: 'POST',
+    body: JSON.stringify(items),
+  });
+};
+
+/**
+ * Reserve stock for order items
+ * @param {Array} items - Array of {ProductId, VariantId, Quantity}
+ * @returns {Promise<void>}
+ */
+export const reserveStock = async (items) => {
+  return await fetchAPI('/Orders/reserve-stock', {
+    method: 'POST',
+    body: JSON.stringify(items),
+  });
+};
+
+/**
+ * Restore stock when order is cancelled
+ * @param {number} orderId - Order ID
+ * @returns {Promise<void>}
+ */
+export const restoreStock = async (orderId) => {
+  try {
+    const response = await fetch(`https://localhost:7062/api/Orders/${orderId}/restore-stock`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    // If response is 204 No Content or empty, that's OK
+    if (response.status === 204 || response.status === 200) {
+      console.log('✅ Stock restored successfully');
+      return { success: true };
+    }
+
+    // Try to parse JSON only if there's content
+    const text = await response.text();
+    if (text) {
+      return JSON.parse(text);
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('❌ Failed to restore stock:', error);
+    throw error;
+  }
+};
+
 
 // --- Order Item APIs ---
 
@@ -1073,6 +1321,15 @@ export const getCustomer = async (id) => {
 };
 
 /**
+ * Get customer by UserProfileId
+ * @param {number} userProfileId - UserProfile ID
+ * @returns {Promise<object>} - Customer object
+ */
+export const getCustomerByUserProfileId = async (userProfileId) => {
+  return await fetchAPI(`/Customers?userProfileId=${userProfileId}`);
+};
+
+/**
  * Create a new customer
  * @param {object} data - Customer data (PascalCase: UserProfileId, FullName, Phone)
  * @returns {Promise<object>} - Created customer object
@@ -1175,6 +1432,15 @@ export const getSellerAddress = async (id) => {
   return await fetchAPI(`/SellerAddresses/${id}`);
 };
 
+/**
+ * Get seller's address by seller ID
+ * @param {number} sellerId - Seller ID
+ * @returns {Promise<object>} - Seller address with address details
+ */
+export const getSellerAddressBySellerId = async (sellerId) => {
+  return await fetchAPI(`/SellerAddresses/Seller/${sellerId}`);
+};
+
 export const createSellerAddress = async (data) => {
   return await fetchAPI('/SellerAddresses', {
     method: 'POST',
@@ -1213,6 +1479,37 @@ export const getDrivers = async () => {
  */
 export const getDriver = async (id) => {
   return await fetchAPI(`/Drivers/${id}`);
+};
+
+/**
+ * Get driver profile by UserProfileId
+ * WORKAROUND: Backend doesn't have a dedicated endpoint for this
+ * @param {number} userProfileId - User Profile ID
+ * @returns {Promise<object|null>} - Driver object or null if not found
+ */
+export const getDriverByUserProfileId = async (userProfileId) => {
+  try {
+    // Backend doesn't have /Drivers/Profile/{userProfileId} endpoint
+    // Fetch all drivers and filter by UserProfileId
+    const drivers = await fetchAPI('/Drivers');
+
+    if (!drivers || !Array.isArray(drivers)) {
+      return null;
+    }
+
+    // Find driver with matching UserProfileId (check both camelCase and PascalCase)
+    const driver = drivers.find(d =>
+      d.UserProfileId === userProfileId ||
+      d.userProfileId === userProfileId ||
+      d.UserProfileId === parseInt(userProfileId) ||
+      d.userProfileId === parseInt(userProfileId)
+    );
+
+    return driver || null;
+  } catch (error) {
+    console.warn('[API] Error fetching drivers:', error);
+    return null;
+  }
 };
 
 /**
@@ -1256,7 +1553,32 @@ export const deleteDriver = async (id) => {
 
 // Profile
 export const getProviderProfile = async (userProfileId) => {
-  return await fetchAPI(`/ServiceProviderDashboard/Profile/${userProfileId}`);
+  try {
+    // First try the dashboard endpoint (for logged-in service provider)
+    return await fetchAPI(`/ServiceProviderDashboard/Profile/${userProfileId}`);
+  } catch (error) {
+    // If dashboard endpoint fails, fallback to fetching all providers and filtering
+    try {
+      const providers = await fetchAPI('/ServiceProviders');
+
+      if (!providers || !Array.isArray(providers)) {
+        return null;
+      }
+
+      // Find provider with matching UserProfileId (check both camelCase and PascalCase)
+      const provider = providers.find(p =>
+        p.UserProfileId === userProfileId ||
+        p.userProfileId === userProfileId ||
+        p.UserProfileId === parseInt(userProfileId) ||
+        p.userProfileId === parseInt(userProfileId)
+      );
+
+      return provider || null;
+    } catch (fallbackError) {
+      console.warn('[API] Error fetching service providers:', fallbackError);
+      return null;
+    }
+  }
 };
 
 export const updateProviderProfile = async (userProfileId, data) => {
@@ -1285,7 +1607,11 @@ export const updateProviderAddress = async (serviceProviderId, data) => {
 
 // Categories & Services
 export const getServiceCategories = async () => {
-  return await fetchAPI('/ServiceProviderDashboard/Categories');
+  return await fetchAPI('/ServiceCategories');
+};
+
+export const getProviderCategories = async (serviceProviderId) => {
+  return await fetchAPI(`/ServiceProviderDashboard/ProviderCategories/${serviceProviderId}`);
 };
 
 export const getMyServices = async (serviceProviderId) => {
@@ -1324,6 +1650,12 @@ export const addTimeSlot = async (data) => {
   });
 };
 
+export const toggleTimeSlot = async (timeSlotId) => {
+  return await fetchAPI(`/ServiceProviderDashboard/ToggleTimeSlot/${timeSlotId}`, {
+    method: 'PUT',
+  });
+};
+
 export const deleteTimeSlot = async (timeSlotId) => {
   return await fetchAPI(`/ServiceProviderDashboard/DeleteTimeSlot/${timeSlotId}`, {
     method: 'DELETE',
@@ -1346,6 +1678,89 @@ export const updateBookingStatus = async (bookingId, data) => {
 // Statistics
 export const getProviderStatistics = async (serviceProviderId) => {
   return await fetchAPI(`/ServiceProviderDashboard/Statistics/${serviceProviderId}`);
+};
+
+// --- Universal User Profile APIs ---
+
+/**
+ * Get user profile for any user type
+ * Routes to appropriate endpoint based on user role
+ * @param {number} userId - User profile ID
+ * @returns {Promise<object>} - User profile data
+ */
+export const getUserProfile = async (userId) => {
+  // Using UserProfiles/Profile endpoint which works for all user types
+  // Returns role-specific data based on the user's RoleType
+  return await fetchAPI(`/UserProfiles/Profile/${userId}`);
+};
+
+/**
+ * Update user profile for any user type
+ * Routes to appropriate endpoint based on user role
+ * @param {number} userId - User profile ID
+ * @param {string} userRole - User role type (Admin, ServiceProvider, Seller, etc.)
+ * @param {object} updates - Profile updates object
+ * @returns {Promise<object>} - Updated profile data
+ */
+export const updateUserProfile = async (userId, userRole, updates) => {
+  // Route profile updates based on role
+  const profileUpdates = {
+    DisplayName: updates.displayName,
+    Phone: updates.phone,
+  };
+
+  // Add BusinessName for Service Providers
+  if (userRole === 'ServiceProvider' && updates.businessName) {
+    profileUpdates.BusinessName = updates.businessName;
+  }
+
+  // Route to appropriate endpoint based on role
+  if (userRole === 'Customer') {
+    await fetchAPI(`/Customers/UpdateProfile/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(profileUpdates),
+    });
+  } else if (userRole === 'ServiceProvider') {
+    await fetchAPI(`/ServiceProviderDashboard/UpdateProfile/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(profileUpdates),
+    });
+  }
+
+  // If address updates are provided and user has associated entity ID
+  if (updates.address && updates.entityId) {
+    const addressUpdates = {
+      Street: updates.address.street,
+      City: updates.address.city,
+      Region: updates.address.region,
+      PostalCode: updates.address.postalCode,
+      Country: updates.address.country,
+    };
+
+    // Route address update based on role
+    if (userRole === 'Customer') {
+      await fetchAPI(`/Customers/UpdateAddress/${updates.entityId}`, {
+        method: 'PUT',
+        body: JSON.stringify(addressUpdates),
+      });
+    } else if (userRole === 'ServiceProvider') {
+      await fetchAPI(`/ServiceProviderDashboard/UpdateAddress/${updates.entityId}`, {
+        method: 'PUT',
+        body: JSON.stringify(addressUpdates),
+      });
+    }
+    // Add other role-specific address updates here if needed
+  }
+
+  // If status update is provided for service providers
+  if (updates.status && updates.entityId && userRole === 'ServiceProvider') {
+    await fetchAPI(`/ServiceProviderDashboard/UpdateStatus/${updates.entityId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ Status: updates.status }),
+    });
+  }
+
+  return { success: true };
 };
 
 // --- Delivery Ticket APIs ---
@@ -1504,8 +1919,11 @@ export const getServiceDetails = async (id) => {
  * @param {number} id - Service ID
  * @returns {Promise<object>} - Response
  */
-export const approveService = async (id) => {
-  return await fetchAPI(`/ServiceModeration/Services/${id}/approve`, {
+export const approveService = async (id, adminUserProfileId = null) => {
+  const url = adminUserProfileId
+    ? `/ServiceModeration/Services/${id}/approve?adminUserProfileId=${adminUserProfileId}`
+    : `/ServiceModeration/Services/${id}/approve`;
+  return await fetchAPI(url, {
     method: 'PUT',
   });
 };
@@ -1514,10 +1932,14 @@ export const approveService = async (id) => {
  * Suspend a service with reason
  * @param {number} id - Service ID
  * @param {string} reason - Suspension reason
+ * @param {number} adminUserProfileId - Admin user profile ID (optional)
  * @returns {Promise<object>} - Response
  */
-export const suspendService = async (id, reason) => {
-  return await fetchAPI(`/ServiceModeration/Services/${id}/suspend`, {
+export const suspendService = async (id, reason, adminUserProfileId = null) => {
+  const url = adminUserProfileId
+    ? `/ServiceModeration/Services/${id}/suspend?adminUserProfileId=${adminUserProfileId}`
+    : `/ServiceModeration/Services/${id}/suspend`;
+  return await fetchAPI(url, {
     method: 'PUT',
     body: JSON.stringify({ reason }),
   });
@@ -1588,9 +2010,378 @@ export const register = async (data) => {
 export const getServiceReviews = async (serviceProviderId = null) => {
   let url = '/ServiceReviews';
   if (serviceProviderId) {
-    // We'll need to filter client-side or add backend support
-    const allReviews = await fetchAPI(url);
-    return allReviews.filter(review => review.serviceProviderId === serviceProviderId);
+    url = `/ServiceReviews/provider/${serviceProviderId}`;
   }
   return await fetchAPI(url);
+};
+
+/**
+ * Get service reviews grouped by service for a service provider
+ * @param {number} serviceProviderId - Service provider ID
+ * @returns {Promise<Array>} - Array of service review objects
+ */
+export const getProviderServiceReviews = async (serviceProviderId) => {
+  return await fetchAPI(`/ServiceReviews/provider/${serviceProviderId}`);
+};
+
+/**
+ * Respond to a service review
+ * @param {number} reviewId - Review ID
+ * @param {string} response - Provider's response text
+ * @returns {Promise<null>} - Returns null on success
+ */
+export const respondToServiceReview = async (reviewId, response) => {
+  return await fetchAPI(`/ServiceReviews/${reviewId}/respond`, {
+    method: 'PUT',
+    body: JSON.stringify({ ProviderResponse: response }),
+  });
+};
+
+/**
+ * Toggle visibility of a service review (hide/unhide)
+ * @param {number} reviewId - Review ID
+ * @returns {Promise<null>} - Returns null on success
+ */
+export const toggleServiceReviewVisibility = async (reviewId) => {
+  return await fetchAPI(`/ServiceReviews/${reviewId}/toggle-visibility`, {
+    method: 'PUT',
+  });
+};
+
+/**
+ * Get service reviews by customer ID
+ * Note: Backend doesn't have a customer endpoint, so we fetch all and filter
+ * @param {number} customerId - Customer ID
+ * @returns {Promise<Array>} - Array of service review objects by the customer
+ */
+export const getCustomerServiceReviews = async (customerId) => {
+  try {
+    const allReviews = await fetchAPI('/ServiceReviews');
+    // Filter reviews by customer ID
+    return Array.isArray(allReviews)
+      ? allReviews.filter(review => review.customerId === customerId)
+      : [];
+  } catch (error) {
+    console.error('Error fetching customer service reviews:', error);
+    return [];
+  }
+};
+
+/**
+ * Create a new service review
+ * @param {Object} reviewData - Service review data
+ *   Example: {
+ *     serviceBookingId: number,
+ *     serviceProviderId: number,
+ *     customerId: number,
+ *     overallRating: number, // 1-5
+ *     qualityRating: number | null, // 1-5
+ *     professionalismRating: number | null, // 1-5
+ *     timelinessRating: number | null, // 1-5
+ *     comment: string | null
+ *   }
+ * @returns {Promise<Object>} - Created service review object
+ */
+export const createServiceReview = async (reviewData) => {
+  return await fetchAPI('/ServiceReviews', {
+    method: 'POST',
+    body: JSON.stringify(reviewData),
+  });
+};
+
+// Fetch all notifications for user
+export const getUserNotifications = async (userId) => {
+  return await fetchAPI(`/Notifications/user/${userId}`);
+};
+
+// Fetch unread count
+export const getUnreadCount = async (userId) => {
+  return await fetchAPI(`/Notifications/user/${userId}/unread/count`);
+};
+
+// Mark all notifications as read
+export const markAllNotificationsRead = async (userId) => {
+  return await fetchAPI(`/Notifications/user/${userId}/read-all`, {
+    method: 'PUT',
+  });
+};
+
+// Mark single notification as read
+export const markNotificationRead = async (id) => {
+  return await fetchAPI(`/Notifications/${id}/read`, {
+    method: 'PUT',
+  });
+};
+
+// Delete notification
+export const deleteNotification = async (id) => {
+  return await fetchAPI(`/Notifications/${id}`, {
+    method: 'DELETE',
+  });
+};
+
+// Fetch sent notifications for user
+export const getSentNotifications = async (userId) => {
+  return await fetchAPI(`/Notifications/user/${userId}/sent`);
+};
+
+// Create announcement
+export const createAnnouncement = async (announcementData) => {
+  return await fetchAPI('/Announcements', {
+    method: 'POST',
+    body: JSON.stringify(announcementData),
+  });
+};
+
+// Get all announcements
+export const getAnnouncements = async () => {
+  return await fetchAPI('/Announcements');
+};
+
+// Get single announcement by ID
+export const getAnnouncement = async (id) => {
+  return await fetchAPI(`/Announcements/${id}`);
+};
+
+// Delete announcement
+export const deleteAnnouncement = async (id) => {
+  return await fetchAPI(`/Announcements/${id}`, {
+    method: 'DELETE',
+  });
+};
+
+// --- Service Category APIs ---
+
+/**
+ * Get all service categories
+ * @returns {Promise<Array>} - Array of service categories
+ */
+export const getServiceCategoryList = async () => {
+  return await fetchAPI('/ServiceCategories');
+};
+
+/**
+ * Get a single service category by ID
+ * @param {number} id - Service Category ID
+ * @returns {Promise<object>} - Service Category object
+ */
+export const getServiceCategoryById = async (id) => {
+  return await fetchAPI(`/ServiceCategories/${id}`);
+};
+
+/**
+ * Create a new service category
+ * @param {object} data - Service category data (Name, Description, IsActive)
+ * @returns {Promise<object>} - Created service category
+ */
+export const createServiceCategory = async (data) => {
+  return await fetchAPI('/ServiceCategories', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Update an existing service category
+ * @param {number} id - Service Category ID
+ * @param {object} data - Updated service category data
+ * @returns {Promise<void>}
+ */
+export const updateServiceCategory = async (id, data) => {
+  return await fetchAPI(`/ServiceCategories/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ ...data, Id: id }),
+  });
+};
+
+// --- Service Catalog APIs ---
+
+/**
+ * Get all service catalogs
+ * @param {number} [categoryId] - Optional: Filter by category ID
+ * @returns {Promise<Array>} - Array of service catalogs
+ */
+export const getServiceCatalogs = async (categoryId = null) => {
+  let url = '/ServiceCatalogs';
+  if (categoryId) {
+    url += `?categoryId=${categoryId}`;
+  }
+  return await fetchAPI(url);
+};
+
+/**
+ * Get a single service catalog by ID
+ * @param {number} id - Service Catalog ID
+ * @returns {Promise<object>} - Service Catalog object
+ */
+export const getServiceCatalogById = async (id) => {
+  return await fetchAPI(`/ServiceCatalogs/${id}`);
+};
+
+/**
+ * Create a new service catalog
+ * @param {object} data - Service catalog data (Name, Description, ServiceCategoryId, IsActive, etc.)
+ * @returns {Promise<object>} - Created service catalog
+ */
+export const createServiceCatalog = async (data) => {
+  return await fetchAPI('/ServiceCatalogs', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Update an existing service catalog
+ * @param {number} id - Service Catalog ID
+ * @param {object} data - Updated service catalog data
+ * @returns {Promise<void>}
+ */
+export const updateServiceCatalog = async (id, data) => {
+  return await fetchAPI(`/ServiceCatalogs/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ ...data, Id: id }),
+  });
+};
+
+// ================== SERVICE BOOKING & TIME SLOTS API ==================
+
+/**
+ * Get time slots for a service provider
+ * @param {number} serviceProviderId - Service provider ID
+ * @returns {Promise<Array>} - Array of time slot objects
+ */
+export const getTimeSlots = async (serviceProviderId) => {
+  return await fetchAPI(`/TimeSlots?serviceProviderId=${serviceProviderId}`);
+};
+
+/**
+ * Get a single time slot by ID
+ * @param {number} id - Time slot ID
+ * @returns {Promise<Object>} - Time slot object
+ */
+export const getTimeSlot = async (id) => {
+  return await fetchAPI(`/TimeSlots/${id}`);
+};
+
+/**
+ * Create a new time slot
+ * @param {object} data - Time slot payload
+ * @returns {Promise<Object>} - Created time slot object
+ */
+export const createTimeSlot = async (data) => {
+  return await fetchAPI('/TimeSlots', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Get service bookings
+ * @param {number} serviceProviderId - Optional service provider ID
+ * @param {number} customerId - Optional customer ID
+ * @returns {Promise<Array>} - Array of service booking objects
+ */
+export const getServiceBookings = async (serviceProviderId = null, customerId = null) => {
+  let url = '/ServiceBookings';
+  const params = [];
+
+  if (serviceProviderId) params.push(`serviceProviderId=${serviceProviderId}`);
+  if (customerId) params.push(`customerId=${customerId}`);
+
+  if (params.length > 0) {
+    url += '?' + params.join('&');
+  }
+
+  return await fetchAPI(url);
+};
+
+/**
+ * Get a single service booking by ID
+ * @param {number} id - Service booking ID
+ * @returns {Promise<Object>} - Service booking object
+ */
+export const getServiceBooking = async (id) => {
+  return await fetchAPI(`/ServiceBookings/${id}`);
+};
+
+/**
+ * Create a new service booking
+ * @param {object} data - Service booking payload
+ * @returns {Promise<Object>} - Created service booking object
+ */
+export const createServiceBooking = async (data) => {
+  return await fetchAPI('/ServiceBookings', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Update an existing service booking
+ * @param {number} id - Service booking ID
+ * @param {object} data - Updated booking data
+ * @returns {Promise<Object>} - Updated service booking object
+ */
+export const updateServiceBooking = async (id, data) => {
+  return await fetchAPI(`/ServiceBookings/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Cancel a service booking
+ * @param {number} id - Service booking ID
+ * @param {object} currentBooking - Current booking object with all fields
+ * @param {string} canceledBy - Name of the person/system canceling
+ * @param {string} cancellationReason - Reason for cancellation
+ * @returns {Promise<Object>} - Updated service booking object
+ */
+export const cancelServiceBooking = async (id, currentBooking, canceledBy, cancellationReason) => {
+  // Extract only the fields needed for the update
+  // DO NOT send navigation properties (address, customer, serviceProvider, etc.)
+  const cleanedBooking = {
+    id: currentBooking.id,
+    customerId: currentBooking.customerId,
+    serviceProviderId: currentBooking.serviceProviderId,
+    serviceCatalogId: currentBooking.serviceCatalogId,
+    serviceId: currentBooking.serviceId || null,
+    serviceAddressId: currentBooking.serviceAddressId,
+    timeSlotId: currentBooking.timeSlotId,
+    bookingDateTime: currentBooking.bookingDateTime,
+    serviceType: currentBooking.serviceType,
+    quotedPrice: currentBooking.quotedPrice || null,
+    finalPrice: currentBooking.finalPrice || null,
+    paymentType: currentBooking.paymentType,
+    notes: currentBooking.notes,
+    createdAt: currentBooking.createdAt,
+    // Update status and cancellation fields
+    status: 'Cancelled',
+    canceledBy: canceledBy,
+    cancellationReason: cancellationReason
+  };
+
+  return await fetchAPI(`/ServiceBookings/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(cleanedBooking),
+  });
+};
+
+// ================== AUDIT LOGS API ==================
+
+/**
+ * Get all audit logs
+ * @returns {Promise<Array>} - Array of audit log objects
+ */
+export const getAuditLogs = async () => {
+  return await fetchAPI('/AuditLogs');
+};
+
+/**
+ * Get a single audit log by ID
+ * @param {number} id - Audit log ID
+ * @returns {Promise<Object>} - Audit log object
+ */
+export const getAuditLog = async (id) => {
+  return await fetchAPI(`/AuditLogs/${id}`);
 };

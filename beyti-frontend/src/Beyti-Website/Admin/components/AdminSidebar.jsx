@@ -11,11 +11,13 @@ import {
   Users,
   ShieldCheck,
   Warning,
-  Package,
   User,
   CaretDown,
   Tag,
-  Briefcase
+  Bell,
+  ClockClockwise,
+  Megaphone,
+  CreditCard
 } from '@phosphor-icons/react';
 import NavigationButton from '../../../components/NavigationButton';
 
@@ -61,27 +63,43 @@ const AdminSidebar = ({ currentPage, onNavigate }) => {
         </NavigationButton>
 
         <NavigationButton
-          selected={currentPage === 'product-moderation'}
-          icon={<Package size={20} weight={currentPage === 'product-moderation' ? 'fill' : 'regular'} />}
-          onClick={() => onNavigate('/admin/product-moderation')}
-        >
-          Product Moderation
-        </NavigationButton>
-
-        <NavigationButton
-          selected={currentPage === 'service-moderation'}
-          icon={<Briefcase size={20} weight={currentPage === 'service-moderation' ? 'fill' : 'regular'} />}
-          onClick={() => onNavigate('/admin/service-moderation')}
-        >
-          Service Moderation
-        </NavigationButton>
-
-        <NavigationButton
           selected={currentPage === 'category-moderation'}
           icon={<Tag size={20} weight={currentPage === 'category-moderation' ? 'fill' : 'regular'} />}
           onClick={() => onNavigate('/admin/category-moderation')}
         >
           Categories
+        </NavigationButton>
+
+        <NavigationButton
+          selected={currentPage === 'membership'}
+          icon={<CreditCard size={20} weight={currentPage === 'membership' ? 'fill' : 'regular'} />}
+          onClick={() => onNavigate('/admin/membership')}
+        >
+          Membership Plans
+        </NavigationButton>
+
+        <NavigationButton
+          selected={currentPage === 'announcements'}
+          icon={<Megaphone size={20} weight={currentPage === 'announcements' ? 'fill' : 'regular'} />}
+          onClick={() => onNavigate('/admin/announcements')}
+        >
+          Announcements
+        </NavigationButton>
+
+        <NavigationButton
+          selected={currentPage === 'notifications'}
+          icon={<Bell size={20} weight={currentPage === 'notifications' ? 'fill' : 'regular'} />}
+          onClick={() => onNavigate('/admin/notifications')}
+        >
+          Notifications
+        </NavigationButton>
+
+        <NavigationButton
+          selected={currentPage === 'audit-logs'}
+          icon={<ClockClockwise size={20} weight={currentPage === 'audit-logs' ? 'fill' : 'regular'} />}
+          onClick={() => onNavigate('/admin/audit-logs')}
+        >
+          Audit Logs
         </NavigationButton>
       </nav>
 

@@ -18,7 +18,11 @@
  */
 
 import React, { useState } from 'react';
-import { MagnifyingGlass, Bell, CaretDown, User } from '@phosphor-icons/react';
+import { useNavigate } from 'react-router-dom';
+import { MagnifyingGlass, Bell, CaretDown, User, House, Gear, SignOut } from '@phosphor-icons/react';
+import SettingsModal from './SettingsModal';
+import { logout } from '../utils/auth';
+import NotificationDropdown from './NotificationDropdown';
 
 const PageHeader = ({
   title,
@@ -29,13 +33,20 @@ const PageHeader = ({
   userName = 'User',
   userRole = 'Admin',
   userProfile = null,
+  entityId = null, // Service Provider ID, Seller ID, etc.
+  userId = null, // User ID for notifications
   onUserMenuClick,
   onProfileClick,
+  onProfileUpdate, // Callback when profile is updated
+  onLogout,
+  additionalActions = null, 
   className = '',
   ...props
 }) => {
+  const navigate = useNavigate();
   const [searchValue, setSearchValue] = useState('');
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const handleSearch = (e) => {
     setSearchValue(e.target.value);
@@ -44,10 +55,31 @@ const PageHeader = ({
     }
   };
 
-  const handleProfileClick = () => {
+const handleProfileClick = () => {
+  setIsUserMenuOpen(false);
+  // Navigate to profile page by default, or call custom handler if provided
+  if (onProfileClick) {
+    onProfileClick();
+  } else {
+    navigate('/profile');
+  }
+};
+
+
+  const handleSettingsClick = () => {
     setIsUserMenuOpen(false);
-    if (onProfileClick) {
-      onProfileClick();
+    setIsSettingsOpen(true);
+  };
+
+  const handleLogout = () => {
+    setIsUserMenuOpen(false);
+    // Call custom logout handler if provided
+    if (onLogout) {
+      onLogout();
+    } else {
+      // Default logout behavior
+      logout();
+      navigate('/login');
     }
   };
 
@@ -56,14 +88,15 @@ const PageHeader = ({
       className={`
         flex items-center justify-between
         h-[80px] px-6
-        border-b border-grey-stroke
-        bg-cream-50
+        border-b border-grey-stroke dark:border-charcoal-400
+        bg-cream-50 dark:bg-charcoal-500
+        transition-colors
         ${className}
       `}
       {...props}
     >
       {/* Left: Page Title */}
-      <h1 className="text-display-h1 text-charcoal-600">{title}</h1>
+      <h1 className="text-display-h1 text-charcoal-600 dark:text-cream-50">{title}</h1>
 
       {/* Center: Search Bar (if withSearch) */}
       {withSearch && (
@@ -71,7 +104,7 @@ const PageHeader = ({
           <div className="relative">
             <MagnifyingGlass
               size={20}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal-400"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal-400 dark:text-charcoal-300"
             />
             <input
               type="text"
@@ -80,12 +113,13 @@ const PageHeader = ({
               onChange={handleSearch}
               className="
                 w-full h-[42px] pl-10 pr-4
-                border border-charcoal-400
+                border border-charcoal-400 dark:border-charcoal-300
                 rounded-md
-                text-body-regular text-charcoal-600
-                placeholder:text-charcoal-400
+                text-body-regular text-charcoal-600 dark:text-cream-50
+                placeholder:text-charcoal-400 dark:placeholder:text-charcoal-300
                 focus:outline-none focus:ring-2 focus:ring-sage-500
-                bg-grey-200
+                bg-grey-200 dark:bg-charcoal-400
+                transition-colors
               "
             />
           </div>
@@ -95,14 +129,10 @@ const PageHeader = ({
       {/* Right: Controls */}
       <div className="flex items-center gap-4">
         {/* Notification Bell */}
-        <button className="relative p-2 bg-sage-500 rounded-md hover:bg-sage-700 transition-colors">
-          <Bell size={20} weight="fill" className="text-sage-100" />
-          {notificationCount > 0 && (
-            <span className="absolute -top-1 -right-1 w-5 h-5 bg-error-btn text-white text-xs flex items-center justify-center rounded-full">
-              {notificationCount > 9 ? '9+' : notificationCount}
-            </span>
-          )}
-        </button>
+        <NotificationDropdown userId={userId} />
+
+        {/* Additional Actions (like Cart Button) */}
+        {additionalActions}
 
         {/* User Dropdown */}
         <div className="relative">
@@ -110,15 +140,15 @@ const PageHeader = ({
             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
             className="
               flex items-center gap-2 h-[42px] px-3
-              border border-grey-stroke rounded-md
-              text-body-regular text-charcoal-600
-              hover:bg-cream-100
+              border border-grey-stroke dark:border-charcoal-400 rounded-md
+              text-body-regular text-charcoal-600 dark:text-cream-50
+              hover:bg-cream-100 dark:hover:bg-charcoal-400
               transition-colors
             "
           >
-            <User size={20} className="text-charcoal-600" />
+            <User size={20} className="text-charcoal-600 dark:text-cream-50" />
             <span>{userName}</span>
-            <CaretDown size={16} className="text-charcoal-400" />
+            <CaretDown size={16} className="text-charcoal-400 dark:text-charcoal-300" />
           </button>
 
           {/* Dropdown Menu */}
@@ -128,22 +158,22 @@ const PageHeader = ({
                 className="fixed inset-0 z-10"
                 onClick={() => setIsUserMenuOpen(false)}
               />
-              <div className="absolute top-full right-0 mt-2 w-80 bg-grey-200 border border-grey-stroke rounded-md shadow-soft-lift z-20 overflow-hidden">
+              <div className="absolute top-full right-0 mt-2 w-80 bg-grey-200 dark:bg-charcoal-500 border border-grey-stroke dark:border-charcoal-400 rounded-md shadow-soft-lift z-20 overflow-hidden">
                 {/* Profile Details Section */}
-                <div className="px-4 py-4 border-b border-grey-stroke bg-cream-50">
+                <div className="px-4 py-4 border-b border-grey-stroke dark:border-charcoal-400 bg-cream-50 dark:bg-charcoal-600">
                   <div className="flex items-start gap-3">
-                    <div className="w-12 h-12 rounded-full bg-sage-500 flex items-center justify-center flex-shrink-0">
-                      <User size={24} weight="fill" className="text-sage-100" />
+                    <div className="w-12 h-12 rounded-full bg-sage-500 dark:bg-sage-700 flex items-center justify-center flex-shrink-0">
+                      <User size={24} weight="fill" className="text-sage-100 dark:text-cream-50" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-body-regular text-charcoal-600 font-semibold truncate">
+                      <p className="text-body-regular text-charcoal-600 dark:text-cream-50 font-semibold truncate">
                         {userProfile?.displayName || userName}
                       </p>
-                      <p className="text-label-medium text-charcoal-400 mt-0.5">
+                      <p className="text-label-medium text-charcoal-400 dark:text-charcoal-300 mt-0.5">
                         {userRole}
                       </p>
-                      {userProfile?.phone && (
-                        <p className="text-label-small text-charcoal-500 mt-1">
+                      {userProfile?.phone && userRole !== 'Admin' && userRole !== 'Super Admin' && (
+                        <p className="text-label-small text-charcoal-500 dark:text-charcoal-300 mt-1">
                           {userProfile.phone}
                         </p>
                       )}
@@ -151,20 +181,22 @@ const PageHeader = ({
                   </div>
 
                   {/* Additional Profile Info */}
-                  {userProfile && (
-                    <div className="mt-3 pt-3 border-t border-grey-stroke space-y-1.5">
+                  {userProfile && (userRole !== 'Admin' && userRole !== 'Super Admin') && (
+                    <div className="mt-3 pt-3 border-t border-grey-stroke dark:border-charcoal-400 space-y-1.5">
                       {userProfile.address && (
                         <div className="flex items-start gap-2">
-                          <span className="text-label-small text-charcoal-400 min-w-[60px]">Address:</span>
-                          <span className="text-label-small text-charcoal-600 break-words">
-                            {userProfile.address}
+                          <span className="text-label-small text-charcoal-400 dark:text-charcoal-300 min-w-[60px]">Address:</span>
+                          <span className="text-label-small text-charcoal-600 dark:text-cream-50 break-words">
+                            {typeof userProfile.address === 'string'
+                              ? userProfile.address
+                              : `${userProfile.address.street || ''}, ${userProfile.address.city || ''}, ${userProfile.address.region || ''} ${userProfile.address.postalCode || ''}, ${userProfile.address.country || ''}`.replace(/,\s*,/g, ',').replace(/^,\s*/, '').replace(/,\s*$/, '')}
                           </span>
                         </div>
                       )}
                       {userProfile.createdAt && (
                         <div className="flex items-start gap-2">
-                          <span className="text-label-small text-charcoal-400 min-w-[60px]">Member Since:</span>
-                          <span className="text-label-small text-charcoal-600">
+                          <span className="text-label-small text-charcoal-400 dark:text-charcoal-300 min-w-[60px]">Member Since:</span>
+                          <span className="text-label-small text-charcoal-600 dark:text-cream-50">
                             {new Date(userProfile.createdAt).toLocaleDateString()}
                           </span>
                         </div>
@@ -175,24 +207,44 @@ const PageHeader = ({
 
                 {/* Menu Actions */}
                 <div className="py-1">
+                  {/* Return to Home - Only show for Customer role */}
+                  {userRole === 'Customer' && (
+                  <button
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      window.location.href = '/mainStore';
+                    }}
+                    className="w-full px-4 py-2.5 text-left text-body-regular text-charcoal-600 dark:text-cream-50 hover:bg-cream-100 dark:hover:bg-charcoal-400 transition-colors flex items-center gap-3"
+                  >
+                    <House size={20} weight="regular" className="text-charcoal-500 dark:text-charcoal-300" />
+                    <span style={{ fontFamily: 'Inter, sans-serif' }}>Return to Home</span>
+                  </button>
+                )}
+                  
                   <button
                     onClick={handleProfileClick}
-                    className="w-full px-4 py-2.5 text-left text-body-regular text-charcoal-600 hover:bg-cream-100 transition-colors flex items-center gap-2"
+                    className="w-full px-4 py-2.5 text-left text-body-regular text-charcoal-600 dark:text-cream-50 hover:bg-cream-100 dark:hover:bg-charcoal-400 transition-colors flex items-center gap-3"
                   >
-                    <User size={18} className="text-charcoal-500" />
-                    <span>View Profile</span>
+                    <User size={20} weight="regular" className="text-charcoal-500 dark:text-charcoal-300" />
+                    <span style={{ fontFamily: 'Inter, sans-serif' }}>View Profile</span>
                   </button>
-                  <button className="w-full px-4 py-2.5 text-left text-body-regular text-charcoal-600 hover:bg-cream-100 transition-colors flex items-center gap-2">
-                    <span className="text-charcoal-500">⚙️</span>
-                    <span>Settings</span>
+                  <button
+                    onClick={handleSettingsClick}
+                    className="w-full px-4 py-2.5 text-left text-body-regular text-charcoal-600 dark:text-cream-50 hover:bg-cream-100 dark:hover:bg-charcoal-400 transition-colors flex items-center gap-3"
+                  >
+                    <Gear size={20} weight="regular" className="text-charcoal-500 dark:text-charcoal-300" />
+                    <span style={{ fontFamily: 'Inter, sans-serif' }}>Settings</span>
                   </button>
                 </div>
 
                 {/* Logout Section */}
-                <div className="border-t border-grey-stroke">
-                  <button className="w-full px-4 py-2.5 text-left text-body-regular text-error-text hover:bg-error-bg transition-colors flex items-center gap-2">
-                    <span>🚪</span>
-                    <span>Logout</span>
+                <div className="border-t border-grey-stroke dark:border-charcoal-400">
+                  <button
+                    onClick={handleLogout}
+                    className="w-full px-4 py-2.5 text-left text-body-regular text-error-text dark:text-red-400 hover:bg-error-bg dark:hover:bg-red-900/20 transition-colors flex items-center gap-3"
+                  >
+                    <SignOut size={20} weight="regular" className="text-error-text dark:text-red-400" />
+                    <span style={{ fontFamily: 'Inter, sans-serif' }}>Logout</span>
                   </button>
                 </div>
               </div>
@@ -200,6 +252,10 @@ const PageHeader = ({
           )}
         </div>
       </div>
+
+      {/* Settings Modal */}
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+
     </header>
   );
 };

@@ -1,61 +1,68 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Button from '../../../components/Button';
+import { getMembershipPlans } from '../../../services/api';
 
 /**
  * Membership Selection Component
  *
- * Displays 3 membership plan cards: Starter (Free), Souq (BHD 15), Partner (BHD 35).
+ * Displays membership plan cards fetched from backend.
  * Used in Seller and Service Provider onboarding flows.
  *
  * @param {object} props
  * @param {function} props.onSelect - Callback when plan is selected, receives planId
- * @param {string} props.selectedPlan - Currently selected plan ID
+ * @param {number} props.selectedPlan - Currently selected plan ID
+ * @param {function} props.onSubmit - Optional callback to submit/complete registration (for auto-submit on skip)
  */
-export default function MembershipSelection({ onSelect, selectedPlan = null }) {
-  const plans = [
-    {
-      id: 'starter',
-      name: 'Starter',
-      price: 'Free',
-      priceValue: 0,
-      features: [
-        'Basic listing',
-        'Up to 10 products',
-        'Email support'
-      ],
-      buttonVariant: 'secondary',
-      recommended: false
-    },
-    {
-      id: 'souq',
-      name: 'Souq',
-      price: 'BHD 15',
-      priceValue: 15,
-      priceColor: 'text-sage-500',
-      features: [
-        'Featured listing',
-        'Unlimited products',
-        'Priority support',
-        'Analytics dashboard'
-      ],
-      buttonVariant: 'primary',
-      recommended: true
-    },
-    {
-      id: 'partner',
-      name: 'Partner',
-      price: 'BHD 35',
-      priceValue: 35,
-      features: [
-        'Everything in Souq',
-        'Dedicated account manager',
-        'Advanced analytics',
-        'API access'
-      ],
-      buttonVariant: 'primary',
-      recommended: false
-    }
-  ];
+export default function MembershipSelection({ onSelect, selectedPlan = null, onSubmit = null }) {
+  const [plans, setPlans] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        const membershipPlans = await getMembershipPlans();
+
+        // Transform backend data to component format
+        const transformedPlans = membershipPlans.map((plan, index) => ({
+          id: plan.id,
+          name: plan.name,
+          price: plan.monthlyPrice === 0 ? 'Free' : `BHD ${plan.monthlyPrice}`,
+          priceValue: plan.monthlyPrice,
+          priceColor: plan.monthlyPrice > 0 ? 'text-sage-500' : undefined,
+          features: plan.description ? plan.description.split(', ') : [],
+          buttonVariant: plan.monthlyPrice === 0 ? 'secondary' : 'primary',
+          recommended: index === 1 // Middle plan is recommended
+        }));
+
+        setPlans(transformedPlans);
+      } catch (error) {
+        console.error('Failed to load membership plans:', error);
+        setError('Failed to load membership plans. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPlans();
+  }, []);
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-body-regular text-charcoal-400">Loading membership plans...</p>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="bg-error-bg border-l-4 border-error-btn p-4 rounded" role="alert">
+        <p className="text-body-regular text-error-text">{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -124,6 +131,25 @@ export default function MembershipSelection({ onSelect, selectedPlan = null }) {
           ✓ {plans.find(p => p.id === selectedPlan)?.name} plan selected
         </p>
       )}
+
+      {/* Skip button - assigns free plan and auto-completes registration */}
+      <div className="text-center mt-6">
+        <Button
+          variant="ghost"
+          onClick={() => {
+            const freePlan = plans.find(p => p.priceValue === 0);
+            if (freePlan) {
+              onSelect(freePlan.id);
+              // Auto-submit if callback provided
+              if (onSubmit) {
+                setTimeout(() => onSubmit(), 100); // Small delay to ensure state updates
+              }
+            }
+          }}
+        >
+          Continue with Free Plan
+        </Button>
+      </div>
     </div>
   );
 }

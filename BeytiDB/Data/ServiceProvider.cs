@@ -16,6 +16,8 @@ public partial class ServiceProvider
 
     public int UserProfileId { get; set; }
 
+    public int ServiceCategoryId { get; set; }
+
     [StringLength(120)]
     public string BusinessName { get; set; } = null!;
 
@@ -35,7 +37,7 @@ public partial class ServiceProvider
     public DateTime? VerifiedAt { get; set; }
 
     [Precision(3)]
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
 
     [Precision(3)]
     public DateTime UpdatedAt { get; set; }
@@ -53,9 +55,16 @@ public partial class ServiceProvider
     public virtual ICollection<ServiceReview> ServiceReviews { get; set; } = new List<ServiceReview>();
 
     [InverseProperty("ServiceProvider")]
+    public virtual ICollection<Service> Services { get; set; } = new List<Service>();
+
+    [InverseProperty("ServiceProvider")]
     public virtual ICollection<TimeSlot> TimeSlots { get; set; } = new List<TimeSlot>();
 
     [ForeignKey("UserProfileId")]
     [InverseProperty("ServiceProvider")]
     public virtual UserProfile UserProfile { get; set; } = null!;
+
+    [ForeignKey("ServiceCategoryId")]
+    [InverseProperty("ServiceProviders")]
+    public virtual ServiceCategory ServiceCategory { get; set; } = null!;
 }

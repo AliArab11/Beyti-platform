@@ -149,21 +149,21 @@ export default function ProfilePage({ userProfile, serviceProviderId, onProfileU
       )}
 
       {/* Header Card */}
-      <div className="bg-white rounded-lg border border-grey-stroke shadow-soft-lift overflow-hidden">
+      <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg border border-grey-stroke dark:border-charcoal-500 shadow-soft-lift dark:shadow-none overflow-hidden transition-colors">
         <div className="h-32 bg-gradient-to-r from-sage-500 to-sage-700"></div>
         <div className="px-8 pb-8">
           <div className="flex items-end justify-between -mt-16 mb-6">
             <div className="flex items-end gap-6">
-              <div className="w-32 h-32 rounded-full bg-white border-4 border-white shadow-soft-lift flex items-center justify-center">
+              <div className="w-32 h-32 rounded-full bg-grey-200 dark:bg-[#2A2A2A] border-4 border-grey-200 dark:border-[#2A2A2A] shadow-soft-lift dark:shadow-none flex items-center justify-center transition-colors">
                 <div className="w-full h-full rounded-full bg-sage-500 flex items-center justify-center">
                   <User size={64} weight="fill" className="text-sage-100" />
                 </div>
               </div>
               <div className="pb-2">
-                <h1 className="text-display-h2 text-charcoal-600 font-semibold">
+                <h1 className="text-display-h2 text-charcoal-600 dark:text-white font-semibold">
                   {formData.displayName || 'User Profile'}
                 </h1>
-                <p className="text-body-large text-charcoal-400 mt-1">Service Provider</p>
+                <p className="text-body-large text-charcoal-400 dark:text-gray-400 mt-1">Service Provider</p>
                 <div className="mt-2">
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-label-medium font-medium ${getStatusBadgeColor(formData.status)}`}>
                     {formData.status}
@@ -177,7 +177,7 @@ export default function ProfilePage({ userProfile, serviceProviderId, onProfileU
                   <button
                     onClick={handleCancel}
                     disabled={isSaving}
-                    className="px-6 py-2.5 border border-grey-stroke text-charcoal-600 rounded-md hover:bg-grey-200 transition-colors text-body-regular font-medium disabled:opacity-50"
+                    className="px-6 py-2.5 border border-grey-stroke dark:border-charcoal-500 text-charcoal-600 dark:text-white rounded-md hover:bg-grey-200 dark:hover:bg-[#2A2A2A] transition-colors text-body-regular font-medium disabled:opacity-50"
                   >
                     Cancel
                   </button>
@@ -212,8 +212,8 @@ export default function ProfilePage({ userProfile, serviceProviderId, onProfileU
       {/* Profile Information */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Personal Information Card */}
-        <div className="bg-white rounded-lg border border-grey-stroke shadow-soft-lift p-6">
-          <h2 className="text-display-h3 text-charcoal-600 font-semibold mb-6">Personal Information</h2>
+        <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg border border-grey-stroke dark:border-charcoal-500 shadow-soft-lift dark:shadow-none p-6 transition-colors">
+          <h2 className="text-display-h3 text-charcoal-600 dark:text-white font-semibold mb-6">Personal Information</h2>
 
           <div className="space-y-4">
             {/* Display Name */}
@@ -222,7 +222,7 @@ export default function ProfilePage({ userProfile, serviceProviderId, onProfileU
                 <User size={20} className="text-sage-700" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-label-medium text-charcoal-400 mb-1">Display Name</p>
+                <p className="text-label-medium text-charcoal-400 dark:text-gray-400 mb-1">Display Name</p>
                 {isEditing ? (
                   <input
                     type="text"
@@ -233,7 +233,7 @@ export default function ProfilePage({ userProfile, serviceProviderId, onProfileU
                     placeholder="Enter your display name"
                   />
                 ) : (
-                  <p className="text-body-regular text-charcoal-600 font-medium">
+                  <p className="text-body-regular text-charcoal-600 dark:text-white font-medium">
                     {formData.displayName || 'Not provided'}
                   </p>
                 )}
@@ -246,7 +246,7 @@ export default function ProfilePage({ userProfile, serviceProviderId, onProfileU
                 <Phone size={20} className="text-sage-700" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-label-medium text-charcoal-400 mb-1">Phone Number</p>
+                <p className="text-label-medium text-charcoal-400 dark:text-gray-400 mb-1">Phone Number</p>
                 {isEditing ? (
                   <input
                     type="tel"
@@ -257,7 +257,7 @@ export default function ProfilePage({ userProfile, serviceProviderId, onProfileU
                     placeholder="Enter your phone number"
                   />
                 ) : (
-                  <p className="text-body-regular text-charcoal-600 font-medium">
+                  <p className="text-body-regular text-charcoal-600 dark:text-white font-medium">
                     {formData.phone || 'Not provided'}
                   </p>
                 )}
@@ -268,8 +268,8 @@ export default function ProfilePage({ userProfile, serviceProviderId, onProfileU
         </div>
 
         {/* Contact & Address Card */}
-        <div className="bg-white rounded-lg border border-grey-stroke shadow-soft-lift p-6">
-          <h2 className="text-display-h3 text-charcoal-600 font-semibold mb-6">Contact & Status</h2>
+        <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg border border-grey-stroke dark:border-charcoal-500 shadow-soft-lift dark:shadow-none p-6 transition-colors">
+          <h2 className="text-display-h3 text-charcoal-600 dark:text-white font-semibold mb-6">Contact & Status</h2>
 
           <div className="space-y-4">
             {/* Address */}
@@ -278,7 +278,7 @@ export default function ProfilePage({ userProfile, serviceProviderId, onProfileU
                 <MapPin size={20} className="text-sage-700" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-label-medium text-charcoal-400 mb-1">Address</p>
+                <p className="text-label-medium text-charcoal-400 dark:text-gray-400 mb-1">Address</p>
                 {isEditing ? (
                   <div className="space-y-3">
                     {/* Street */}
@@ -347,14 +347,27 @@ export default function ProfilePage({ userProfile, serviceProviderId, onProfileU
                     </div>
                   </div>
                 ) : (
-                  <div className="text-body-regular text-charcoal-600 font-medium">
-                    {userProfile.address ? (
-                      <>
-                        {userProfile.address}
-                      </>
-                    ) : (
-                      <span className="text-charcoal-400">No address provided</span>
-                    )}
+                  <div className="text-body-regular text-charcoal-600 dark:text-white font-medium">
+                    {(() => {
+                      // Try to use pre-formatted address first
+                      if (userProfile.address) {
+                        return userProfile.address;
+                      }
+                      // Otherwise, construct from individual fields
+                      const parts = [
+                        userProfile.street,
+                        userProfile.city,
+                        userProfile.region,
+                        userProfile.postalCode,
+                        userProfile.country
+                      ].filter(Boolean);
+
+                      if (parts.length > 0) {
+                        return parts.join(', ');
+                      }
+
+                      return <span className="text-charcoal-400 dark:text-gray-400">No address provided</span>;
+                    })()}
                   </div>
                 )}
               </div>
@@ -366,7 +379,7 @@ export default function ProfilePage({ userProfile, serviceProviderId, onProfileU
                 <IdentificationCard size={20} className="text-sage-700" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-label-medium text-charcoal-400 mb-1">Service Provider Status</p>
+                <p className="text-label-medium text-charcoal-400 dark:text-gray-400 mb-1">Service Provider Status</p>
                 {isEditing ? (
                   <select
                     name="status"
@@ -392,8 +405,8 @@ export default function ProfilePage({ userProfile, serviceProviderId, onProfileU
                 <IdentificationCard size={20} className="text-sage-700" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-label-medium text-charcoal-400 mb-1">User ID</p>
-                <p className="text-body-regular text-charcoal-600 font-medium font-mono">
+                <p className="text-label-medium text-charcoal-400 dark:text-gray-400 mb-1">User ID</p>
+                <p className="text-body-regular text-charcoal-600 dark:text-white font-medium font-mono">
                   {userProfile.userProfileId || userProfile.id || 'N/A'}
                 </p>
               </div>
@@ -403,15 +416,15 @@ export default function ProfilePage({ userProfile, serviceProviderId, onProfileU
       </div>
 
       {/* Account Information Card */}
-      <div className="bg-white rounded-lg border border-grey-stroke shadow-soft-lift p-6">
-        <h2 className="text-display-h3 text-charcoal-600 font-semibold mb-6">Account Information</h2>
+      <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg border border-grey-stroke dark:border-charcoal-500 shadow-soft-lift dark:shadow-none p-6 transition-colors">
+        <h2 className="text-display-h3 text-charcoal-600 dark:text-white font-semibold mb-6">Account Information</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Created At */}
           {userProfile.createdAt && (
             <div className="flex flex-col">
-              <p className="text-label-medium text-charcoal-400 mb-2">Member Since</p>
-              <p className="text-body-regular text-charcoal-600 font-medium">
+              <p className="text-label-medium text-charcoal-400 dark:text-gray-400 mb-2">Member Since</p>
+              <p className="text-body-regular text-charcoal-600 dark:text-white font-medium">
                 {new Date(userProfile.createdAt).toLocaleDateString('en-US', {
                   year: 'numeric',
                   month: 'long',
@@ -424,8 +437,8 @@ export default function ProfilePage({ userProfile, serviceProviderId, onProfileU
           {/* Updated At */}
           {userProfile.updatedAt && (
             <div className="flex flex-col">
-              <p className="text-label-medium text-charcoal-400 mb-2">Last Updated</p>
-              <p className="text-body-regular text-charcoal-600 font-medium">
+              <p className="text-label-medium text-charcoal-400 dark:text-gray-400 mb-2">Last Updated</p>
+              <p className="text-body-regular text-charcoal-600 dark:text-white font-medium">
                 {new Date(userProfile.updatedAt).toLocaleDateString('en-US', {
                   year: 'numeric',
                   month: 'long',
@@ -435,11 +448,15 @@ export default function ProfilePage({ userProfile, serviceProviderId, onProfileU
             </div>
           )}
 
-          {/* Account Status */}
+          {/* Account Status - Service Providers show accountStatus (Active/Inactive), not service availability status */}
           <div className="flex flex-col">
-            <p className="text-label-medium text-charcoal-400 mb-2">Account Status</p>
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-label-medium font-medium bg-success-bg text-success-text w-fit">
-              Active
+            <p className="text-label-medium text-charcoal-400 dark:text-gray-400 mb-2">Account Status</p>
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-label-medium font-medium w-fit ${
+              userProfile.accountStatus === 'Inactive' || userProfile.accountStatus === 'Suspended'
+                ? 'bg-error-bg text-error-text'
+                : 'bg-success-bg text-success-text'
+            }`}>
+              {userProfile.accountStatus || 'Active'}
             </span>
           </div>
         </div>
@@ -447,14 +464,14 @@ export default function ProfilePage({ userProfile, serviceProviderId, onProfileU
 
       {/* Additional Information Card */}
       {(userProfile.bio || userProfile.specialization || userProfile.yearsOfExperience) && (
-        <div className="bg-white rounded-lg border border-grey-stroke shadow-soft-lift p-6">
-          <h2 className="text-display-h3 text-charcoal-600 font-semibold mb-6">Professional Details</h2>
+        <div className="bg-grey-200 dark:bg-[#2A2A2A] rounded-lg border border-grey-stroke dark:border-charcoal-500 shadow-soft-lift dark:shadow-none p-6 transition-colors">
+          <h2 className="text-display-h3 text-charcoal-600 dark:text-white font-semibold mb-6">Professional Details</h2>
 
           <div className="space-y-4">
             {userProfile.specialization && (
               <div>
-                <p className="text-label-medium text-charcoal-400 mb-2">Specialization</p>
-                <p className="text-body-regular text-charcoal-600">
+                <p className="text-label-medium text-charcoal-400 dark:text-gray-400 mb-2">Specialization</p>
+                <p className="text-body-regular text-charcoal-600 dark:text-white">
                   {userProfile.specialization}
                 </p>
               </div>
@@ -462,8 +479,8 @@ export default function ProfilePage({ userProfile, serviceProviderId, onProfileU
 
             {userProfile.yearsOfExperience && (
               <div>
-                <p className="text-label-medium text-charcoal-400 mb-2">Years of Experience</p>
-                <p className="text-body-regular text-charcoal-600">
+                <p className="text-label-medium text-charcoal-400 dark:text-gray-400 mb-2">Years of Experience</p>
+                <p className="text-body-regular text-charcoal-600 dark:text-white">
                   {userProfile.yearsOfExperience} years
                 </p>
               </div>
@@ -471,8 +488,8 @@ export default function ProfilePage({ userProfile, serviceProviderId, onProfileU
 
             {userProfile.bio && (
               <div>
-                <p className="text-label-medium text-charcoal-400 mb-2">Bio</p>
-                <p className="text-body-regular text-charcoal-600 leading-relaxed">
+                <p className="text-label-medium text-charcoal-400 dark:text-gray-400 mb-2">Bio</p>
+                <p className="text-body-regular text-charcoal-600 dark:text-white leading-relaxed">
                   {userProfile.bio}
                 </p>
               </div>

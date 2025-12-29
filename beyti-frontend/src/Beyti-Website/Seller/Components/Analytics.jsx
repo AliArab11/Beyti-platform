@@ -146,15 +146,8 @@ const Analytics = ({ sellerId, sellerName, orders = [] }) => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 pb-12">
-      {/* HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-display-h1 text-charcoal-600">Analytics</h1>
-          <p className="text-body-regular text-charcoal-400 mt-1">
-            Detailed insights into your store's performance
-          </p>
-        </div>
+    <div className="max-w-7xl mx-auto space-y-6">
+      <div className="flex items-center justify-end gap-2">
 
         <div className="flex items-center gap-2">
           <span className="text-label-medium text-charcoal-400">TIME RANGE:</span>
@@ -205,28 +198,49 @@ const Analytics = ({ sellerId, sellerName, orders = [] }) => {
           </div>
         ) : (
           <div className="space-y-2">
-            {analytics.revenueByDay.map((day) => {
+            {analytics.revenueByDay.slice().reverse().map((day) => {
               const maxRevenue = Math.max(...analytics.revenueByDay.map(d => d.revenue));
               const widthPercent = maxRevenue > 0 ? (day.revenue / maxRevenue) * 100 : 0;
+              
+              // Threshold for label placement (adjust based on your container width)
+              const MIN_LABEL_WIDTH = 15; // percentage threshold
+              const showLabelInside = widthPercent >= MIN_LABEL_WIDTH;
+              
+              const formattedAmount = Number(day.revenue).toFixed(3);
               
               return (
                 <div key={day.date} className="flex items-center gap-4">
                   <span className="text-label-medium text-charcoal-600 w-20 flex-shrink-0">
                     {formatDate(day.date)}
                   </span>
-                  <div className="flex-1 bg-grey-100 rounded-full h-10 relative overflow-hidden">
-                    <div
-                      className="bg-sage-500 h-full rounded-full flex items-center justify-end pr-4 transition-all duration-300"
-                      style={{
-                        width: `${Math.max(widthPercent, 5)}%`
-                      }}
-                    >
-                      <span className="text-xs font-semibold text-white whitespace-nowrap">
-                        {formatCurrency(day.revenue)}
-                      </span>
+                  <div className="flex-1 relative">
+                    <div className="bg-grey-100 rounded-full h-10 relative overflow-hidden">
+                      <div
+                        className="bg-sage-500 h-full rounded-full transition-all duration-300 flex items-center justify-end pr-3"
+                        style={{
+                          width: `${Math.max(widthPercent, 2)}%`,
+                          minWidth: '6px'
+                        }}
+                      >
+                        {showLabelInside && (
+                          <span className="text-sm font-semibold text-white whitespace-nowrap">
+                            {formattedAmount} BHD
+                          </span>
+                        )}
+                      </div>
                     </div>
+                    {!showLabelInside && (
+                      <span 
+                        className="absolute top-1/2 -translate-y-1/2 text-sm font-semibold text-charcoal-700 whitespace-nowrap"
+                        style={{
+                          left: `calc(${Math.max(widthPercent, 2)}% + 12px)`
+                        }}
+                      >
+                        {formattedAmount} BHD
+                      </span>
+                    )}
                   </div>
-                  <span className="text-body-regular text-charcoal-400 w-20 text-right flex-shrink-0">
+                  <span className="text-body-regular text-charcoal-400 w-24 text-right flex-shrink-0">
                     {day.orders} {day.orders === 1 ? 'order' : 'orders'}
                   </span>
                 </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
@@ -6,6 +6,7 @@ import PasswordInput from '../../components/PasswordInput';
 import Checkbox from '../../components/Checkbox';
 import { register, login } from '../../services/api';
 import { validateEmail, validatePassword, passwordsMatch } from '../../utils/validation';
+import { isLoggedIn } from '../../utils/auth';
 
 /**
  * Universal Registration Page
@@ -28,6 +29,14 @@ export default function Register() {
   });
 
   const [errors, setErrors] = useState({});
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (isLoggedIn()) {
+      console.log('[Register] User already logged in, redirecting to home');
+      navigate('/');
+    }
+  }, [navigate]);
   const [isLoading, setIsLoading] = useState(false);
 
   // Password strength validation
@@ -117,10 +126,16 @@ export default function Register() {
         Password: formData.password
       });
 
-      // Step 3: Store auth data
-      localStorage.setItem('authToken', loginResponse.Token);
-      localStorage.setItem('userId', loginResponse.UserId);
-      localStorage.setItem('userRole', loginResponse.Role);
+      console.log('[Register] Login response:', loginResponse);
+      console.log('[Register] token:', loginResponse.token);
+      console.log('[Register] userId:', loginResponse.userId);
+      console.log('[Register] role:', loginResponse.role);
+
+      // Step 3: Store auth data (backend returns camelCase fields)
+      localStorage.setItem('authToken', loginResponse.token);
+      localStorage.setItem('userId', loginResponse.userId);
+      localStorage.setItem('userProfileId', loginResponse.userProfileId);
+      localStorage.setItem('userRole', loginResponse.role);
       localStorage.setItem('userEmail', formData.email);
       localStorage.setItem('userPhone', formData.phoneNumber);
       localStorage.setItem('userName', `${formData.firstName} ${formData.lastName}`);
@@ -130,11 +145,14 @@ export default function Register() {
 
     } catch (error) {
       let errorMessage = error.message;
+      let emailError = null;
 
       // Map common errors to user-friendly messages
       if (errorMessage.toLowerCase().includes('duplicate') ||
-          errorMessage.toLowerCase().includes('already exists')) {
-        errorMessage = 'This email is already registered. Try logging in instead.';
+          errorMessage.toLowerCase().includes('already exists') ||
+          errorMessage.toLowerCase().includes('already registered')) {
+        errorMessage = 'This email is already registered. Please login or use a different email.';
+        emailError = 'This email is already registered';
       } else if (errorMessage.toLowerCase().includes('network') ||
                  errorMessage.toLowerCase().includes('failed to fetch')) {
         errorMessage = 'Unable to connect to server. Please check your connection.';
@@ -142,7 +160,10 @@ export default function Register() {
         errorMessage = 'An error occurred during registration. Please try again.';
       }
 
-      setErrors({ form: errorMessage });
+      setErrors({
+        form: errorMessage,
+        email: emailError
+      });
       setIsLoading(false);
     }
   };

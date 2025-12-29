@@ -98,7 +98,7 @@ namespace Beyti_Backend.Controllers.Api
                 if (string.IsNullOrEmpty(title))
                     return BadRequest("Title is required");
 
-                var now = DateTime.UtcNow;
+                var now = DateTime.Now;
 
                 // Create UserProfile first
                 var userProfile = new UserProfile
@@ -158,7 +158,7 @@ namespace Beyti_Backend.Controllers.Api
             admin.UserProfile.Status = admin.UserProfile.Status == "Active"
                 ? "Inactive"
                 : "Active";
-            admin.UserProfile.UpdatedAt = DateTime.UtcNow;
+            admin.UserProfile.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 

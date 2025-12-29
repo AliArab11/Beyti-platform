@@ -28,9 +28,15 @@ const AnalyticsCard = ({
   // Base card styles
   const cardStyles = `
     bg-grey-200
+    dark:bg-[#2A2A2A]
     shadow-soft-lift
+    dark:shadow-none
     rounded-lg
     p-6
+    border
+    border-transparent
+    dark:border-charcoal-500
+    transition-colors
     ${className}
   `.trim().replace(/\s+/g, ' ');
 
@@ -40,15 +46,15 @@ const AnalyticsCard = ({
     return (
       <div className={cardStyles} {...props}>
         {title && (
-          <h3 className="text-card-h2 text-charcoal-600 mb-4">
+          <h3 className="text-card-h2 text-charcoal-600 dark:text-white mb-4">
             {title}
           </h3>
         )}
-        <p className="text-metric-h3 text-charcoal-600">
+        <p className="text-metric-h3 text-charcoal-600 dark:text-white">
           {metric.value}
         </p>
         {(metric.label || description) && (
-          <p className="text-body-regular text-charcoal-400 mt-2">
+          <p className="text-body-regular text-charcoal-400 dark:text-gray-400 mt-2">
             {metric.label || description}
           </p>
         )}
@@ -61,18 +67,18 @@ const AnalyticsCard = ({
     return (
       <div className={cardStyles} {...props}>
         {title && (
-          <h3 className="text-card-h2 text-charcoal-600 mb-4">
+          <h3 className="text-card-h2 text-charcoal-600 dark:text-white mb-4">
             {title}
           </h3>
         )}
         <div className="flex gap-8">
           {metrics.map((metric, index) => (
             <div key={index} className="flex-1">
-              <p className="text-metric-h3 text-charcoal-600">
+              <p className="text-metric-h3 text-charcoal-600 dark:text-white">
                 {metric.value}
               </p>
               {metric.label && (
-                <p className="text-body-regular text-charcoal-400 mt-2">
+                <p className="text-body-regular text-charcoal-400 dark:text-gray-400 mt-2">
                   {metric.label}
                 </p>
               )}
@@ -87,13 +93,13 @@ const AnalyticsCard = ({
   return (
     <div className={cardStyles} {...props}>
       {title && (
-        <h3 className="text-card-h2 text-charcoal-600 mb-4">
+        <h3 className="text-card-h2 text-charcoal-600 dark:text-white mb-4">
           {title}
         </h3>
       )}
-      <p className="text-metric-h3 text-charcoal-600">0</p>
+      <p className="text-metric-h3 text-charcoal-600 dark:text-white">0</p>
       {description && (
-        <p className="text-body-regular text-charcoal-400 mt-2">
+        <p className="text-body-regular text-charcoal-400 dark:text-gray-400 mt-2">
           {description}
         </p>
       )}

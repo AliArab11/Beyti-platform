@@ -131,3 +131,4 @@ venv/
 # Never commit merge cruft
 *.orig
 
+NUL

@@ -40,6 +40,24 @@ namespace Beyti_Backend.Controllers.Api
             return await _context.SubCategories.ToListAsync();
         }
 
+        // GET: api/SubCategories/ByCategory/5
+        [HttpGet("ByCategory/{categoryId}")]
+        public async Task<ActionResult<IEnumerable<object>>> GetSubCategoriesByCategory(int categoryId)
+        {
+            var subCategories = await _context.SubCategories
+                .Where(sc => sc.CategoryId == categoryId && sc.IsActive)
+                .OrderBy(sc => sc.Name)
+                .Select(sc => new
+                {
+                    sc.Id,
+                    sc.Name,
+                    sc.CategoryId
+                })
+                .ToListAsync();
+
+            return Ok(subCategories);
+        }
+
         // GET: api/SubCategories/5
         [HttpGet("{id}")]
         public async Task<ActionResult<SubCategory>> GetSubCategory(int id)

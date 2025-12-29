@@ -23,14 +23,60 @@ public partial class Seller
     [StringLength(30)]
     public string? Phone { get; set; }  // Optional
 
+    [NotMapped] // This means it won't be stored in database, just calculated
+    public decimal? AverageRating { get; set; }
+
     [Precision(3)]
     public DateTime CreatedAt { get; set; }
 
     [Precision(3)]
     public DateTime UpdatedAt { get; set; }
 
+    public bool IsOpen { get; set; }
+
+    [StringLength(500)]
+    public string? StoreDescription { get; set; }
+
+    [StringLength(500)]
+    public string? StoreImageUrl { get; set; }   // main store picture
+
+    // 🔹 STORE BANNER (PRESET THEMES – NO UPLOADS)
+    [StringLength(50)]
+    public string? BannerThemeKey { get; set; }   
+
+    [StringLength(20)]
+    public string? BannerAccentColor { get; set; }
+
+    public TimeSpan? OpenTime { get; set; }
+    public TimeSpan? CloseTime { get; set; }
+    public bool? IsManuallyClosed { get; set; }
+
+    public bool? IsForceOpen { get; set; }
+
+    // ADD THIS NEW LINE:
+    public DateTime? ForceOpenStartTime { get; set; }  // Track when force open was activated
+
+    // 🔹 MAIN STORE CATEGORY (Food / Clothes / Self Care)
+    public int CategoryId { get; set; }
+
+    [ForeignKey("CategoryId")]
+    public virtual Category Category { get; set; } = null!;
+
+    // 🔹 SUBCATEGORIES (max 3 – enforced in backend)
+    public virtual ICollection<SellerSubCategory> SellerSubCategories { get; set; }
+        = new List<SellerSubCategory>();
+
     [InverseProperty("Seller")]
     public virtual ICollection<Order> Orders { get; set; } = new List<Order>();
+
+    [InverseProperty("Seller")]
+    public virtual ICollection<StoreSection> StoreSections { get; set; }
+    = new List<StoreSection>();
+
+    [InverseProperty(nameof(CustomerFavoriteSeller.Seller))]
+    public virtual ICollection<CustomerFavoriteSeller> FavoritedByCustomers { get; set; }
+    = new List<CustomerFavoriteSeller>();
+
 
     [InverseProperty("Seller")]
     public virtual ICollection<Product> Products { get; set; } = new List<Product>();

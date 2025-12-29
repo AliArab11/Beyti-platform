@@ -6,7 +6,7 @@ namespace Beyti_Backend.Controllers.Api
 {
     public class CreateDriverDto
     {
-        public int? UserId { get; set; }
+        public string? UserId { get; set; }  // Changed from int? to string? to accept GUID
         public string? FullName { get; set; }
         public string? VehicleType { get; set; }
         public string? LicenseNumber { get; set; }
@@ -36,12 +36,64 @@ namespace Beyti_Backend.Controllers.Api
                 .Select(d => new
                 {
                     d.Id,
+                    d.UserProfileId,
                     fullName = d.UserProfile.DisplayName,
                     d.Phone,
                     d.Status,
                     d.CreatedAt
                 })
                 .ToListAsync();
+        }
+
+        // GET: api/Drivers/Profile/{userProfileId} - Get driver by UserProfileId
+        [HttpGet("Profile/{userProfileId}")]
+        public async Task<ActionResult<object>> GetDriverByUserProfileId(int userProfileId)
+        {
+            try
+            {
+                var driver = await _context.Drivers
+                    .Include(d => d.UserProfile)
+                    .FirstOrDefaultAsync(d => d.UserProfileId == userProfileId);
+
+                if (driver == null)
+                    return NotFound("Driver not found");
+
+                // ✅ ASSIGN RANDOM BAHRAIN LOCATION IF NOT SET
+                if (driver.CurrentLat == null || driver.CurrentLng == null)
+                {
+                    var random = new Random();
+
+                    // Bahrain land bounds (tight - avoids sea)
+                    driver.CurrentLat = (decimal)(26.05 + random.NextDouble() * 0.20); // 26.05 to 26.25
+                    driver.CurrentLng = (decimal)(50.45 + random.NextDouble() * 0.15); // 50.45 to 50.60
+                    driver.UpdatedAt = DateTime.UtcNow;
+
+                    await _context.SaveChangesAsync();
+                }
+
+                return Ok(new
+                {
+                    DriverId = driver.Id,
+                    Id = driver.Id,
+                    UserProfileId = driver.UserProfileId,
+                    FullName = driver.UserProfile.DisplayName,
+                    Phone = driver.Phone,
+                    Status = driver.Status,
+                    CreatedAt = driver.CreatedAt,
+                    DisplayName = driver.UserProfile.DisplayName,
+                    RoleType = driver.UserProfile.RoleType,
+                    CurrentLat = driver.CurrentLat,
+                    CurrentLng = driver.CurrentLng
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Error fetching driver profile",
+                    error = ex.Message
+                });
+            }
         }
 
         // GET: api/Drivers/5
@@ -74,31 +126,42 @@ namespace Beyti_Backend.Controllers.Api
                 // Check if UserId is provided (for onboarding flow)
                 UserProfile profile;
 
-                if (dto.UserId.HasValue)
+                if (!string.IsNullOrEmpty(dto.UserId))
                 {
-                    // Find existing UserProfile by IdentityUserId
+                    // ONBOARDING FLOW: Find existing UserProfile by IdentityUserId (GUID string)
                     profile = await _context.UserProfiles
-                        .FirstOrDefaultAsync(up => up.IdentityUserId == dto.UserId.Value.ToString());
+                        .FirstOrDefaultAsync(up => up.IdentityUserId == dto.UserId);
 
                     if (profile == null)
                     {
-                        return BadRequest(new { error = "User profile not found" });
+                        return BadRequest(new { error = "User profile not found for userId: " + dto.UserId });
                     }
 
                     // Update profile to Driver role
                     profile.RoleType = "Driver";
-                    profile.UpdatedAt = DateTime.UtcNow;
+                    profile.UpdatedAt = DateTime.Now;
+
+                    // Delete orphaned Customer record if exists
+                    var existingCustomer = await _context.Customers
+                        .FirstOrDefaultAsync(c => c.UserProfileId == profile.Id);
+                    if (existingCustomer != null)
+                    {
+                        _context.Customers.Remove(existingCustomer);
+                    }
+
+                    await _context.SaveChangesAsync();
                 }
                 else
                 {
-                    // Create new UserProfile (for admin creating drivers)
+                    // ADMIN CREATION FLOW: Create new UserProfile
                     profile = new UserProfile
                     {
+                        IdentityUserId = Guid.NewGuid().ToString(),
                         DisplayName = dto.FullName ?? dto.Email ?? "Driver",
                         RoleType = "Driver",
                         Status = dto.Status,
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
+                        CreatedAt = DateTime.Now,
+                        UpdatedAt = DateTime.Now
                     };
 
                     _context.UserProfiles.Add(profile);
@@ -110,8 +173,8 @@ namespace Beyti_Backend.Controllers.Api
                     UserProfileId = profile.Id,
                     Phone = dto.PhoneNumber,
                     Status = dto.Status,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.Now,
+                    UpdatedAt = DateTime.Now
                 };
 
                 _context.Drivers.Add(driver);
@@ -151,8 +214,8 @@ namespace Beyti_Backend.Controllers.Api
             driver.UserProfile.DisplayName = dto.FullName;
             driver.Phone = dto.PhoneNumber;
             driver.Status = dto.Status;
-            driver.UserProfile.UpdatedAt = DateTime.UtcNow;
-            driver.UpdatedAt = DateTime.UtcNow;
+            driver.UserProfile.UpdatedAt = DateTime.Now;
+            driver.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 

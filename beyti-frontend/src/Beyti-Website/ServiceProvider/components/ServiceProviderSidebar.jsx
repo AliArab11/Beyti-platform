@@ -12,16 +12,18 @@ import {
   CalendarCheck,
   CalendarBlank,
   User,
-  CaretDown
+  CaretDown,
+  Star,
+  Bell
 } from '@phosphor-icons/react';
 import NavigationButton from '../../../components/NavigationButton';
 
 const ServiceProviderSidebar = ({ currentPage, onNavigate, userName = "Service Provider", userRole = "Provider" }) => {
   return (
-    <aside className="w-[250px] bg-sage-500 flex flex-col fixed h-screen">
-      <div className="p-6 border-b border-sage-700">
-        <h1 className="text-display-h1 text-cream-200">Beyti</h1>
-        <p className="text-label-medium text-cream-100 mt-1">Provider Portal</p>
+    <aside className="w-[250px] bg-sage-500 dark:bg-charcoal-500 flex flex-col fixed h-screen transition-colors border-r border-sage-700 dark:border-charcoal-400">
+      <div className="p-6 border-b border-sage-700 dark:border-charcoal-400">
+        <h1 className="text-display-h1 text-cream-200 dark:text-cream-50">Beyti</h1>
+        <p className="text-label-medium text-cream-100 dark:text-charcoal-300 mt-1">Provider Portal</p>
       </div>
 
       <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
@@ -56,21 +58,37 @@ const ServiceProviderSidebar = ({ currentPage, onNavigate, userName = "Service P
         >
           Availability
         </NavigationButton>
+
+        <NavigationButton
+          selected={currentPage === 'reviews'}
+          icon={<Star size={20} weight={currentPage === 'reviews' ? 'fill' : 'regular'} />}
+          onClick={() => onNavigate('reviews')}
+        >
+          Reviews
+        </NavigationButton>
+
+        <NavigationButton
+          selected={currentPage === 'notifications'}
+          icon={<Bell size={20} weight={currentPage === 'notifications' ? 'fill' : 'regular'} />}
+          onClick={() => onNavigate('notifications')}
+        >
+          Notifications
+        </NavigationButton>
       </nav>
 
-      <div className="border-t border-sage-700 p-4">
+      <div className="border-t border-sage-700 dark:border-charcoal-400 p-4">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="w-10 h-10 rounded-full bg-sage-700 flex items-center justify-center flex-shrink-0">
-              <User size={20} className="text-cream-200" />
+            <div className="w-10 h-10 rounded-full bg-sage-700 dark:bg-charcoal-400 flex items-center justify-center flex-shrink-0">
+              <User size={20} className="text-cream-200 dark:text-cream-50" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-body-regular text-cream-200 truncate">{userName}</p>
-              <p className="text-label-medium text-cream-100 truncate">{userRole}</p>
+              <p className="text-body-regular text-cream-200 dark:text-cream-50 truncate">{userName}</p>
+              <p className="text-label-medium text-cream-100 dark:text-charcoal-300 truncate">{userRole}</p>
             </div>
           </div>
-          <button className="flex-shrink-0 p-1 hover:bg-sage-700 rounded transition-colors">
-            <CaretDown size={16} className="text-cream-200" />
+          <button className="flex-shrink-0 p-1 hover:bg-sage-700 dark:hover:bg-charcoal-400 rounded transition-colors">
+            <CaretDown size={16} className="text-cream-200 dark:text-cream-50" />
           </button>
         </div>
       </div>

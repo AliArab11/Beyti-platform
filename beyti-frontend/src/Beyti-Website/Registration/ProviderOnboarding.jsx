@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
 import Select from '../../components/Select';
 import MembershipSelection from './components/MembershipSelection';
 import { validateRequired, validatePhone, validateNumber, validatePriceRange } from '../../utils/validation';
+import { getServiceCategories, createUserMembership } from '../../services/api';
 
 /**
  * Service Provider Onboarding Wizard
@@ -24,8 +25,8 @@ export default function ProviderOnboarding() {
   const [formData, setFormData] = useState({
     // Step 1: Identity
     businessName: '',
-    serviceType: '',
-    phone: '',
+    serviceCategoryId: '',
+    phone: localStorage.getItem('userPhone') || '',
     // Step 2: Services
     serviceDescription: '',
     minPrice: '',
@@ -44,23 +45,28 @@ export default function ProviderOnboarding() {
 
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [serviceCategories, setServiceCategories] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
+  const [uploadedCertificates, setUploadedCertificates] = useState([]);
 
-  // Service type options
-  const serviceTypes = [
-    { value: 'plumbing', label: 'Plumbing' },
-    { value: 'electrical', label: 'Electrical' },
-    { value: 'carpentry', label: 'Carpentry' },
-    { value: 'painting', label: 'Painting' },
-    { value: 'cleaning', label: 'Cleaning' },
-    { value: 'tutoring', label: 'Tutoring' },
-    { value: 'photography', label: 'Photography' },
-    { value: 'catering', label: 'Catering' },
-    { value: 'landscaping', label: 'Landscaping' },
-    { value: 'hvac', label: 'HVAC' },
-    { value: 'pest-control', label: 'Pest Control' },
-    { value: 'moving', label: 'Moving Services' },
-    { value: 'other', label: 'Other' }
-  ];
+  // Fetch service categories from backend
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const categories = await getServiceCategories();
+        setServiceCategories(categories.map(cat => ({
+          value: cat.id,
+          label: cat.name
+        })));
+      } catch (error) {
+        console.error('Failed to load service categories:', error);
+        setErrors(prev => ({ ...prev, form: 'Failed to load service categories. Please refresh the page.' }));
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   /**
    * Update form field
@@ -84,8 +90,8 @@ export default function ProviderOnboarding() {
       if (!validateRequired(formData.businessName)) {
         newErrors.businessName = 'Business name is required';
       }
-      if (!validateRequired(formData.serviceType)) {
-        newErrors.serviceType = 'Please select a service type';
+      if (!validateRequired(formData.serviceCategoryId)) {
+        newErrors.serviceCategoryId = 'Please select a service category';
       }
       if (!validateRequired(formData.phone)) {
         newErrors.phone = 'Phone number is required';
@@ -122,11 +128,8 @@ export default function ProviderOnboarding() {
       if (!formData.isVerified) {
         newErrors.verification = 'Please complete the verification step';
       }
-    } else if (step === 5) {
-      if (!formData.selectedPlan) {
-        newErrors.membership = 'Please select a membership plan';
-      }
     }
+    // Step 5: Membership is now optional - no validation needed
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -169,116 +172,265 @@ export default function ProviderOnboarding() {
   };
 
   /**
+   * Handle certificate file upload
+   */
+  const handleCertificateUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+    if (!allowedTypes.includes(file.type)) {
+      setErrors(prev => ({ ...prev, certificate: 'Invalid file type. Please use PDF, JPG, or PNG' }));
+      return;
+    }
+
+    // Validate file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      setErrors(prev => ({ ...prev, certificate: 'File too large. Maximum size is 5MB' }));
+      return;
+    }
+
+    // Convert to base64
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setUploadedCertificates(prev => [...prev, {
+        title: file.name,
+        fileData: reader.result, // base64 string
+        fileName: file.name
+      }]);
+      // Auto-check verification checkbox when file uploaded
+      setFormData(prev => ({ ...prev, isVerified: true }));
+      // Clear any certificate errors
+      if (errors.certificate) {
+        setErrors(prev => ({ ...prev, certificate: null }));
+      }
+    };
+    reader.onerror = () => {
+      setErrors(prev => ({ ...prev, certificate: 'Failed to read file. Please try again' }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  /**
+   * Remove uploaded certificate
+   */
+  const handleRemoveCertificate = (index) => {
+    setUploadedCertificates(prev => prev.filter((_, i) => i !== index));
+    // Uncheck verification if no certificates remain
+    if (uploadedCertificates.length === 1) {
+      setFormData(prev => ({ ...prev, isVerified: false }));
+    }
+  };
+
+  /**
    * Submit provider registration
    */
   const handleSubmit = async () => {
-    if (!validateStep(5)) {
-      return;
-    }
+    // No validation needed for step 5 since membership is optional
 
     setIsLoading(true);
 
     try {
       // Get stored user data from registration
       const userId = localStorage.getItem('userId');
+      const userProfileId = localStorage.getItem('userProfileId');
       const userEmail = localStorage.getItem('userEmail');
       const userPhone = localStorage.getItem('userPhone');
 
-      // Step 1: Create Address
-      // Combine location fields into proper address format
-      const streetParts = [
-        formData.road ? `Road ${formData.road}` : '',
-        formData.building ? `Building ${formData.building}` : '',
-        formData.avenue ? `Avenue ${formData.avenue}` : ''
-      ].filter(Boolean).join(', ');
+      console.log('[ProviderOnboarding] userId from localStorage:', userId);
+      console.log('[ProviderOnboarding] userProfileId from localStorage:', userProfileId);
 
-      const addressResponse = await fetch('https://localhost:7062/api/Addresses', {
+      if (!userId) {
+        throw new Error('User ID not found. Please register or login first before completing onboarding.');
+      }
+
+      // Check if ServiceProvider already exists (resubmission case)
+      let providerId = null;
+      let isResubmission = false;
+
+      try {
+        const checkProviderResponse = await fetch(`https://localhost:7062/api/ServiceProviders/user/${userProfileId}`);
+        if (checkProviderResponse.ok) {
+          const existingProvider = await checkProviderResponse.json();
+          providerId = existingProvider.id || existingProvider.Id;
+          isResubmission = true;
+          console.log('[ProviderOnboarding] Existing provider found (resubmission):', providerId);
+        }
+      } catch (error) {
+        console.log('[ProviderOnboarding] No existing provider found (new registration)');
+      }
+
+      // If NEW registration, create address and provider
+      if (!isResubmission) {
+        // Step 1: Create Address
+        const streetParts = [
+          formData.road ? `Road ${formData.road}` : '',
+          formData.building ? `Building ${formData.building}` : '',
+          formData.avenue ? `Avenue ${formData.avenue}` : ''
+        ].filter(Boolean).join(', ');
+
+        const addressResponse = await fetch('https://localhost:7062/api/Addresses', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            Label: 'Service Area',
+            Street: streetParts || 'N/A',
+            City: formData.city,
+            Region: null,
+            PostalCode: formData.block,
+            Country: 'Bahrain',
+            Latitude: null,
+            Longitude: null,
+            IsDefault: true
+          })
+        });
+
+        if (!addressResponse.ok) {
+          const errorText = await addressResponse.text();
+          console.error('Address creation failed:', errorText);
+          throw new Error(`Failed to create address - ${errorText || 'Bad Request'}`);
+        }
+
+        const addressData = await addressResponse.json();
+        const addressId = addressData.id || addressData.Id;
+
+        if (!addressId) {
+          throw new Error('Address created but no ID returned');
+        }
+
+        // Step 2: Create Service Provider with status 'Unavailable'
+        const providerResponse = await fetch('https://localhost:7062/api/ServiceProviders', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            businessName: formData.businessName,
+            serviceCategoryId: parseInt(formData.serviceCategoryId),
+            phone: formData.phone,
+            minServicePrice: parseFloat(formData.minPrice),
+            maxServicePrice: parseFloat(formData.maxPrice),
+            displayName: formData.businessName,
+            status: 'Unavailable',  // Changed from 'Available'
+            userId: userId
+          })
+        });
+
+        if (!providerResponse.ok) {
+          const errorText = await providerResponse.text();
+          console.error('Service Provider creation failed:', errorText);
+          throw new Error(`Failed to create service provider account - ${errorText || 'Bad Request'}`);
+        }
+
+        const providerData = await providerResponse.json();
+        providerId = providerData.id || providerData.Id;
+
+        if (!providerId) {
+          throw new Error('Service provider created but no ID returned');
+        }
+
+        // Step 3: Link Address
+        const providerAddressResponse = await fetch('https://localhost:7062/api/ServiceProviderAddresses', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ServiceProviderId: providerId,
+            AddressId: addressId
+          })
+        });
+
+        if (!providerAddressResponse.ok) {
+          const errorText = await providerAddressResponse.text();
+          console.error('ServiceProviderAddress creation failed:', errorText);
+          throw new Error(`Failed to link address to service provider - ${errorText || 'Bad Request'}`);
+        }
+
+        console.log('[ProviderOnboarding] New ServiceProvider created:', providerId);
+      }
+
+      // Step 4: Create or Update ProviderApplication
+      const applicationResponse = await fetch('https://localhost:7062/api/ProviderApplications', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          Label: 'Service Area',
-          Street: streetParts || 'N/A',
-          City: formData.city,
-          Region: null,
-          PostalCode: formData.block,
-          Country: 'Bahrain',
-          Latitude: null,
-          Longitude: null,
-          IsDefault: true
+          serviceProviderId: providerId,
+          status: 'Pending',
+          notes: formData.serviceDescription || null
         })
       });
 
-      if (!addressResponse.ok) {
-        const errorText = await addressResponse.text();
-        console.error('Address creation failed:', errorText);
-        throw new Error(`Step 1: Failed to create address - ${errorText || 'Bad Request'}`);
+      if (!applicationResponse.ok) {
+        const errorText = await applicationResponse.text();
+        console.error('ProviderApplication creation failed:', errorText);
+        throw new Error(`Failed to create application - ${errorText || 'Bad Request'}`);
       }
 
-      const addressData = await addressResponse.json();
-      console.log('Address created:', addressData);
+      const applicationData = await applicationResponse.json();
+      const applicationId = applicationData.id || applicationData.Id;
 
-      // Handle both camelCase (id) and PascalCase (Id) from backend
-      const addressId = addressData.id || addressData.Id;
-      if (!addressId) {
-        throw new Error('Step 1: Address created but no ID returned');
+      if (!applicationId) {
+        throw new Error('Application created but no ID returned');
       }
 
-      // Step 2: Create Service Provider
-      const providerResponse = await fetch('https://localhost:7062/api/ServiceProviders', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          businessName: formData.businessName,
-          phone: formData.phone,
-          minServicePrice: parseFloat(formData.minPrice),
-          maxServicePrice: parseFloat(formData.maxPrice),
-          displayName: formData.businessName,
-          status: 'Available'
-        })
-      });
+      console.log('[ProviderOnboarding] ProviderApplication created/updated:', applicationId);
 
-      if (!providerResponse.ok) {
-        const errorText = await providerResponse.text();
-        console.error('Service Provider creation failed:', errorText);
-        throw new Error(`Step 2: Failed to create service provider account - ${errorText || 'Bad Request'}`);
+      // Step 5: Upload certificates
+      for (const cert of uploadedCertificates) {
+        try {
+          const certResponse = await fetch('https://localhost:7062/api/ProviderCertificates', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              providerApplicationId: applicationId,
+              title: cert.title,
+              fileData: cert.fileData,
+              expiresAt: null
+            })
+          });
+
+          if (!certResponse.ok) {
+            const errorText = await certResponse.text();
+            console.error('Certificate upload failed:', errorText);
+            throw new Error(`Failed to upload certificate ${cert.fileName} - ${errorText}`);
+          }
+
+          console.log('[ProviderOnboarding] Certificate uploaded:', cert.fileName);
+        } catch (error) {
+          console.error('Certificate upload error:', error);
+          throw error;
+        }
       }
 
-      const providerData = await providerResponse.json();
-      console.log('Service Provider created:', providerData);
-
-      // Handle both camelCase (id) and PascalCase (Id) from backend
-      const providerId = providerData.id || providerData.Id;
-      if (!providerId) {
-        throw new Error('Step 2: Service provider created but no ID returned');
+      // Step 6: Create membership if selected
+      if (formData.selectedPlan) {
+        try {
+          await createUserMembership({
+            userProfileId: parseInt(userProfileId),
+            membershipPlanId: formData.selectedPlan,
+            autoRenew: false
+          });
+          console.log('[ProviderOnboarding] Membership created successfully');
+        } catch (error) {
+          console.error('Failed to assign membership, continuing...', error);
+          // Don't block registration if membership fails
+        }
       }
 
-      // Step 3: Create ServiceProviderAddress relationship
-      const providerAddressResponse = await fetch('https://localhost:7062/api/ServiceProviderAddresses', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ServiceProviderId: providerId,
-          AddressId: addressId
-        })
-      });
+      // Step 7: Set role to 'Pending' (CHANGED!)
+      localStorage.setItem('userRole', 'Pending');
+      console.log('[ProviderOnboarding] User role set to Pending');
 
-      if (!providerAddressResponse.ok) {
-        const errorText = await providerAddressResponse.text();
-        console.error('ServiceProviderAddress creation failed:', errorText);
-        throw new Error(`Step 3: Failed to link address to service provider - ${errorText || 'Bad Request'}`);
-      }
-
-      // Update role in localStorage
-      localStorage.setItem('userRole', 'ServiceProvider');
-
-      // Navigate to dashboard
-      navigate('/dashboard');
+      // Step 8: Navigate to homepage (CHANGED from /dashboard)
+      navigate('/');
 
     } catch (error) {
       console.error('Registration error:', error);
@@ -356,27 +508,35 @@ export default function ProviderOnboarding() {
 
               <Select
                 label="SERVICE TYPE"
-                name="serviceType"
-                id="serviceType"
-                value={formData.serviceType}
-                onChange={handleChange('serviceType')}
-                options={serviceTypes}
-                placeholder="Select your service type"
+                name="serviceCategoryId"
+                id="serviceCategoryId"
+                value={formData.serviceCategoryId}
+                onChange={handleChange('serviceCategoryId')}
+                options={serviceCategories}
+                placeholder={loadingCategories ? "Loading..." : "Select your service type"}
                 required
-                error={errors.serviceType}
+                disabled={loadingCategories}
+                error={errors.serviceCategoryId}
               />
 
-              <Input
-                label="PHONE NUMBER"
-                type="tel"
-                name="phone"
-                id="phone"
-                value={formData.phone}
-                onChange={handleChange('phone')}
-                placeholder="+973 12345678"
-                required
-                error={errors.phone}
-              />
+              <div>
+                <Input
+                  label="BUSINESS PHONE NUMBER"
+                  type="tel"
+                  name="phone"
+                  id="phone"
+                  value={formData.phone}
+                  onChange={handleChange('phone')}
+                  placeholder="+973 12345678"
+                  required
+                  error={errors.phone}
+                />
+                {localStorage.getItem('userPhone') && (
+                  <p className="text-xs text-charcoal-400 mt-1">
+                    Using your registered number. You can change it if needed.
+                  </p>
+                )}
+              </div>
             </div>
           )}
 
@@ -541,11 +701,51 @@ export default function ProviderOnboarding() {
                   Accepted formats: PDF, JPG, PNG (Max 5MB)
                 </p>
 
-                {/* Mock Upload Button */}
-                <Button variant="secondary" onClick={() => {}}>
-                  Upload Certification
-                </Button>
+                {/* Real File Upload */}
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={handleCertificateUpload}
+                  className="hidden"
+                  id="certificate-upload"
+                />
+                <label htmlFor="certificate-upload">
+                  <Button variant="secondary" as="span" style={{ cursor: 'pointer' }}>
+                    Upload Certification
+                  </Button>
+                </label>
+
+                {/* Display error */}
+                {errors.certificate && (
+                  <p className="text-sm text-error-text mt-2" role="alert">
+                    {errors.certificate}
+                  </p>
+                )}
               </div>
+
+              {/* Display uploaded files */}
+              {uploadedCertificates.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {uploadedCertificates.map((cert, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between bg-cream-100 border border-grey-stroke rounded-lg p-3"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">📄</span>
+                        <span className="text-body-regular text-charcoal-600">{cert.fileName}</span>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveCertificate(idx)}
+                        className="text-error-btn hover:text-error-text text-sm font-semibold"
+                        type="button"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Verification Checkbox */}
               <label className="flex items-start gap-3 cursor-pointer mt-6">
@@ -596,6 +796,7 @@ export default function ProviderOnboarding() {
               <MembershipSelection
                 onSelect={handleMembershipSelect}
                 selectedPlan={formData.selectedPlan}
+                onSubmit={handleSubmit}
               />
 
               {errors.membership && (

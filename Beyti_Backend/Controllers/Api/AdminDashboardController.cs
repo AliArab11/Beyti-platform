@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using BeytiDB.Data;
 using System.Text.Json;
+using Beyti_Backend.Services;
 
 namespace Beyti_Backend.Controllers.Api
 {
@@ -10,10 +11,14 @@ namespace Beyti_Backend.Controllers.Api
     public class AdminDashboardController : ControllerBase
     {
         private readonly BeytiContext _context;
+        private readonly INotificationService _notificationService;
+        private readonly IAuditLogService _auditLogService;
 
-        public AdminDashboardController(BeytiContext context)
+        public AdminDashboardController(BeytiContext context, INotificationService notificationService, IAuditLogService auditLogService)
         {
             _context = context;
+            _notificationService = notificationService;
+            _auditLogService = auditLogService;
         }
 
         [HttpGet("Users")]
@@ -35,7 +40,15 @@ namespace Beyti_Backend.Controllers.Api
                     u.RoleType,
                     u.Status,
                     u.CreatedAt,
-                    u.UpdatedAt
+                    u.UpdatedAt,
+                    // Include categoryId for Sellers
+                    CategoryId = u.RoleType == "Seller"
+                        ? _context.Sellers.Where(s => s.UserProfileId == u.Id).Select(s => (int?)s.CategoryId).FirstOrDefault()
+                        : null,
+                    // Include serviceCategoryId for ServiceProviders
+                    ServiceCategoryId = u.RoleType == "ServiceProvider"
+                        ? _context.ServiceProviders.Where(sp => sp.UserProfileId == u.Id).Select(sp => (int?)sp.ServiceCategoryId).FirstOrDefault()
+                        : null
                 })
                 .ToListAsync();
 
@@ -44,7 +57,7 @@ namespace Beyti_Backend.Controllers.Api
 
         // PUT: api/AdminDashboard/Users/5
         [HttpPut("Users/{id}")]
-        public async Task<IActionResult> UpdateUser(int id, JsonElement body)
+        public async Task<IActionResult> UpdateUser(int id, [FromQuery] int? adminUserProfileId, JsonElement body)
         {
             var user = await _context.UserProfiles.FindAsync(id);
             if (user == null) return NotFound();
@@ -52,6 +65,8 @@ namespace Beyti_Backend.Controllers.Api
             string? newDisplayName = null;
             string? newRoleType = null;
             string? newStatus = null;
+            int? categoryId = null;
+            int? serviceCategoryId = null;
 
             if (body.TryGetProperty("displayName", out var displayNameProp))
                 newDisplayName = displayNameProp.GetString();
@@ -62,12 +77,59 @@ namespace Beyti_Backend.Controllers.Api
             if (body.TryGetProperty("status", out var statusProp))
                 newStatus = statusProp.GetString();
 
+            // Parse categoryId - handle both string and number formats
+            if (body.TryGetProperty("categoryId", out var catProp) && catProp.ValueKind != JsonValueKind.Null)
+            {
+                if (catProp.ValueKind == JsonValueKind.Number)
+                {
+                    categoryId = catProp.GetInt32();
+                }
+                else if (catProp.ValueKind == JsonValueKind.String)
+                {
+                    var catStr = catProp.GetString();
+                    if (!string.IsNullOrEmpty(catStr) && int.TryParse(catStr, out var catInt))
+                    {
+                        categoryId = catInt;
+                    }
+                }
+            }
+
+            // Parse serviceCategoryId - handle both string and number formats
+            if (body.TryGetProperty("serviceCategoryId", out var scatProp) && scatProp.ValueKind != JsonValueKind.Null)
+            {
+                if (scatProp.ValueKind == JsonValueKind.Number)
+                {
+                    serviceCategoryId = scatProp.GetInt32();
+                }
+                else if (scatProp.ValueKind == JsonValueKind.String)
+                {
+                    var scatStr = scatProp.GetString();
+                    if (!string.IsNullOrEmpty(scatStr) && int.TryParse(scatStr, out var scatInt))
+                    {
+                        serviceCategoryId = scatInt;
+                    }
+                }
+            }
+
             // Check if role is being changed
             if (!string.IsNullOrEmpty(newRoleType) && newRoleType != user.RoleType)
             {
+                // Validate required fields for role changes
+                if (newRoleType == "Seller" && !categoryId.HasValue)
+                {
+                    return BadRequest("Category is required when changing to Seller role. Please select a category.");
+                }
+
+                if (newRoleType == "ServiceProvider" && !serviceCategoryId.HasValue)
+                {
+                    return BadRequest("Service Category is required when changing to Service Provider role. Please select a service category.");
+                }
+
+                string oldRoleType = user.RoleType;
+
                 // Mark current user as "Role Changed"
                 user.Status = "Role Changed";
-                user.UpdatedAt = DateTime.UtcNow;
+                user.UpdatedAt = DateTime.Now;
                 await _context.SaveChangesAsync();
 
                 // Create new UserProfile with the new role
@@ -77,8 +139,8 @@ namespace Beyti_Backend.Controllers.Api
                     DisplayName = newDisplayName ?? user.DisplayName,
                     RoleType = newRoleType,
                     Status = "Active",
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.Now,
+                    UpdatedAt = DateTime.Now
                 };
 
                 _context.UserProfiles.Add(newUser);
@@ -88,25 +150,54 @@ namespace Beyti_Backend.Controllers.Api
                 switch (newRoleType)
                 {
                     case "Seller":
-                        _context.Sellers.Add(new Seller { UserProfileId = newUser.Id, StoreName = "Default Store", Phone = "N/A", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
+                        _context.Sellers.Add(new Seller
+                        {
+                            UserProfileId = newUser.Id,
+                            StoreName = "Default Store",
+                            Phone = "N/A",
+                            CategoryId = categoryId!.Value,
+                            CreatedAt = DateTime.Now,
+                            UpdatedAt = DateTime.Now
+                        });
                         break;
                     case "Customer":
-                        _context.Customers.Add(new Customer { UserProfileId = newUser.Id, Phone = "N/A", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
+                        _context.Customers.Add(new Customer { UserProfileId = newUser.Id, Phone = "N/A", CreatedAt = DateTime.Now, UpdatedAt = DateTime.Now });
                         break;
                     case "Driver":
-                        _context.Drivers.Add(new Driver { UserProfileId = newUser.Id, Phone = "N/A", Status = "Active", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
+                        _context.Drivers.Add(new Driver { UserProfileId = newUser.Id, Phone = "N/A", Status = "Active", CreatedAt = DateTime.Now, UpdatedAt = DateTime.Now });
                         break;
                     case "ServiceProvider":
-                        _context.ServiceProviders.Add(new BeytiDB.Data.ServiceProvider { UserProfileId = newUser.Id, BusinessName = "Default Business", Phone = "N/A", Status = "Available", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
+                        _context.ServiceProviders.Add(new BeytiDB.Data.ServiceProvider
+                        {
+                            UserProfileId = newUser.Id,
+                            BusinessName = "Default Business",
+                            Phone = "N/A",
+                            ServiceCategoryId = serviceCategoryId!.Value,
+                            Status = "Available",
+                            CreatedAt = DateTime.Now,
+                            UpdatedAt = DateTime.Now
+                        });
                         break;
                     case "Admin":
-                        _context.AdminProfiles.Add(new AdminProfile { UserProfileId = newUser.Id, Title = newUser.DisplayName, Permissions = "All", CreatedAt = DateTime.UtcNow });
+                        _context.AdminProfiles.Add(new AdminProfile { UserProfileId = newUser.Id, Title = newUser.DisplayName, Permissions = "All", CreatedAt = DateTime.Now });
                         break;
                     default:
                         return BadRequest("Invalid RoleType");
                 }
 
                 await _context.SaveChangesAsync();
+
+                // Log role change in audit trail
+                if (adminUserProfileId.HasValue)
+                {
+                    await _auditLogService.LogRoleChangedAsync(
+                        adminUserProfileId.Value,
+                        user.Id,
+                        newUser.Id,
+                        oldRoleType,
+                        newRoleType
+                    );
+                }
 
                 return Ok(new
                 {
@@ -118,31 +209,166 @@ namespace Beyti_Backend.Controllers.Api
             else
             {
                 // Normal update (no role change)
-                if (!string.IsNullOrEmpty(newDisplayName))
+                bool statusChanged = false;
+                string oldStatus = user.Status;
+                string oldDisplayName = user.DisplayName ?? "Unknown";
+                List<string> changes = new List<string>();
+
+                if (!string.IsNullOrEmpty(newDisplayName) && newDisplayName != user.DisplayName)
+                {
                     user.DisplayName = newDisplayName;
+                    changes.Add($"Display name changed from '{oldDisplayName}' to '{newDisplayName}'");
+                }
 
-                if (!string.IsNullOrEmpty(newStatus))
+                if (!string.IsNullOrEmpty(newStatus) && newStatus != user.Status)
+                {
                     user.Status = newStatus;
+                    statusChanged = true;
+                    changes.Add($"Status changed from '{oldStatus}' to '{newStatus}'");
+                }
 
-                user.UpdatedAt = DateTime.UtcNow;
+                // Update category for Sellers
+                if (user.RoleType == "Seller" && categoryId.HasValue)
+                {
+                    var seller = await _context.Sellers.FirstOrDefaultAsync(s => s.UserProfileId == user.Id);
+                    if (seller != null && seller.CategoryId != categoryId.Value)
+                    {
+                        int oldCategoryId = seller.CategoryId;
+                        seller.CategoryId = categoryId.Value;
+                        seller.UpdatedAt = DateTime.Now;
+                        changes.Add($"Category changed from ID {oldCategoryId} to ID {categoryId.Value}");
+                    }
+                }
+
+                // Update service category for Service Providers
+                if (user.RoleType == "ServiceProvider" && serviceCategoryId.HasValue)
+                {
+                    var serviceProvider = await _context.ServiceProviders.FirstOrDefaultAsync(sp => sp.UserProfileId == user.Id);
+                    if (serviceProvider != null && serviceProvider.ServiceCategoryId != serviceCategoryId.Value)
+                    {
+                        int oldServiceCategoryId = serviceProvider.ServiceCategoryId;
+                        serviceProvider.ServiceCategoryId = serviceCategoryId.Value;
+                        serviceProvider.UpdatedAt = DateTime.Now;
+                        changes.Add($"Service Category changed from ID {oldServiceCategoryId} to ID {serviceCategoryId.Value}");
+                    }
+                }
+
+                user.UpdatedAt = DateTime.Now;
 
                 await _context.SaveChangesAsync();
+
+                // Log user update in audit trail
+                if (adminUserProfileId.HasValue && changes.Count > 0)
+                {
+                    string changeDescription = string.Join(", ", changes);
+                    await _auditLogService.LogUserUpdatedAsync(
+                        adminUserProfileId.Value,
+                        user.Id,
+                        user.DisplayName ?? "Unknown",
+                        changeDescription
+                    );
+                }
+
+                // Send notification if status changed
+                if (statusChanged && newStatus != null)
+                {
+                    string notificationTitle = "Account Status Updated";
+                    string notificationBody = $"Your account status has been changed from {oldStatus} to {newStatus} by an administrator.";
+                    string notificationType = newStatus.ToLower() switch
+                    {
+                        "active" => "status_activated",
+                        "inactive" => "status_deactivated",
+                        "suspended" => "status_suspended",
+                        _ => "status_changed"
+                    };
+
+                    await _notificationService.SendNotificationAsync(
+                        recipientUserId: user.Id,
+                        senderUserId: adminUserProfileId,
+                        type: notificationType,
+                        title: notificationTitle,
+                        body: notificationBody,
+                        relatedEntityType: "UserProfile",
+                        relatedEntityId: user.Id
+                    );
+                }
+
                 return Ok(user);
             }
         }
 
         [HttpPost("Users")]
-        public async Task<ActionResult> AddUser([FromBody] UserProfile userProfile)
+        public async Task<ActionResult> AddUser([FromBody] JsonElement body, [FromQuery] int? adminUserProfileId)
         {
             try
             {
-                if (string.IsNullOrEmpty(userProfile.IdentityUserId))
-                    userProfile.IdentityUserId = Guid.NewGuid().ToString();
+                // Parse the incoming JSON
+                string? displayName = body.TryGetProperty("displayName", out var dnProp) ? dnProp.GetString() : null;
+                string? roleType = body.TryGetProperty("roleType", out var rtProp) ? rtProp.GetString() : null;
+                string? status = body.TryGetProperty("status", out var stProp) ? stProp.GetString() : "Active";
 
-                userProfile.CreatedAt = DateTime.UtcNow;
-                userProfile.UpdatedAt = DateTime.UtcNow;
-                if (string.IsNullOrEmpty(userProfile.Status))
-                    userProfile.Status = "Active";
+                // Parse categoryId - handle both string and number formats
+                int? categoryId = null;
+                if (body.TryGetProperty("categoryId", out var catProp) && catProp.ValueKind != JsonValueKind.Null)
+                {
+                    if (catProp.ValueKind == JsonValueKind.Number)
+                    {
+                        categoryId = catProp.GetInt32();
+                    }
+                    else if (catProp.ValueKind == JsonValueKind.String)
+                    {
+                        var catStr = catProp.GetString();
+                        if (!string.IsNullOrEmpty(catStr) && int.TryParse(catStr, out var catInt))
+                        {
+                            categoryId = catInt;
+                        }
+                    }
+                }
+
+                // Parse serviceCategoryId - handle both string and number formats
+                int? serviceCategoryId = null;
+                if (body.TryGetProperty("serviceCategoryId", out var scatProp) && scatProp.ValueKind != JsonValueKind.Null)
+                {
+                    if (scatProp.ValueKind == JsonValueKind.Number)
+                    {
+                        serviceCategoryId = scatProp.GetInt32();
+                    }
+                    else if (scatProp.ValueKind == JsonValueKind.String)
+                    {
+                        var scatStr = scatProp.GetString();
+                        if (!string.IsNullOrEmpty(scatStr) && int.TryParse(scatStr, out var scatInt))
+                        {
+                            serviceCategoryId = scatInt;
+                        }
+                    }
+                }
+
+                if (string.IsNullOrEmpty(displayName) || string.IsNullOrEmpty(roleType))
+                {
+                    return BadRequest("DisplayName and RoleType are required");
+                }
+
+                // Validate required fields for Seller and ServiceProvider
+                if (roleType == "Seller" && !categoryId.HasValue)
+                {
+                    return BadRequest("Category is required for Seller role. Please select a category.");
+                }
+
+                if (roleType == "ServiceProvider" && !serviceCategoryId.HasValue)
+                {
+                    return BadRequest("Service Category is required for Service Provider role. Please select a service category.");
+                }
+
+                // Create UserProfile
+                var userProfile = new UserProfile
+                {
+                    IdentityUserId = Guid.NewGuid().ToString(),
+                    DisplayName = displayName,
+                    RoleType = roleType,
+                    Status = status ?? "Active",
+                    CreatedAt = DateTime.Now,
+                    UpdatedAt = DateTime.Now
+                };
 
                 _context.UserProfiles.Add(userProfile);
                 await _context.SaveChangesAsync();
@@ -151,25 +377,53 @@ namespace Beyti_Backend.Controllers.Api
                 switch (userProfile.RoleType)
                 {
                     case "Seller":
-                        _context.Sellers.Add(new Seller { UserProfileId = userProfile.Id, StoreName = "Default Store", Phone = "N/A", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
+                        _context.Sellers.Add(new Seller
+                        {
+                            UserProfileId = userProfile.Id,
+                            StoreName = "Default Store",
+                            Phone = "N/A",
+                            CategoryId = categoryId!.Value,
+                            CreatedAt = DateTime.Now,
+                            UpdatedAt = DateTime.Now
+                        });
                         break;
                     case "Customer":
-                        _context.Customers.Add(new Customer { UserProfileId = userProfile.Id, Phone = "N/A", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
+                        _context.Customers.Add(new Customer { UserProfileId = userProfile.Id, Phone = "N/A", CreatedAt = DateTime.Now, UpdatedAt = DateTime.Now });
                         break;
                     case "Driver":
-                        _context.Drivers.Add(new Driver { UserProfileId = userProfile.Id, Phone = "N/A", Status = "Active", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
+                        _context.Drivers.Add(new Driver { UserProfileId = userProfile.Id, Phone = "N/A", Status = "Active", CreatedAt = DateTime.Now, UpdatedAt = DateTime.Now });
                         break;
                     case "ServiceProvider":
-                        _context.ServiceProviders.Add(new BeytiDB.Data.ServiceProvider { UserProfileId = userProfile.Id, BusinessName = "Default Business", Phone = "N/A", Status = "Available", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
+                        _context.ServiceProviders.Add(new BeytiDB.Data.ServiceProvider
+                        {
+                            UserProfileId = userProfile.Id,
+                            BusinessName = "Default Business",
+                            Phone = "N/A",
+                            ServiceCategoryId = serviceCategoryId!.Value,
+                            Status = "Available",
+                            CreatedAt = DateTime.Now,
+                            UpdatedAt = DateTime.Now
+                        });
                         break;
                     case "Admin":
-                        _context.AdminProfiles.Add(new AdminProfile { UserProfileId = userProfile.Id, Title = userProfile.DisplayName, Permissions = "All", CreatedAt = DateTime.UtcNow });
+                        _context.AdminProfiles.Add(new AdminProfile { UserProfileId = userProfile.Id, Title = userProfile.DisplayName, Permissions = "All", CreatedAt = DateTime.Now });
                         break;
                     default:
                         return BadRequest("Invalid RoleType");
                 }
 
                 await _context.SaveChangesAsync();
+
+                // Log user creation in audit trail
+                if (adminUserProfileId.HasValue)
+                {
+                    await _auditLogService.LogUserCreatedAsync(
+                        adminUserProfileId.Value,
+                        userProfile.Id,
+                        userProfile.DisplayName ?? "Unknown",
+                        userProfile.RoleType
+                    );
+                }
 
                 // Return minimal user data to avoid serialization issues
                 return CreatedAtAction(nameof(GetUsers), new { id = userProfile.Id }, new
@@ -190,15 +444,53 @@ namespace Beyti_Backend.Controllers.Api
 
         // PATCH: api/AdminDashboard/Users/5/toggle
         [HttpPatch("Users/{id}/toggle")]
-        public async Task<IActionResult> ToggleUserStatus(int id)
+        public async Task<IActionResult> ToggleUserStatus(int id, [FromQuery] int? adminUserProfileId)
         {
             var user = await _context.UserProfiles.FindAsync(id);
             if (user == null) return NotFound();
 
+            string oldStatus = user.Status;
             user.Status = user.Status == "Active" ? "Inactive" : "Active";
-            user.UpdatedAt = DateTime.UtcNow;
+            user.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
+
+            // Log activation/deactivation in audit trail
+            if (adminUserProfileId.HasValue)
+            {
+                if (user.Status == "Active")
+                {
+                    await _auditLogService.LogUserActivatedAsync(
+                        adminUserProfileId.Value,
+                        user.Id,
+                        user.DisplayName ?? "Unknown"
+                    );
+                }
+                else
+                {
+                    await _auditLogService.LogUserDeactivatedAsync(
+                        adminUserProfileId.Value,
+                        user.Id,
+                        user.DisplayName ?? "Unknown"
+                    );
+                }
+            }
+
+            // Send notification about status toggle
+            string notificationTitle = user.Status == "Active" ? "Account Activated" : "Account Deactivated";
+            string notificationBody = $"Your account has been {(user.Status == "Active" ? "activated" : "deactivated")} by an administrator.";
+            string notificationType = user.Status == "Active" ? "status_activated" : "status_deactivated";
+
+            await _notificationService.SendNotificationAsync(
+                recipientUserId: user.Id,
+                senderUserId: adminUserProfileId,
+                type: notificationType,
+                title: notificationTitle,
+                body: notificationBody,
+                relatedEntityType: "UserProfile",
+                relatedEntityId: user.Id
+            );
+
             return Ok(user);
         }
 
@@ -229,7 +521,7 @@ namespace Beyti_Backend.Controllers.Api
 
         // PATCH: api/AdminDashboard/ServiceProviderRequests/5/approve
         [HttpPatch("ServiceProviderRequests/{id}/approve")]
-        public async Task<IActionResult> ApproveServiceProviderRequest(int id)
+        public async Task<IActionResult> ApproveServiceProviderRequest(int id, [FromQuery] int? adminUserProfileId)
         {
             try
             {
@@ -242,18 +534,40 @@ namespace Beyti_Backend.Controllers.Api
 
                 // Update application status
                 request.Status = "Approved";
-                request.UpdatedAt = DateTime.UtcNow;
+                request.UpdatedAt = DateTime.Now;
 
                 // Update service provider
                 request.ServiceProvider.Status = "Available"; // Set to Available (not Active)
-                request.ServiceProvider.VerifiedAt = DateTime.UtcNow;
-                request.ServiceProvider.UpdatedAt = DateTime.UtcNow;
+                request.ServiceProvider.VerifiedAt = DateTime.Now;
+                request.ServiceProvider.UpdatedAt = DateTime.Now;
 
                 // Update user profile status (for account activation)
                 request.ServiceProvider.UserProfile.Status = "Active";
-                request.ServiceProvider.UserProfile.UpdatedAt = DateTime.UtcNow;
+                request.ServiceProvider.UserProfile.UpdatedAt = DateTime.Now;
 
                 await _context.SaveChangesAsync();
+
+                // Get admin name for notification
+                string adminInfo = "";
+                if (adminUserProfileId.HasValue)
+                {
+                    var adminProfile = await _context.UserProfiles.FindAsync(adminUserProfileId.Value);
+                    if (adminProfile != null)
+                    {
+                        adminInfo = $" by Administrator {adminProfile.DisplayName}";
+                    }
+                }
+
+                // Send notification to the service provider
+                await _notificationService.SendNotificationAsync(
+                    recipientUserId: request.ServiceProvider.UserProfileId,
+                    senderUserId: adminUserProfileId,
+                    type: "application_approved",
+                    title: "Application Approved",
+                    body: $"Congratulations! Your service provider application has been approved{adminInfo}. You can now start accepting service requests.",
+                    relatedEntityType: "ProviderApplication",
+                    relatedEntityId: request.Id
+                );
 
                 return Ok(new
                 {
@@ -270,7 +584,7 @@ namespace Beyti_Backend.Controllers.Api
 
         // PATCH: api/AdminDashboard/ServiceProviderRequests/5/reject
         [HttpPatch("ServiceProviderRequests/{id}/reject")]
-        public async Task<IActionResult> RejectServiceProviderRequest(int id)
+        public async Task<IActionResult> RejectServiceProviderRequest(int id, [FromQuery] int? adminUserProfileId, [FromBody] JsonElement body)
         {
             try
             {
@@ -281,25 +595,57 @@ namespace Beyti_Backend.Controllers.Api
 
                 if (request == null) return NotFound();
 
-                // Update application status
+                // Extract rejection reason from body
+                string? rejectionReason = null;
+                if (body.TryGetProperty("rejectionReason", out var reasonProp))
+                    rejectionReason = reasonProp.GetString();
+
+                // Update application status and store rejection reason in Notes
                 request.Status = "Rejected";
-                request.UpdatedAt = DateTime.UtcNow;
+                request.Notes = rejectionReason ?? request.Notes;
+                request.UpdatedAt = DateTime.Now;
 
-                // Optionally set service provider as unavailable
+                // Set service provider as unavailable
                 request.ServiceProvider.Status = "Unavailable";
-                request.ServiceProvider.UpdatedAt = DateTime.UtcNow;
+                request.ServiceProvider.UpdatedAt = DateTime.Now;
 
-                // Optionally deactivate user profile
-                request.ServiceProvider.UserProfile.Status = "Inactive";
-                request.ServiceProvider.UserProfile.UpdatedAt = DateTime.UtcNow;
+                // Keep user profile Active (allow resubmission and login)
+                request.ServiceProvider.UserProfile.UpdatedAt = DateTime.Now;
 
                 await _context.SaveChangesAsync();
+
+                // Get admin name for notification
+                string adminInfo = "";
+                if (adminUserProfileId.HasValue)
+                {
+                    var adminProfile = await _context.UserProfiles.FindAsync(adminUserProfileId.Value);
+                    if (adminProfile != null)
+                    {
+                        adminInfo = $" by Administrator {adminProfile.DisplayName}";
+                    }
+                }
+
+                // Send notification with rejection reason
+                string notificationBody = rejectionReason != null
+                    ? $"Your service provider application has been rejected. Reason: {rejectionReason}. You may resubmit your application after addressing the issues."
+                    : "Your service provider application has been rejected. Please contact support for details. You may resubmit your application.";
+
+                await _notificationService.SendNotificationAsync(
+                    recipientUserId: request.ServiceProvider.UserProfileId,
+                    senderUserId: adminUserProfileId,
+                    type: "application_rejected",
+                    title: "Application Rejected",
+                    body: notificationBody,
+                    relatedEntityType: "ProviderApplication",
+                    relatedEntityId: request.Id
+                );
 
                 return Ok(new
                 {
                     message = "Request rejected successfully",
                     applicationId = request.Id,
-                    serviceProviderId = request.ServiceProviderId
+                    serviceProviderId = request.ServiceProviderId,
+                    rejectionReason
                 });
             }
             catch (Exception ex)
@@ -360,7 +706,7 @@ namespace Beyti_Backend.Controllers.Api
                     .CountAsync(sp => sp.Status == "Available");
 
                 // Recent Activities (last 7 days)
-                var weekAgo = DateTime.UtcNow.AddDays(-7);
+                var weekAgo = DateTime.Now.AddDays(-7);
                 var recentUsers = await _context.UserProfiles
                     .CountAsync(u => u.CreatedAt >= weekAgo);
 
@@ -383,7 +729,7 @@ namespace Beyti_Backend.Controllers.Api
                 var driverMemberships = activeMemberships.FirstOrDefault(m => m.Role == "Driver")?.Count ?? 0;
 
                 // Monthly revenue (last 30 days)
-                var monthAgo = DateTime.UtcNow.AddDays(-30);
+                var monthAgo = DateTime.Now.AddDays(-30);
                 var monthlyRevenue = await _context.Orders
                     .Where(o => completedStatuses.Contains(o.Status) && o.CreatedAt >= monthAgo)
                     .SumAsync(o => (decimal?)o.TotalAmount) ?? 0;
@@ -514,9 +860,17 @@ namespace Beyti_Backend.Controllers.Api
                 // Flag service providers with issues (NOT suspended)
                 var flaggedServiceProviders = await _context.ServiceProviders
                     .Include(sp => sp.UserProfile)
+                    .Include(sp => sp.Services)
                     .Where(sp =>
-                        sp.UserProfile.Status == "Active" && // Only active accounts
-                        sp.Status == "Unavailable" // Provider marked as unavailable
+                        sp.UserProfile.Status == "Active" && ( // Only active accounts
+                            sp.Status == "Unavailable" || // Provider marked as unavailable
+                            sp.Services.Any(s =>
+                                prohibitedKeywords.Any(keyword =>
+                                    s.Name.ToLower().Contains(keyword) ||
+                                    (s.Description != null && s.Description.ToLower().Contains(keyword))
+                                )
+                            ) // Has services with prohibited keywords
+                        )
                     )
                     .Select(sp => new
                     {
@@ -528,10 +882,22 @@ namespace Beyti_Backend.Controllers.Api
                         phone = sp.Phone,
                         availabilityStatus = sp.Status,
                         userStatus = sp.UserProfile.Status,
+                        totalServices = sp.Services.Count,
+                        inappropriateServices = sp.Services.Count(s =>
+                            prohibitedKeywords.Any(keyword =>
+                                s.Name.ToLower().Contains(keyword) ||
+                                (s.Description != null && s.Description.ToLower().Contains(keyword))
+                            )
+                        ),
                         createdAt = sp.CreatedAt,
                         updatedAt = sp.UpdatedAt,
                         verifiedAt = sp.VerifiedAt,
-                        flagReason = "Marked as Unavailable"
+                        flagReason = sp.Services.Any(s =>
+                            prohibitedKeywords.Any(keyword =>
+                                s.Name.ToLower().Contains(keyword) ||
+                                (s.Description != null && s.Description.ToLower().Contains(keyword))
+                            )
+                        ) ? "Inappropriate Content" : "Marked as Unavailable"
                     })
                     .ToListAsync();
 
@@ -629,6 +995,7 @@ namespace Beyti_Backend.Controllers.Api
 
                 // Check if user is a service provider
                 var serviceProvider = await _context.ServiceProviders
+                    .Include(sp => sp.Services)
                     .FirstOrDefaultAsync(sp => sp.UserProfileId == userId);
 
                 if (serviceProvider != null)
@@ -662,6 +1029,36 @@ namespace Beyti_Backend.Controllers.Api
                             flaggedKeywords = new List<string>()
                         });
                     }
+
+                    // Get services with inappropriate content from Service table (not ServiceCatalog)
+                    var inappropriateServices = serviceProvider.Services
+                        .Where(s =>
+                            prohibitedKeywords.Any(keyword =>
+                                s.Name.ToLower().Contains(keyword) ||
+                                (s.Description != null && s.Description.ToLower().Contains(keyword))
+                            )
+                        )
+                        .Select(s => new
+                        {
+                            id = s.Id,
+                            name = s.Name,
+                            description = s.Description,
+                            minPrice = s.MinPrice,
+                            maxPrice = s.MaxPrice,
+                            isActive = s.IsActive,
+                            createdAt = s.CreatedAt,
+                            updatedAt = DateTime.Now,
+                            violationType = s.IsActive ? "Inappropriate Content (Active)" : "Inappropriate Content (Inactive)",
+                            flaggedKeywords = prohibitedKeywords
+                                .Where(keyword =>
+                                    s.Name.ToLower().Contains(keyword) ||
+                                    (s.Description != null && s.Description.ToLower().Contains(keyword))
+                                )
+                                .ToList()
+                        })
+                        .ToList();
+
+                    violations.AddRange(inappropriateServices);
                 }
 
                 return Ok(new
@@ -682,7 +1079,7 @@ namespace Beyti_Backend.Controllers.Api
 
         // PUT: api/AdminDashboard/SuspendUser/5
         [HttpPut("SuspendUser/{userId}")]
-        public async Task<IActionResult> SuspendUser(int userId, [FromBody] JsonElement body)
+        public async Task<IActionResult> SuspendUser(int userId, [FromQuery] int? adminUserProfileId, [FromBody] JsonElement body)
         {
             try
             {
@@ -695,7 +1092,7 @@ namespace Beyti_Backend.Controllers.Api
 
                 // Suspend the UserProfile (account level)
                 user.Status = "Suspended"; // Changed from "Inactive" to "Suspended"
-                user.UpdatedAt = DateTime.UtcNow;
+                user.UpdatedAt = DateTime.Now;
 
                 // Handle role-specific suspensions
                 if (user.RoleType == "Seller")
@@ -706,27 +1103,33 @@ namespace Beyti_Backend.Controllers.Api
 
                     if (seller != null)
                     {
-                        seller.UpdatedAt = DateTime.UtcNow;
+                        seller.UpdatedAt = DateTime.Now;
 
                         // Deactivate all their products
                         foreach (var product in seller.Products)
                         {
                             product.IsActive = false;
-                            product.UpdatedAt = DateTime.UtcNow;
+                            product.UpdatedAt = DateTime.Now;
                         }
                     }
                 }
                 else if (user.RoleType == "ServiceProvider")
                 {
                     var serviceProvider = await _context.ServiceProviders
+                        .Include(sp => sp.Services)
                         .FirstOrDefaultAsync(sp => sp.UserProfileId == userId);
 
                     if (serviceProvider != null)
                     {
-                        // Keep availability status separate - mark as Suspended in a note
-                        // Or you could add a IsSuspended boolean field
+                        // Mark service provider as unavailable
                         serviceProvider.Status = "Unavailable";
-                        serviceProvider.UpdatedAt = DateTime.UtcNow;
+                        serviceProvider.UpdatedAt = DateTime.Now;
+
+                        // Deactivate all their services
+                        foreach (var service in serviceProvider.Services)
+                        {
+                            service.IsActive = false;
+                        }
                     }
                 }
                 else if (user.RoleType == "Driver")
@@ -737,11 +1140,33 @@ namespace Beyti_Backend.Controllers.Api
                     if (driver != null)
                     {
                         driver.Status = "Suspended"; // Changed from "Inactive"
-                        driver.UpdatedAt = DateTime.UtcNow;
+                        driver.UpdatedAt = DateTime.Now;
                     }
                 }
 
                 await _context.SaveChangesAsync();
+
+                // Log user suspension in audit trail
+                if (adminUserProfileId.HasValue)
+                {
+                    await _auditLogService.LogUserSuspendedAsync(
+                        adminUserProfileId.Value,
+                        userId,
+                        user.DisplayName ?? "Unknown",
+                        reason ?? "No reason provided"
+                    );
+                }
+
+                // Send notification to the suspended user
+                await _notificationService.SendNotificationAsync(
+                    recipientUserId: userId,
+                    senderUserId: adminUserProfileId,
+                    type: "account_suspended",
+                    title: "Account Suspended",
+                    body: reason ?? "Your account has been suspended by an administrator. Please contact support for more information.",
+                    relatedEntityType: "UserProfile",
+                    relatedEntityId: userId
+                );
 
                 return Ok(new
                 {
@@ -759,7 +1184,7 @@ namespace Beyti_Backend.Controllers.Api
 
         // PUT: api/AdminDashboard/ReactivateUser/5
         [HttpPut("ReactivateUser/{userId}")]
-        public async Task<IActionResult> ReactivateUser(int userId)
+        public async Task<IActionResult> ReactivateUser(int userId, [FromQuery] int? adminUserProfileId)
         {
             try
             {
@@ -768,19 +1193,44 @@ namespace Beyti_Backend.Controllers.Api
 
                 // Reactivate the UserProfile
                 user.Status = "Active";
-                user.UpdatedAt = DateTime.UtcNow;
+                user.UpdatedAt = DateTime.Now;
 
                 // Handle role-specific reactivations
-                if (user.RoleType == "ServiceProvider")
+                if (user.RoleType == "Seller")
+                {
+                    var seller = await _context.Sellers
+                        .Include(s => s.Products)
+                        .FirstOrDefaultAsync(s => s.UserProfileId == userId);
+
+                    if (seller != null)
+                    {
+                        seller.UpdatedAt = DateTime.Now;
+
+                        // Reactivate all their products
+                        foreach (var product in seller.Products)
+                        {
+                            product.IsActive = true;
+                            product.UpdatedAt = DateTime.Now;
+                        }
+                    }
+                }
+                else if (user.RoleType == "ServiceProvider")
                 {
                     var serviceProvider = await _context.ServiceProviders
+                        .Include(sp => sp.Services)
                         .FirstOrDefaultAsync(sp => sp.UserProfileId == userId);
 
                     if (serviceProvider != null)
                     {
                         // Set back to Available
                         serviceProvider.Status = "Available";
-                        serviceProvider.UpdatedAt = DateTime.UtcNow;
+                        serviceProvider.UpdatedAt = DateTime.Now;
+
+                        // Reactivate all their services
+                        foreach (var service in serviceProvider.Services)
+                        {
+                            service.IsActive = true;
+                        }
                     }
                 }
                 else if (user.RoleType == "Driver")
@@ -791,17 +1241,78 @@ namespace Beyti_Backend.Controllers.Api
                     if (driver != null)
                     {
                         driver.Status = "Active";
-                        driver.UpdatedAt = DateTime.UtcNow;
+                        driver.UpdatedAt = DateTime.Now;
                     }
                 }
 
                 await _context.SaveChangesAsync();
+
+                // Log user reactivation in audit trail
+                if (adminUserProfileId.HasValue)
+                {
+                    await _auditLogService.LogUserReactivatedAsync(
+                        adminUserProfileId.Value,
+                        userId,
+                        user.DisplayName ?? "Unknown"
+                    );
+                }
+
+                // Send notification to the reactivated user
+                await _notificationService.SendNotificationAsync(
+                    recipientUserId: userId,
+                    senderUserId: adminUserProfileId,
+                    type: "account_reactivated",
+                    title: "Account Reactivated",
+                    body: "Your account has been reactivated by an administrator. You can now access all features.",
+                    relatedEntityType: "UserProfile",
+                    relatedEntityId: userId
+                );
 
                 return Ok(new
                 {
                     message = "User reactivated successfully",
                     userId,
                     userStatus = user.Status
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
+
+        // PUT: api/AdminDashboard/WarnUser/5
+        [HttpPut("WarnUser/{userId}")]
+        public async Task<IActionResult> WarnUser(int userId, [FromQuery] int? adminUserProfileId, [FromBody] JsonElement body)
+        {
+            try
+            {
+                var user = await _context.UserProfiles.FindAsync(userId);
+                if (user == null) return NotFound();
+
+                string? message = null;
+                if (body.TryGetProperty("message", out var messageProp))
+                    message = messageProp.GetString();
+
+                if (string.IsNullOrWhiteSpace(message))
+                    return BadRequest(new { error = "Warning message is required" });
+
+                // Send warning notification to the user
+                await _notificationService.SendNotificationAsync(
+                    recipientUserId: userId,
+                    senderUserId: adminUserProfileId,
+                    type: "user_warning",
+                    title: "Warning from Administration",
+                    body: message,
+                    relatedEntityType: "UserProfile",
+                    relatedEntityId: userId
+                );
+
+                return Ok(new
+                {
+                    message = "Warning sent successfully",
+                    userId,
+                    warningMessage = message
                 });
             }
             catch (Exception ex)

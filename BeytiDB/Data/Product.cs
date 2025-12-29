@@ -17,7 +17,7 @@ public partial class Product
 
     public int SellerId { get; set; }
 
-    public int SubCategoryId { get; set; }
+    public int? SubCategoryId { get; set; }
 
     public byte? GenderId { get; set; }
 
@@ -29,6 +29,15 @@ public partial class Product
     [Column(TypeName = "decimal(10, 2)")]
     public decimal BasePrice { get; set; }
 
+    [NotMapped]
+    public decimal? AverageRating { get; set; }
+
+    [Column(TypeName = "decimal(5, 2)")]
+    public decimal? DiscountPercentage { get; set; }
+
+    [StringLength(500)]
+    public string? ImageUrl { get; set; }
+
     public bool IsActive { get; set; }
 
     [Precision(3)]
@@ -36,6 +45,12 @@ public partial class Product
 
     [Precision(3)]
     public DateTime UpdatedAt { get; set; }
+
+    public int? StoreSectionId { get; set; }
+
+    [ForeignKey(nameof(StoreSectionId))]
+    [InverseProperty("Products")]
+    public virtual StoreSection? StoreSection { get; set; }
 
     [ForeignKey("GenderId")]
     [InverseProperty("Products")]

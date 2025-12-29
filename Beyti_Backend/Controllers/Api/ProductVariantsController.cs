@@ -24,6 +24,7 @@ namespace Beyti_Backend.Controllers.Api
         public class CreateProductVariantDto
         {
             public int ProductId { get; set; }
+            public string VariantName { get; set; } = null!;
             public string? ColorValue { get; set; }
             public string? SizeValue { get; set; }
             public string? SKU { get; set; }
@@ -36,6 +37,7 @@ namespace Beyti_Backend.Controllers.Api
         {
             public int Id { get; set; }
             public int ProductId { get; set; }
+            public string VariantName { get; set; } = null!;
             public int? ColorValueId { get; set; }
             public int? SizeValueId { get; set; }
             public string? ColorValue { get; set; }
@@ -51,7 +53,7 @@ namespace Beyti_Backend.Controllers.Api
         [HttpGet]
         public async Task<ActionResult<IEnumerable<ProductVariantResponse>>> GetProductVariants([FromQuery] int? productId)
         {
-            var query = _context.ProductVariants.AsQueryable();
+            var query = _context.ProductVariants.Where(pv => pv.IsActive).AsQueryable();
 
             if (productId.HasValue)
             {
@@ -67,6 +69,7 @@ namespace Beyti_Backend.Controllers.Api
                 {
                     Id = v.Id,
                     ProductId = v.ProductId,
+                    VariantName = v.VariantName,
                     ColorValueId = v.ColorValueId,
                     SizeValueId = v.SizeValueId,
                     SKU = v.SKU,
@@ -154,6 +157,7 @@ namespace Beyti_Backend.Controllers.Api
             {
                 Id = v.Id,
                 ProductId = v.ProductId,
+                VariantName = v.VariantName,
                 ColorValueId = v.ColorValueId,
                 SizeValueId = v.SizeValueId,
                 SKU = v.SKU,
@@ -247,13 +251,15 @@ namespace Beyti_Backend.Controllers.Api
             var productVariant = new ProductVariant
             {
                 ProductId = dto.ProductId,
+                VariantName = dto.VariantName,
                 ColorValueId = colorValueId,
                 SizeValueId = sizeValueId,
                 SKU = dto.SKU,
                 Price = dto.Price,
                 StockQty = dto.StockQty,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now,
+                UpdatedAt = DateTime.Now,
+                IsActive = true
             };
 
             _context.ProductVariants.Add(productVariant);
@@ -263,6 +269,7 @@ namespace Beyti_Backend.Controllers.Api
             {
                 Id = productVariant.Id,
                 ProductId = productVariant.ProductId,
+                VariantName = productVariant.VariantName,
                 ColorValueId = productVariant.ColorValueId,
                 SizeValueId = productVariant.SizeValueId,
                 ColorValue = dto.ColorValue,
@@ -341,19 +348,20 @@ namespace Beyti_Backend.Controllers.Api
                 sizeValueId = sizeValue.Id;
             }
 
+            productVariant.VariantName = dto.VariantName;
             productVariant.ColorValueId = colorValueId;
             productVariant.SizeValueId = sizeValueId;
             productVariant.SKU = dto.SKU;
             productVariant.Price = dto.Price;
             productVariant.StockQty = dto.StockQty;
-            productVariant.UpdatedAt = DateTime.UtcNow;
+            productVariant.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
             return NoContent();
         }
 
-        // DELETE: api/ProductVariants/5
+        // DELETE: api/ProductVariants/5 - Toggle IsActive status
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteProductVariant(int id)
         {
@@ -363,7 +371,10 @@ namespace Beyti_Backend.Controllers.Api
                 return NotFound();
             }
 
-            _context.ProductVariants.Remove(productVariant);
+            // Toggle active status instead of deleting
+            productVariant.IsActive = false;
+            productVariant.UpdatedAt = DateTime.Now;
+
             await _context.SaveChangesAsync();
 
             return NoContent();

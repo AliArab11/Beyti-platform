@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using BeytiDB.Data;
+using Beyti_Backend.DTOs;
+using Beyti_Backend.Services;
 
 namespace Beyti_Backend.Controllers.Api
 {
@@ -14,10 +16,12 @@ namespace Beyti_Backend.Controllers.Api
     public class AnnouncementsController : ControllerBase
     {
         private readonly BeytiContext _context;
+        private readonly INotificationService _notificationService;
 
-        public AnnouncementsController(BeytiContext context)
+        public AnnouncementsController(BeytiContext context, INotificationService notificationService)
         {
             _context = context;
+            _notificationService = notificationService;
         }
 
         // GET: api/Announcements
@@ -75,12 +79,49 @@ namespace Beyti_Backend.Controllers.Api
         // POST: api/Announcements
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Announcement>> PostAnnouncement(Announcement announcement)
+        public async Task<ActionResult<Announcement>> PostAnnouncement([FromBody] AnnouncementCreateDto dto)
         {
+            // 1. Create announcement record
+            var announcement = new Announcement
+            {
+                AdminUserId = dto.AdminUserId,
+                Title = dto.Title,
+                Message = dto.Message,
+                Audience = string.Join(",", dto.Audiences), // Store as comma-separated
+                IsActive = true,
+                CreatedAt = DateTime.Now,
+                ExpiresAt = dto.ExpiresAt
+            };
+
             _context.Announcements.Add(announcement);
             await _context.SaveChangesAsync();
 
+            // 2. Send notifications to all users in selected audiences
+            await _notificationService.SendAnnouncementNotificationsAsync(
+                announcement.Id,
+                dto.AdminUserId,
+                dto.Title,
+                dto.Message,
+                dto.Audiences
+            );
+
             return CreatedAtAction("GetAnnouncement", new { id = announcement.Id }, announcement);
+        }
+
+        // PUT: api/Announcements/5/deactivate
+        [HttpPut("{id}/deactivate")]
+        public async Task<IActionResult> DeactivateAnnouncement(int id)
+        {
+            var announcement = await _context.Announcements.FindAsync(id);
+            if (announcement == null)
+            {
+                return NotFound();
+            }
+
+            announcement.IsActive = false;
+            await _context.SaveChangesAsync();
+
+            return NoContent();
         }
 
         // DELETE: api/Announcements/5

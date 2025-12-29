@@ -26,10 +26,13 @@ namespace Beyti_Backend.Controllers.Api
         {
             var providers = await _context.ServiceProviders
                 .Include(sp => sp.UserProfile)
+                .Include(sp => sp.ServiceReviews)
+                .Where(sp => sp.UserProfile.Status == "Active" && sp.UserProfile.RoleType == "ServiceProvider")
                 .Select(sp => new
                 {
                     sp.Id,
                     sp.UserProfileId,
+                    sp.ServiceCategoryId,
                     sp.BusinessName,
                     sp.Phone,
                     sp.MinServicePrice,
@@ -38,7 +41,13 @@ namespace Beyti_Backend.Controllers.Api
                     sp.CreatedAt,
                     sp.UpdatedAt,
                     sp.VerifiedAt,
-                    DisplayName = sp.UserProfile.DisplayName
+                    DisplayName = sp.UserProfile != null && !string.IsNullOrEmpty(sp.UserProfile.DisplayName)
+                        ? sp.UserProfile.DisplayName
+                        : sp.BusinessName,
+                    AverageRating = sp.ServiceReviews.Any(r => !r.IsHidden)
+                        ? sp.ServiceReviews.Where(r => !r.IsHidden).Average(r => (double)r.OverallRating)
+                        : 0,
+                    ReviewCount = sp.ServiceReviews.Count(r => !r.IsHidden)
                 })
                 .ToListAsync();
 
@@ -53,6 +62,61 @@ namespace Beyti_Backend.Controllers.Api
             if (provider == null)
                 return NotFound();
             return provider;
+        }
+
+        // GET: api/ServiceProviders/5/services
+        [HttpGet("{id}/services")]
+        public async Task<ActionResult<IEnumerable<object>>> GetServiceProviderServices(int id)
+        {
+            var provider = await _context.ServiceProviders.FindAsync(id);
+            if (provider == null)
+                return NotFound("Service provider not found");
+
+            Console.WriteLine($"[GetServiceProviderServices] Fetching services for provider ID: {id}");
+
+            // First check if Service table has any data at all
+            var totalServices = await _context.Services.CountAsync();
+            Console.WriteLine($"[GetServiceProviderServices] Total services in database: {totalServices}");
+
+            // Check services for this specific provider
+            var providerServiceCount = await _context.Services
+                .Where(s => s.ServiceProviderId == id)
+                .CountAsync();
+            Console.WriteLine($"[GetServiceProviderServices] Services for provider {id}: {providerServiceCount}");
+
+            var services = await _context.Services
+                .Include(s => s.ServiceCatalog)
+                    .ThenInclude(sc => sc.ServiceCategory)
+                .Include(s => s.ServiceBookings)
+                    .ThenInclude(sb => sb.ServiceReviews)
+                .Where(s => s.ServiceProviderId == id)
+                .Select(s => new
+                {
+                    s.Id,
+                    s.Name,
+                    s.Description,
+                    s.MinPrice,
+                    s.MaxPrice,
+                    s.EstimatedDuration,
+                    s.IsActive,
+                    ServiceCatalogId = s.ServiceCatalogId,
+                    ServiceCatalogName = s.ServiceCatalog.Name,
+                    ServiceCategoryId = s.ServiceCatalog.ServiceCategoryId,
+                    ServiceCategoryName = s.ServiceCatalog.ServiceCategory.Name,
+                    // Calculate average rating from service reviews
+                    AverageRating = s.ServiceBookings
+                        .SelectMany(sb => sb.ServiceReviews)
+                        .Where(sr => !sr.IsHidden)
+                        .Average(sr => (double?)sr.OverallRating) ?? 0,
+                    ReviewCount = s.ServiceBookings
+                        .SelectMany(sb => sb.ServiceReviews)
+                        .Count(sr => !sr.IsHidden),
+                    s.CreatedAt
+                })
+                .ToListAsync();
+
+            Console.WriteLine($"[GetServiceProviderServices] Returning {services.Count} services");
+            return Ok(services);
         }
 
         // PUT: api/ServiceProviders/5
@@ -81,7 +145,7 @@ namespace Beyti_Backend.Controllers.Api
                     provider.Status = status;
             }
 
-            provider.UpdatedAt = DateTime.UtcNow;
+            provider.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
             return Ok(provider);
@@ -105,6 +169,7 @@ namespace Beyti_Backend.Controllers.Api
             decimal? maxServicePrice = null;
             string? displayName = null;
             string status = "Available"; // default
+            string? userId = null; // For onboarding flow
 
             if (body.TryGetProperty("phone", out var phoneProp))
                 phone = phoneProp.GetString();
@@ -125,26 +190,73 @@ namespace Beyti_Backend.Controllers.Api
                     status = s;
             }
 
-            var now = DateTime.UtcNow;
+            // NEW: Extract userId for onboarding flow
+            if (body.TryGetProperty("userId", out var userIdProp))
+                userId = userIdProp.GetString();
 
-            // Create UserProfile
-            var profile = new UserProfile
+            // Extract serviceCategoryId (required)
+            if (!body.TryGetProperty("serviceCategoryId", out var serviceCategoryIdProp))
+                return BadRequest(new { error = "serviceCategoryId is required" });
+
+            int serviceCategoryId = serviceCategoryIdProp.GetInt32();
+
+            // Validate ServiceCategory exists
+            var categoryExists = await _context.ServiceCategories
+                .AnyAsync(sc => sc.Id == serviceCategoryId && sc.IsActive);
+
+            if (!categoryExists)
+                return BadRequest(new { error = "Invalid service category" });
+
+            var now = DateTime.Now;
+            UserProfile profile;
+
+            // Check if this is onboarding (userId provided) or admin creation
+            if (!string.IsNullOrEmpty(userId))
             {
-                IdentityUserId = Guid.NewGuid().ToString(),
-                DisplayName = displayName ?? businessName,
-                RoleType = "ServiceProvider",
-                Status = "Active",  // UserProfile status is for account activation
-                CreatedAt = now,
-                UpdatedAt = now
-            };
+                // ONBOARDING FLOW: Update existing UserProfile
+                profile = await _context.UserProfiles
+                    .FirstOrDefaultAsync(up => up.IdentityUserId == userId);
 
-            _context.UserProfiles.Add(profile);
-            await _context.SaveChangesAsync();
+                if (profile == null)
+                    return BadRequest(new { error = "User profile not found for userId: " + userId });
+
+                // Update existing profile to ServiceProvider role
+                profile.RoleType = "ServiceProvider";
+                profile.DisplayName = displayName ?? businessName;
+                profile.UpdatedAt = now;
+
+                // Delete orphaned Customer record if exists
+                var existingCustomer = await _context.Customers
+                    .FirstOrDefaultAsync(c => c.UserProfileId == profile.Id);
+                if (existingCustomer != null)
+                {
+                    _context.Customers.Remove(existingCustomer);
+                }
+
+                await _context.SaveChangesAsync();
+            }
+            else
+            {
+                // ADMIN CREATION FLOW: Create new UserProfile (existing behavior)
+                profile = new UserProfile
+                {
+                    IdentityUserId = Guid.NewGuid().ToString(),
+                    DisplayName = displayName ?? businessName,
+                    RoleType = "ServiceProvider",
+                    Status = "Active",  // UserProfile status is for account activation
+                    CreatedAt = now,
+                    UpdatedAt = now
+                };
+
+                _context.UserProfiles.Add(profile);
+                await _context.SaveChangesAsync();
+            }
 
             // Create ServiceProvider - manually added providers are auto-verified
             var provider = new BeytiDB.Data.ServiceProvider
             {
                 UserProfileId = profile.Id,
+                ServiceCategoryId = serviceCategoryId,
                 BusinessName = businessName,
                 Phone = phone,
                 MinServicePrice = minServicePrice,

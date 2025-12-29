@@ -5,13 +5,32 @@ import NavigationButton from "../../components/NavigationButton";
 import AnalyticsCard from "../../components/AnalyticsCard";
 import StatusChip from "../../components/StatusChip";
 import CRUDButton from "../../components/CRUDButton";
+import Snackbar from "../../components/Snackbar";
+import ProfilePage from '../../components/ProfilePage';
+
 import { Table, TableHeader, TableBody, TableRow } from "../../components/Table";
 
-import { getSellerOrders, getSellers } from "../../services/api";
-import Orders from "./Components/Orders"; 
+import { getSellerOrders, getSellers, restoreStock, getProducts, getProductVariants, getSellerProfile } from "../../services/api";
+import OrderTimer from "./Components/OrderTimer";
+import Orders from "./Components/Orders";
 import Analytics from "./Components/Analytics";
+import Products from "./Components/Products";
+import Reviews from "./Components/Reviews";
+import NotificationsPage from '../ServiceProvider/components/NotificationsPage';
+
+import './Components/modalAnimations.css';
+
+import { isStoreOpen, formatTime } from './Components/storeStatus';
+
+import { Outlet, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 
 import * as Icon from "@phosphor-icons/react";
+import { getUserProfileId, getUserId } from "../../utils/auth";
+import { handleSuspensionError } from "../../utils/authUtils";
+import { useSignalRNotifications } from '../../hooks/useSignalRNotifications';
+import { useSignalR } from '../../contexts/SignalRContext';
+
 
 
 
@@ -37,11 +56,11 @@ const getStatusVariant = (status) => {
   const s = status?.toLowerCase();
   if (!s) return "neutral";
   if (s === "placed" || s === "pending") return "danger";
-  if (["accepted", "preparing", "ready for pickup"].includes(s)) return "brand";
-  if (s === "completed") return "success";
+  if (["accepted", "preparing", "ready for pickup", "picked up"].includes(s)) return "brand";
+  if (s === "completed" || s === "delivered") return "success";
   if (s === "cancelled") return "error";
   return "neutral";
-};
+};;
 
 const getPaymentVariant = (status) => {
   const s = status?.toLowerCase();
@@ -53,10 +72,42 @@ const getPaymentVariant = (status) => {
 };
 
 // ---------- Order Details Modal (Option A - Centered) ----------
-const OrderDetailsModal = ({ order, onClose, onOrderUpdated }) => {
+const OrderDetailsModal = ({ order, onClose, onOrderUpdated, onOrderExpired, onShowSnackbar }) => {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState(null);
   const [localOrder, setLocalOrder] = useState(order);
+
+   useEffect(() => {
+    setLocalOrder(order);
+  }, [order]);
+
+
+  // Handle timer expiration - update UI and close modal
+const handleTimerExpired = async (orderId) => {
+  console.log('⏰ Timer expired in modal for order:', orderId);
+  
+  // Check if already cancelled to prevent duplicate calls
+  if (localOrder.status?.toLowerCase() === 'cancelled') {
+    console.log('⚠️ Order already cancelled, skipping');
+    onClose();
+    return;
+  }
+  
+  // Update local state immediately for instant UI feedback
+  const cancelledOrder = { ...localOrder, status: "Cancelled" };
+  setLocalOrder(cancelledOrder);
+  
+  // DON'T call the API - backend auto-cancel already handled it
+  // Just notify parent to update UI
+  if (onOrderExpired) {
+    onOrderExpired(orderId);
+  }
+  
+  // Close modal after a brief delay
+  setTimeout(() => {
+    onClose();
+  }, 1500);
+};
 
   // derived flags
   const status = (localOrder.status || "").toLowerCase();
@@ -78,67 +129,109 @@ const OrderDetailsModal = ({ order, onClose, onOrderUpdated }) => {
   };
 
   const handleSellerResponse = async (newStatus) => {
-    setActionLoading(true);
-    setActionError(null);
+  setActionLoading(true);
+  setActionError(null);
+  try {
+    const res = await fetch(`${baseUrl}/${localOrder.id}/seller-response`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        Status: newStatus,
+        SellerNote: null,
+      }),
+    });
+
+    if (!res.ok) {
+  let errorMessage = "Failed to update order";
+  
+  try {
+    const errorData = await res.json();
+    errorMessage = errorData.message || errorData.Message || errorMessage;
+  } catch (e) {
+    // If JSON parsing fails, try text
     try {
-      const res = await fetch(`${baseUrl}/${localOrder.id}/seller-response`, {
+      const errorText = await res.text();
+      if (errorText) errorMessage = errorText;
+    } catch (textError) {
+      // Use default message
+    }
+    
+  }
+  console.log('❌ API Error Response:', errorMessage);
+      
+      // Check if it's an expiry error
+      if ( errorMessage.includes("expired") || errorMessage.includes("cancelled") )  {
+        // Update local state
+        const cancelledOrder = { ...localOrder, status: "Cancelled" };
+        setLocalOrder(cancelledOrder);
+        if (onOrderUpdated) onOrderUpdated(cancelledOrder);
+        
+        // Show snackbar
+        if (onShowSnackbar) {
+          onShowSnackbar({
+            message: errorMessage,
+            type: 'error'
+          });
+        }
+        
+        // Close modal after brief delay
+        setTimeout(() => {
+          onClose();
+        }, 1500);
+        
+        return;
+      }
+      
+      throw new Error(errorMessage);
+    }
+
+    applyUpdate(newStatus);
+  } catch (err) {
+    console.error(err);
+    setActionError(err.message || "Failed to update order");
+  } finally {
+    setActionLoading(false);
+  }
+};
+
+
+
+  const handleAdvanceStatus = async () => {
+  let nextStatus = null;
+
+  if (isAccepted) nextStatus = "Preparing";
+  else if (isPreparing) nextStatus = "Ready for Pickup";
+  else if (isReadyForPickup && isPickup) nextStatus = "Completed";
+  else return;
+
+  setActionLoading(true);
+  setActionError(null);
+  try {
+    const res = await fetch(
+      `${baseUrl}/${localOrder.id}/update-seller-status`,
+      {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          Status: newStatus,
-          SellerNote: null,
+          Status: nextStatus,
         }),
-      });
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "Failed to update order");
       }
+    );
 
-      applyUpdate(newStatus);
-    } catch (err) {
-      console.error(err);
-      setActionError(err.message || "Failed to update order");
-    } finally {
-      setActionLoading(false);
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || "Failed to update order status");
     }
-  };
 
-  const handleAdvanceStatus = async () => {
-    let nextStatus = null;
-
-    if (isAccepted) nextStatus = "Preparing";
-    else if (isPreparing) nextStatus = "Ready for Pickup";
-    else if (isReadyForPickup && isPickup) nextStatus = "Completed";
-    else return;
-
-    setActionLoading(true);
-    setActionError(null);
-    try {
-      const res = await fetch(
-        `${baseUrl}/${localOrder.id}/update-seller-status`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            Status: nextStatus,
-          }),
-        }
-      );
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "Failed to update order status");
-      }
-
-      applyUpdate(nextStatus);
-    } catch (err) {
-      console.error(err);
-      setActionError(err.message || "Failed to update order status");
-    } finally {
-      setActionLoading(false);
-    }
-  };
+    applyUpdate(nextStatus);
+    // Don't restore stock - only needed when cancelling from placed/pending
+  } catch (err) {
+    console.error(err);
+    setActionError(err.message || "Failed to update order status");
+  } finally {
+    setActionLoading(false);
+  }
+};
 
   const renderFooterButtons = () => {
     if (isCompleted) {
@@ -218,8 +311,8 @@ const OrderDetailsModal = ({ order, onClose, onOrderUpdated }) => {
   if (!localOrder) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="bg-cream-50 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-grey-stroke">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm modal-backdrop-enter">
+      <div className="bg-cream-50 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-grey-stroke modal-content-enter">
         {/* Header */}
         <div className="px-6 py-4 border-b border-grey-stroke flex items-center justify-between">
           <div>
@@ -241,15 +334,25 @@ const OrderDetailsModal = ({ order, onClose, onOrderUpdated }) => {
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
-          {/* Status + Payment row */}
+         {/* Status + Payment row */}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="space-y-1">
               <p className="text-xs text-charcoal-400 uppercase tracking-wide">
                 Status
               </p>
-              <StatusChip variant={getStatusVariant(localOrder.status)}>
-                {localOrder.status || "Unknown"}
-              </StatusChip>
+              <div className="flex items-center gap-3">
+                <StatusChip variant={getStatusVariant(localOrder.status)}>
+                  {localOrder.status || "Unknown"}
+                </StatusChip>
+                {isPlaced && (
+                  <OrderTimer 
+                    order={localOrder} 
+                    onExpire={handleTimerExpired}
+                    size="large"
+                    showIcon={true}
+                  />
+                )}
+              </div>
             </div>
             <div className="space-y-1">
               <p className="text-xs text-charcoal-400 uppercase tracking-wide">
@@ -260,6 +363,35 @@ const OrderDetailsModal = ({ order, onClose, onOrderUpdated }) => {
               </span>
             </div>
           </div>
+
+          {/* Timer Warning Banner - Only for placed orders */}
+          {isPlaced && (
+            <div className="bg-orange-50 border-l-4 border-orange-500 px-4 py-3 rounded-lg">
+              <div className="flex items-center gap-3">
+                <svg
+                  className="w-6 h-6 text-orange-600 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-orange-800">
+                    Action Required
+                  </p>
+                  <div className="text-sm text-orange-700">
+                    Please accept or decline this order to continue processing.
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Customer & Store info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-grey-100 rounded-xl p-4 border border-grey-stroke">
@@ -287,14 +419,16 @@ const OrderDetailsModal = ({ order, onClose, onOrderUpdated }) => {
                 {formatCurrency(localOrder.totalAmount || 0)}
               </p>
             </div>
-            <div>
-              <p className="text-xs text-charcoal-400 mb-1 uppercase tracking-wide">
-                Delivery Fee
-              </p>
-              <p className="text-sm font-semibold text-charcoal-700">
-                {formatCurrency(localOrder.deliveryFee || 0)}
-              </p>
-            </div>
+            {localOrder.fulfillmentType === "Delivery" && (
+              <div>
+                <p className="text-xs text-charcoal-400 mb-1 uppercase tracking-wide">
+                  Delivery Fee
+                </p>
+                <p className="text-sm font-semibold text-charcoal-700">
+                  {formatCurrency(localOrder.deliveryFee || 0)}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Items */}
@@ -341,6 +475,23 @@ const OrderDetailsModal = ({ order, onClose, onOrderUpdated }) => {
             )}
           </div>
 
+          {/* Order Comments */}
+            {localOrder.orderNote && (
+              <div className="bg-amber-50 border-l-4 border-amber-500 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-amber-800 mb-1">Customer's Order Comments</p>
+                    <p className="text-sm text-charcoal-700 bg-white rounded px-3 py-2">
+                      {localOrder.orderNote}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
           {/* Error message */}
           {actionError && (
             <div className="bg-error-bg border-l-4 border-error-btn px-3 py-2 rounded">
@@ -360,22 +511,285 @@ const OrderDetailsModal = ({ order, onClose, onOrderUpdated }) => {
 
 // ---------- Main Component ----------
 const SellerDashboard = () => {
-  const [activeTab, setActiveTab] = useState("dashboard");
+
+
+const getPageTitle = () => {
+  if (location.pathname.includes("/seller-dashboard/orders")) {
+    return "Order Management";
+  } else if (location.pathname.includes("/seller-dashboard/products")) {
+    return "Product Management";
+  } else if (location.pathname.includes("/seller-dashboard/analytics")) {
+    return "Analytics & Insights";
+  } else if (location.pathname.includes("/seller-dashboard/reviews")) {
+    return "Customer Reviews";
+  } else if (location.pathname.includes("/seller-dashboard/profile")) {
+    return "My Profile";
+  } else if (location.pathname.includes("/seller-dashboard/notifications")) {
+    return "Notifications";
+  } else {
+    return "Seller Dashboard";
+  }
+};
+
+  const [isOpen, setIsOpen] = useState(false);
+  const [isTogglingStore, setIsTogglingStore] = useState(false);
+
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [sellerId, setSellerId] = useState(null);
   const [sellerName, setSellerName] = useState("My Store");
+  const [sellerUserProfileId, setSellerUserProfileId] = useState(null);
+
+  // Get logged-in user ID for notifications (NOT the seller entity ID)
+  // This will be overridden by the seller's UserProfileId when a seller is selected
+  const loggedInUserId = sellerUserProfileId || getUserProfileId();
 
   const [sellerList, setSellerList] = useState([]);
-  const [selectModalOpen, setSelectModalOpen] = useState(true);
+  const [selectModalOpen, setSelectModalOpen] = useState(false); // Changed to false - will open only if multiple sellers exist
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const [sellerProducts, setSellerProducts] = useState([]);
+
   const [searchRecent, setSearchRecent] = useState("");
+
+  // Notifications state
+  const [notificationSearchQuery, setNotificationSearchQuery] = useState('');
 
   // order modal state
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [orderModalOpen, setOrderModalOpen] = useState(false);
+
+  // snackbar state
+  const [snackbar, setSnackbar] = useState({ show: false, message: '', type: 'error' });
+
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+const handleOrderExpired = (orderId) => {
+  // FRONTEND DOES NOT CANCEL — BACKEND ALREADY DID
+  setOrders(prev =>
+    prev.map(o =>
+      o.id === orderId ? { ...o, status: "Cancelled" } : o
+    )
+  );
+
+  setSnackbar({
+    show: true,
+    message: "Order expired and was automatically cancelled",
+    type: "error"
+  });
+};
+
+// SignalR connection (connection is established globally by App/NotificationDropdown)
+const { isConnected, invoke } = useSignalR();
+
+// When a seller is selected, register this seller with the current user's SignalR connection
+// This tells the backend: "User X is now managing Seller Y, send notifications to User X"
+React.useEffect(() => {
+  const currentUserId = getUserId();
+  console.log('[SellerDashboard] 🔍 Logged-in user ID:', currentUserId);
+  console.log('[SellerDashboard] 🔍 Selected seller ID:', sellerId);
+  console.log('[SellerDashboard] 🔍 Selected seller UserProfileId:', sellerUserProfileId);
+  console.log('[SellerDashboard] 🔍 SignalR isConnected:', isConnected);
+
+  // If we have a seller selected and SignalR is connected
+  if (sellerId && isConnected && currentUserId) {
+    console.log('[SellerDashboard] ✅ Registering seller management: User', currentUserId, 'managing Seller', sellerId);
+
+    // Register this seller-user mapping with the backend
+    // This way, when orders come in for this seller, they'll be sent to the current user
+    invoke('RegisterSellerManager', sellerId, parseInt(currentUserId))
+      .then(() => {
+        console.log('[SellerDashboard] ✅ Successfully registered as manager for Seller', sellerId);
+        console.log('[SellerDashboard] 📡 Order notifications for Seller', sellerId, 'will be sent to user_' + currentUserId);
+      })
+      .catch(err => {
+        console.error('[SellerDashboard] ❌ Failed to register seller manager:', err);
+        console.warn('[SellerDashboard] ⚠️ Real-time notifications may not work!');
+      });
+  }
+}, [sellerId, sellerUserProfileId, isConnected, invoke]);
+
+// SignalR order status change handler
+const handleOrderStatusChange = React.useCallback((data) => {
+  console.log('[SellerDashboard] Received order status change:', data);
+  console.log('[SellerDashboard] Order data from SignalR:', data.order);
+
+  // Update the order in the list with complete order data from backend
+  setOrders(prev => prev.map(order => {
+    if (order.id === data.orderId) {
+      // Use the complete order data from backend, ensuring we preserve the id
+      const updatedOrder = {
+        ...data.order,
+        id: data.orderId,
+        status: data.newStatus
+      };
+      console.log('[SellerDashboard] Updating order from:', order, 'to:', updatedOrder);
+      return updatedOrder;
+    }
+    return order;
+  }));
+
+  // Also update selectedOrder if modal is open for this order
+  setSelectedOrder(prev => {
+    if (prev && prev.id === data.orderId) {
+      return {
+        ...data.order,
+        id: data.orderId,
+        status: data.newStatus
+      };
+    }
+    return prev;
+  });
+
+  // Show notification about order status change
+  const orderStatusMessages = {
+    'Accepted': 'Order accepted',
+    'Preparing': 'Order is being prepared',
+    'Ready for Pickup': 'Order is ready for pickup',
+    'Completed': 'Order completed',
+    'Cancelled': 'Order cancelled'
+  };
+
+  const message = orderStatusMessages[data.newStatus] || 'Order status updated';
+  setSnackbar({
+    show: true,
+    message,
+    type: data.newStatus === 'Cancelled' ? 'error' : 'success'
+  });
+}, []);
+
+const handleOrderUpdate = React.useCallback((data) => {
+  console.log('[SellerDashboard] 🔔 Received order update:', data);
+  console.log('[SellerDashboard] 📊 Full data object:', JSON.stringify(data, null, 2));
+
+  if (data.type === 'OrderReceived') {
+    // New order received from customer - add it to the orders list
+    // Try both data.data and data.order to handle different payload structures
+    const newOrder = data.data || data.order;
+
+    if (newOrder) {
+      console.log('[SellerDashboard] ✅ Adding new order to list:', newOrder);
+      console.log('[SellerDashboard] 📦 Order details - ID:', newOrder.id, 'Customer:', newOrder.customerName, 'Total:', newOrder.totalAmount);
+
+      setOrders(prev => {
+        // Check if order already exists to prevent duplicates
+        const exists = prev.some(o => o.id === newOrder.id);
+        if (exists) {
+          console.log('[SellerDashboard] ⚠️ Order already exists, skipping duplicate');
+          return prev;
+        }
+
+        // Add new order at the beginning (most recent)
+        const updated = [newOrder, ...prev];
+        console.log('[SellerDashboard] ✅ Updated orders count:', updated.length, '(was', prev.length, ')');
+        return updated;
+      });
+
+      setSnackbar({
+        show: true,
+        message: `New order #${newOrder.id} received from ${newOrder.customerName || 'customer'}!`,
+        type: 'success'
+      });
+    } else {
+      console.warn('[SellerDashboard] ⚠️ No order data received, refreshing list...');
+      // Fallback to refresh if no data
+      if (sellerId) {
+        getSellerOrders(sellerId).then(ordersData => {
+          const sorted = (Array.isArray(ordersData) ? ordersData : [])
+            .slice()
+            .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+          setOrders(sorted);
+          console.log('[SellerDashboard] 🔄 Orders refreshed, count:', sorted.length);
+        }).catch(error => {
+          console.error('[SellerDashboard] ❌ Error refreshing orders:', error);
+        });
+      }
+
+      setSnackbar({
+        show: true,
+        message: 'New order received!',
+        type: 'success'
+      });
+    }
+  }
+}, [sellerId]);
+
+// Handle real-time announcements
+const handleAnnouncement = React.useCallback((data) => {
+  console.log('[SellerDashboard] Received announcement:', data);
+  setSnackbar({
+    show: true,
+    message: `📢 ${data.title}: ${data.message}`,
+    type: 'success'
+  });
+}, []);
+
+// Set up real-time order updates via SignalR
+useSignalRNotifications({
+  onOrderUpdate: handleOrderUpdate,
+  onOrderStatusChange: handleOrderStatusChange,
+  onAnnouncement: handleAnnouncement
+});
+
+const handleToggleStoreStatus = async () => {
+  setIsTogglingStore(true);
+  
+  try {
+    const response = await fetch(`https://localhost:7062/api/Sellers/${sellerId}/toggle-store-status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log('✅ Toggle response:', data);
+      
+      // Update local state
+      setIsOpen(data.isOpen);
+      
+      // Reload seller data to sync everything
+      await reloadSellerData();
+      
+      // Show success message
+      setSnackbar({
+        show: true,
+        message: data.message || (data.isOpen ? 'Store opened successfully' : 'Store closed successfully'),
+        type: 'success'
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error toggling store status:', error);
+    setSnackbar({
+      show: true,
+      message: 'Failed to update store status',
+      type: 'error'
+    });
+  } finally {
+    setIsTogglingStore(false);
+  }
+};
+
+// Helper function to reload seller data
+const reloadSellerData = async () => {
+  try {
+    const data = await getSellers();
+    console.log('🔄 Reloaded sellers:', data);
+    setSellerList(Array.isArray(data) ? data : []);
+    
+    // Update current seller name if needed
+    const currentSeller = data.find(s => s.id === sellerId);
+    if (currentSeller) {
+      setSellerName(currentSeller.storeName || "My Store");
+    }
+  } catch (err) {
+    console.error("Failed to reload sellers", err);
+  }
+};
+
 
   // Disable page scroll when modals are open
 useEffect(() => {
@@ -410,48 +824,148 @@ useEffect(() => {
     );
   };
 
-  // Load sellers for modal
-  useEffect(() => {
-    const loadSellers = async () => {
-      try {
-        const data = await getSellers();
-        setSellerList(Array.isArray(data) ? data : []);
-      } catch (err) {
-        console.error("Failed to load sellers", err);
+  // Load seller for current user
+useEffect(() => {
+  const loadSeller = async () => {
+    try {
+      const currentUserProfileId = getUserProfileId();
+      if (!currentUserProfileId) {
+        console.error('No userProfileId found in localStorage');
+        return;
       }
-    };
 
-    loadSellers();
-  }, []);
+      console.log('📦 Loading seller for userProfileId:', currentUserProfileId);
+      const { getSellerByUserProfileId } = await import('../../services/api');
+      const sellerData = await getSellerByUserProfileId(currentUserProfileId);
+      console.log('📦 Loaded seller:', sellerData);
 
-  // Load seller orders after selecting sellerId
-  useEffect(() => {
-    if (!sellerId) return;
+      if (sellerData) {
+        // Auto-select the seller for this user
+        const sellerId = sellerData.sellerId || sellerData.id;
+        const storeName = sellerData.storeName || sellerData.name || "My Store";
+        const userProfileId = sellerData.userProfileId || sellerData.UserProfileId;
 
-    const loadOrders = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await getSellerOrders(sellerId);
-        setOrders(Array.isArray(data) ? data : []);
-      } catch (err) {
-        setError(err.message || "Failed to load orders");
-      } finally {
-        setLoading(false);
+        setSellerName(storeName);
+        setSellerId(sellerId);
+        setSellerUserProfileId(userProfileId);
+        setSellerList([sellerData]); // Store in list for potential future use
+        setSelectModalOpen(false); // Never show modal for single user
+
+        console.log('📦 Auto-selected seller:', { sellerId, storeName, userProfileId });
+      } else {
+        console.warn('No seller profile found for current user');
       }
-    };
+    } catch (err) {
+      console.error("Failed to load seller", err);
+    }
+  };
 
-    loadOrders();
-  }, [sellerId]);
+  loadSeller();
+}, []);
+
+
+// Load seller orders and products after selecting sellerId
+useEffect(() => {
+  if (!sellerId) return;
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Check seller account status for suspension
+      const currentSeller = sellerList.find(s => s.id === sellerId);
+      if (currentSeller && currentSeller.userProfileId) {
+        try {
+          const sellerProfile = await getSellerProfile(sellerId, currentSeller.userProfileId);
+          console.log('[SellerDashboard] Seller profile:', sellerProfile);
+          console.log('[SellerDashboard] Account status:', sellerProfile?.accountStatus || sellerProfile?.AccountStatus);
+
+          // Check if account is suspended
+          const accountStatus = sellerProfile?.accountStatus || sellerProfile?.AccountStatus;
+          if (accountStatus === 'Suspended') {
+            console.log('[SellerDashboard] Account is suspended, redirecting...');
+            navigate('/account-suspended');
+            return;
+          }
+        } catch (error) {
+          console.error('[SellerDashboard] Error checking account status:', error);
+          // Check if error is due to suspension
+          if (!handleSuspensionError(error, navigate)) {
+            // Continue loading even if profile check fails for other reasons
+            console.warn('[SellerDashboard] Continuing despite profile check error');
+          } else {
+            // Suspension error was handled, stop loading
+            return;
+          }
+        }
+      }
+
+      // Load orders
+      const ordersData = await getSellerOrders(sellerId);
+      const sorted = (Array.isArray(ordersData) ? ordersData : [])
+        .slice()
+        .sort((a, b) => {
+          return Date.parse(b.createdAt) - Date.parse(a.createdAt);
+        });
+      setOrders(sorted);
+
+      // Load products to get accurate active count
+      const productsData = await getProducts();
+      const sellerProductsList = productsData.filter(p => p.sellerId === sellerId);
+
+      // Attach variants to each product (same logic as Products.jsx)
+      for (const product of sellerProductsList) {
+        try {
+          const variants = await getProductVariants(product.id);
+          // Filter only active variants
+          product.variants = variants.filter(v => v.isActive !== false);
+        } catch {
+          product.variants = [];
+        }
+      }
+
+      setSellerProducts(sellerProductsList);
+
+      // Set initial store open/closed state
+      if (currentSeller) {
+        setIsOpen(currentSeller.isOpen === true);
+      }
+
+    } catch (err) {
+      setError(err.message || "Failed to load data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  loadData();
+}, [sellerId, sellerList, navigate]);
+
+// Add this new useEffect AFTER the existing ones
+useEffect(() => {
+  const handleOpenAddProduct = () => {
+    openNew();
+  };
+
+  window.addEventListener('openAddProduct', handleOpenAddProduct);
+
+  return () => {
+    window.removeEventListener('openAddProduct', handleOpenAddProduct);
+  };
+}, []);
 
   // ---------- Derived metrics & views ----------
   const { metrics, recentOrders, topProducts, analyticsPreview } = useMemo(() => {
+    // Calculate active products count FIRST, outside the orders check
+    const activeProducts = sellerProducts.filter(p => p.isActive === true).length;
+    
     if (!orders || orders.length === 0) {
       return {
         metrics: {
           totalOrders: 0,
           pendingOrders: 0,
-          activeProducts: 0,
+          activeProducts: activeProducts,  // ← NOW USES REAL COUNT
           totalRevenue: 0,
         },
         recentOrders: [],
@@ -468,26 +982,34 @@ useEffect(() => {
     sevenDaysAgo.setDate(now.getDate() - 7);
 
     let totalRevenue = 0;
-    let pendingOrders = 0;
-    let last7DaysRevenue = 0;
-    let last7DaysOrders = 0;
+let pendingOrders = 0;
+let last7DaysRevenue = 0;
+let last7DaysOrders = 0;
 
-    const productMap = new Map();
+const productMap = new Map();
+const activeProductIds = new Set(); // Track unique active products
 
-    orders.forEach((order) => {
-      const amount = order.totalAmount || 0;
-      totalRevenue += amount;
+orders.forEach((order) => {
+  const amount = order.totalAmount || 0;
+  const status = order.status?.toLowerCase();
+  
+  // Only count revenue for completed orders
+  if (status === "completed" || status === "delivered") {
+    totalRevenue += amount;
+  }
 
-      const status = order.status?.toLowerCase();
-      if (status === "placed" || status === "pending") {
-        pendingOrders += 1;
-      }
+  if (status === "placed" || status === "pending") {
+    pendingOrders += 1;
+  }
 
-      const created = new Date(order.createdAt);
-      if (!Number.isNaN(created.getTime()) && created >= sevenDaysAgo) {
-        last7DaysRevenue += amount;
-        last7DaysOrders += 1;
-      }
+  const created = new Date(order.createdAt);
+  if (!Number.isNaN(created.getTime()) && created >= sevenDaysAgo) {
+    // Only count last 7 days revenue for completed orders
+    if (status === "completed" || status === "delivered") {
+      last7DaysRevenue += amount;
+    }
+    last7DaysOrders += 1;
+  }
 
       (order.orderItems || []).forEach((item) => {
         const key = item.productId || item.productName || "unknown";
@@ -498,25 +1020,27 @@ useEffect(() => {
             productImage: item.productImage || item.imageUrl || null,
             totalOrders: 0,
             totalQty: 0,
+            isActive: item.isActive !== false, // Track active status
           });
         }
         const record = productMap.get(key);
         record.totalOrders += 1;
         record.totalQty += item.qty || 0;
+        
       });
     });
 
-    const totalOrders = orders.length;
-    const activeProducts = productMap.size;
+const totalOrders = orders.length;
+// Always use sellerProducts as the source of truth for active products count
 
-    const productsArr = Array.from(productMap.values()).sort(
-      (a, b) => b.totalOrders - a.totalOrders
-    );
+const productsArr = Array.from(productMap.values()).sort(
+  (a, b) => b.totalOrders - a.totalOrders
+);
+
     const topProducts = productsArr.slice(0, 3);
 
-    const recentOrders = [...orders]
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-      .slice(0, 5);
+    const recentOrders = orders.slice(0, 5);
+
 
     return {
       metrics: {
@@ -532,7 +1056,7 @@ useEffect(() => {
         last7DaysOrders,
       },
     };
-  }, [orders]);
+  }, [orders, sellerProducts]);
 
   const filteredRecentOrders = useMemo(() => {
     if (!searchRecent.trim()) return recentOrders;
@@ -553,8 +1077,8 @@ useEffect(() => {
     if (!selectModalOpen) return null;
 
     return (
-      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-40 p-4">
-        <div className="bg-cream-50 rounded-2xl shadow-2xl w-full max-w-md p-6 border border-grey-stroke">
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-40 p-4 modal-backdrop-enter">
+        <div className="bg-cream-50 rounded-2xl shadow-2xl w-full max-w-md p-6 border border-grey-stroke modal-content-enter">
           <h2 className="text-2xl font-semibold text-charcoal-700 mb-2">
             Select a Store
           </h2>
@@ -571,8 +1095,12 @@ useEffect(() => {
               if (id) {
                 const numericId = parseInt(id, 10);
                 const selected = sellerList.find((s) => s.id === numericId);
+                console.log('🔍 Selected seller:', selected);
+                console.log('🔍 Selected seller UserProfileId:', selected?.userProfileId || selected?.UserProfileId);
                 setSellerName(selected?.storeName || "My Store");
                 setSellerId(numericId);
+                // Set the UserProfileId for notifications
+                setSellerUserProfileId(selected?.userProfileId || selected?.UserProfileId || null);
                 setSelectModalOpen(false);
               }
             }}
@@ -602,94 +1130,196 @@ useEffect(() => {
   // -----------------------------------------
   // MAIN DASHBOARD LAYOUT
   // -----------------------------------------
-  return (
-    <div className="min-h-screen bg-cream-50 flex">
-      <SellerSelectModal />
-      {orderModalOpen && selectedOrder && (
+ return (
+    <>
+      {/* Snackbar - Rendered outside main layout for proper z-index */}
+      {snackbar.show && (
+        <Snackbar
+          message={snackbar.message}
+          type={snackbar.type}
+          onClose={() => setSnackbar({ ...snackbar, show: false })}
+        />
+      )}
+      
+      <div className="min-h-screen bg-cream-50 flex">
+        <SellerSelectModal />
+        {orderModalOpen && selectedOrder && (
         <OrderDetailsModal
           order={selectedOrder}
           onClose={closeOrderModal}
           onOrderUpdated={handleOrderUpdated}
+          onOrderExpired={handleOrderExpired}
+          onShowSnackbar={({ message, type }) => {
+          setSnackbar({
+            show: true,
+            message,
+            type: type || 'error'
+          });
+        }}
+
         />
       )}
 
       {/* Sidebar */}
-      <aside className="hidden lg:flex flex-col bg-sage-500 text-white w-64 p-4 justify-between">
-        <div className="space-y-3">
-          <div className="mb-4">
-            <h2 className="text-card-h2 text-cream-50">Beyti Seller</h2>
-            <p className="text-body-regular text-sage-100 opacity-80">
-              Manage your store at a glance.
-            </p>
-          </div>
-
-          <NavigationButton
-            selected={activeTab === "dashboard"}
-            onClick={() => setActiveTab("dashboard")}
-            icon={
-                <Icon.House
-                size={20}
-                weight={activeTab === "dashboard" ? "fill" : "regular"}
-                />
-            }
-            >
-            Dashboard
-            </NavigationButton>
-
-            <NavigationButton
-            selected={activeTab === "orders"}
-            onClick={() => setActiveTab("orders")}
-            icon={
-                <Icon.Receipt
-                size={20}
-                weight={activeTab === "orders" ? "fill" : "regular"}
-                />
-            }
-            >
-            Orders
-            </NavigationButton>
-
-            <NavigationButton
-            selected={activeTab === "products"}
-            onClick={() => setActiveTab("products")}
-            icon={
-                <Icon.Package
-                size={20}
-                weight={activeTab === "products" ? "fill" : "regular"}
-                />
-            }
-            >
-            Products
-            </NavigationButton>
-
-            <NavigationButton
-            selected={activeTab === "analytics"}
-            onClick={() => setActiveTab("analytics")}
-            icon={
-                <Icon.ChartBar
-                size={20}
-                weight={activeTab === "analytics" ? "fill" : "regular"}
-                />
-            }
-            >
-            Analytics
-            </NavigationButton>
-
+      <aside className="w-64 bg-sage-500 flex flex-col fixed h-screen transition-colors border-r border-sage-700">
+        <div className="p-6 border-b border-sage-700">
+          <h1 className="text-display-h1 text-cream-200">Beyti</h1>
+          <p className="text-label-medium text-cream-100 mt-1">Seller Portal</p>
         </div>
 
-        <SidebarProfile userName={sellerName} userRole="Seller" />
+        <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+          {/* Dashboard */}
+          <NavigationButton
+            selected={location.pathname.includes("/seller-dashboard/dashboard") || location.pathname === "/seller-dashboard"}
+            onClick={() => navigate("dashboard")}
+            icon={
+              <Icon.House
+                size={20}
+                weight={(location.pathname.includes("/seller-dashboard/dashboard") || location.pathname === "/seller-dashboard") ? "fill" : "regular"}
+              />
+            }
+          >
+            Dashboard
+          </NavigationButton>
+
+          {/* Orders */}
+          <NavigationButton
+            selected={location.pathname.includes("/seller-dashboard/orders")}
+            onClick={() => navigate("orders")}
+            icon={
+              <Icon.Receipt
+                size={20}
+                weight={location.pathname.includes("/seller-dashboard/orders") ? "fill" : "regular"}
+              />
+            }
+          >
+            Orders
+          </NavigationButton>
+
+          {/* Products */}
+          <NavigationButton
+            selected={location.pathname.includes("/seller-dashboard/products")}
+            onClick={() => navigate("products")}
+            icon={
+              <Icon.Package
+                size={20}
+                weight={location.pathname.includes("/seller-dashboard/products") ? "fill" : "regular"}
+              />
+            }
+          >
+            Products
+          </NavigationButton>
+
+          {/* Analytics */}
+          <NavigationButton
+            selected={location.pathname.includes("/seller-dashboard/analytics")}
+            onClick={() => navigate("analytics")}
+            icon={
+              <Icon.ChartBar
+                size={20}
+                weight={location.pathname.includes("/seller-dashboard/analytics") ? "fill" : "regular"}
+              />
+            }
+          >
+            Analytics
+          </NavigationButton>
+
+          {/* Reviews */}
+          <NavigationButton
+            selected={location.pathname.includes("/seller-dashboard/reviews")}
+            onClick={() => navigate("reviews")}
+            icon={
+              <Icon.Star
+                size={20}
+                weight={location.pathname.includes("/seller-dashboard/reviews") ? "fill" : "regular"}
+              />
+            }
+          >
+            Reviews
+          </NavigationButton>
+
+          {/* Notifications */}
+          <NavigationButton
+            selected={location.pathname.includes("/seller-dashboard/notifications")}
+            onClick={() => navigate("notifications")}
+            icon={
+              <Icon.Bell
+                size={20}
+                weight={location.pathname.includes("/seller-dashboard/notifications") ? "fill" : "regular"}
+              />
+            }
+          >
+            Notifications
+          </NavigationButton>
+
+          {/* Profile */}
+          <NavigationButton
+            selected={location.pathname.includes("/seller-dashboard/profile")}
+            onClick={() => navigate("profile")}
+            icon={
+              <Icon.User
+                size={20}
+                weight={location.pathname.includes("/seller-dashboard/profile") ? "fill" : "regular"}
+              />
+            }
+          >
+            Profile
+          </NavigationButton>
+        </nav>
+
+        <div className="border-t border-sage-700 p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="w-10 h-10 rounded-full bg-sage-700 flex items-center justify-center flex-shrink-0">
+                <Icon.User size={20} weight="fill" className="text-cream-200" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-body-regular text-cream-200 truncate">{sellerName}</p>
+                <p className="text-label-medium text-cream-100 truncate">Seller</p>
+              </div>
+            </div>
+            <button className="flex-shrink-0 p-1 hover:bg-sage-700 rounded transition-colors">
+              <Icon.CaretDown size={16} className="text-cream-200" />
+            </button>
+          </div>
+        </div>
       </aside>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 ml-64 flex flex-col">
         <div className="border-b border-grey-stroke bg-grey-200">
-          <PageHeader
-            title="Seller Dashboard"
-            withSearch
-            notificationCount={metrics.pendingOrders || 0}
-            userName={sellerName}
-            userRole="Seller"
-          />
+         <PageHeader
+          title={getPageTitle()}
+          userName={sellerName}
+          userRole="Seller"
+          userProfile={{
+            userProfileId: sellerId,
+            displayName: sellerName,
+            roleType: 'Seller',
+            status: 'Active',
+            phone: sellerList.find(s => s.id === sellerId)?.phone || '',
+            address: sellerList.find(s => s.id === sellerId)?.address || '',
+            createdAt: sellerList.find(s => s.id === sellerId)?.createdAt,
+            updatedAt: new Date().toISOString()
+          }}
+          entityId={sellerId}
+          userId={loggedInUserId}
+          onProfileClick={() => navigate('profile')}
+          onProfileUpdate={async (updates) => {
+            try {
+              console.log('Profile updates:', updates);
+              const sellers = await getSellers();
+              const updatedSeller = sellers.find(s => s.id === sellerId);
+              if (updatedSeller) {
+                setSellerName(updatedSeller.storeName || sellerName);
+              }
+            } catch (error) {
+              console.error('Error updating profile:', error);
+              throw error;
+            }
+          }}
+        />
+        
         </div>
 
         <main className="flex-1 p-6 lg:p-8">
@@ -719,11 +1349,33 @@ useEffect(() => {
               </div>
             )}
 
-            {/* DASHBOARD CONTENT */}
             {sellerId && !loading && !error && (
               <>
-              {activeTab === "dashboard" ? (
+                {location.pathname === "/seller-dashboard" || location.pathname === "/seller-dashboard/dashboard" ? (
                 <>
+                {/* Store Status Toggle - Only on Dashboard */}
+                <div className="flex justify-end mb-6">
+                  <div className="bg-grey-200 border border-grey-stroke rounded-lg px-4 py-2 shadow-soft-lift inline-flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2.5 h-2.5 rounded-full ${isOpen ? 'bg-success-btn' : 'bg-grey-400'} ${isOpen ? 'animate-pulse' : ''}`}></span>
+                      <span className={`text-sm font-semibold ${isOpen ? 'text-success-text' : 'text-charcoal-400'}`}>
+                        {isOpen ? 'Store Open' : 'Store Closed'}
+                      </span>
+                    </div>
+                    <button
+                      onClick={handleToggleStoreStatus}
+                      disabled={isTogglingStore}
+                      className={`px-4 py-1.5 rounded-lg font-semibold text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
+                        isOpen 
+                          ? 'bg-error-btn hover:bg-error-text text-white' 
+                          : 'bg-success-btn hover:bg-success-text text-white'
+                      }`}
+                    >
+                      {isTogglingStore ? 'Updating...' : (isOpen ? 'Close Store' : 'Open Store')}
+                    </button>
+                  </div>
+                </div>
+
                 {/* TOP METRIC CARDS */}
                 <section className="space-y-4">
                   <h2 className="text-card-h2 text-charcoal-600">Overview</h2>
@@ -794,9 +1446,9 @@ useEffect(() => {
                             type="button"
                             className="text-sm font-medium text-sage-600 hover:text-sage-700 underline cursor-pointer"
                             onClick={() => {
-                            setActiveTab("orders");
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                            }}
+                              navigate("orders");
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
                             >
                             View all
                             </button>
@@ -821,125 +1473,201 @@ useEffect(() => {
                         />
                        <TableBody>
                         {filteredRecentOrders.map((order) => {
-                            // Check if order is a new request (within last 30 minutes)
-                            const status = order.status?.toLowerCase();
-                            const isRequest = ["placed", "pending"].includes(status);
-                            
-                            let isNew = false;
-                            if (isRequest) {
+                          const status = order.status?.toLowerCase();
+                          const isRequest = ["placed", "pending"].includes(status);
+                          
+                          let isNew = false;
+                          if (isRequest) {
                             const orderTime = new Date(order.createdAt);
                             const now = new Date();
-                            const diffMinutes = (now - orderTime) / (1000 * 60);
-                            isNew = diffMinutes <= 100000;
-                            }
-                            
-                            return (
+                            const diffMs = Date.now() - Date.parse(order.createdAt);
+                            const diffMinutes = diffMs / (1000 * 60);
+                            isNew = diffMinutes >= 0 && diffMinutes <= 10;
+
+                          }
+                          
+                          return (
                             <TableRow
-                                key={order.id}
-                                className={isNew ? "bg-danger-bg" : ""}
-                                data={[
+                              key={order.id}
+                              className={isNew ? "bg-danger-bg" : ""}
+                              data={[
                                 <div className="flex items-center gap-2" key={`id-${order.id}`}>
-                                    {isNew && (
+                                  {isNew && (
                                     <span className="flex h-2 w-2">
-                                        <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-danger-btn opacity-75"></span>
-                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-danger-btn"></span>
+                                      <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-danger-btn opacity-75"></span>
+                                      <span className="relative inline-flex rounded-full h-2 w-2 bg-danger-btn"></span>
                                     </span>
-                                    )}
-                                    <span className={isNew ? "font-semibold text-danger-text" : ""}>
+                                  )}
+                                  <span className={isNew ? "font-semibold text-danger-text" : ""}>
                                     #{order.id}
-                                    </span>
+                                  </span>
                                 </div>,
                                 <span className={isNew ? "font-semibold" : ""}>
-                                    {order.customerName || "—"}
+                                  {order.customerName || "—"}
                                 </span>,
-                                <StatusChip
-                                    key={`status-${order.id}`}
-                                    variant={getStatusVariant(order.status)}
-                                >
+                                <div key={`status-timer-${order.id}`} className="flex items-center gap-2">
+                                  <StatusChip variant={getStatusVariant(order.status)}>
                                     {order.status || "Unknown"}
-                                </StatusChip>,
+                                  </StatusChip>
+                                  {isRequest && (
+                                    <OrderTimer 
+                                      order={order} 
+                                      onExpire={handleOrderExpired}
+                                      size="small"
+                                      showIcon={false}
+                                    />
+                                  )}
+                                </div>,
                                 <span className={isNew ? "font-semibold" : ""}>
-                                    {formatCurrency(order.totalAmount || 0)}
+                                  {formatCurrency(order.totalAmount || 0)}
                                 </span>,
                                 formatDate(order.createdAt),
-                                ]}
-                                actions={
+                              ]}
+                              actions={
                                 <CRUDButton
-                                    variant={isNew ? "danger" : "neutral"}
-                                    onClick={() => openOrderModal(order)}
+                                  variant={isNew ? "danger" : "neutral"}
+                                  onClick={() => openOrderModal(order)}
                                 >
-                                    {isNew ? "Respond Now" : "View Details"}
+                                  {isNew ? "Respond Now" : "View Details"}
                                 </CRUDButton>
-                                }
+                              }
                             />
-                            );
+                          );
                         })}
-                        </TableBody>
+                      </TableBody>
                       </Table>
                     )}
                   </div>
 
-                  {/* Top Products */}
-                  <div className="bg-grey-200 rounded-lg p-6 shadow-soft-lift border border-grey-stroke space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h2 className="text-card-h2 text-charcoal-600">
-                          Top Products
-                        </h2>
-                        <p className="text-body-regular text-charcoal-400">
-                          Most ordered items in your store.
-                        </p>
+                 {/* Top Products */}
+                    <div className="bg-grey-200 rounded-lg p-6 shadow-soft-lift border border-grey-stroke space-y-4 flex flex-col">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h2 className="text-card-h2 text-charcoal-600">
+                            {topProducts.length === 0 && sellerProducts.length > 0 ? "Your Products" : "Top Products"}
+                          </h2>
+                          <p className="text-body-regular text-charcoal-400">
+                            {topProducts.length === 0 && sellerProducts.length > 0 
+                              ? "Start getting orders to see top performers" 
+                              : "Most ordered items in your store."}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          className="text-sm font-medium text-sage-600 hover:text-sage-700 underline cursor-pointer"
+                          onClick={() => {
+                            navigate("products");
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                        >
+                          View all
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        className="text-sm font-medium text-sage-600 hover:text-sage-700 underline"
-                        onClick={() => console.log("Go to Products page")}
-                      >
-                        View all
-                      </button>
-                    </div>
 
-                    {topProducts.length === 0 ? (
-                      <p className="text-body-regular text-charcoal-400">
-                        No product data yet. Once orders start coming in,
-                        you’ll see your top items here.
-                      </p>
-                    ) : (
-                      <ul className="space-y-3">
-                        {topProducts.map((product) => (
-                          <li
-                            key={product.productId || product.productName}
-                            className="flex items-center justify-between bg-cream-50 rounded-lg px-3 py-2 border border-grey-stroke"
+                      {/* Show empty state ONLY if NO products exist at all */}
+                      {topProducts.length === 0 && sellerProducts.filter(p => p.isActive).length === 0 ? (
+                        <div className="flex-1 flex flex-col items-center justify-center text-center py-12 px-4">
+                          {/* Icon */}
+                          <div className="w-20 h-20 rounded-full bg-sage-100 flex items-center justify-center mb-6">
+                            <Icon.Package size={40} className="text-sage-500" weight="duotone" />
+                          </div>
+
+                          {/* Text Content */}
+                          <h3 className="text-card-h2 text-charcoal-600 mb-2">
+                            Stock Your Shelves
+                          </h3>
+                          <p className="text-body-regular text-charcoal-400 mb-6 max-w-xs">
+                            Your shop is looking a little empty. Add your first product to get ready for launch.
+                          </p>
+
+                          {/* CTA Button */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigate("products");
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                            className="w-full max-w-xs bg-sage-500 hover:bg-sage-600 text-cream-50 py-3 px-6 rounded-lg font-semibold text-sm shadow-soft-lift transition-colors"
                           >
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-lg bg-grey-200 flex items-center justify-center overflow-hidden">
-                                {product.productImage ? (
-                                  <img
-                                    src={product.productImage}
-                                    alt={product.productName}
-                                    className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  <span className="text-xs text-charcoal-400">
-                                    No image
-                                  </span>
-                                )}
+                            Add Your First Product
+                          </button>
+                        </div>
+                      ) : topProducts.length === 0 && sellerProducts.filter(p => p.isActive).length > 0 ? (
+                        /* Show products when they exist but have no orders yet */
+                        <div className="space-y-3">
+                          <ul className="space-y-3">
+                            {sellerProducts
+                              .filter(p => p.isActive)
+                              .slice(0, 3)
+                              .map((product) => (
+                                <li
+                                  key={product.id}
+                                  className="flex items-center justify-between bg-cream-50 rounded-lg px-3 py-2 border border-grey-stroke"
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-lg bg-grey-200 flex items-center justify-center overflow-hidden">
+                                        {product.productImage || product.imageUrl ? (
+                                          <img
+                                            src={`https://localhost:7062${product.productImage || product.imageUrl}`}
+                                            alt={product.productName}
+                                            className="w-full h-full object-cover"
+                                          />
+                                        ) : (
+                                          <span className="text-xs text-charcoal-400">
+                                            No image
+                                          </span>
+                                        )}
+                                      </div>
+                                    <div>
+                                      <p className="text-body-medium text-charcoal-600">
+                                        {product.name}
+                                      </p>
+                                      <p className="text-label-medium text-charcoal-400">
+                                        {formatCurrency(product.basePrice)} • {product.variants?.length || 0} variant{product.variants?.length === 1 ? '' : 's'}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </li>
+                              ))}
+                          </ul>
+                        </div>
+                      ) : (
+                        /* Show top products when orders exist */
+                        <ul className="space-y-3">
+                          {topProducts.map((product) => (
+                            <li
+                              key={product.productId || product.productName}
+                              className="flex items-center justify-between bg-cream-50 rounded-lg px-3 py-2 border border-grey-stroke"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-grey-200 flex items-center justify-center overflow-hidden">
+                                  {product.productImage || product.imageUrl ? (
+                                    <img
+                                      src={`https://localhost:7062${product.productImage || product.imageUrl}`}
+                                      alt={product.productName}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <span className="text-xs text-charcoal-400">
+                                      No image
+                                    </span>
+                                  )}
+                                </div>
+                                <div>
+                                  <p className="text-body-medium text-charcoal-600">
+                                    {product.productName}
+                                  </p>
+                                  <p className="text-label-medium text-charcoal-400">
+                                    {product.totalOrders} orders •{" "}
+                                    {product.totalQty} items sold
+                                  </p>
+                                </div>
                               </div>
-                              <div>
-                                <p className="text-body-medium text-charcoal-600">
-                                  {product.productName}
-                                </p>
-                                <p className="text-label-medium text-charcoal-400">
-                                  {product.totalOrders} orders •{" "}
-                                  {product.totalQty} items sold
-                                </p>
-                              </div>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                 </section>
 
                 {/* ANALYTICS PREVIEW + QUICK ACTIONS */}
@@ -958,10 +1686,10 @@ useEffect(() => {
                       <button
                         type="button"
                         className="text-sm font-medium text-sage-600 hover:text-sage-700 underline cursor-pointer"
-                            onClick={() => {
-                            setActiveTab("analytics");
+                           onClick={() => {
+                            navigate("analytics");
                             window.scrollTo({ top: 0, behavior: 'smooth' });
-                            }}
+                        }}
                             
                             
                       >
@@ -1008,21 +1736,35 @@ useEffect(() => {
                       <button
                         type="button"
                         className="w-full py-2.5 rounded-full bg-sage-500 hover:bg-sage-600 text-cream-50 font-semibold text-sm shadow-soft-lift"
-                        onClick={() => console.log("Add product")}
+                        onClick={() => {
+                          navigate("products");
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                          // Trigger the "Add Product" modal after navigation
+                          setTimeout(() => {
+                            // The Products component will need to expose this functionality
+                            window.dispatchEvent(new CustomEvent('openAddProduct'));
+                          }, 100);
+                        }}
                       >
                         + Add Product
                       </button>
                       <button
                         type="button"
                         className="w-full py-2.5 rounded-full bg-sage-100 hover:bg-sage-200 text-sage-700 font-semibold text-sm"
-                        onClick={() => console.log("View all orders")}
+                        onClick={() => {
+                          navigate("orders");
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
                       >
                         View All Orders
                       </button>
                       <button
                         type="button"
                         className="w-full py-2.5 rounded-full bg-grey-300 hover:bg-grey-400 text-charcoal-600 font-semibold text-sm"
-                        onClick={() => console.log("Manage store")}
+                        onClick={() => {
+                          navigate("profile");
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
                       >
                         Manage Store
                       </button>
@@ -1030,20 +1772,105 @@ useEffect(() => {
                   </div>
                 </section>
               </>
-                ) : activeTab === "orders" ? (
+                ) : location.pathname.includes("/seller-dashboard/orders") ? (
                     <Orders
                         sellerId={sellerId}
                         sellerName={sellerName}
                         onOpenOrderModal={openOrderModal}
                         orders={orders}
                         onOrderUpdate={handleOrderUpdated}
+                        onOrderExpired={handleOrderExpired}
                     />
-                    ) : activeTab === "analytics" ? (
+                    ) : location.pathname.includes("/seller-dashboard/products") ? (
+                    <Products
+                        sellerId={sellerId}
+                        sellerName={sellerName}
+                    />
+                    ) : location.pathname.includes("/seller-dashboard/analytics") ? (
                     <Analytics
                         sellerId={sellerId}
                         sellerName={sellerName}
                         orders={orders}
                     />
+                    ) : location.pathname.includes("/seller-dashboard/reviews") ? (
+                      <Reviews sellerId={sellerId} sellerName={sellerName} />
+                    ) : location.pathname.includes("/seller-dashboard/notifications") ? (
+                      <NotificationsPage
+                        userId={loggedInUserId}
+                        searchQuery={notificationSearchQuery}
+                      />
+                    ) : location.pathname.includes("/seller-dashboard/profile") ? (
+                      (() => {
+                        const currentSeller = sellerList.find(s => s.id === sellerId);
+                        console.log('🔍 Current seller from sellerList:', currentSeller);
+                        console.log('🔍 isForceOpen in sellerList:', currentSeller?.isForceOpen);
+                        console.log('🔍 isManuallyClosed in sellerList:', currentSeller?.isManuallyClosed);
+                        
+                        return (
+                          <ProfilePage
+                            key={`profile-${sellerId}-${currentSeller?.isForceOpen}-${currentSeller?.isManuallyClosed}`}
+                            userProfile={{
+                              userProfileId: sellerId,
+                              displayName: sellerName,
+                              phone: currentSeller?.phone || '',
+                              street: currentSeller?.street || '',
+                              city: currentSeller?.city || '',
+                              region: currentSeller?.region || '',
+                              postalCode: currentSeller?.postalCode || '',
+                              country: currentSeller?.country || 'Bahrain',
+                              address: currentSeller?.address || '',
+                              status: 'Active',
+                              categoryId: currentSeller?.categoryId,
+                              subCategoryIds: currentSeller?.subCategoryIds || [],
+                              storeImageUrl: currentSeller?.storeImageUrl || null,
+                              storeDescription: currentSeller?.storeDescription || '',
+                              bannerThemeKey: currentSeller?.bannerThemeKey || 'modern-gradient',
+                              bannerAccentColor: currentSeller?.bannerAccentColor || '#F97316',
+                              openTime: currentSeller?.openTime || '',  
+                              closeTime: currentSeller?.closeTime || '',  
+                              isManuallyClosed: currentSeller?.isManuallyClosed || false,
+                              isForceOpen: currentSeller?.isForceOpen || false, 
+                              createdAt: currentSeller?.createdAt,
+                              updatedAt: new Date().toISOString()
+                            }}
+                            userRole="Seller"
+                            entityId={sellerId}
+                            shouldFetchProfile={true}
+                            onProfileUpdate={async (updates) => {
+                              try {
+                                console.log('💾 Profile updates:', updates);
+                                
+                                // If this is a store toggle, update immediately
+                                if (updates.forceRefresh || updates.isManuallyClosed !== undefined || updates.isForceOpen !== undefined) {
+                                  console.log('🔄 Force refresh triggered');
+                                  
+                                  // Wait for backend
+                                  await new Promise(resolve => setTimeout(resolve, 500));
+                                  
+                                  // Reload all seller data TWICE to ensure fresh data
+                                  await reloadSellerData();
+                                  await new Promise(resolve => setTimeout(resolve, 200));
+                                  
+                                  // Force reload again
+                                  const freshData = await getSellers();
+                                  console.log('🔍 Fresh data after toggle:', freshData);
+                                  console.log('🔍 Current seller in fresh data:', freshData.find(s => s.id === sellerId));
+                                  setSellerList(Array.isArray(freshData) ? freshData : []);
+                                } else {
+                                  // Normal profile update
+                                  await new Promise(resolve => setTimeout(resolve, 300));
+                                  await reloadSellerData();
+                                }
+                                
+                              } catch (error) {
+                                console.error('💥 Error updating profile:', error);
+                                throw error;
+                              }
+                            }}
+                            readOnly={false}
+                          />
+                        );
+                      })()
                     ) : null}
             </>
             )}
@@ -1051,6 +1878,7 @@ useEffect(() => {
         </main>
       </div>
     </div>
+    </>
   );
 };
 

@@ -22,6 +22,13 @@ public partial class Driver
     [StringLength(20)]
     public string Status { get; set; } = null!;
 
+    // ✅ Driver simulated location (for tracking)
+    [Column(TypeName = "decimal(9,6)")]
+    public decimal? CurrentLat { get; set; }
+
+    [Column(TypeName = "decimal(9,6)")]
+    public decimal? CurrentLng { get; set; }
+
     [Precision(3)]
     public DateTime CreatedAt { get; set; }
 

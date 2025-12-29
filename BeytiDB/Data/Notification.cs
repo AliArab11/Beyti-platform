@@ -33,6 +33,8 @@ public partial class Notification
 
     public bool IsRead { get; set; }
 
+    public bool IsDeleted { get; set; }
+
     [Precision(3)]
     public DateTime CreatedAt { get; set; }
 

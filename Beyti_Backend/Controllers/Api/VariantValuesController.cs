@@ -27,6 +27,32 @@ namespace Beyti_Backend.Controllers.Api
             return await _context.VariantValues.ToListAsync();
         }
 
+        // GET: api/VariantValues/colors
+        [HttpGet("colors")]
+        public async Task<ActionResult<IEnumerable<object>>> GetColors()
+        {
+            var colors = await _context.VariantValues
+                .Include(v => v.VariantOption)
+                .Where(v => v.VariantOption.Name == "Color")
+                .Select(v => new { id = v.Id, name = v.ValueName })
+                .ToListAsync();
+
+            return Ok(colors);
+        }
+
+        // GET: api/VariantValues/sizes
+        [HttpGet("sizes")]
+        public async Task<ActionResult<IEnumerable<object>>> GetSizes()
+        {
+            var sizes = await _context.VariantValues
+                .Include(v => v.VariantOption)
+                .Where(v => v.VariantOption.Name == "Size")
+                .Select(v => new { id = v.Id, name = v.ValueName })
+                .ToListAsync();
+
+            return Ok(sizes);
+        }
+
         // GET: api/VariantValues/5
         [HttpGet("{id}")]
         public async Task<ActionResult<VariantValue>> GetVariantValue(int id)

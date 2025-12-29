@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using BeytiDB.Data;
 using System.Text.Json;
+using Beyti_Backend.Services;
 
 namespace Beyti_Backend.Controllers.Api
 {
@@ -10,10 +11,12 @@ namespace Beyti_Backend.Controllers.Api
     public class ProductModerationController : ControllerBase
     {
         private readonly BeytiContext _context;
+        private readonly INotificationService _notificationService;
 
-        public ProductModerationController(BeytiContext context)
+        public ProductModerationController(BeytiContext context, INotificationService notificationService)
         {
             _context = context;
+            _notificationService = notificationService;
         }
 
         // GET: api/ProductModeration/Statistics
@@ -29,7 +32,7 @@ namespace Beyti_Backend.Controllers.Api
                 // Pending products (you might need to add a Status field to Product table)
                 // For now, we'll use IsActive as the indicator
                 var recentProducts = await _context.Products
-                    .Where(p => p.CreatedAt >= DateTime.UtcNow.AddDays(-7))
+                    .Where(p => p.CreatedAt >= DateTime.Now.AddDays(-7))
                     .CountAsync();
 
                 return Ok(new
@@ -153,17 +156,43 @@ namespace Beyti_Backend.Controllers.Api
 
         // PUT: api/ProductModeration/Products/5/approve
         [HttpPut("Products/{id}/approve")]
-        public async Task<IActionResult> ApproveProduct(int id)
+        public async Task<IActionResult> ApproveProduct(int id, [FromQuery] int? adminUserProfileId)
         {
             try
             {
-                var product = await _context.Products.FindAsync(id);
+                var product = await _context.Products
+                    .Include(p => p.Seller)
+                        .ThenInclude(s => s.UserProfile)
+                    .FirstOrDefaultAsync(p => p.Id == id);
+
                 if (product == null) return NotFound();
 
                 product.IsActive = true;
-                product.UpdatedAt = DateTime.UtcNow;
+                product.UpdatedAt = DateTime.Now;
 
                 await _context.SaveChangesAsync();
+
+                // Get admin name for notification
+                string adminInfo = "";
+                if (adminUserProfileId.HasValue)
+                {
+                    var adminProfile = await _context.UserProfiles.FindAsync(adminUserProfileId.Value);
+                    if (adminProfile != null)
+                    {
+                        adminInfo = $" by Administrator {adminProfile.DisplayName}";
+                    }
+                }
+
+                // Send notification to the seller
+                await _notificationService.SendNotificationAsync(
+                    recipientUserId: product.Seller.UserProfileId,
+                    senderUserId: adminUserProfileId,
+                    type: "product_approved",
+                    title: "Product Approved",
+                    body: $"Your product '{product.Name}' has been approved{adminInfo} and is now visible to customers.",
+                    relatedEntityType: "Product",
+                    relatedEntityId: product.Id
+                );
 
                 return Ok(new { message = "Product approved successfully", product });
             }
@@ -175,15 +204,19 @@ namespace Beyti_Backend.Controllers.Api
 
         // PUT: api/ProductModeration/Products/5/suspend
         [HttpPut("Products/{id}/suspend")]
-        public async Task<IActionResult> SuspendProduct(int id, [FromBody] JsonElement body)
+        public async Task<IActionResult> SuspendProduct(int id, [FromQuery] int? adminUserProfileId, [FromBody] JsonElement body)
         {
             try
             {
-                var product = await _context.Products.FindAsync(id);
+                var product = await _context.Products
+                    .Include(p => p.Seller)
+                        .ThenInclude(s => s.UserProfile)
+                    .FirstOrDefaultAsync(p => p.Id == id);
+
                 if (product == null) return NotFound();
 
                 product.IsActive = false;
-                product.UpdatedAt = DateTime.UtcNow;
+                product.UpdatedAt = DateTime.Now;
 
                 // You could add a reason field to track why it was suspended
                 string? reason = null;
@@ -191,6 +224,34 @@ namespace Beyti_Backend.Controllers.Api
                     reason = reasonProp.GetString();
 
                 await _context.SaveChangesAsync();
+
+                // Get admin name for notification
+                string adminInfo = "";
+                if (adminUserProfileId.HasValue)
+                {
+                    var adminProfile = await _context.UserProfiles.FindAsync(adminUserProfileId.Value);
+                    if (adminProfile != null)
+                    {
+                        adminInfo = $" by Administrator {adminProfile.DisplayName}";
+                    }
+                }
+
+                // Send notification to the seller
+                string notificationBody = $"Your product '{product.Name}' has been suspended{adminInfo} and is no longer visible to customers.";
+                if (!string.IsNullOrEmpty(reason))
+                {
+                    notificationBody += $" Reason: {reason}";
+                }
+
+                await _notificationService.SendNotificationAsync(
+                    recipientUserId: product.Seller.UserProfileId,
+                    senderUserId: adminUserProfileId,
+                    type: "product_suspended",
+                    title: "Product Suspended",
+                    body: notificationBody,
+                    relatedEntityType: "Product",
+                    relatedEntityId: product.Id
+                );
 
                 return Ok(new
                 {
@@ -230,7 +291,7 @@ namespace Beyti_Backend.Controllers.Api
 
         // GET: api/ProductModeration/FlaggedKeywords
         [HttpGet("FlaggedKeywords")]
-        public async Task<IActionResult> CheckFlaggedKeywords([FromQuery] string text)
+        public Task<IActionResult> CheckFlaggedKeywords([FromQuery] string text)
         {
             // Define prohibited keywords
             var prohibitedKeywords = new[]
@@ -246,14 +307,14 @@ namespace Beyti_Backend.Controllers.Api
                 .Where(keyword => text.ToLower().Contains(keyword))
                 .ToList();
 
-            return Ok(new
+            return Task.FromResult<IActionResult>(Ok(new
             {
                 isFlagged = foundKeywords.Any(),
                 flaggedKeywords = foundKeywords,
                 message = foundKeywords.Any()
                     ? "This content contains prohibited keywords"
                     : "No prohibited keywords found"
-            });
+            }));
         }
     }
 }
