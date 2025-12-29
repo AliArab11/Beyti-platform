@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { addTimeSlot } from '../../../services/api';
 import { logProviderActivity } from '../../../utils/providerActivityLogger';
+import Snackbar from '../../../components/Snackbar';
 
 export default function QuickAddScheduleModal({ serviceProviderId, isOpen, onClose, onSuccess }) {
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', type: 'success' });
   const [formData, setFormData] = useState({
     dayOfWeek: '',
     startTime: '',
@@ -38,13 +40,25 @@ export default function QuickAddScheduleModal({ serviceProviderId, isOpen, onClo
         `${dayName}: ${formData.startTime} - ${formData.endTime}`
       );
 
-      alert('Time slot added successfully!');
+      setSnackbar({
+        open: true,
+        message: 'Time slot added successfully!',
+        type: 'success'
+      });
+
       setFormData({ dayOfWeek: '', startTime: '', endTime: '' });
-      onClose();
-      if (onSuccess) onSuccess();
+
+      setTimeout(() => {
+        onClose();
+        if (onSuccess) onSuccess();
+      }, 1500);
     } catch (err) {
       console.error('Error adding time slot:', err);
-      alert(err.message || 'Error adding time slot');
+      setSnackbar({
+        open: true,
+        message: err.message || 'Error adding time slot. Please try again.',
+        type: 'error'
+      });
     }
   };
 
@@ -133,6 +147,14 @@ export default function QuickAddScheduleModal({ serviceProviderId, isOpen, onClo
           </div>
         </div>
       </div>
+
+      {/* Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        message={snackbar.message}
+        type={snackbar.type}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+      />
     </div>
   );
 }

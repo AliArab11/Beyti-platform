@@ -3,7 +3,9 @@ import { X, MapPin, Calendar, Clock, CalendarCheck } from '@phosphor-icons/react
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import BookingConfirmationModal from '../../../components/BookingConfirmationModal';
+import Snackbar from '../../../components/Snackbar';
 import { cancelServiceBooking } from '../../../services/api';
+import { useSignalR } from '../../../contexts/SignalRContext';
 
 const ServiceCheckout = ({ bookingData, onClose }) => {
   const [step, setStep] = useState(1); // 1: Date & Time, 2: Address, 3: Notes
@@ -22,6 +24,20 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [createdBooking, setCreatedBooking] = useState(null);
   const [showAreYouSureDialog, setShowAreYouSureDialog] = useState(false);
+
+  // Snackbar state
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', type: 'success' });
+
+  // SignalR connection
+  const { startConnection, isConnected } = useSignalR();
+
+  // Initialize SignalR connection when component mounts
+  useEffect(() => {
+    const userProfileId = 4; // TODO: Get from auth context
+    if (userProfileId && !isConnected) {
+      startConnection(userProfileId);
+    }
+  }, [isConnected, startConnection]);
 
   // New address form
   const [newAddress, setNewAddress] = useState({
@@ -308,7 +324,7 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
 
         // Link address to customer
         // Hardcoded customerId - will be replaced with context/API in future
-        const customerId = 2; // TODO: Get from API based on userProfileId
+        const customerId = 4; // TODO: Get from API based on userProfileId
 
         if (customerId) {
           await fetch('https://localhost:7062/api/CustomerAddresses', {
@@ -360,7 +376,7 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
   const handlePlaceBooking = async () => {
     try {
       // Hardcoded customerId - will be replaced with context/API in future
-      const customerId = 2; // TODO: Get from API based on userProfileId
+      const customerId = 4; // TODO: Get from API based on userProfileId
 
       if (!customerId) {
         alert('Please log in to book a service');
@@ -442,13 +458,32 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
   const handleCancelBooking = async (bookingId, currentBooking, canceledBy, cancellationReason) => {
     try {
       await cancelServiceBooking(bookingId, currentBooking, canceledBy, cancellationReason);
-      alert('Booking cancelled successfully.');
+      setSnackbar({ open: true, message: 'Booking cancelled successfully', type: 'info' });
       setShowConfirmationModal(false);
       onClose();
     } catch (error) {
       console.error('Error cancelling booking:', error);
       throw error;
     }
+  };
+
+  // Handle real-time status change from SignalR
+  const handleBookingStatusChange = (newStatus, bookingData) => {
+    console.log('[ServiceCheckout] Booking status changed:', newStatus);
+
+    const statusMessages = {
+      'Confirmed': { message: 'Your booking has been confirmed!', type: 'success' },
+      'Rejected': { message: 'Your booking request was rejected', type: 'error' },
+      'Canceled': { message: 'Booking has been canceled', type: 'info' },
+      'Cancelled': { message: 'Booking has been cancelled', type: 'info' },
+      'InProgress': { message: 'Your service is now in progress', type: 'success' },
+      'Completed': { message: 'Your service has been completed!', type: 'success' }
+    };
+
+    const statusInfo = statusMessages[newStatus] || { message: 'Booking status updated', type: 'info' };
+    setSnackbar({ open: true, message: statusInfo.message, type: statusInfo.type });
+
+    // Modal will close automatically via SignalR handler
   };
 
   const estimatedPrice = bookingData?.minPrice || 0;
@@ -465,6 +500,7 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
           }}
           booking={createdBooking}
           onCancel={handleCancelBooking}
+          onStatusChange={handleBookingStatusChange}
         />
       )}
 
@@ -882,6 +918,14 @@ const ServiceCheckout = ({ bookingData, onClose }) => {
       )}
       </div>
       )}
+
+      {/* Snackbar for status notifications */}
+      <Snackbar
+        open={snackbar.open}
+        message={snackbar.message}
+        type={snackbar.type}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+      />
     </>
   );
 };

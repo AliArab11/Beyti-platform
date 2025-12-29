@@ -11,11 +11,9 @@ import {
   Users,
   ShieldCheck,
   Warning,
-  Package,
   User,
   CaretDown,
   Tag,
-  Briefcase,
   Bell,
   ClockClockwise,
   Megaphone,
@@ -62,22 +60,6 @@ const AdminSidebar = ({ currentPage, onNavigate }) => {
           onClick={() => onNavigate('/admin/flagged-users')}
         >
           Flagged Users
-        </NavigationButton>
-
-        <NavigationButton
-          selected={currentPage === 'product-moderation'}
-          icon={<Package size={20} weight={currentPage === 'product-moderation' ? 'fill' : 'regular'} />}
-          onClick={() => onNavigate('/admin/product-moderation')}
-        >
-          Product Moderation
-        </NavigationButton>
-
-        <NavigationButton
-          selected={currentPage === 'service-moderation'}
-          icon={<Briefcase size={20} weight={currentPage === 'service-moderation' ? 'fill' : 'regular'} />}
-          onClick={() => onNavigate('/admin/service-moderation')}
-        >
-          Service Moderation
         </NavigationButton>
 
         <NavigationButton

@@ -11,8 +11,12 @@ import CRUDButton from '../../../components/CRUDButton';
 import StatusChip from '../../../components/StatusChip';
 import { Table, TableHeader, TableBody, TableRow } from '../../../components/Table';
 import { logProviderActivity } from '../../../utils/providerActivityLogger';
+import Snackbar from '../../../components/Snackbar';
+import ConfirmModal from '../../../components/ConfirmModal';
+import { useSignalR } from '../../../contexts/SignalRContext';
 
 export default function ServicesManagement({ serviceProviderId, searchTerm = '' }) {
+  const { on, off } = useSignalR();
   const [services, setServices] = useState([]);
   const [providerCategory, setProviderCategory] = useState(null);
   const [serviceCatalogs, setServiceCatalogs] = useState([]);
@@ -34,6 +38,55 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
   const [flaggedKeywords, setFlaggedKeywords] = useState([]);
   const [showWarning, setShowWarning] = useState(false);
   const [priceError, setPriceError] = useState('');
+
+  // Snackbar state
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    type: 'success'
+  });
+
+  // Confirm modal state
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    variant: 'danger'
+  });
+
+  // Helper functions for snackbar
+  const showSnackbar = (message, type = 'success') => {
+    setSnackbar({ open: true, message, type });
+    setTimeout(() => {
+      setSnackbar(prev => ({ ...prev, open: false }));
+    }, 3000);
+  };
+
+  const closeSnackbar = () => {
+    setSnackbar(prev => ({ ...prev, open: false }));
+  };
+
+  // Helper functions for confirm modal
+  const showConfirmModal = (title, message, onConfirm, variant = 'danger') => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      onConfirm,
+      variant
+    });
+  };
+
+  const closeConfirmModal = () => {
+    setConfirmModal({
+      isOpen: false,
+      title: '',
+      message: '',
+      onConfirm: null,
+      variant: 'danger'
+    });
+  };
 
   const fetchServices = async () => {
     try {
@@ -65,7 +118,7 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
       console.error('Error fetching categories:', err);
       // If provider is not enrolled in any category, show error
       if (err.status === 404) {
-        alert('You are not enrolled in any service category. Please contact support.');
+        showSnackbar('You are not enrolled in any service category. Please contact support.', 'error');
       }
     }
   };
@@ -74,6 +127,48 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
     fetchServices();
     fetchCategories();
   }, [serviceProviderId]);
+
+  // SignalR listener for real-time service updates
+  useEffect(() => {
+    const handleServiceUpdate = (data) => {
+      console.log('[ServicesManagement] Received service update:', data);
+
+      // Check if this update is for the current service provider
+      const isForCurrentProvider = data.serviceProviderId &&
+                                    data.serviceProviderId.toString() === serviceProviderId.toString();
+
+      // Also check if the update data contains this provider's ID
+      const isProviderMatch = data.data?.ServiceProviderId &&
+                              data.data.ServiceProviderId.toString() === serviceProviderId.toString();
+
+      if ((data.type === 'ServiceCreated' || data.type === 'ServiceUpdated') &&
+          (isForCurrentProvider || isProviderMatch)) {
+        console.log('[ServicesManagement] Update is for this provider, refreshing services...');
+
+        // Refresh services list to get the latest data
+        fetchServices();
+
+        // Show notification to user
+        if (data.type === 'ServiceCreated') {
+          showSnackbar('New service added successfully!', 'success');
+        } else {
+          showSnackbar('Service updated successfully!', 'success');
+        }
+      }
+    };
+
+    // Subscribe to service updates
+    if (on) {
+      on('ReceiveServiceUpdate', handleServiceUpdate);
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (off) {
+        off('ReceiveServiceUpdate', handleServiceUpdate);
+      }
+    };
+  }, [on, off, serviceProviderId]);
 
   // Check for flagged keywords whenever name or description changes
   useEffect(() => {
@@ -109,35 +204,93 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validate price range
-    const minPrice = formData.minPrice ? parseFloat(formData.minPrice) : null;
-    const maxPrice = formData.maxPrice ? parseFloat(formData.maxPrice) : null;
+    // Validate service name
+    if (!formData.name || !formData.name.trim()) {
+      showSnackbar('Error: Service name is required', 'error');
+      return;
+    }
 
-    if (minPrice !== null && maxPrice !== null && minPrice > maxPrice) {
+    // Validate price - both minimum and maximum prices are required
+    const minPriceStr = formData.minPrice?.toString().trim();
+    const maxPriceStr = formData.maxPrice?.toString().trim();
+
+    const minPrice = minPriceStr && minPriceStr !== '' ? parseFloat(minPriceStr) : null;
+    const maxPrice = maxPriceStr && maxPriceStr !== '' ? parseFloat(maxPriceStr) : null;
+
+    // Both prices must be provided
+    if (minPrice === null || maxPrice === null) {
+      setPriceError('Both minimum and maximum prices are required');
+      showSnackbar('Error: Please provide both minimum and maximum prices', 'error');
+      return;
+    }
+
+    // Validate that prices are valid numbers
+    if (isNaN(minPrice) || minPrice < 0) {
+      setPriceError('Minimum price must be a valid positive number');
+      showSnackbar('Error: Minimum price must be a valid positive number', 'error');
+      return;
+    }
+
+    if (isNaN(maxPrice) || maxPrice < 0) {
+      setPriceError('Maximum price must be a valid positive number');
+      showSnackbar('Error: Maximum price must be a valid positive number', 'error');
+      return;
+    }
+
+    // Validate price range
+    if (minPrice > maxPrice) {
       setPriceError('Minimum price must be less than or equal to maximum price');
-      alert('Error: Minimum price must be less than or equal to maximum price');
+      showSnackbar('Error: Minimum price must be less than or equal to maximum price', 'error');
+      return;
+    }
+
+    // Validate duration - at least one of hours or minutes must be provided
+    const hoursStr = formData.durationHours?.toString().trim();
+    const minutesStr = formData.durationMinutes?.toString().trim();
+
+    const hours = hoursStr && hoursStr !== '' ? parseInt(hoursStr) : 0;
+    const minutes = minutesStr && minutesStr !== '' ? parseInt(minutesStr) : 0;
+    const totalMinutes = (hours * 60) + minutes;
+
+    if (totalMinutes === 0 || isNaN(totalMinutes)) {
+      showSnackbar('Error: Please provide an estimated duration (hours and/or minutes)', 'error');
+      return;
+    }
+
+    if (hours < 0 || minutes < 0) {
+      showSnackbar('Error: Duration cannot be negative', 'error');
       return;
     }
 
     // Clear price error if validation passes
     setPriceError('');
 
+    // Warn user if flagged keywords detected
+    if (flaggedKeywords.length > 0) {
+      showConfirmModal(
+        'Prohibited Keywords Detected',
+        `Warning: Your service contains prohibited keywords (${flaggedKeywords.join(', ')}). This may result in your service being flagged or suspended. Do you want to proceed anyway?`,
+        () => {
+          closeConfirmModal();
+          submitService();
+        },
+        'warning'
+      );
+      return;
+    }
+
+    submitService();
+  };
+
+  const submitService = async () => {
     // Calculate total duration in minutes from hours and minutes
     const hours = formData.durationHours ? parseInt(formData.durationHours) : 0;
     const minutes = formData.durationMinutes ? parseInt(formData.durationMinutes) : 0;
     const totalMinutes = (hours * 60) + minutes;
 
-    // Warn user if flagged keywords detected
-    if (flaggedKeywords.length > 0) {
-      const confirmSubmit = window.confirm(
-        `Warning: Your service contains prohibited keywords (${flaggedKeywords.join(', ')}). ` +
-        `This may result in your service being flagged or suspended. ` +
-        `Do you want to proceed anyway?`
-      );
-      if (!confirmSubmit) {
-        return;
-      }
-    }
+    // Get price values
+    const minPrice = formData.minPrice ? parseFloat(formData.minPrice) : null;
+    const maxPrice = formData.maxPrice ? parseFloat(formData.maxPrice) : null;
 
     try {
       if (editingService) {
@@ -159,7 +312,7 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
           `Service: ${formData.name}`
         );
 
-        alert('Service updated successfully!');
+        showSnackbar('Service updated successfully!', 'success');
       } else {
         const addData = {
           serviceProviderId,
@@ -180,7 +333,7 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
           `Service: ${formData.name}`
         );
 
-        alert('Service added successfully!');
+        showSnackbar('Service added successfully!', 'success');
       }
 
       setFormData({
@@ -204,9 +357,9 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
 
       // Show specific error message if it's a category authorization error
       if (err.error === 'Unauthorized category' || err.message?.includes('category')) {
-        alert(err.message || 'You can only add services from your enrolled category.');
+        showSnackbar(err.message || 'You can only add services from your enrolled category.', 'error');
       } else {
-        alert('Error saving service. Check console for details.');
+        showSnackbar('Error saving service. Check console for details.', 'error');
       }
     }
   };
@@ -233,9 +386,24 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
     setShowForm(true);
   };
 
-  const handleToggle = async (serviceId) => {
+  const handleToggle = (serviceId) => {
+    const service = services.find(s => s.serviceId === serviceId);
+    const action = service?.isActive ? 'deactivate' : 'activate';
+    const actionTitle = service?.isActive ? 'Deactivate Service' : 'Activate Service';
+
+    showConfirmModal(
+      actionTitle,
+      `Are you sure you want to ${action} "${service?.name}"?`,
+      () => {
+        closeConfirmModal();
+        performToggle(serviceId, service);
+      },
+      service?.isActive ? 'warning' : 'success'
+    );
+  };
+
+  const performToggle = async (serviceId, service) => {
     try {
-      const service = services.find(s => s.serviceId === serviceId);
       await toggleServiceStatus(serviceId);
 
       // Log activity
@@ -247,9 +415,15 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
       );
 
       fetchServices();
+
+      // Show success message
+      const successMessage = service?.isActive
+        ? `Service "${service?.name}" has been deactivated successfully!`
+        : `Service "${service?.name}" has been activated successfully!`;
+      showSnackbar(successMessage, 'success');
     } catch (err) {
       console.error('Error toggling service:', err);
-      alert('Error toggling service status');
+      showSnackbar('Error toggling service status', 'error');
     }
   };
 
@@ -521,47 +695,56 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">Min Price (BHD)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.minPrice}
-                  onChange={(e) => {
-                    setFormData({ ...formData, minPrice: e.target.value });
-                    setPriceError('');
-                  }}
-                  className={`w-full border ${priceError ? 'border-red-500' : 'border-grey-stroke'} rounded-lg px-4 py-2 text-body-regular focus:ring-2 focus:ring-sage-500 focus:border-sage-500 bg-white dark:bg-[#1F1F1F] dark:text-white`}
-                />
-              </div>
+            <div>
+              <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">
+                Price Range (BHD) *
+                <span className="text-label-medium text-charcoal-400 dark:text-gray-400 ml-2">
+                  (Both prices required)
+                </span>
+              </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-label-medium text-charcoal-400 dark:text-gray-400 mb-2">Min Price *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.minPrice}
+                    onChange={(e) => {
+                      setFormData({ ...formData, minPrice: e.target.value });
+                      setPriceError('');
+                    }}
+                    className={`w-full border ${priceError ? 'border-red-500' : 'border-grey-stroke'} rounded-lg px-4 py-2 text-body-regular focus:ring-2 focus:ring-sage-500 focus:border-sage-500 bg-white dark:bg-[#1F1F1F] dark:text-white`}
+                    placeholder="Enter minimum price"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">Max Price (BHD)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.maxPrice}
-                  onChange={(e) => {
-                    setFormData({ ...formData, maxPrice: e.target.value });
-                    setPriceError('');
-                  }}
-                  className={`w-full border ${priceError ? 'border-red-500' : 'border-grey-stroke'} rounded-lg px-4 py-2 text-body-regular focus:ring-2 focus:ring-sage-500 focus:border-sage-500 bg-white dark:bg-[#1F1F1F] dark:text-white`}
-                />
+                <div>
+                  <label className="block text-label-medium text-charcoal-400 dark:text-gray-400 mb-2">Max Price *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.maxPrice}
+                    onChange={(e) => {
+                      setFormData({ ...formData, maxPrice: e.target.value });
+                      setPriceError('');
+                    }}
+                    className={`w-full border ${priceError ? 'border-red-500' : 'border-grey-stroke'} rounded-lg px-4 py-2 text-body-regular focus:ring-2 focus:ring-sage-500 focus:border-sage-500 bg-white dark:bg-[#1F1F1F] dark:text-white`}
+                    placeholder="Enter maximum price"
+                  />
+                </div>
               </div>
+              {priceError && (
+                <p className="text-label-medium text-red-600 dark:text-red-400 mt-2">
+                  {priceError}
+                </p>
+              )}
             </div>
-
-            {priceError && (
-              <p className="text-label-medium text-red-600 dark:text-red-400 mt-2">
-                {priceError}
-              </p>
-            )}
 
             <div>
               <label className="block text-body-medium text-charcoal-600 dark:text-white mb-2">
-                Estimated Duration
+                Estimated Duration *
               </label>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -711,6 +894,26 @@ export default function ServicesManagement({ serviceProviderId, searchTerm = '' 
           </TableBody>
         </Table>
       </div>
+
+      {/* Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        message={snackbar.message}
+        type={snackbar.type}
+        onClose={closeSnackbar}
+      />
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={closeConfirmModal}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+        confirmText="Proceed"
+        cancelText="Cancel"
+      />
     </div>
   );
 }

@@ -36,8 +36,6 @@ import UsersFlagged from './components/UsersFlagged';
 import UserManagement from './components/UserManagement';
 import RequestApprovals from './components/RequestApprovals';
 import CategoryModeration from './components/CategoryModeration';
-import ProductModeration from './components/ProductModeration';
-import ServiceModeration from './components/ServiceModeration';
 import NotificationsPage from '../ServiceProvider/components/NotificationsPage';
 import AuditLogs from './components/AuditLogs';
 import AdminSidebar from './components/AdminSidebar';
@@ -98,6 +96,7 @@ const AdminView = () => {
   // Get admin credentials from localStorage (set during login)
   const userProfileId = getUserProfileId();
   const userRole = getUserRole();
+  const adminProfileId = 1;  // Admin Id for announcements
 
   console.log('Admin View Initialized with:', {
     userProfileId,
@@ -258,9 +257,23 @@ const AdminView = () => {
 
   // Helper function to format time ago
   const formatTimeAgo = (timestamp) => {
-    const now = new Date();
+    if (!timestamp) return '';
+
+    // Parse the timestamp - backend sends local timestamps using DateTime.Now
+    // JavaScript's new Date() will treat timestamps without timezone as local time
     const past = new Date(timestamp);
+
+    // Validate the date
+    if (isNaN(past.getTime())) {
+      console.error('Invalid timestamp:', timestamp);
+      return '';
+    }
+
+    const now = new Date();
     const diffInSeconds = Math.floor((now - past) / 1000);
+
+    // Handle negative differences (clock skew or future timestamps)
+    if (diffInSeconds < 0) return 'Just now';
 
     if (diffInSeconds < 60) return 'Just now';
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
@@ -397,8 +410,6 @@ const AdminView = () => {
       '/admin/users': 'users',
       '/admin/approvals': 'approvals',
       '/admin/flagged-users': 'flagged-users',
-      '/admin/product-moderation': 'product-moderation',
-      '/admin/service-moderation': 'service-moderation',
       '/admin/category-moderation': 'category-moderation',
       '/admin/membership': 'membership',
       '/admin/announcements': 'announcements',
@@ -417,8 +428,6 @@ const AdminView = () => {
       'users': 'User Management',
       'approvals': 'Request Approvals',
       'flagged-users': 'User Moderation',
-      'product-moderation': 'Product Moderation',
-      'service-moderation': 'Service Moderation',
       'category-moderation': 'Category Moderation',
       'membership': 'Membership Plans',
       'announcements': 'Announcements',
@@ -434,8 +443,6 @@ const AdminView = () => {
     const placeholders = {
       'users': 'Search by name or role...',
       'approvals': 'Search by business name or provider...',
-      'product-moderation': 'Search products, sellers, categories...',
-      'service-moderation': 'Search services, categories...',
       'category-moderation': 'Search categories or subcategories...',
       'membership': 'Search plans by name or description...',
       'announcements': 'Search announcements by title or message...',
@@ -447,7 +454,7 @@ const AdminView = () => {
 
   // Check if current view should have search
   const hasSearch = () => {
-    return ['users', 'approvals', 'product-moderation', 'service-moderation', 'category-moderation', 'membership', 'announcements', 'notifications', 'audit-logs'].includes(currentView);
+    return ['users', 'approvals', 'category-moderation', 'membership', 'announcements', 'notifications', 'audit-logs'].includes(currentView);
   };
 
   // Render the content for each view (without sidebar and header)
@@ -459,10 +466,6 @@ const AdminView = () => {
         return <RequestApprovals onNavigate={handleNavigate} adminUserProfileId={userProfileId} renderContentOnly={true} />;
       case 'flagged-users':
         return <UsersFlagged onNavigate={handleNavigate} adminUserProfileId={userProfileId} renderContentOnly={true} />;
-      case 'product-moderation':
-        return <ProductModeration onNavigate={handleNavigate} adminUserProfileId={userProfileId} renderContentOnly={true} />;
-      case 'service-moderation':
-        return <ServiceModeration onNavigate={handleNavigate} adminUserProfileId={userProfileId} renderContentOnly={true} />;
       case 'category-moderation':
         return <CategoryModeration onNavigate={handleNavigate} adminUserProfileId={userProfileId} renderContentOnly={true} />;
       case 'membership':

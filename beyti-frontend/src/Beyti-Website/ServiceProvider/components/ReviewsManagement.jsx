@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { getProviderServiceReviews, respondToServiceReview, toggleServiceReviewVisibility } from '../../../services/api';
 import Button from '../../../components/Button';
 import { Star, Eye, EyeSlash } from '@phosphor-icons/react';
+import Snackbar from '../../../components/Snackbar';
 
 export default function ReviewsManagement({ serviceProviderId, searchQuery = '' }) {
   const [reviews, setReviews] = useState([]);
@@ -15,6 +16,25 @@ export default function ReviewsManagement({ serviceProviderId, searchQuery = '' 
   // Filter states
   const [ratingFilter, setRatingFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
+
+  // Snackbar state
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    type: 'success'
+  });
+
+  // Helper functions for snackbar
+  const showSnackbar = (message, type = 'success') => {
+    setSnackbar({ open: true, message, type });
+    setTimeout(() => {
+      setSnackbar(prev => ({ ...prev, open: false }));
+    }, 3000);
+  };
+
+  const closeSnackbar = () => {
+    setSnackbar(prev => ({ ...prev, open: false }));
+  };
 
   useEffect(() => {
     fetchReviews();
@@ -62,19 +82,23 @@ export default function ReviewsManagement({ serviceProviderId, searchQuery = '' 
       setIsResponding(false);
       setSelectedReview(null);
       setResponseText('');
+      showSnackbar('Response submitted successfully!', 'success');
     } catch (error) {
       console.error('Error submitting response:', error);
-      alert('Failed to submit response. Please try again.');
+      showSnackbar('Failed to submit response. Please try again.', 'error');
     }
   };
 
   const handleToggleVisibility = async (reviewId) => {
     try {
+      const review = reviews.find(r => r.id === reviewId);
       await toggleServiceReviewVisibility(reviewId);
       await fetchReviews();
+      const action = review?.isHidden ? 'shown' : 'hidden';
+      showSnackbar(`Review ${action} successfully!`, 'success');
     } catch (error) {
       console.error('Error toggling visibility:', error);
-      alert('Failed to toggle visibility. Please try again.');
+      showSnackbar('Failed to toggle visibility. Please try again.', 'error');
     }
   };
 
@@ -546,6 +570,14 @@ export default function ReviewsManagement({ serviceProviderId, searchQuery = '' 
           </div>
         </div>
       )}
+
+      {/* Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        message={snackbar.message}
+        type={snackbar.type}
+        onClose={closeSnackbar}
+      />
     </div>
   );
 }

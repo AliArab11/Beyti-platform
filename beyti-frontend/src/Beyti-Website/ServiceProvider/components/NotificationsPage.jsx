@@ -110,13 +110,26 @@ const NotificationsPage = ({ userId, searchQuery = '' }) => {
 
   // Format timestamp
   const formatTime = (timestamp) => {
-    // Ensure timestamp is treated as UTC if it doesn't have timezone info
-    const date = new Date(timestamp + (timestamp.endsWith('Z') ? '' : 'Z'));
+    if (!timestamp) return '';
+
+    // Parse the timestamp - backend sends local timestamps using DateTime.Now
+    // JavaScript's new Date() will treat timestamps without timezone as local time
+    const date = new Date(timestamp);
+
+    // Validate the date
+    if (isNaN(date.getTime())) {
+      console.error('Invalid timestamp:', timestamp);
+      return '';
+    }
+
     const now = new Date();
     const diffMs = now - date;
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
+
+    // Handle negative differences (clock skew or future timestamps)
+    if (diffMs < 0) return 'Just now';
 
     if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;

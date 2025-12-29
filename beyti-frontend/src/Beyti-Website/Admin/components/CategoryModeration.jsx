@@ -42,6 +42,7 @@ import PageHeader from '../../../components/PageHeader';
 import AdminSidebar from './AdminSidebar';
 
 const CategoryModeration = ({ onNavigate, adminUserProfileId = 4037 }) => {
+
   // View mode: 'products' or 'services'
   const [viewMode, setViewMode] = useState('products');
 

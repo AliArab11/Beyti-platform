@@ -5,6 +5,7 @@ import { getServiceProviders, getServiceCategoryList, getServiceCatalogs, getUse
 import { isAuthenticated, getUserId, handleSuspensionError } from "../../utils/authUtils";
 import CustomerHeader from "../../components/CustomerHeader";
 import ActiveOrderBanner from "./Components/ActiveOrderBanner";
+import { useSignalR } from '../../contexts/SignalRContext';
 
 // Main Category Tabs Component with Scrolling
 const CategoryTabs = ({ categories, selected, onSelect }) => {
@@ -457,6 +458,7 @@ const ProviderCard = ({ provider, onClick, services }) => {
 // Main Component
 const ServiceProviderStoresView = () => {
   const navigate = useNavigate();
+  const { on, off } = useSignalR();
   const [providers, setProviders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState([]);
@@ -494,9 +496,9 @@ const ServiceProviderStoresView = () => {
   //   }
   // }, [navigate]);
 
-  // Get user ID from localStorage (Customer: UserProfileId = 2, CustomerId = 1)
+  
   const userProfileId = parseInt(getUserId()) || 4;
-  const customerId = 1; // TODO: Get from API based on userProfileId
+  const customerId = 4; // TODO: Get from API based on userProfileId
 
   // Fetch user profile details
   const fetchUserProfile = async () => {
@@ -792,6 +794,29 @@ const handleCartClick = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showFilterDropdown]);
+
+  // SignalR listener for real-time service updates
+  useEffect(() => {
+    const handleServiceUpdate = (data) => {
+      console.log('[ServiceProviderStoresView] Received service update:', data);
+
+      // Refresh providers when any service is created or updated
+      if (data.type === 'ServiceCreated' || data.type === 'ServiceUpdated') {
+        console.log('[ServiceProviderStoresView] Refreshing providers due to service update');
+        fetchInitialData();
+      }
+    };
+
+    if (on) {
+      on('ReceiveServiceUpdate', handleServiceUpdate);
+    }
+
+    return () => {
+      if (off) {
+        off('ReceiveServiceUpdate', handleServiceUpdate);
+      }
+    };
+  }, [on, off]);
 
 
   // Update service catalog scroll arrows

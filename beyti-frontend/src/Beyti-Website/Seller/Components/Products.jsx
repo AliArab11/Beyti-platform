@@ -6,6 +6,7 @@ import ConfirmModal from "../../../components/ConfirmModal";
 import Snackbar from '../../../components/Snackbar';
 import SectionsManager from './SectionsManager';
 import Cropper from 'react-easy-crop';
+import { useSignalR } from '../../../contexts/SignalRContext';
 
 import {
   getProducts,
@@ -20,10 +21,10 @@ import {
   getSellerById,
   getColorValues,
   getSizeValues,
-  getStoreSections,  
-  createStoreSection,  
-  updateStoreSection,  
-  deleteStoreSection,  
+  getStoreSections,
+  createStoreSection,
+  updateStoreSection,
+  deleteStoreSection,
 } from "../../../services/api";
 
 const formatCurrency = (value) => {
@@ -32,6 +33,7 @@ const formatCurrency = (value) => {
 };
 
 const Products = ({ sellerId }) => {
+  const { on, off } = useSignalR();
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState([]);
   const [subCategories, setSubCategories] = useState([]);
@@ -285,8 +287,49 @@ useEffect(() => {
   load();
 }, [sellerId]);
 
+// SignalR listener for real-time product updates
+useEffect(() => {
+  const handleProductUpdate = (data) => {
+    console.log('[Products] Received product update:', data);
 
+    // Check if this update is for the current seller
+    const isForCurrentSeller = data.sellerId &&
+                                data.sellerId.toString() === sellerId.toString();
 
+    // Also check if the update data contains this seller's ID
+    const isSellerMatch = data.data?.sellerId &&
+                          data.data.sellerId.toString() === sellerId.toString();
+
+    if ((data.type === 'ProductCreated' || data.type === 'ProductUpdated' || data.type === 'ProductStatusChanged') &&
+        (isForCurrentSeller || isSellerMatch)) {
+      console.log('[Products] Update is for this seller, refreshing products...');
+
+      // Refresh products list to get the latest data
+      loadSellerProducts();
+
+      // Show notification to user
+      if (data.type === 'ProductCreated') {
+        showSnackbar('New product added successfully!', 'success');
+      } else if (data.type === 'ProductUpdated') {
+        showSnackbar('Product updated successfully!', 'success');
+      } else if (data.type === 'ProductStatusChanged') {
+        showSnackbar(`Product ${data.newStatus === 'Active' ? 'activated' : 'deactivated'} successfully!`, 'success');
+      }
+    }
+  };
+
+  // Subscribe to product updates
+  if (on) {
+    on('ReceiveProductUpdate', handleProductUpdate);
+  }
+
+  // Cleanup on unmount
+  return () => {
+    if (off) {
+      off('ReceiveProductUpdate', handleProductUpdate);
+    }
+  };
+}, [on, off, sellerId]);
 
   // ========================
   // METRICS
