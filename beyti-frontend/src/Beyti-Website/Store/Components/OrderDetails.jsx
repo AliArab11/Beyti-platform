@@ -65,17 +65,16 @@ const OrderDetails = ({ order, onClose }) => {
   useEffect(() => {
     if (order) {
       console.log('📦 OrderDetails useEffect - order:', order);
-      console.log('🔄 OrderDetails received updated order status:', order.status);
-
+      
       // Start tracking if delivery order
       if (order.fulfillmentType === 'Delivery') {
         fetchTracking(); // Initial fetch
-
+        
         // Poll every 10 seconds
         trackingIntervalRef.current = setInterval(fetchTracking, 10000);
       }
     }
-
+    
     // Cleanup on unmount
     return () => {
       if (trackingIntervalRef.current) {

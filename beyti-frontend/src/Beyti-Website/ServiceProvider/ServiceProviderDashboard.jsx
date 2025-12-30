@@ -14,8 +14,6 @@ import ConfirmModal from '../../components/ConfirmModal';
 import { getUserProfile, updateUserProfile, updateProviderStatus, getProviderProfile } from '../../services/api';
 import { logProviderActivity } from '../../utils/providerActivityLogger';
 import { isAuthenticated, getUserId, handleSuspensionError } from '../../utils/authUtils';
-import { useSignalR } from '../../contexts/SignalRContext';
-import { useSignalRNotifications } from '../../hooks/useSignalRNotifications';
 
 export default function ServiceProviderDashboard() {
   const navigate = useNavigate();
@@ -30,11 +28,7 @@ export default function ServiceProviderDashboard() {
   const [notificationSearchQuery, setNotificationSearchQuery] = useState('');
   const [serviceSearchQuery, setServiceSearchQuery] = useState('');
   const [activityRefreshKey, setActivityRefreshKey] = useState(0);
-  const [bookingRefreshKey, setBookingRefreshKey] = useState(0);
   const [serviceProviderId, setServiceProviderId] = useState(null);
-
-  // SignalR
-  const { startConnection, isConnected } = useSignalR();
 
   // Snackbar state
   const [snackbar, setSnackbar] = useState({ open: false, message: '', type: 'success' });
@@ -209,61 +203,6 @@ export default function ServiceProviderDashboard() {
         fetchUserProfile();
     }
   }, [userProfileId]);
-
-  // Start SignalR connection when userProfileId is available
-  useEffect(() => {
-    if (userProfileId && !isConnected) {
-      console.log('[ServiceProviderDashboard] Starting SignalR connection for user:', userProfileId);
-      startConnection(userProfileId);
-    }
-  }, [userProfileId, isConnected, startConnection]);
-
-  // Set up real-time booking updates via SignalR
-  useSignalRNotifications({
-    onBookingUpdate: (data) => {
-      console.log('[ServiceProviderDashboard] Received booking update:', data);
-
-      if (data.type === 'BookingReceived') {
-        // Show notification only if NOT on bookings tab (to avoid duplicate snackbars)
-        if (activeTab !== 'bookings') {
-          setSnackbar({
-            open: true,
-            message: 'New booking received!',
-            type: 'success'
-          });
-        }
-
-        // Trigger refresh of bookings component
-        setBookingRefreshKey(prev => prev + 1);
-
-        // Refresh activity log
-        setActivityRefreshKey(prev => prev + 1);
-      } else if (data.type === 'BookingCreated') {
-        // Booking created - refresh bookings
-        setBookingRefreshKey(prev => prev + 1);
-      }
-    },
-    onBookingStatusChange: (data) => {
-      console.log('[ServiceProviderDashboard] Received booking status change:', data);
-
-      // No notifications needed - BookingsManagement handles all status change notifications
-      // with "successfully" messages. This avoids duplicate snackbars.
-
-      // Trigger refresh of bookings component
-      setBookingRefreshKey(prev => prev + 1);
-
-      // Refresh activity log
-      setActivityRefreshKey(prev => prev + 1);
-    },
-    onAnnouncement: (data) => {
-      console.log('[ServiceProviderDashboard] Received announcement:', data);
-      setSnackbar({
-        open: true,
-        message: `📢 ${data.title}: ${data.message}`,
-        type: 'success'
-      });
-    }
-  });
 
   // Handle status change with confirmation
   const handleStatusChange = async (newStatus) => {
@@ -467,7 +406,6 @@ export default function ServiceProviderDashboard() {
                 serviceProviderId={serviceProviderId}
                 initialFilter={bookingFilter}
                 initialViewMode={bookingViewMode}
-                refreshTrigger={bookingRefreshKey}
               />
             )}
             {activeTab === 'reviews' && (

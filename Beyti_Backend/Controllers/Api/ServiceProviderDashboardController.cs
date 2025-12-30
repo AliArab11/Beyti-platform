@@ -14,13 +14,11 @@ namespace Beyti_Backend.Controllers.Api
     {
         private readonly BeytiContext _context;
         private readonly INotificationService _notificationService;
-        private readonly ISignalRService _signalRService;
 
-        public ServiceProviderDashboardController(BeytiContext context, INotificationService notificationService, ISignalRService signalRService)
+        public ServiceProviderDashboardController(BeytiContext context, INotificationService notificationService)
         {
             _context = context;
             _notificationService = notificationService;
-            _signalRService = signalRService;
         }
 
         // ==================== PROFILE MANAGEMENT ====================
@@ -546,36 +544,6 @@ namespace Beyti_Backend.Controllers.Api
                 _context.Services.Add(service);
                 await _context.SaveChangesAsync();
 
-                // Send real-time notification for service creation
-                Console.WriteLine($"[ServiceProviderDashboard] Service created - ServiceId: {service.Id}, ProviderId: {serviceProviderId}");
-
-                // Get the complete service data with all related information
-                var serviceData = await _context.Services
-                    .Include(s => s.ServiceCatalog)
-                        .ThenInclude(sc => sc.ServiceCategory)
-                    .Where(s => s.Id == service.Id)
-                    .Select(s => new
-                    {
-                        ServiceId = s.Id,
-                        s.ServiceProviderId,
-                        s.Name,
-                        s.Description,
-                        s.MinPrice,
-                        s.MaxPrice,
-                        s.EstimatedDuration,
-                        s.IsActive,
-                        Category = s.ServiceCatalog.ServiceCategory.Name,
-                        SubCategory = s.ServiceCatalog.Name,
-                        CategoryId = s.ServiceCatalog.ServiceCategoryId,
-                        ServiceCatalogId = s.ServiceCatalogId,
-                        s.CreatedAt
-                    })
-                    .FirstOrDefaultAsync();
-
-                // Send SignalR notification with serviceProviderId
-                await _signalRService.SendServiceCreatedAsync(serviceProviderId, serviceData);
-                Console.WriteLine($"[ServiceProviderDashboard] Service creation notification sent for ServiceProviderId: {serviceProviderId}");
-
                 return Ok(new
                 {
                     message = "Service added successfully",
@@ -728,36 +696,6 @@ namespace Beyti_Backend.Controllers.Api
 
                 await _context.SaveChangesAsync();
 
-                // Send real-time notification for service update
-                Console.WriteLine($"[ServiceProviderDashboard] Service updated - ServiceId: {serviceId}");
-
-                // Get the complete updated service data with all related information
-                var updatedServiceData = await _context.Services
-                    .Include(s => s.ServiceCatalog)
-                        .ThenInclude(sc => sc.ServiceCategory)
-                    .Where(s => s.Id == serviceId)
-                    .Select(s => new
-                    {
-                        ServiceId = s.Id,
-                        s.ServiceProviderId,
-                        s.Name,
-                        s.Description,
-                        s.MinPrice,
-                        s.MaxPrice,
-                        s.EstimatedDuration,
-                        s.IsActive,
-                        Category = s.ServiceCatalog.ServiceCategory.Name,
-                        SubCategory = s.ServiceCatalog.Name,
-                        CategoryId = s.ServiceCatalog.ServiceCategoryId,
-                        ServiceCatalogId = s.ServiceCatalogId,
-                        s.CreatedAt
-                    })
-                    .FirstOrDefaultAsync();
-
-                // Send SignalR notification with serviceProviderId
-                await _signalRService.SendServiceUpdatedAsync(service.ServiceProviderId, updatedServiceData);
-                Console.WriteLine($"[ServiceProviderDashboard] Service update notification sent for ServiceProviderId: {service.ServiceProviderId}");
-
                 return Ok(new { message = "Service updated successfully" });
             }
             catch (Exception ex)
@@ -772,41 +710,12 @@ namespace Beyti_Backend.Controllers.Api
         {
             try
             {
-                var service = await _context.Services
-                    .Include(s => s.ServiceCatalog)
-                        .ThenInclude(sc => sc.ServiceCategory)
-                    .FirstOrDefaultAsync(s => s.Id == serviceId);
-
+                var service = await _context.Services.FindAsync(serviceId);
                 if (service == null)
                     return NotFound("Service not found");
 
                 service.IsActive = !service.IsActive;
                 await _context.SaveChangesAsync();
-
-                // Send real-time notification for service toggle
-                Console.WriteLine($"[ServiceProviderDashboard] Service toggled - ServiceId: {serviceId}, IsActive: {service.IsActive}");
-
-                // Get the complete service data
-                var serviceData = new
-                {
-                    ServiceId = service.Id,
-                    ServiceProviderId = service.ServiceProviderId,
-                    service.Name,
-                    service.Description,
-                    service.MinPrice,
-                    service.MaxPrice,
-                    service.EstimatedDuration,
-                    service.IsActive,
-                    Category = service.ServiceCatalog.ServiceCategory.Name,
-                    SubCategory = service.ServiceCatalog.Name,
-                    CategoryId = service.ServiceCatalog.ServiceCategoryId,
-                    ServiceCatalogId = service.ServiceCatalogId,
-                    service.CreatedAt
-                };
-
-                // Send SignalR notification
-                await _signalRService.SendServiceUpdatedAsync(service.ServiceProviderId, serviceData);
-                Console.WriteLine($"[ServiceProviderDashboard] Service toggle notification sent for ServiceProviderId: {service.ServiceProviderId}");
 
                 return Ok(new
                 {
@@ -1097,79 +1006,6 @@ namespace Beyti_Backend.Controllers.Api
                         relatedEntityType: "ServiceBooking",
                         relatedEntityId: bookingId
                     );
-                }
-
-                // Send real-time booking status change via SignalR
-                if (!string.IsNullOrEmpty(newStatus) && booking.Customer?.UserProfile != null && booking.ServiceProvider?.UserProfile != null)
-                {
-                    Console.WriteLine($"[ServiceProviderDashboard] Sending booking status change - BookingId: {bookingId}, NewStatus: {newStatus}");
-
-                    // Fetch the complete updated booking with all related data to send to clients
-                    // This structure MUST match the GET endpoint to ensure UI consistency
-                    var updatedBooking = await _context.ServiceBookings
-                        .Include(b => b.Customer)
-                            .ThenInclude(c => c.UserProfile)
-                        .Include(b => b.ServiceProvider)
-                            .ThenInclude(sp => sp.UserProfile)
-                        .Include(b => b.ServiceCatalog)
-                        .Include(b => b.Service)
-                        .Include(b => b.ServiceAddress)
-                        .Include(b => b.TimeSlot)
-                        .Where(b => b.Id == bookingId)
-                        .Select(b => new
-                        {
-                            b.Id,
-                            b.CustomerId,
-                            b.ServiceProviderId,
-                            b.ServiceCatalogId,
-                            b.ServiceId,
-                            b.ServiceAddressId,
-                            b.TimeSlotId,
-                            b.BookingDateTime,
-                            serviceDate = b.BookingDateTime.Date,
-                            serviceTime = b.TimeSlot != null ? b.TimeSlot.StartTime.ToString(@"hh\:mm") : null,
-                            b.Status,
-                            b.ServiceType,
-                            b.QuotedPrice,
-                            b.FinalPrice,
-                            b.PaymentType,
-                            b.Notes,
-                            b.CanceledBy,
-                            b.CancellationReason,
-                            b.CancellationFee,
-                            b.CreatedAt,
-                            b.UpdatedAt,
-                            // Provider info
-                            providerName = b.ServiceProvider.UserProfile.DisplayName,
-                            businessName = b.ServiceProvider.BusinessName,
-                            // Service info - use Service table if available, otherwise fall back to ServiceCatalog
-                            serviceName = b.Service != null ? b.Service.Name : b.ServiceCatalog.Name,
-                            serviceDescription = b.Service != null ? b.Service.Description : null,
-                            serviceCategoryName = b.ServiceCatalog.Name,
-                            // Customer info
-                            customerName = b.Customer.UserProfile.DisplayName,
-                            // Address info
-                            serviceAddress = b.ServiceAddress != null ? new
-                            {
-                                b.ServiceAddress.Id,
-                                b.ServiceAddress.Street,
-                                b.ServiceAddress.City,
-                                b.ServiceAddress.Region,
-                                b.ServiceAddress.PostalCode,
-                                b.ServiceAddress.Country
-                            } : null
-                        })
-                        .FirstOrDefaultAsync();
-
-                    await _signalRService.SendBookingStatusChangedAsync(
-                        customerId: booking.Customer.UserProfile.Id,
-                        serviceProviderId: booking.ServiceProvider.UserProfile.Id,
-                        bookingId: bookingId,
-                        newStatus: newStatus,
-                        bookingData: updatedBooking
-                    );
-
-                    Console.WriteLine($"[ServiceProviderDashboard] Booking status change sent successfully");
                 }
 
                 return Ok(new { message = "Booking updated successfully" });

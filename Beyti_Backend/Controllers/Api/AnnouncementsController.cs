@@ -108,22 +108,6 @@ namespace Beyti_Backend.Controllers.Api
             return CreatedAtAction("GetAnnouncement", new { id = announcement.Id }, announcement);
         }
 
-        // PUT: api/Announcements/5/deactivate
-        [HttpPut("{id}/deactivate")]
-        public async Task<IActionResult> DeactivateAnnouncement(int id)
-        {
-            var announcement = await _context.Announcements.FindAsync(id);
-            if (announcement == null)
-            {
-                return NotFound();
-            }
-
-            announcement.IsActive = false;
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
-
         // DELETE: api/Announcements/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteAnnouncement(int id)

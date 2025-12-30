@@ -43,7 +43,7 @@ const formatCurrency = (value) => {
   return `BHD ${Number(value).toFixed(3)}`;
 };
 
-const Orders = ({ sellerId, sellerName, onOpenOrderModal, orders: externalOrders, onOrderUpdate, onOrderExpired: parentOnOrderExpired }) => {
+const Orders = ({ sellerId, sellerName, onOpenOrderModal, orders: externalOrders, onOrderUpdate }) => {
   const [loading, setLoading] = useState(false);
   const [orders, setOrders] = useState([]);
   const [activeTab, setActiveTab] = useState("all");
@@ -79,9 +79,6 @@ const Orders = ({ sellerId, sellerName, onOpenOrderModal, orders: externalOrders
       );
       if (onOrderUpdate) {
         onOrderUpdate({ id: orderId, status: "Cancelled" });
-      }
-      if (parentOnOrderExpired) {
-        parentOnOrderExpired(orderId);
       }
       await restoreStock(orderId);
       console.log('✅ Order auto-cancelled and stock restored');

@@ -156,7 +156,6 @@ namespace Beyti_Backend.Controllers.Api
                     CreatedAt = seller.CreatedAt,
                     DisplayName = seller.UserProfile.DisplayName,
                     RoleType = seller.UserProfile.RoleType,
-                    AccountStatus = seller.UserProfile.Status,  // Add account status for suspension check
                     CategoryId = seller.CategoryId,
                     BannerThemeKey = seller.BannerThemeKey,
                     BannerAccentColor = seller.BannerAccentColor,

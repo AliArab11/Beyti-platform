@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { ThemeProvider } from './contexts/ThemeContext';
-import { SignalRProvider } from './contexts/SignalRContext';
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
 import RegistrationPage from "./Pages/Registration";
 import MembershipPage from "./Pages/Membership";
@@ -125,155 +124,186 @@ export default function App() {
   ];
   return (
     <ThemeProvider>
-      <SignalRProvider>
-        <BrowserRouter>
-          <div className="min-h-screen bg-gray-50">
-            {/* Navigation Bar */}
-            <nav className="bg-white shadow-md sticky top-0 z-50">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center justify-between h-16">
-                  {/* Logo/Brand */}
-                  <div className="flex-shrink-0">
-                    <h1 className="text-2xl font-bold text-blue-600">Beyti Platform</h1>
-                  </div>
-
-                  {/* Navigation Items */}
-                  <div className="hidden md:flex items-center space-x-1">
-                    {navItems.map((item) => (
-                      <NavLink
-                        key={item.path}
-                        to={item.path}
-                        className={({ isActive }) =>
-                          `px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                            isActive
-                              ? 'bg-blue-600 text-white shadow-md'
-                              : 'text-gray-700 hover:bg-gray-100 hover:text-blue-600'
-                          }`
-                        }
-                      >
-                        {item.label}
-                      </NavLink>
-                    ))}
-                  </div>
-
-                  {/* Mobile Menu Button */}
-                  <div className="md:hidden">
-                    <button
-                      onClick={() => {
-                        const menu = document.getElementById('mobile-menu');
-                        menu.classList.toggle('hidden');
-                      }}
-                      className="text-gray-700 hover:text-blue-600 focus:outline-none"
-                    >
-                      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
+      <BrowserRouter>
+        <div className="min-h-screen bg-gray-50">
+          {/* Navigation Bar */}
+          <nav className="bg-white shadow-md sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between h-16">
+              {/* Logo/Brand */}
+              <div className="flex-shrink-0">
+                <h1 className="text-2xl font-bold text-blue-600">Beyti Platform</h1>
               </div>
 
-              {/* Mobile Menu */}
-              <div id="mobile-menu" className="hidden md:hidden bg-white border-t border-gray-200">
-                <div className="px-2 pt-2 pb-3 space-y-1">
-                  {navItems.map((item) => (
-                    <NavLink
-                      key={item.path}
-                      to={item.path}
-                      onClick={() => {
-                        document.getElementById('mobile-menu').classList.add('hidden');
-                      }}
-                      className={({ isActive }) =>
-                        `block w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                          isActive
-                            ? 'bg-blue-600 text-white'
-                            : 'text-gray-700 hover:bg-gray-100 hover:text-blue-600'
-                        }`
-                      }
-                    >
-                      {item.label}
-                    </NavLink>
-                  ))}
-                </div>
+              {/* Navigation Items */}
+              <div className="hidden md:flex items-center space-x-1">
+                {navItems.map((item) => (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    className={({ isActive }) =>
+                      `px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                        isActive
+                          ? 'bg-blue-600 text-white shadow-md'
+                          : 'text-gray-700 hover:bg-gray-100 hover:text-blue-600'
+                      }`
+                    }
+                  >
+                    {item.label}
+                  </NavLink>
+                ))}
               </div>
-            </nav>
 
-            {/* Page Content */}
-            <main>
-              <Routes>
-                <Route path="/" element={<RegistrationPage />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                <Route path="/role-selection" element={<RoleSelect />} />
-                <Route path="/seller-onboarding" element={<SellerOnboarding />} />
-                <Route path="/provider-onboarding" element={<ProviderOnboarding />} />
-                <Route path="/driver-onboarding" element={<DriverOnboarding />} />
-                <Route path="/membership" element={<MembershipPage />} />
-                <Route path="/addplan" element={<AddPlanPage />} />
-                <Route path="/seller" element={<SellerPage />} />
-
-                <Route path="/seller-dashboard" element={<SellerDashboardLayout />}>
-                  <Route index element={<SellerAnalyticsPage />} />
-                  <Route path="dashboard" element={<SellerAnalyticsPage />} />
-                  <Route path="orders" element={<SellerOrdersPage />} />
-                  <Route path="products" element={<SellerProductsPage />} />
-                  <Route path="analytics" element={<SellerAnalyticsPage />} />
-                  <Route path="reviews" element={<SellerReviewsPage />} />
-                  <Route path="notifications" element={<div />} />
-                  <Route path="profile" element={<div />} />
-                </Route>
-
-                <Route path="/customer-dashboard" element={<CustomerDashboardPage />}>
-                  <Route index element={<div />} />
-                  <Route path="bookings" element={<div />} />
-                  <Route path="history" element={<div />} />
-                  <Route path="notifications" element={<div />} />
-                  <Route path="profile" element={<div />} />
-                </Route>
-
-                <Route path="/checkout" element={<Checkout />} />
-
-
-                <Route path="/stores" element={<HomePage />} />
-                <Route path="/mainStore" element={<MainStoreView />} />
-                <Route path="/serviceProviders" element={<ServiceProviderStoresView />} />
-                <Route path="/service-provider/:providerId" element={<ServiceProviderDetailView />} />
-                <Route path="/store/:storeId" element={<StoreView />} />
-                <Route path="/store/:storeId/product/:productId" element={<ProductPage />} />
-                <Route path="/store/:id" element={<StoreDetailsPage />} />
-                <Route path="/product" element={<ProductsPage />} />
-                <Route path="/category" element={<CategoryPage />} />
-                <Route path="/customer" element={<CustomerPage />} />
-
-                <Route path="/driver" element={<DriverPage />} />
-                <Route path="/driver-dashboard" element={<DriverDashboardPage />}>
-                  <Route index element={<div />} />
-                  <Route path="dashboard" element={<div />} />
-                  <Route path="orders" element={<div />} />
-                  <Route path="analytics" element={<div />} />
-                  <Route path="notifications" element={<div />} />
-                  <Route path="profile" element={<div />} />
-                </Route>
-
-                <Route path="/admin" element={<AdminPage />} />
-                <Route path="/serviceprovider" element={<ServiceProviderPage />} />
-                <Route path="/serviceprovider-dashboard" element={<ServiceProviderDashboard />} />
-                <Route path="/account-suspended" element={<AccountSuspended />} />
-                <Route path="/admin-view" element={<AdminView />} />
-                <Route path="/admindashboard" element={<AdminUsersPage />} />
-                <Route path="/servicerequest" element={<ServiceProviderRequests />} />
-                <Route path="/notification" element={<PlaceholderPage pageName="Notification" />} />
-                <Route path="/design-demo" element={<DesignSystemDemo />} />
-                <Route path="/dashboard-template" element={<DashboardTemplate />} />
-                <Route path="/user-management" element={<AdminUserManagementNew />} />
-                <Route path="/dashboard" element={<DashboardRouter />} />
-                <Route path="/driver-placeholder" element={<DriverDashboardPlaceholder />} />
-                <Route path="/profile" element={<ProfilePageWrapper />} />
-              </Routes>
-            </main>
+              {/* Mobile Menu Button */}
+              <div className="md:hidden">
+                <button
+                  onClick={() => {
+                    const menu = document.getElementById('mobile-menu');
+                    menu.classList.toggle('hidden');
+                  }}
+                  className="text-gray-700 hover:text-blue-600 focus:outline-none"
+                >
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
+              </div>
+            </div>
           </div>
-        </BrowserRouter>
-      </SignalRProvider>
+
+          {/* Mobile Menu */}
+          <div id="mobile-menu" className="hidden md:hidden bg-white border-t border-gray-200">
+            <div className="px-2 pt-2 pb-3 space-y-1">
+              {navItems.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  onClick={() => {
+                    document.getElementById('mobile-menu').classList.add('hidden');
+                  }}
+                  className={({ isActive }) =>
+                    `block w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      isActive
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-700 hover:bg-gray-100 hover:text-blue-600'
+                    }`
+                  }
+                >
+                  {item.label}
+                </NavLink>
+              ))}
+            </div>
+          </div>
+        </nav>
+
+        {/* Page Content */}
+        <main>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/role-selection" element={<RoleSelect />} />
+            <Route path="/seller-onboarding" element={<SellerOnboarding />} />
+            <Route path="/provider-onboarding" element={<ProviderOnboarding />} />
+            <Route path="/driver-onboarding" element={<DriverOnboarding />} />
+            <Route path="/membership" element={<MembershipPage />} />
+            <Route path="/addplan" element={<AddPlanPage />} />
+            <Route path="/seller" element={<SellerPage />} />
+
+            <Route path="/seller-dashboard" element={
+              <ProtectedRoute requiredRole="Seller">
+                <SellerDashboardLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<SellerAnalyticsPage />} />
+              <Route path="dashboard" element={<SellerAnalyticsPage />} />
+              <Route path="orders" element={<SellerOrdersPage />} />
+              <Route path="products" element={<SellerProductsPage />} />
+              <Route path="analytics" element={<SellerAnalyticsPage />} />
+              <Route path="reviews" element={<SellerReviewsPage />} />
+              <Route path="notifications" element={<div />} />
+              <Route path="profile" element={<div />} />
+            </Route>
+
+            <Route path="/customer-dashboard" element={
+              <ProtectedRoute requiredRole="Customer">
+                <CustomerDashboardPage />
+              </ProtectedRoute>
+            }>
+              <Route index element={<div />} />
+              <Route path="bookings" element={<div />} />
+              <Route path="history" element={<div />} />
+              <Route path="notifications" element={<div />} />
+              <Route path="profile" element={<div />} />
+            </Route>
+
+            <Route path="/checkout" element={
+              <ProtectedRoute requiredRole="Customer">
+                <Checkout />
+              </ProtectedRoute>
+            } />
+
+
+            <Route path="/stores" element={<HomePage />} />
+            <Route path="/mainStore" element={<MainStoreView />} />
+            <Route path="/serviceProviders" element={<ServiceProviderStoresView />} />
+            <Route path="/service-provider/:providerId" element={<ServiceProviderDetailView />} />
+            <Route path="/store/:storeId" element={<StoreView />} />
+            <Route path="/store/:storeId/product/:productId" element={<ProductPage />} />
+            <Route path="/store/:id" element={<StoreDetailsPage />} />
+            <Route path="/product" element={<ProductsPage />} />
+            <Route path="/category" element={<CategoryPage />} />
+            <Route path="/customer" element={<CustomerPage />} />
+
+            <Route path="/driver" element={<DriverPage />} />
+            <Route path="/driver-dashboard" element={
+              <ProtectedRoute requiredRole="Driver">
+                <DriverDashboardPage />
+              </ProtectedRoute>
+            }>
+              <Route index element={<div />} />
+              <Route path="dashboard" element={<div />} />
+              <Route path="orders" element={<div />} />
+              <Route path="analytics" element={<div />} />
+              <Route path="notifications" element={<div />} />
+              <Route path="profile" element={<div />} />
+            </Route>
+
+            <Route path="/admin" element={<AdminPage />} />
+            <Route path="/serviceprovider" element={<ServiceProviderPage />} />
+            <Route path="/serviceprovider-dashboard" element={
+              <ProtectedRoute requiredRole="ServiceProvider">
+                <ServiceProviderDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/account-suspended" element={<AccountSuspended />} />
+            <Route path="/admin-view" element={
+              <ProtectedRoute requiredRole="Admin">
+                <AdminView />
+              </ProtectedRoute>
+            } />
+            <Route path="/admindashboard" element={<AdminUsersPage />} />
+            <Route path="/servicerequest" element={<ServiceProviderRequests />} />
+            <Route path="/notification" element={<PlaceholderPage pageName="Notification" />} />
+            <Route path="/design-demo" element={<DesignSystemDemo />} />
+            <Route path="/dashboard-template" element={<DashboardTemplate />} />
+            <Route path="/user-management" element={<AdminUserManagementNew />} />
+            <Route path="/dashboard" element={
+              <ProtectedRoute>
+                <DashboardRouter />
+              </ProtectedRoute>
+            } />
+            <Route path="/pending-approval" element={
+              <ProtectedRoute>
+                <PendingApproval />
+              </ProtectedRoute>
+            } />
+            <Route path="/driver-placeholder" element={<DriverDashboardPlaceholder />} />
+            <Route path="/profile" element={<ProfilePageWrapper />} />
+          </Routes>
+        </main>
+      </div>
+      </BrowserRouter>
     </ThemeProvider>
   );
 }

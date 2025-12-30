@@ -10,7 +10,7 @@ import ProfilePage from '../../components/ProfilePage';
 
 import { Table, TableHeader, TableBody, TableRow } from "../../components/Table";
 
-import { getSellerOrders, getSellers, restoreStock, getProducts, getProductVariants, getSellerProfile } from "../../services/api";
+import { getSellerOrders, getSellers, restoreStock, getProducts, getProductVariants } from "../../services/api";
 import OrderTimer from "./Components/OrderTimer";
 import Orders from "./Components/Orders";
 import Analytics from "./Components/Analytics";
@@ -26,10 +26,7 @@ import { Outlet, useNavigate } from "react-router-dom";
 import { useLocation } from "react-router-dom";
 
 import * as Icon from "@phosphor-icons/react";
-import { getUserProfileId, getUserId } from "../../utils/auth";
-import { handleSuspensionError } from "../../utils/authUtils";
-import { useSignalRNotifications } from '../../hooks/useSignalRNotifications';
-import { useSignalR } from '../../contexts/SignalRContext';
+import { getUserProfileId } from "../../utils/auth";
 
 
 
@@ -583,158 +580,6 @@ const handleOrderExpired = (orderId) => {
   });
 };
 
-// SignalR connection (connection is established globally by App/NotificationDropdown)
-const { isConnected, invoke } = useSignalR();
-
-// When a seller is selected, register this seller with the current user's SignalR connection
-// This tells the backend: "User X is now managing Seller Y, send notifications to User X"
-React.useEffect(() => {
-  const currentUserId = getUserId();
-  console.log('[SellerDashboard] 🔍 Logged-in user ID:', currentUserId);
-  console.log('[SellerDashboard] 🔍 Selected seller ID:', sellerId);
-  console.log('[SellerDashboard] 🔍 Selected seller UserProfileId:', sellerUserProfileId);
-  console.log('[SellerDashboard] 🔍 SignalR isConnected:', isConnected);
-
-  // If we have a seller selected and SignalR is connected
-  if (sellerId && isConnected && currentUserId) {
-    console.log('[SellerDashboard] ✅ Registering seller management: User', currentUserId, 'managing Seller', sellerId);
-
-    // Register this seller-user mapping with the backend
-    // This way, when orders come in for this seller, they'll be sent to the current user
-    invoke('RegisterSellerManager', sellerId, parseInt(currentUserId))
-      .then(() => {
-        console.log('[SellerDashboard] ✅ Successfully registered as manager for Seller', sellerId);
-        console.log('[SellerDashboard] 📡 Order notifications for Seller', sellerId, 'will be sent to user_' + currentUserId);
-      })
-      .catch(err => {
-        console.error('[SellerDashboard] ❌ Failed to register seller manager:', err);
-        console.warn('[SellerDashboard] ⚠️ Real-time notifications may not work!');
-      });
-  }
-}, [sellerId, sellerUserProfileId, isConnected, invoke]);
-
-// SignalR order status change handler
-const handleOrderStatusChange = React.useCallback((data) => {
-  console.log('[SellerDashboard] Received order status change:', data);
-  console.log('[SellerDashboard] Order data from SignalR:', data.order);
-
-  // Update the order in the list with complete order data from backend
-  setOrders(prev => prev.map(order => {
-    if (order.id === data.orderId) {
-      // Use the complete order data from backend, ensuring we preserve the id
-      const updatedOrder = {
-        ...data.order,
-        id: data.orderId,
-        status: data.newStatus
-      };
-      console.log('[SellerDashboard] Updating order from:', order, 'to:', updatedOrder);
-      return updatedOrder;
-    }
-    return order;
-  }));
-
-  // Also update selectedOrder if modal is open for this order
-  setSelectedOrder(prev => {
-    if (prev && prev.id === data.orderId) {
-      return {
-        ...data.order,
-        id: data.orderId,
-        status: data.newStatus
-      };
-    }
-    return prev;
-  });
-
-  // Show notification about order status change
-  const orderStatusMessages = {
-    'Accepted': 'Order accepted',
-    'Preparing': 'Order is being prepared',
-    'Ready for Pickup': 'Order is ready for pickup',
-    'Completed': 'Order completed',
-    'Cancelled': 'Order cancelled'
-  };
-
-  const message = orderStatusMessages[data.newStatus] || 'Order status updated';
-  setSnackbar({
-    show: true,
-    message,
-    type: data.newStatus === 'Cancelled' ? 'error' : 'success'
-  });
-}, []);
-
-const handleOrderUpdate = React.useCallback((data) => {
-  console.log('[SellerDashboard] 🔔 Received order update:', data);
-  console.log('[SellerDashboard] 📊 Full data object:', JSON.stringify(data, null, 2));
-
-  if (data.type === 'OrderReceived') {
-    // New order received from customer - add it to the orders list
-    // Try both data.data and data.order to handle different payload structures
-    const newOrder = data.data || data.order;
-
-    if (newOrder) {
-      console.log('[SellerDashboard] ✅ Adding new order to list:', newOrder);
-      console.log('[SellerDashboard] 📦 Order details - ID:', newOrder.id, 'Customer:', newOrder.customerName, 'Total:', newOrder.totalAmount);
-
-      setOrders(prev => {
-        // Check if order already exists to prevent duplicates
-        const exists = prev.some(o => o.id === newOrder.id);
-        if (exists) {
-          console.log('[SellerDashboard] ⚠️ Order already exists, skipping duplicate');
-          return prev;
-        }
-
-        // Add new order at the beginning (most recent)
-        const updated = [newOrder, ...prev];
-        console.log('[SellerDashboard] ✅ Updated orders count:', updated.length, '(was', prev.length, ')');
-        return updated;
-      });
-
-      setSnackbar({
-        show: true,
-        message: `New order #${newOrder.id} received from ${newOrder.customerName || 'customer'}!`,
-        type: 'success'
-      });
-    } else {
-      console.warn('[SellerDashboard] ⚠️ No order data received, refreshing list...');
-      // Fallback to refresh if no data
-      if (sellerId) {
-        getSellerOrders(sellerId).then(ordersData => {
-          const sorted = (Array.isArray(ordersData) ? ordersData : [])
-            .slice()
-            .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
-          setOrders(sorted);
-          console.log('[SellerDashboard] 🔄 Orders refreshed, count:', sorted.length);
-        }).catch(error => {
-          console.error('[SellerDashboard] ❌ Error refreshing orders:', error);
-        });
-      }
-
-      setSnackbar({
-        show: true,
-        message: 'New order received!',
-        type: 'success'
-      });
-    }
-  }
-}, [sellerId]);
-
-// Handle real-time announcements
-const handleAnnouncement = React.useCallback((data) => {
-  console.log('[SellerDashboard] Received announcement:', data);
-  setSnackbar({
-    show: true,
-    message: `📢 ${data.title}: ${data.message}`,
-    type: 'success'
-  });
-}, []);
-
-// Set up real-time order updates via SignalR
-useSignalRNotifications({
-  onOrderUpdate: handleOrderUpdate,
-  onOrderStatusChange: handleOrderStatusChange,
-  onAnnouncement: handleAnnouncement
-});
-
 const handleToggleStoreStatus = async () => {
   setIsTogglingStore(true);
   
@@ -872,35 +717,7 @@ useEffect(() => {
     try {
       setLoading(true);
       setError(null);
-
-      // Check seller account status for suspension
-      const currentSeller = sellerList.find(s => s.id === sellerId);
-      if (currentSeller && currentSeller.userProfileId) {
-        try {
-          const sellerProfile = await getSellerProfile(sellerId, currentSeller.userProfileId);
-          console.log('[SellerDashboard] Seller profile:', sellerProfile);
-          console.log('[SellerDashboard] Account status:', sellerProfile?.accountStatus || sellerProfile?.AccountStatus);
-
-          // Check if account is suspended
-          const accountStatus = sellerProfile?.accountStatus || sellerProfile?.AccountStatus;
-          if (accountStatus === 'Suspended') {
-            console.log('[SellerDashboard] Account is suspended, redirecting...');
-            navigate('/account-suspended');
-            return;
-          }
-        } catch (error) {
-          console.error('[SellerDashboard] Error checking account status:', error);
-          // Check if error is due to suspension
-          if (!handleSuspensionError(error, navigate)) {
-            // Continue loading even if profile check fails for other reasons
-            console.warn('[SellerDashboard] Continuing despite profile check error');
-          } else {
-            // Suspension error was handled, stop loading
-            return;
-          }
-        }
-      }
-
+      
       // Load orders
       const ordersData = await getSellerOrders(sellerId);
       const sorted = (Array.isArray(ordersData) ? ordersData : [])
@@ -909,11 +726,11 @@ useEffect(() => {
           return Date.parse(b.createdAt) - Date.parse(a.createdAt);
         });
       setOrders(sorted);
-
+      
       // Load products to get accurate active count
       const productsData = await getProducts();
       const sellerProductsList = productsData.filter(p => p.sellerId === sellerId);
-
+      
       // Attach variants to each product (same logic as Products.jsx)
       for (const product of sellerProductsList) {
         try {
@@ -924,14 +741,15 @@ useEffect(() => {
           product.variants = [];
         }
       }
-
+      
       setSellerProducts(sellerProductsList);
 
       // Set initial store open/closed state
+      const currentSeller = sellerList.find(s => s.id === sellerId);
       if (currentSeller) {
         setIsOpen(currentSeller.isOpen === true);
       }
-
+      
     } catch (err) {
       setError(err.message || "Failed to load data");
     } finally {
@@ -940,7 +758,7 @@ useEffect(() => {
   };
 
   loadData();
-}, [sellerId, sellerList, navigate]);
+}, [sellerId]);
 
 // Add this new useEffect AFTER the existing ones
 useEffect(() => {
@@ -1779,7 +1597,6 @@ const productsArr = Array.from(productMap.values()).sort(
                         onOpenOrderModal={openOrderModal}
                         orders={orders}
                         onOrderUpdate={handleOrderUpdated}
-                        onOrderExpired={handleOrderExpired}
                     />
                     ) : location.pathname.includes("/seller-dashboard/products") ? (
                     <Products

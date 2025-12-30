@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react';
 import { getProviderCategories, addService } from '../../../services/api';
 import { logProviderActivity } from '../../../utils/providerActivityLogger';
-import Snackbar from '../../../components/Snackbar';
 
 export default function QuickAddServiceModal({ serviceProviderId, isOpen, onClose, onSuccess }) {
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', type: 'success' });
   const [providerCategory, setProviderCategory] = useState(null);
   const [serviceCatalogs, setServiceCatalogs] = useState([]);
   const [formData, setFormData] = useState({
@@ -64,12 +62,7 @@ export default function QuickAddServiceModal({ serviceProviderId, isOpen, onClos
         `Service: ${formData.name}`
       );
 
-      setSnackbar({
-        open: true,
-        message: 'Service added successfully!',
-        type: 'success'
-      });
-
+      alert('Service added successfully!');
       setFormData({
         name: '',
         serviceCategoryId: '',
@@ -79,18 +72,11 @@ export default function QuickAddServiceModal({ serviceProviderId, isOpen, onClos
         durationHours: '',
         durationMinutes: ''
       });
-
-      setTimeout(() => {
-        onClose();
-        if (onSuccess) onSuccess();
-      }, 1500);
+      onClose();
+      if (onSuccess) onSuccess();
     } catch (err) {
       console.error('Error saving service:', err);
-      setSnackbar({
-        open: true,
-        message: 'Error saving service. Please try again.',
-        type: 'error'
-      });
+      alert('Error saving service. Check console for details.');
     }
   };
 
@@ -239,14 +225,6 @@ export default function QuickAddServiceModal({ serviceProviderId, isOpen, onClos
           </div>
         </div>
       </div>
-
-      {/* Snackbar */}
-      <Snackbar
-        open={snackbar.open}
-        message={snackbar.message}
-        type={snackbar.type}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
-      />
     </div>
   );
 }

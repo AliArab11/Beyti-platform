@@ -16,13 +16,11 @@ namespace Beyti_Backend.Controllers.Api
     {
         private readonly BeytiContext _context;
         private readonly INotificationService _notificationService;
-        private readonly ISignalRService _signalRService;
 
-        public ServiceBookingsController(BeytiContext context, INotificationService notificationService, ISignalRService signalRService)
+        public ServiceBookingsController(BeytiContext context, INotificationService notificationService)
         {
             _context = context;
             _notificationService = notificationService;
-            _signalRService = signalRService;
         }
 
         // GET: api/ServiceBookings
@@ -159,15 +157,6 @@ namespace Beyti_Backend.Controllers.Api
                 return BadRequest();
             }
 
-            // Get the old booking to track status changes
-            var oldBooking = await _context.ServiceBookings
-                .Include(b => b.Customer)
-                    .ThenInclude(c => c.UserProfile)
-                .Include(b => b.ServiceProvider)
-                    .ThenInclude(sp => sp.UserProfile)
-                .AsNoTracking()
-                .FirstOrDefaultAsync(b => b.Id == id);
-
             // Update timestamp
             serviceBooking.UpdatedAt = DateTime.Now;
 
@@ -179,91 +168,6 @@ namespace Beyti_Backend.Controllers.Api
 
                 // Update TimeSlot IsActive based on booking status
                 await UpdateTimeSlotAvailability(serviceBooking.TimeSlotId, serviceBooking.Status);
-
-                // Send real-time status change if status changed
-                Console.WriteLine($"[ServiceBookings] Checking status change - oldBooking: {oldBooking != null}, statusChanged: {oldBooking?.Status != serviceBooking.Status}");
-
-                if (oldBooking != null && oldBooking.Status != serviceBooking.Status &&
-                    oldBooking.Customer?.UserProfile != null && oldBooking.ServiceProvider?.UserProfile != null)
-                {
-                    var customerUserProfileId = oldBooking.Customer.UserProfile.Id;
-                    var providerUserProfileId = oldBooking.ServiceProvider.UserProfile.Id;
-
-                    Console.WriteLine($"[ServiceBookings] Sending status change - CustomerUserProfileId: {customerUserProfileId}, ProviderUserProfileId: {providerUserProfileId}, BookingId: {serviceBooking.Id}, NewStatus: {serviceBooking.Status}");
-
-                    // Fetch the complete updated booking with all related data to send to clients
-                    // This structure MUST match the GET endpoint to ensure UI consistency
-                    var updatedBooking = await _context.ServiceBookings
-                        .Include(b => b.Customer)
-                            .ThenInclude(c => c.UserProfile)
-                        .Include(b => b.ServiceProvider)
-                            .ThenInclude(sp => sp.UserProfile)
-                        .Include(b => b.ServiceCatalog)
-                        .Include(b => b.Service)
-                        .Include(b => b.ServiceAddress)
-                        .Include(b => b.TimeSlot)
-                        .Where(b => b.Id == serviceBooking.Id)
-                        .Select(b => new
-                        {
-                            b.Id,
-                            b.CustomerId,
-                            b.ServiceProviderId,
-                            b.ServiceCatalogId,
-                            b.ServiceId,
-                            b.ServiceAddressId,
-                            b.TimeSlotId,
-                            b.BookingDateTime,
-                            serviceDate = b.BookingDateTime.Date,
-                            serviceTime = b.TimeSlot != null ? b.TimeSlot.StartTime.ToString(@"hh\:mm") : null,
-                            b.Status,
-                            b.ServiceType,
-                            b.QuotedPrice,
-                            b.FinalPrice,
-                            b.PaymentType,
-                            b.Notes,
-                            b.CanceledBy,
-                            b.CancellationReason,
-                            b.CancellationFee,
-                            b.CreatedAt,
-                            b.UpdatedAt,
-                            // Provider info
-                            providerName = b.ServiceProvider.UserProfile.DisplayName,
-                            businessName = b.ServiceProvider.BusinessName,
-                            // Service info - use Service table if available, otherwise fall back to ServiceCatalog
-                            serviceName = b.Service != null ? b.Service.Name : b.ServiceCatalog.Name,
-                            serviceDescription = b.Service != null ? b.Service.Description : null,
-                            serviceCategoryName = b.ServiceCatalog.Name,
-                            // Customer info
-                            customerName = b.Customer.UserProfile.DisplayName,
-                            // Address info
-                            serviceAddress = b.ServiceAddress != null ? new
-                            {
-                                b.ServiceAddress.Id,
-                                b.ServiceAddress.Street,
-                                b.ServiceAddress.City,
-                                b.ServiceAddress.Region,
-                                b.ServiceAddress.PostalCode,
-                                b.ServiceAddress.Country
-                            } : null
-                        })
-                        .FirstOrDefaultAsync();
-
-                    await _signalRService.SendBookingStatusChangedAsync(
-                        customerId: customerUserProfileId,
-                        serviceProviderId: providerUserProfileId,
-                        bookingId: serviceBooking.Id,
-                        newStatus: serviceBooking.Status,
-                        bookingData: updatedBooking
-                    );
-                }
-                else
-                {
-                    Console.WriteLine($"[ServiceBookings] Status change NOT sent - Reasons:");
-                    if (oldBooking == null) Console.WriteLine("  - oldBooking is null");
-                    if (oldBooking?.Status == serviceBooking.Status) Console.WriteLine($"  - Status unchanged: {oldBooking?.Status}");
-                    if (oldBooking?.Customer?.UserProfile == null) Console.WriteLine("  - Customer.UserProfile is null");
-                    if (oldBooking?.ServiceProvider?.UserProfile == null) Console.WriteLine("  - ServiceProvider.UserProfile is null");
-                }
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -346,23 +250,6 @@ namespace Beyti_Backend.Controllers.Api
                         body: notificationMessage,
                         relatedEntityType: "ServiceBooking",
                         relatedEntityId: serviceBooking.Id
-                    );
-
-                    // Send real-time booking update via SignalR
-                    await _signalRService.SendBookingCreatedAsync(
-                        customerId: customer.UserProfile.Id,
-                        serviceProviderId: serviceProvider.UserProfile.Id,
-                        bookingData: new
-                        {
-                            id = serviceBooking.Id,
-                            customerId = serviceBooking.CustomerId,
-                            serviceProviderId = serviceBooking.ServiceProviderId,
-                            serviceCatalogId = serviceBooking.ServiceCatalogId,
-                            status = serviceBooking.Status,
-                            bookingDateTime = serviceBooking.BookingDateTime,
-                            quotedPrice = serviceBooking.QuotedPrice,
-                            createdAt = serviceBooking.CreatedAt
-                        }
                     );
                 }
 

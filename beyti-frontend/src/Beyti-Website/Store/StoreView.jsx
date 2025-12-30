@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Cake, Heart, Star, MagnifyingGlass, ArrowLeft, Bread, ShoppingCartSimple, X, Package } from "@phosphor-icons/react";
 import ProductPage from './Components/ProductPage';
-import ProductList from './Components/ProductDetails';
+import ProductList from './Components/ProductDetails';  
 import Checkout from './Components/Checkout';
 import ActiveOrderBanner from './Components/ActiveOrderBanner';
 import Snackbar from './../../components/Snackbar';
@@ -10,7 +10,6 @@ import PageHeader from '../../components/PageHeader';
 import CustomerHeader from '../../components/CustomerHeader';
 import { isStoreOpen, formatTime } from '../Seller/Components/storeStatus';
 import { StoreBanner } from '../../components/StoreBanner';
-import { useSignalR } from '../../contexts/SignalRContext';
 
 import OrderDetails from './Components/OrderDetails';
 import { createOrder, createOrderItem, getProductVariants, getOrder, getOrders } from '../../services/api';
@@ -414,7 +413,6 @@ const StoreView = () => {
   const { storeId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { on, off } = useSignalR();
 
    // Get customer info from navigation state
   const customerId = location.state?.customerId;
@@ -918,53 +916,6 @@ useEffect(() => {
     loadStore();
   }
 }, [storeId]);
-
-// SignalR listener for real-time product updates
-useEffect(() => {
-  const handleProductUpdate = async (data) => {
-    console.log('[StoreView] Received product update:', data);
-
-    // Check if this update is for the current store
-    const isForCurrentStore = data.sellerId &&
-                                data.sellerId.toString() === storeId.toString();
-
-    // Also check if the update data contains this seller's ID
-    const isStoreMatch = data.data?.sellerId &&
-                          data.data.sellerId.toString() === storeId.toString();
-
-    if ((data.type === 'ProductCreated' || data.type === 'ProductUpdated' || data.type === 'ProductStatusChanged') &&
-        (isForCurrentStore || isStoreMatch)) {
-      console.log('[StoreView] Update is for this store, refreshing products...');
-
-      try {
-        // Refresh store data to get the latest products
-        const updatedStoreData = await getStoreDetails(storeId);
-        setStore(updatedStoreData);
-
-        // Update system sections if present
-        if (updatedStoreData?.systemSections) {
-          setSystemSections(updatedStoreData.systemSections);
-        }
-
-        console.log('[StoreView] Store data refreshed with new products');
-      } catch (err) {
-        console.error('[StoreView] Error refreshing store data:', err);
-      }
-    }
-  };
-
-  // Subscribe to product updates
-  if (on) {
-    on('ReceiveProductUpdate', handleProductUpdate);
-  }
-
-  // Cleanup on unmount
-  return () => {
-    if (off) {
-      off('ReceiveProductUpdate', handleProductUpdate);
-    }
-  };
-}, [on, off, storeId]);
 
 // Show snackbar when item is added
 useEffect(() => {

@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { X, MapPin, Calendar, Clock, User, Phone, Wrench, CreditCard, X as XCircle } from '@phosphor-icons/react';
 import BookingTimer from './BookingTimer';
-import { useSignalRNotifications } from '../hooks/useSignalRNotifications';
 
 /**
  * BookingConfirmationModal Component
@@ -9,34 +8,16 @@ import { useSignalRNotifications } from '../hooks/useSignalRNotifications';
  * Displays booking details with a 1-minute timer
  * Allows customer to cancel the booking before provider accepts
  * Auto-cancels if provider doesn't respond within 1 minute
- * Listens for real-time status updates via SignalR and auto-closes
  *
  * @param {boolean} isOpen - Modal visibility
  * @param {function} onClose - Close modal callback
  * @param {object} booking - Booking data object
  * @param {function} onCancel - Cancel booking callback
- * @param {function} onStatusChange - Optional callback when status changes (for snackbar)
  */
-export default function BookingConfirmationModal({ isOpen, onClose, booking, onCancel, onStatusChange }) {
+export default function BookingConfirmationModal({ isOpen, onClose, booking, onCancel }) {
   const [cancelling, setCancelling] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [cancellationReason, setCancellationReason] = useState('');
-
-  // Listen for real-time booking status changes
-  useSignalRNotifications({
-    onBookingStatusChange: (data) => {
-      // Only handle status changes for THIS booking
-      if (data.bookingId === booking?.id) {
-        console.log('[BookingConfirmationModal] Booking status changed:', data.newStatus);
-
-        // Close modal and notify parent
-        if (onStatusChange) {
-          onStatusChange(data.newStatus, data.booking);
-        }
-        onClose();
-      }
-    }
-  });
 
   if (!isOpen || !booking) return null;
 

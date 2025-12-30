@@ -1,12 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using BeytiDB.Data;
+using Beyti_SignalR;
 using Beyti_Backend.Services;
 using Microsoft.AspNetCore.Identity;
 using Beyti_Backend.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
-using Beyti_SignalR;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -70,17 +70,14 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Add SignalR
+builder.Services.AddSignalR();
+
 // Add NotificationService
 builder.Services.AddScoped<INotificationService, NotificationService>();
 
 // Add AuditLogService
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
-
-// Add SignalRService
-builder.Services.AddScoped<ISignalRService, SignalRService>();
-
-// Add SignalR
-builder.Services.AddSignalR();
 
 builder.Services.AddCors(options =>
 {

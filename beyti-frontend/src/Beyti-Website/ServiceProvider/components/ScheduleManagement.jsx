@@ -3,8 +3,6 @@ import { getProviderTimeSlots, addTimeSlot, toggleTimeSlot, deleteTimeSlot } fro
 import CRUDButton from '../../../components/CRUDButton';
 import StatusChip from '../../../components/StatusChip';
 import { logProviderActivity } from '../../../utils/providerActivityLogger';
-import Snackbar from '../../../components/Snackbar';
-import ConfirmModal from '../../../components/ConfirmModal';
 
 export default function ScheduleManagement({ serviceProviderId }) {
   const [timeSlots, setTimeSlots] = useState([]);
@@ -15,55 +13,6 @@ export default function ScheduleManagement({ serviceProviderId }) {
     startTime: '',
     endTime: ''
   });
-
-  // Snackbar state
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: '',
-    type: 'success'
-  });
-
-  // Confirm modal state
-  const [confirmModal, setConfirmModal] = useState({
-    isOpen: false,
-    title: '',
-    message: '',
-    onConfirm: null,
-    variant: 'danger'
-  });
-
-  // Helper functions for snackbar
-  const showSnackbar = (message, type = 'success') => {
-    setSnackbar({ open: true, message, type });
-    setTimeout(() => {
-      setSnackbar(prev => ({ ...prev, open: false }));
-    }, 3000);
-  };
-
-  const closeSnackbar = () => {
-    setSnackbar(prev => ({ ...prev, open: false }));
-  };
-
-  // Helper functions for confirm modal
-  const showConfirmModal = (title, message, onConfirm, variant = 'danger') => {
-    setConfirmModal({
-      isOpen: true,
-      title,
-      message,
-      onConfirm,
-      variant
-    });
-  };
-
-  const closeConfirmModal = () => {
-    setConfirmModal({
-      isOpen: false,
-      title: '',
-      message: '',
-      onConfirm: null,
-      variant: 'danger'
-    });
-  };
 
   const daysOfWeek = [
     { id: 0, name: 'Sunday' },
@@ -110,13 +59,13 @@ export default function ScheduleManagement({ serviceProviderId }) {
         `${dayName}: ${formData.startTime} - ${formData.endTime}`
       );
 
-      showSnackbar('Time slot added successfully!', 'success');
+      alert('Time slot added successfully!');
       setFormData({ dayOfWeek: '', startTime: '', endTime: '' });
       setShowForm(false);
       fetchTimeSlots();
     } catch (err) {
       console.error('Error adding time slot:', err);
-      showSnackbar(err.message || 'Error adding time slot', 'error');
+      alert(err.message || 'Error adding time slot');
     }
   };
 
@@ -124,25 +73,11 @@ export default function ScheduleManagement({ serviceProviderId }) {
     setShowForm(false);
   };
 
-  const handleToggle = (timeSlotId) => {
-    const slot = timeSlots.find(s => s.id === timeSlotId);
-    const dayName = daysOfWeek.find(d => d.id === slot?.dayOfWeek)?.name || 'N/A';
-    const action = slot?.isActive ? 'deactivate' : 'activate';
-    const actionTitle = slot?.isActive ? 'Deactivate Time Slot' : 'Activate Time Slot';
-
-    showConfirmModal(
-      actionTitle,
-      `Are you sure you want to ${action} the time slot "${dayName}: ${slot?.startTime} - ${slot?.endTime}"?`,
-      () => {
-        closeConfirmModal();
-        performToggle(timeSlotId, slot, dayName);
-      },
-      slot?.isActive ? 'warning' : 'success'
-    );
-  };
-
-  const performToggle = async (timeSlotId, slot, dayName) => {
+  const handleToggle = async (timeSlotId) => {
     try {
+      const slot = timeSlots.find(s => s.id === timeSlotId);
+      const dayName = daysOfWeek.find(d => d.id === slot?.dayOfWeek)?.name || 'N/A';
+
       await toggleTimeSlot(timeSlotId);
 
       // Log activity
@@ -154,52 +89,33 @@ export default function ScheduleManagement({ serviceProviderId }) {
       );
 
       fetchTimeSlots();
-
-      // Show success message
-      const successMessage = slot?.isActive
-        ? `Time slot "${dayName}: ${slot?.startTime} - ${slot?.endTime}" has been deactivated successfully!`
-        : `Time slot "${dayName}: ${slot?.startTime} - ${slot?.endTime}" has been activated successfully!`;
-      showSnackbar(successMessage, 'success');
     } catch (err) {
       console.error('Error toggling time slot:', err);
-      showSnackbar(err.message || 'Error toggling time slot', 'error');
+      alert(err.message || 'Error toggling time slot');
     }
   };
 
-  const handleDelete = (timeSlotId) => {
-    const slot = timeSlots.find(s => s.id === timeSlotId);
-    const dayName = daysOfWeek.find(d => d.id === slot?.dayOfWeek)?.name || 'N/A';
+  const handleDelete = async (timeSlotId) => {
+    if (confirm('Are you sure you want to delete this time slot?')) {
+      try {
+        const slot = timeSlots.find(s => s.id === timeSlotId);
+        const dayName = daysOfWeek.find(d => d.id === slot?.dayOfWeek)?.name || 'N/A';
 
-    showConfirmModal(
-      'Delete Time Slot',
-      `Are you sure you want to delete the time slot "${dayName}: ${slot?.startTime} - ${slot?.endTime}"? This action cannot be undone.`,
-      () => {
-        closeConfirmModal();
-        performDelete(timeSlotId, slot, dayName);
-      },
-      'danger'
-    );
-  };
+        await deleteTimeSlot(timeSlotId);
 
-  const performDelete = async (timeSlotId, slot, dayName) => {
-    try {
-      await deleteTimeSlot(timeSlotId);
+        // Log activity
+        logProviderActivity(
+          serviceProviderId,
+          'schedule',
+          'Removed Availability',
+          `${dayName}: ${slot?.startTime || ''} - ${slot?.endTime || ''}`
+        );
 
-      // Log activity
-      logProviderActivity(
-        serviceProviderId,
-        'schedule',
-        'Removed Availability',
-        `${dayName}: ${slot?.startTime || ''} - ${slot?.endTime || ''}`
-      );
-
-      fetchTimeSlots();
-
-      // Show success message
-      showSnackbar(`Time slot "${dayName}: ${slot?.startTime} - ${slot?.endTime}" has been deleted successfully!`, 'success');
-    } catch (err) {
-      console.error('Error deleting time slot:', err);
-      showSnackbar(err.message || 'Error deleting time slot', 'error');
+        fetchTimeSlots();
+      } catch (err) {
+        console.error('Error deleting time slot:', err);
+        alert(err.message || 'Error deleting time slot');
+      }
     }
   };
 
@@ -387,26 +303,6 @@ export default function ScheduleManagement({ serviceProviderId }) {
           </div>
         </div>
       )}
-
-      {/* Snackbar */}
-      <Snackbar
-        open={snackbar.open}
-        message={snackbar.message}
-        type={snackbar.type}
-        onClose={closeSnackbar}
-      />
-
-      {/* Confirm Modal */}
-      <ConfirmModal
-        isOpen={confirmModal.isOpen}
-        onClose={closeConfirmModal}
-        onConfirm={confirmModal.onConfirm}
-        title={confirmModal.title}
-        message={confirmModal.message}
-        variant={confirmModal.variant}
-        confirmText="Confirm"
-        cancelText="Cancel"
-      />
     </div>
   );
 }

@@ -1,6 +1,6 @@
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using BeytiDB.Data;
-using Microsoft.AspNetCore.SignalR;
 using Beyti_SignalR;
 
 namespace Beyti_Backend.Services
@@ -62,27 +62,19 @@ namespace Beyti_Backend.Services
             await _context.SaveChangesAsync();
 
             // Send real-time notification via SignalR
-            await _hubContext.Clients.Group($"user_{recipientUserId}")
-                .SendAsync("ReceiveNotification", new
-                {
-                    id = notification.Id,
-                    recipientUserId = notification.RecipientUserId,
-                    senderUserId = notification.SenderUserId,
-                    type = notification.Type,
-                    title = notification.Title,
-                    body = notification.Body,
-                    relatedEntityType = notification.RelatedEntityType,
-                    relatedEntityId = notification.RelatedEntityId,
-                    isRead = notification.IsRead,
-                    createdAt = notification.CreatedAt
-                });
-
-            // Update unread count
-            var unreadCount = await _context.Notifications
-                .CountAsync(n => n.RecipientUserId == recipientUserId && !n.IsRead && !n.IsDeleted);
-
-            await _hubContext.Clients.Group($"user_{recipientUserId}")
-                .SendAsync("ReceiveUnreadCountUpdate", unreadCount);
+            await _hubContext.Clients.Group($"user_{recipientUserId}").SendAsync("ReceiveNotification", new
+            {
+                notification.Id,
+                notification.RecipientUserId,
+                notification.SenderUserId,
+                notification.Type,
+                notification.Title,
+                notification.Body,
+                notification.RelatedEntityType,
+                notification.RelatedEntityId,
+                notification.IsRead,
+                notification.CreatedAt
+            });
         }
 
         public async Task SendAnnouncementNotificationsAsync(
@@ -126,7 +118,7 @@ namespace Beyti_Backend.Services
             await _context.Notifications.AddRangeAsync(notifications);
             await _context.SaveChangesAsync();
 
-            // 4. Send real-time notifications via SignalR to all recipients
+            // 4. Send real-time notifications via SignalR
             foreach (var notification in notifications)
             {
                 await _hubContext.Clients.Group($"user_{notification.RecipientUserId}")
@@ -143,24 +135,7 @@ namespace Beyti_Backend.Services
                         isRead = notification.IsRead,
                         createdAt = notification.CreatedAt
                     });
-
-                // Update unread count for each recipient
-                var unreadCount = await _context.Notifications
-                    .CountAsync(n => n.RecipientUserId == notification.RecipientUserId && !n.IsRead && !n.IsDeleted);
-
-                await _hubContext.Clients.Group($"user_{notification.RecipientUserId}")
-                    .SendAsync("ReceiveUnreadCountUpdate", unreadCount);
             }
-
-            // 5. Send announcement broadcast
-            await _hubContext.Clients.Groups(recipients.Select(id => $"user_{id}").ToList())
-                .SendAsync("ReceiveAnnouncement", new
-                {
-                    announcementId,
-                    title,
-                    message,
-                    audiences
-                });
         }
     }
 }
